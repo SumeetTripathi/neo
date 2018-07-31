@@ -4,26 +4,33 @@
 <%@ page session="false"%>
 <html>
    <head>
-      <title>Shrink Url</title>
+      <title>Track Usage</title>
    </head>
    <script type="text/javascript">
-      function validateForm(){
-		if(document.getElementsByName("url")[0].value.trim().length>0){
-			return true;
-		}else{
-			alert("Please Enter a Url");
-			return false;
+      var hits ="${hits}";
+        function validateForm(){
+			if(document.getElementsByName("url")[0].value.trim().length>0){
+				return true;
+			}else{
+				alert("Please Enter a Url");
+				return false;
+			}
+        }
+        
+        function validateHits(){
+			if(document.getElementsByName("shrinkurl")[0].value.trim().length>0){
+				return true;
+			}else{
+				alert("Please Enter a Url");
+				return false;
+			}
+        }
+		
+		function popIt(){
+			
+			window.open("${serverName}${shrinkurl}");
 		}
-      }
-      
-      function validateHits(){
-		if(document.getElementsByName("shrinkurl")[0].value.trim().length>0){
-			return true;
-		}else{
-			alert("Please Enter a Url");
-			return false;
-		}
-      }
+		
    </script>
    <style>
 * {
@@ -88,8 +95,9 @@ input[type=submit]:hover {
 }
 </style>
    <body>
+      <h3><i>Total hits for <a href= ${shrinkurl} onClick="popIt(); return false;">${shrinkurl} </a>is ${hits}</h3></i>
       <form action="shrinkurl" onsubmit="return validateForm()" method="post">
-         <table>
+          <table>
             <tr>
                <td><Label>Enter a long Url to shrink it:</Label></td>
                <td colspan="2"><input type="text" name="url"></td>

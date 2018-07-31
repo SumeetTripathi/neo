@@ -7,6 +7,7 @@
       <title>Shrink Url</title>
    </head>
    <script type="text/javascript">
+      var shrinkurl='<c:out value="${shrinkurl}"/>';
       function validateForm(){
 		if(document.getElementsByName("url")[0].value.trim().length>0){
 			return true;
@@ -24,6 +25,10 @@
 			return false;
 		}
       }
+	  function popIt(){
+			
+			window.open("${serverName}${shrinkurl}");
+		}
    </script>
    <style>
 * {
@@ -88,6 +93,8 @@ input[type=submit]:hover {
 }
 </style>
    <body>
+     <h3><i> ${message}</h3></i></br>
+    <h3><i>  Alias for your url is <a href=${serverName}${shrinkurl} onClick="popIt(); return false;">${serverName}${shrinkurl}</a></h3></i>
       <form action="shrinkurl" onsubmit="return validateForm()" method="post">
          <table>
             <tr>
