@@ -38,7 +38,7 @@ public class JedisConnectionManager {
 
 	public static void jedisPool() {
 		try {
-
+			System.out.println(System.getenv("REDIS_URL"));
 			JedisPoolConfig c = getPoolConfig();
 			String password = null;
 
