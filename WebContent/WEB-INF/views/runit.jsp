@@ -8,6 +8,7 @@
    </head>
    <script type="text/javascript">
       var shrinkurl ="${shrinkurl}";
-      window.location = shrinkurl;
+      setInterval(function(){ window.location = shrinkurl; }, 300000);
+      
    </script>
 </html>
