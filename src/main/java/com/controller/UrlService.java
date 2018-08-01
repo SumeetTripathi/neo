@@ -107,7 +107,7 @@ public class UrlService {
 			} else {
 				String redirectUrl=redisCache.getUrl(url);
 				if(redirectUrl!=null && redirectUrl.length()>0){
-					model.addAttribute("shrinkurl", );
+					model.addAttribute("shrinkurl", redirectUrl);
 					return "geturl";	
 				}else{
 					return "notfound";
