@@ -64,7 +64,7 @@ public class EHCacheImpl implements RedisCache {
 			}
 		}
 
-		if (minutes > 0) {
+		if (minutes != null && minutes > 0) {
 			CacheConfiguration cacheConfiguration = new CacheConfiguration()
 					.name(key).maxEntriesLocalHeap(100)
 					.timeToLiveSeconds(60 * minutes);
