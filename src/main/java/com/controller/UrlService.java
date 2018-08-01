@@ -39,7 +39,7 @@ public class UrlService {
 	public void loadCache() {
 		try {
 
-			if (config.getProperty("app.server.name").equalsIgnoreCase(
+			if (config.getProperty("app.cache.manager").equalsIgnoreCase(
 					"EHCACHE")) {
 				redisCache = new EHCacheImpl();
 			} else {
