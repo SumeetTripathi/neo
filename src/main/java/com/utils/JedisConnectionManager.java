@@ -4,6 +4,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.Properties;
 
+import java.net.URI;
+
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
@@ -42,9 +44,12 @@ public class JedisConnectionManager {
 
 			int db_name = (config.getProperty("redis.db") != null) ? Integer
 					.parseInt(config.getProperty("redis.db")) : 2;
-			jedisPool = new JedisPool(c, config.getProperty("redis.host"),
-					Integer.parseInt(config.getProperty("redis.port")),
-					Protocol.DEFAULT_TIMEOUT, password, db_name);
+// 			jedisPool = new JedisPool(c, config.getProperty("redis.host"),
+// 					Integer.parseInt(config.getProperty("redis.port")),
+// 					Protocol.DEFAULT_TIMEOUT, password, db_name);
+
+			URI redisURI = new URI(System.getenv("REDIS_URL"));
+			jedisPool = new JedisPool(c, redisURI);
 
 			// setup JVM shutdown hook
 			Runtime.getRuntime().addShutdownHook(new Thread() {
