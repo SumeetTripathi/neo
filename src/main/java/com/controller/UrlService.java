@@ -105,8 +105,13 @@ public class UrlService {
 				model.addAttribute("shrinkurl", url);
 				return "pwdprotected";
 			} else {
-				model.addAttribute("shrinkurl", redisCache.getUrl(url));
-				return "geturl";
+				String redirectUrl=redisCache.getUrl(url);
+				if(redirectUrl!=null && redirectUrl.length()>0){
+					model.addAttribute("shrinkurl", );
+					return "geturl";	
+				}else{
+					return "notfound";
+				}
 			}
 		} catch (Exception e) {
 			return "notfound";
