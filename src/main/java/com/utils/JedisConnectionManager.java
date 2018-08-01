@@ -38,7 +38,7 @@ public class JedisConnectionManager {
 
 	public static void jedisPool() {
 		try {
-			System.out.println(System.getenv("REDIS_URL"));
+			System.out.println("this is a test code !!!"+System.getenv("REDIS_URL"));
 			JedisPoolConfig c = getPoolConfig();
 			String password = null;
 
@@ -66,12 +66,13 @@ public class JedisConnectionManager {
 	}
 
 	public static Jedis getConnection() {
-
+System.out.println("this is a test code !!!"+System.getenv("REDIS_URL"));
 		Jedis conn = jedisPool.getResource();
 		return conn;
 	}
 
 	public static void release(Jedis conn) {
+		System.out.println("this is a test code !!!"+System.getenv("REDIS_URL"));
 		jedisPool.returnResource(conn);
 	}
 
