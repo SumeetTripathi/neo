@@ -1,8 +1,12 @@
 package com.controller;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Locale;
+import java.util.Properties;
 
-import org.springframework.beans.factory.annotation.Autowired;
+import javax.annotation.PostConstruct;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -10,13 +14,41 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.cache.RedisCache;
+import com.cache.impl.EHCacheImpl;
+import com.cache.impl.RedisCacheImpl;
 import com.utils.JedisConnectionManager;
 
 @Controller
 public class UrlService {
 
-	@Autowired
+	private static Properties config;
+
 	private RedisCache redisCache;
+	static {
+		InputStream is = Thread.currentThread().getContextClassLoader()
+				.getResourceAsStream("redis.properties");
+		config = new Properties();
+		try {
+			config.load(is);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+	@PostConstruct
+	public void loadCache() {
+		try {
+
+			if (config.getProperty("app.server.name").equalsIgnoreCase(
+					"EHCACHE")) {
+				redisCache = new EHCacheImpl();
+			} else {
+				redisCache = new RedisCacheImpl();
+			}
+		} catch (Throwable e) {
+			//do-nothing
+		}
+	}
 
 	@RequestMapping(value = "/", method = RequestMethod.GET)
 	public String home(Locale locale, Model model) {
@@ -27,7 +59,7 @@ public class UrlService {
 	@RequestMapping(value = "/shrinkurl", method = RequestMethod.POST)
 	public String shrinkUrl(String url, String customUrl, Integer expiry,
 			String password, Model model) {
-		
+
 		String key;
 		model.addAttribute("serverName", JedisConnectionManager.getServerName());
 
@@ -44,7 +76,7 @@ public class UrlService {
 			key = redisCache.addUrl(customUrl, url, expiry);
 		}
 		model.addAttribute("shrinkurl", key);
-		if(password!=null && password.trim().length()>0){
+		if (password != null && password.trim().length() > 0) {
 			redisCache.passwordProtected(key, password, expiry);
 		}
 		return "shrinkurl";
@@ -67,11 +99,12 @@ public class UrlService {
 	public String getUrl(@PathVariable("url") String url, Model model) {
 		model.addAttribute("serverName", JedisConnectionManager.getServerName());
 		try {
-			if(redisCache.isPasswordProtected(url)){
-				model.addAttribute("serverName", JedisConnectionManager.getServerName());
+			if (redisCache.isPasswordProtected(url)) {
+				model.addAttribute("serverName",
+						JedisConnectionManager.getServerName());
 				model.addAttribute("shrinkurl", url);
 				return "pwdprotected";
-			}else{
+			} else {
 				model.addAttribute("shrinkurl", redisCache.getUrl(url));
 				return "geturl";
 			}
@@ -79,15 +112,15 @@ public class UrlService {
 			return "notfound";
 		}
 	}
-	
+
 	@RequestMapping(value = "/pwdprotected", method = RequestMethod.POST)
-	public String getPwdProtectedUrl(String url,String pwd, Model model) {
+	public String getPwdProtectedUrl(String url, String pwd, Model model) {
 		model.addAttribute("serverName", JedisConnectionManager.getServerName());
 		try {
-			if(redisCache.isPasswordCorrect(url, pwd)){
+			if (redisCache.isPasswordCorrect(url, pwd)) {
 				model.addAttribute("shrinkurl", redisCache.getUrl(url));
 				return "geturl";
-			}else{
+			} else {
 				return "notfound";
 			}
 		} catch (Exception e) {
