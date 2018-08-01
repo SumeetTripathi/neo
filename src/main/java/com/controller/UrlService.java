@@ -55,6 +55,12 @@ public class UrlService {
 		model.addAttribute("serverName", JedisConnectionManager.getServerName());
 		return "home";
 	}
+	
+	@RequestMapping(value = "/runit", method = RequestMethod.GET)
+	public String runit(Locale locale, Model model) {
+		model.addAttribute("serverName", JedisConnectionManager.getServerName()+"runit");
+		return "runit";
+	}
 
 	@RequestMapping(value = "/shrinkurl", method = RequestMethod.POST)
 	public String shrinkUrl(String url, String customUrl, Integer expiry,
