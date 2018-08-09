@@ -77,6 +77,8 @@ public class InMemoryCacheImpl implements RedisCache {
 					hitBucket.get(key).incrementAndGet();
 					return (String) urlEntry.get("url");
 				} else {
+					hitBucket.remove(key);
+					urlBucket.remove(key);
 					return null;
 				}
 			} else {
