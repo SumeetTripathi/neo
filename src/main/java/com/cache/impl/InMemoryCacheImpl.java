@@ -59,7 +59,9 @@ public class InMemoryCacheImpl implements RedisCache {
 
 		Map<String, Object> urlEntry = new ConcurrentHashMap<String, Object>();
 		urlEntry.put("url", value);
-		urlEntry.put("expiry", expiry);
+		if(expiry!=null){
+			urlEntry.put("expiry", expiry);
+		}
 
 		urlBucket.put(key, urlEntry);
 		hitBucket.put(key, new AtomicLong(0l));
