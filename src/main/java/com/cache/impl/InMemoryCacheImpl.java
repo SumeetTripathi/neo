@@ -54,6 +54,7 @@ public class InMemoryCacheImpl implements RedisCache {
 
 		if (minutes != null && minutes > 0) {
 			expiry = System.currentTimeMillis() + (minutes * 60 * 1000);
+			System.out.println(key +"expiry for url "+expiry);
 		}
 
 		Map<String, Object> urlEntry = new ConcurrentHashMap<String, Object>();
@@ -77,6 +78,7 @@ public class InMemoryCacheImpl implements RedisCache {
 					hitBucket.get(key).incrementAndGet();
 					return (String) urlEntry.get("url");
 				} else {
+					System.out.println("removing url"+key);
 					hitBucket.remove(key);
 					urlBucket.remove(key);
 					return null;
