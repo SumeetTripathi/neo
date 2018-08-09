@@ -76,7 +76,7 @@ public class InMemoryCacheImpl implements RedisCache {
 			return null;
 		} else {
 			if ((Long) urlEntry.get("expiry") != null) {
-				if (((Long) urlEntry.get("expiry")).longValue() < System.currentTimeMillis()) {
+				if (((Long) urlEntry.get("expiry")).longValue() > System.currentTimeMillis()) {
 					hitBucket.get(key).incrementAndGet();
 					return (String) urlEntry.get("url");
 				} else {
