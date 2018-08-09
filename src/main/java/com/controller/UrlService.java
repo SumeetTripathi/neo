@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMethod;
 
 import com.cache.RedisCache;
 import com.cache.impl.EHCacheImpl;
+import com.cache.impl.InMemoryCacheImpl;
 import com.cache.impl.RedisCacheImpl;
 import com.utils.JedisConnectionManager;
 
@@ -42,8 +43,11 @@ public class UrlService {
 			if (config.getProperty("app.cache.manager").equalsIgnoreCase(
 					"EHCACHE")) {
 				redisCache = new EHCacheImpl();
-			} else {
+			} else if(config.getProperty("app.cache.manager").equalsIgnoreCase(
+					"REDIS")){
 				redisCache = new RedisCacheImpl();
+			}else{
+				redisCache = new InMemoryCacheImpl();
 			}
 		} catch (Throwable e) {
 			//do-nothing
