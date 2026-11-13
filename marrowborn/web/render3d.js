@@ -82,7 +82,7 @@ function floorTexture(theme,hue){
       const w=42+rnd()*44,v=rnd();
       if(crypt||rnd()<.74){
         const jx=crypt?0:rnd()*3-1.5,jy=crypt?0:rnd()*3-1.5,sx=x+1.3+jx,sy=y+1.3+jy,sw=w-2.6,sh=rh-2.6;
-        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,25+v*10):hsl(hue+v*24-12,4+v*6,23+v*10);g.fillRect(sx,sy,sw,sh);
+        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,25+v*10):hsl(v<.5?hue:35,2+v*5,24+v*10);g.fillRect(sx,sy,sw,sh);
         for(let i=0;i<9;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,1+rnd()*5,0,TAU);g.fill()}
         g.fillStyle='rgba(255,255,255,.1)';g.fillRect(sx,sy,sw,1.4);g.fillRect(sx,sy,1.4,sh);
         g.fillStyle='rgba(0,0,0,.4)';g.fillRect(sx,sy+sh-2,sw,2);g.fillRect(sx+sw-2,sy,2,sh);
@@ -154,7 +154,7 @@ function buildEnv(key){
   const ftex=floorTexture(crypt?'crypt':'out',hue);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:ftex,bumpMap:ftex,bumpScale:1.6,roughness:.86,metalness:.04}));
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
-  const btex=brickTexture(crypt?226:hue,crypt?9:6);
+  const btex=brickTexture(crypt?226:hue,crypt?9:4);
   const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x2c2c35,roughness:.95});
   const mats=[side,side,top,top,side,side];
   if(crypt){
@@ -198,7 +198,7 @@ function buildEnv(key){
   // corner lights: iron braziers in the crypt, crystal-topped menhirs outside
   const iron=std(0x24222a,{roughness:.6,metalness:.5}),stone=std(crypt?0x55545f:hslColor(hue,.1,.3),{flatShading:true,roughness:1});
   const flameCol=crypt?0xff8a3a:hslColor(hue,.85,.6).getHex(),coreCol=crypt?0xffe2a0:hslColor(hue,.7,.82).getHex();
-  E.lightColor=crypt?new THREE.Color(0xff9448):hslColor(hue,.4,.7);
+  E.lightColor=crypt?new THREE.Color(0xff9448):hslColor(hue,.3,.72);
   CORNERS.forEach(([x,z],i)=>{
     const g=new THREE.Group();g.position.set(x,0,z);
     let topY;
@@ -251,9 +251,9 @@ const mCore={e:basic(0xfff0d8),bolt:basic(0xe8f6ff),orb:basic(0xfff6cf),bone:bas
 function orbMaker(coreMat,glowHex,glowK){return()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.sphere,coreMat),halo=new THREE.Sprite(glowMat(glowHex,.9)),pool=new THREE.Mesh(G.quad,flatGlowMat(glowHex,.4));
   halo.scale.setScalar(glowK);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(glowK*1.5);g.add(core,halo,pool);g.userData.core=core;return g}}
 const pools={
-  shot:new Pool(orbMaker(mCore.e,0xff7a30,5.2)),
-  bolt:new Pool(orbMaker(mCore.bolt,0x4fb4ff,5.2)),
-  orb:new Pool(orbMaker(mCore.orb,0xffc64a,5.6)),
+  shot:new Pool(orbMaker(mCore.e,0xff7a30,6.4)),
+  bolt:new Pool(orbMaker(mCore.bolt,0x4fb4ff,7)),
+  orb:new Pool(orbMaker(mCore.orb,0xffc64a,7)),
   skull:new Pool(()=>{const g=new THREE.Group(),h=new THREE.Mesh(G.sphere,mCore.bone),jaw=new THREE.Mesh(G.box,mCore.bone),halo=new THREE.Sprite(glowMat(0x58e04a,.85)),pool=new THREE.Mesh(G.quad,flatGlowMat(0x58e04a,.38));
     jaw.scale.set(1.1,.6,.9);jaw.position.set(0,-.75,.35);g.add(h,jaw);
     for(const s of[-1,1]){const e=new THREE.Mesh(G.sphere,mCore.dark);e.scale.setScalar(.27);e.position.set(s*.38,.12,.82);g.add(e)}
@@ -460,7 +460,7 @@ function draw(dt){
     hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.22;
     sun.color.setHex(0xcfd8f6);sun.intensity=1.0;
   }else{
-    hemi.color.setHSL(env.hue/360,.1,.62);hemi.groundColor.setHSL(env.hue/360,.12,.1);hemi.intensity=.26;
+    hemi.color.setHSL(env.hue/360,.07,.62);hemi.groundColor.setHSL(env.hue/360,.12,.1);hemi.intensity=.26;
     sun.color.setHex(0xe6e9f2);sun.intensity=1.05;
   }
   for(let i=0;i<4;i++){
@@ -492,7 +492,7 @@ function draw(dt){
   for(let i=0;i<ps.length;i++){const p=ps[i],r=p.r||5,pool=pools[p.kind]||pools.bolt,o=pool.get();o.position.set(p.x,SHOT_Y,p.y);
     if(p.kind==='arrow')o.rotation.y=Math.PI/2-Math.atan2(p.vy,p.vx);
     else if(p.kind==='skull'){o.scale.setScalar(r*1.25);o.userData.core.rotation.y=Math.PI/2-Math.atan2(p.vy,p.vx);o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
-    else{o.scale.setScalar(r);o.userData.core.scale.setScalar(.85)}}
+    else{o.scale.setScalar(Math.max(4.5,r));o.userData.core.scale.setScalar(.8)}}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
   if(sight&&MB.has('touch')){const zs=MB.zones;

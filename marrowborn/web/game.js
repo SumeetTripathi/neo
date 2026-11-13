@@ -70,23 +70,129 @@ const EXTRA={
  necro:{boon:['Legion','One more thrall at your side.',5],adv:[['lich','Lich','Undeath','Three more thralls, and your thralls no longer crumble with time.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard.']]},
 };
 for(const k in EXTRA)Object.assign(CLASSES[k],EXTRA[k]);
-// six active skills per class, four carried at a time: [id, name, cooldown in seconds, text].
-// The first two come with the class, the third and fourth with the power-ups of levels 10 and 11, the fifth at level 15 and the sixth (the ultimate) at level 20.
+// Ten active skills per class, four carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs].
+// Effects are small shared building blocks run in order by cast() (see there for the arguments); damage numbers are multiples of your damage multiplier.
+// needs: 't' a monster above ground, 'near' one within reach, 'thrall' at least one thrall. A skill that cannot be used keeps its cooldown.
 const SKILLS={
- fighter:[['whirlwind','Whirlwind',5,'Spin and hit everything around you hard.'],['lunge','Lunge',7,'Drive straight through your target and hit everything in the way. Nothing can hurt you while you move.'],['warcry','War Cry',14,'For 5 seconds you hit 40% harder and swing 25% faster.'],['rend','Rend',10,'One huge blow on the nearest monster in reach. It is slowed for 3 seconds.'],['secondwind','Second Wind',22,'Heal 4 health and shrug off everything for a second.'],['bladestorm','Bladestorm',45,'Ultimate. For 4 seconds you are a storm of steel, hitting everything around you again and again while you move freely.']],
- tank:[['earthsplitter','Earthsplitter',6,'Slam the ground to hit everything around you hard and wipe out nearby bolts.'],['charge','Shield Charge',8,'Rush forward behind your shield, hitting and stunning whatever is in the way.'],['bastion','Bastion',14,'For 3 seconds every hit is blocked and thrown back as a shockwave.'],['throw','Hammer Throw',7,'Hurl a hammer that passes through everything, hits hard and stuns.'],['rally','Rally',22,'Heal 5 health and raise your shield at once.'],['cataclysm','Cataclysm',50,'Ultimate. Three shockwaves roll out of you, each wider than the last.']],
- assassin:[['shadowstep','Shadowstep',5,'Appear behind the nearest monster and stab it for heavy damage.'],['knives','Fan of Knives',6,'Throw five knives in a fan.'],['smoke','Smoke Bomb',12,'Vanish for 2 seconds. Nothing can hurt you, nearby bolts are snuffed out, and your next strike is an ambush.'],['venom','Venom',14,'Stab the nearest monster in reach with a poisoned blade. It keeps taking damage for 6 seconds.'],['mark','Death Mark',20,'Mark the nearest monster. For 6 seconds it takes 50% more damage from everything.'],['cuts','Thousand Cuts',45,'Ultimate. Flicker around your target and cut it eight times. Nothing can touch you until you are done.']],
- mage:[['nova','Nova',7,'A ring of bolts bursts out of you and erases enemy bolts nearby.'],['chain','Chain Lightning',6,'Lightning jumps to the three nearest monsters at any range.'],['frost','Frost Field',10,'Freeze the ground under your target for 4 seconds. Monsters on it are slowed and take damage.'],['meteor','Meteor',12,'Call a meteor down on your target. It lands after a moment and hits very hard.'],['warp','Time Warp',20,'Every enemy bolt vanishes and every monster moves at half speed for 5 seconds.'],['starfall','Starfall',50,'Ultimate. Seven meteors fall on your target, one after another.']],
- ranger:[['volley','Volley',4.5,'Loose a fan of seven arrows at once.'],['tumble','Tumble',6,'Roll away from your target, untouchable, and loose three arrows as you land.'],['pin','Pinning Shot',9,'One heavy arrow that passes through everything, hits hard and slows what it hits for 3 seconds.'],['rain','Arrow Rain',12,'Arrows fall on your target for 3 seconds.'],['boom','Blast Arrow',10,'An arrow that explodes on the first thing it hits and hurts everything near it.'],['storm','Arrowstorm',45,'Ultimate. For 2.5 seconds you loose a stream of arrows at the nearest monster while you keep moving.']],
- healer:[['lance','Sun Lance',7,'A spear of light that passes through everything and hits hard.'],['mend','Mend',10,'Heal 5 health at once and throw back everything near you.'],['flash','Blinding Light',12,'Stun every monster near you and burn away nearby bolts.'],['halo','Hallowed Ground',15,'Bless the ground around you for 5 seconds. It mends you and burns monsters that stand on it.'],['renew','Renewal',24,'Mend 1 health every second for 8 seconds.'],['wrath','Wrath of the Sun',55,'Ultimate. Heal to full and scorch everything in a huge ring around you.']],
- necro:[['army','Army of Bones',9,'Four extra thralls claw out of the ground at once.'],['drain','Soul Drain',8,'Tear life out of the nearest monster at any range. It is hurt and you heal 2 health.'],['grasp','Grave Grasp',9,'Dead hands seize your target. It takes heavy damage and cannot act for a moment.'],['burst','Bone Burst',10,'Your thralls explode and hurt everything near them. New ones rise in time.'],['plague','Plague',16,'Every monster near you sickens and keeps taking damage for 6 seconds.'],['legion','The Legion Rises',60,'Ultimate. Ten thralls rise for 8 seconds, and every thrall hits twice as hard while they last.']],
+ fighter:[
+  ['whirlwind','Whirlwind',5,'Spin and hit everything around you hard.',[['shock',115,3]]],
+  ['lunge','Lunge',7,'Drive straight through your target and hit everything in the way. Nothing can hurt you while you move.',[['rush',4,0]]],
+  ['warcry','War Cry',14,'For 5 seconds you hit 40% harder and swing 25% faster.',[['buff','rageT',5],['ring',90]]],
+  ['rend','Rend',10,'One huge blow on the nearest monster in reach. It is slowed for 3 seconds.',[['hit',7,{slow:3}]],'near'],
+  ['secondwind','Second Wind',22,'Heal 4 health and shrug off everything for a second.',[['heal',4],['buff','inv',1]]],
+  ['bladestorm','Bladestorm',45,'Ultimate. For 4 seconds you are a storm of steel, hitting everything around you again and again while you move freely.',[['buff','stormT',4]]],
+  ['breaker','Ground Breaker',11,'Crack the ground under your target. It bursts a moment later and hits very hard.',[['blast','at',100,.5,8]]],
+  ['ironskin','Iron Skin',18,'For 5 seconds every hit on you does half damage.',[['buff','stoneT',5],['ring',60]]],
+  ['hurl','Blade Hurl',8,'Throw your blade. It passes through everything in its path and hits hard.',[['fan',1,0,640,5,8,'bolt',99]]],
+  ['challenge','Challenge',16,'Roar a challenge. Every monster near you is dragged closer and stunned for a moment.',[['pull',340],['near',340,{stun:1.2}],['ring',340]]]],
+ tank:[
+  ['earthsplitter','Earthsplitter',6,'Slam the ground to hit everything around you hard and wipe out nearby bolts.',[['shock',125,4]]],
+  ['charge','Shield Charge',8,'Rush forward behind your shield, hitting and stunning whatever is in the way.',[['rush',3,1]]],
+  ['bastion','Bastion',14,'For 3 seconds every hit is blocked and thrown back as a shockwave.',[['buff','guardT',3],['shield'],['ring',60]]],
+  ['throw','Hammer Throw',7,'Hurl a hammer that passes through everything, hits hard and stuns.',[['fan',1,0,560,4,8,'bolt',99,{stun:1}]]],
+  ['rally','Rally',22,'Heal 5 health and raise your shield at once.',[['heal',5],['shield']]],
+  ['cataclysm','Cataclysm',50,'Ultimate. Three shockwaves roll out of you, each wider than the last.',[['shock',130,4],['seq','quake']]],
+  ['stoneskin','Stone Skin',18,'For 6 seconds every hit on you does half damage.',[['buff','stoneT',6],['ring',60]]],
+  ['tremor','Tremor',10,'Send a tremor toward your target: three bursts in a line, each hitting hard.',[['line',3,90,70,5]]],
+  ['banner','War Banner',25,'Plant a banner for 8 seconds. It mends you while you stand near it and burns monsters near it.',[['field','halo','self',130,8,.5,1,false]]],
+  ['leapslam','Leap Slam',12,'Leap onto your target and slam the ground around it.',[['tele'],['shock',130,5]],'t']],
+ assassin:[
+  ['shadowstep','Shadowstep',5,'Appear behind the nearest monster and stab it for heavy damage.',[['tele'],['hit',5,{}]],'t'],
+  ['knives','Fan of Knives',6,'Throw five knives in a fan.',[['fan',5,.15,620,2,3,'arrow',0]]],
+  ['smoke','Smoke Bomb',12,'Vanish for 2 seconds. Nothing can hurt you, nearby bolts are snuffed out, and your next strike is an ambush.',[['buff','inv',2],['buff','amb',3],['clear',130],['ring',130]]],
+  ['venom','Venom',14,'Stab the nearest monster in reach with a poisoned blade. It keeps taking damage for 6 seconds.',[['hit',3,{dot:.6}]],'near'],
+  ['mark','Death Mark',20,'Mark the nearest monster. For 6 seconds it takes 50% more damage from everything.',[['hit',0,{mark:6}]],'t'],
+  ['cuts','Thousand Cuts',45,'Ultimate. Flicker around your target and cut it eight times. Nothing can touch you until you are done.',[['seq','cuts']],'t'],
+  ['quicksilver','Quicksilver',16,'Move 40% faster for 5 seconds.',[['buff','fleetT',5],['ring',50]]],
+  ['caltrops','Caltrops',12,'Scatter caltrops around you for 5 seconds. Monsters on them are slowed and hurt.',[['field','rain','self',105,5,.5,.6,true]]],
+  ['garrote','Garrote',10,'Choke the nearest monster in reach. It takes heavy damage and cannot act for a moment.',[['hit',4,{stun:1.2}]],'near'],
+  ['flurry','Blade Flurry',18,'Throw twelve heavy knives in a ring. Each passes through one monster.',[['ringp',12,620,3,3,'arrow',1]]]],
+ mage:[
+  ['nova','Nova',7,'A ring of bolts bursts out of you and erases enemy bolts nearby.',[['ringp',14,380,2,5,'bolt','pw3'],['clear',140],['ring',140]]],
+  ['chain','Chain Lightning',6,'Lightning jumps to the three nearest monsters at any range.',[['chain']],'t'],
+  ['frost','Frost Field',10,'Freeze the ground under your target for 4 seconds. Monsters on it are slowed and take damage.',[['field','frost','at',110,4,.5,1,true]]],
+  ['meteor','Meteor',12,'Call a meteor down on your target. It lands after a moment and hits very hard.',[['blast','at',95,.8,10]]],
+  ['warp','Time Warp',20,'Every enemy bolt vanishes and every monster moves at half speed for 5 seconds.',[['clear',9999],['near',9999,{slow:5}],['ring',300]]],
+  ['starfall','Starfall',50,'Ultimate. Seven meteors fall on your target, one after another.',[['seq','star']]],
+  ['barrier','Arcane Barrier',18,'For 5 seconds every hit on you does half damage, and nearby bolts are erased.',[['buff','stoneT',5],['clear',160],['ring',160]]],
+  ['barrage','Arcane Barrage',9,'Five heavy bolts in a tight fan.',[['fan',5,.08,460,3,5,'bolt','pw3']]],
+  ['repulse','Repulse',10,'Throw every monster near you back, stun it for a moment and erase nearby bolts.',[['knock',220],['near',300,{stun:.8}],['clear',220],['ring',220]]],
+  ['combust','Combust',14,'Set your target alight at any range. It burns for 6 seconds.',[['hit',2,{dot:1}]],'t']],
+ ranger:[
+  ['volley','Volley',4.5,'Loose a fan of seven arrows at once.',[['fan',7,.13,720,1,3,'arrow','barb']]],
+  ['tumble','Tumble',6,'Roll away from your target, untouchable, and loose three arrows as you go.',[['back'],['fan',3,.12,720,1.5,3,'arrow','barb']]],
+  ['pin','Pinning Shot',9,'One heavy arrow that passes through everything, hits hard and slows what it hits for 3 seconds.',[['fan',1,0,820,4,5,'arrow',99,{slow:3}]]],
+  ['rain','Arrow Rain',12,'Arrows fall on your target for 3 seconds.',[['field','rain','at',95,3,.3,1,false]]],
+  ['boom','Blast Arrow',10,'An arrow that explodes on the first thing it hits and hurts everything near it.',[['fan',1,0,700,2,5,'arrow',0,{boom:4}]]],
+  ['storm','Arrowstorm',45,'Ultimate. For 2.5 seconds you loose a stream of arrows at the nearest monster while you keep moving.',[['buff','fireT',2.5]]],
+  ['pack','Call the Pack',30,'Two wolves fight beside you for 10 seconds.',[['summon','wolf',2,10]]],
+  ['huntmark',"Hunter's Mark",20,'Mark the nearest monster. For 6 seconds it takes 50% more damage from everything.',[['hit',0,{mark:6}]],'t'],
+  ['snare','Snare',12,'Throw a snare under your target. It snaps shut a moment later, hurting and stunning what it catches.',[['blast','at',80,.4,3,{stun:1.5}]]],
+  ['fleet','Fleet Foot',16,'Move 40% faster for 6 seconds.',[['buff','fleetT',6],['ring',50]]]],
+ healer:[
+  ['lance','Sun Lance',7,'A spear of light that passes through everything and hits hard.',[['fan',1,0,560,5,9,'orb',99]]],
+  ['mend','Mend',10,'Heal 5 health at once and throw a shockwave at everything near you.',[['heal',5],['shock',100,2]]],
+  ['flash','Blinding Light',12,'Stun every monster near you and burn away nearby bolts.',[['near',220,{stun:1.2}],['clear',220],['ring',220]]],
+  ['halo','Hallowed Ground',15,'Bless the ground around you for 5 seconds. It mends you and burns monsters that stand on it.',[['field','halo','self',120,5,.5,1,false]]],
+  ['renew','Renewal',24,'Mend 1 health every second for 8 seconds.',[['buff','renewT',8]]],
+  ['wrath','Wrath of the Sun',55,'Ultimate. Heal to full and scorch everything in a huge ring around you.',[['heal','full'],['shock',260,10]]],
+  ['aegis','Aegis',20,'Nothing can hurt you for 2.5 seconds.',[['buff','inv',2.5],['ring',50]]],
+  ['radiance','Radiance',9,'Ten orbs of light burst out of you in a ring.',[['ringp',10,420,2,5,'orb',0]]],
+  ['judgement','Judgement',14,'A pillar of light falls on your target after a moment and hits very hard.',[['blast','at',90,.7,9]]],
+  ['purify','Purify',12,'Erase every enemy bolt in the room and heal 2 health.',[['clear',9999],['heal',2],['ring',300]]]],
+ necro:[
+  ['army','Army of Bones',9,'Four extra thralls claw out of the ground at once and fight for 9 seconds.',[['army']]],
+  ['drain','Soul Drain',8,'Tear life out of the nearest monster at any range. It is hurt and you heal 2 health.',[['beam'],['heal',2],['hit',3,{}]],'t'],
+  ['grasp','Grave Grasp',9,'Dead hands seize your target. It takes heavy damage and cannot act for a moment.',[['hit',3,{stun:1.2}],['ringT',30]],'t'],
+  ['burst','Bone Burst',10,'Your thralls explode and hurt everything near them. New ones rise in time.',[['burst']],'thrall'],
+  ['plague','Plague',16,'Every monster near you sickens and keeps taking damage for 6 seconds.',[['near',260,{dot:.6}],['ring',260]]],
+  ['legion','The Legion Rises',60,'Ultimate. Six thralls rise for 6 seconds, and every thrall hits 50% harder while they last.',[['buff','legT',6],['summon','thrall',6,6]]],
+  ['spears','Bone Volley',7,'Five bone spears in a fan. Each passes through everything.',[['fan',5,.14,420,2,5,'skull',99]]],
+  ['shroud','Death Shroud',20,'For 6 seconds every hit on you does half damage.',[['buff','stoneT',6],['ring',60]]],
+  ['pit','Grave Pit',12,'Open a pit under your target for 4 seconds. Monsters in it are slowed and hurt.',[['field','frost','at',100,4,.5,1,true]]],
+  ['pact','Dark Pact',25,'Unmake your thralls. Each one heals you 2 health, up to 8.',[['pact']],'thrall']],
 };
-const SKLV=[9,9,10,11,15,20]; // the level at which each skill is learned
+const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
 const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds.';
 for(const k in SKILLS){const c=CLASSES[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
 const SK=[0,1,2,3].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1}));
 const known=(lv=S.level)=>S.cls&&lv>=8?SKLV.filter(l=>lv+1>=l).length:0;
-const okLoad=l=>Array.isArray(l)&&l.length===4&&l.every((v,i)=>Number.isInteger(v)&&v>=0&&v<6&&l.indexOf(v)===i);
+const okLoad=l=>Array.isArray(l)&&l.length===4&&l.every((v,i)=>Number.isInteger(v)&&v>=0&&v<10&&l.indexOf(v)===i);
+
+const BOONS=[
+ {id:'might',name:'Might',text:'+20% damage with everything you do.'},
+ {id:'haste',name:'Haste',text:'Attack 10% faster.',cap:8},
+ {id:'vigor',name:'Vigor',text:'+3 maximum health.'},
+ {id:'focus',name:'Focus',text:'Your skill recharges 12% faster.',cap:5},
+ {id:'fleet',name:'Fleet',text:'Move 6% faster.',cap:5},
+ {id:'spec'},
+];
+const SPEC={
+ crawler:{name:'Gravecrawler',r:24,hp:9,col:'#7c9a52',eyes:2,legs:8},
+ hound:{name:'Bonehound',r:22,hp:12,col:'#c9c1a8',eyes:2,spikes:6},
+ witch:{name:'Tallow Witch',r:20,hp:13,col:'#8566b8',eyes:2,hood:1},
+ fist:{name:'Gravel Fist',r:32,hp:18,col:'#8f8474',eyes:1,spikes:4},
+ mother:{name:'Brood Mother',r:34,hp:15,col:'#b3557a',eyes:5,pust:1},
+ burrower:{name:'The Burrower',r:26,hp:15,col:'#c0823c',eyes:0,teeth:1},
+ mimic:{name:'The Mimic',r:22,hp:12,col:'#3fa596',eyes:3,mask:1},
+ hollow:{name:'The Hollow',r:38,hp:40,col:'#4a3a66',eyes:2,void:1,spikes:9},
+ knight:{name:'Carrion Knight',ai:'hound',r:26,hp:32,col:'#7d8a99',eyes:2,spikes:8},
+ lich:{name:'Bog Lich',ai:'witch',r:22,hp:28,col:'#5f9a6a',eyes:3,hood:1},
+ wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:30,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
+ king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:70,col:'#8c2f39',eyes:3,void:1,spikes:11},
+ mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
+};
+// levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
+const AREAS=[['The Ash Road',28],['The Drowned Fen',165],['The Bone Peaks',215],['The Black Court',285],['The Endless Dark',340]];
+const PRE=['Ashen','Dread','Rotting','Gilded','Howling','Pale','Iron','Blighted','Starved','Elder'];
+const POOL=['crawler','hound','witch','fist','mother','burrower'];
+const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
+function levelDef(n){
+  if(n<LEVELS.length){const L=LEVELS[n];return{title:L.title,hint:L.hint,kind:L.boss,spec:SPEC[L.boss],hue:100}}
+  const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],mult=1.6+(n-12)*.14;
+  const spec={...base,ai:kind,crown:tyrant?1:0,name:tyrant?'Tyrant of '+area[0].replace('The ',''):PRE[n%10]+' '+base.name.replace('The ',''),hp:Math.round(base.hp*mult*(tyrant?1.3:1)),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
+  return{title:area[0],hint:tyrant?'A tyrant holds this ground.':N===50?'':'Stronger than the last. So are you.',kind,spec,hue:area[1]};
+}
 
 /* ---------- equipment: three slots, four rarities, dropped by every boss from level 9 on ---------- */
 const SLOTS=['weapon','armor','trinket'];
@@ -240,7 +346,7 @@ const SND={
   dash(){noise(.14,.2,500,2600);sfx(500,.12,'sine',.12,900)},
   blink(){sfx(1400,.12,'sine',.16,500);sfx(500,.14,'sine',.12,1900,.09);noise(.1,.1,5000,2000)},
   skill(c,i){
-    if(i===5){sfx(82,1,'sawtooth',.2,164);sfx(123,1,'triangle',.2,246,.05);noise(.9,.25,200,3000);[392,523.25,783.99].forEach((f,k)=>sfx(f,.5,'triangle',.12,0,.2+k*.12));return}
+    if(SKILLS[c][i][2]>=40){sfx(82,1,'sawtooth',.2,164);sfx(123,1,'triangle',.2,246,.05);noise(.9,.25,200,3000);[392,523.25,783.99].forEach((f,k)=>sfx(f,.5,'triangle',.12,0,.2+k*.12));return}
     if(i>1){i=i%2?1:2;const f={fighter:150,tank:110,assassin:700,mage:500,ranger:900,healer:660,necro:180}[c];
       if(i===1){noise(.2,.26,f*3,f*8);sfx(f*1.5,.22,'sawtooth',.15,f*.6);sfx(f*3,.1,'triangle',.1,f*4.5,.04)}
       else{sfx(f,.6,'triangle',.2,f*1.5);sfx(f*2,.5,'sine',.1,f*3,.08);noise(.5,.12,f*2,f*10)}return}
@@ -302,7 +408,7 @@ const AI={
   witch(m,dt,a,d){
     const E=m.rage;if(m.slide>0)m.slide-=dt;
     const dir=m.slide>0?a+Math.PI/2*m.side:d<200?a+Math.PI:d>330?a:a+Math.PI/2*m.side;
-    if(move(m,dir,d<200?112:90,dt)){m.side*=-1;m.slide=.7}
+    if(move(m,dir,d<200?(S.level<8?78:112):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind
     if((m.t-=dt)<=0){m.n++;if(m.n%(E?2:3)===0)ringShot(m,E?12:10,150,a);else for(const k of E?[-.5,-.25,0,.25,.5]:[-.25,0,.25])shoot(m.x,m.y,a+k,200);
       if(E&&S.level>=3&&m.n%2)zone(P.x,P.y,70,1,m);m.t=1.25;sfx(520,.12,'sine',.2,260)}
   },
@@ -377,6 +483,7 @@ function hurtP(d,src){
   if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);shock(115,2);return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
   if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){P.hp=Math.min(P.maxHp,P.hp+2);hud()}if(pw(1))shock(115,2);return}
+  if(P.stoneT>0)d=Math.ceil(d/2);
   P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
   if(P.hp<=0){S.mode='dead';SND.dead();
@@ -417,64 +524,55 @@ function strike(pt){
 }
 function field(kind,x,y,r,dur,every,dmg,slow){const f={kind,x,y,r,t:0,dur,every,tick:0,dmg,slow};clamp(f,10);fields.push(f)}
 function rush(a,dmg,stun){P.dashT=dmg?.24:.2;P.dx=Math.cos(a);P.dy=Math.sin(a);P.face=a;P.rushD=dmg;P.rushStun=stun;P.rushHit=dmg?new Set():null;P.inv=Math.max(P.inv,.4)}
-function skill(si){
-  const c=cls(),D=dmgMul(),sk=SKILLS[c][si],id=sk[0];
-  let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
-  const ta=t?angTo(P,t):P.face,at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},near=t&&bd<t.r+110;
-  const ring=(o,r)=>rings.push({x:o.x,y:o.y,life:.5,max:.5,r,fx:true});
-  // nothing to use it on: keep the skill ready instead of wasting the cooldown
-  if(!t&&['shadowstep','grasp','drain','chain','mark','cuts'].includes(id)||!near&&(id==='rend'||id==='venom')||id==='burst'&&!allies.some(a=>a.kind==='thrall')){SND.fizzle();return}
-  P.atk=.16;P.swing=ta;SND.skill(c,si);if(si===5){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}
-  if(id==='whirlwind'){shock(115,3);puff(P,'#dfe6ec',20,280)}
-  else if(id==='lunge'){rush(ta,4*D,0);haptic(30)}
-  else if(id==='warcry'){P.rageT=5;ring(P,90);puff(P,'#b8263d',22,240);haptic([30,30,80])}
-  else if(id==='rend'){t.slow=Math.max(t.slow||0,3);puff(t,'#dfe6ec',16,240);S.shake=.25;hurtM(t,7*D);haptic(45)}
-  else if(id==='secondwind'){P.hp=Math.min(P.maxHp,P.hp+4);P.inv=Math.max(P.inv,1);hud();puff(P,'#7fd66b',20,200);haptic(30)}
-  else if(id==='bladestorm'){P.stormT=4;P.stormK=0}
-  else if(id==='earthsplitter'){shock(125,4);puff(P,'#d6a544',24,300)}
-  else if(id==='charge'){rush(ta,3*D,1);haptic(40)}
-  else if(id==='bastion'){P.guardT=3;if(S.adv!=='berserker'){P.shield=true;P.shT=0}ring(P,60);puff(P,'#d6a544',18,200);haptic([30,30,80])}
-  else if(id==='throw'){pshot(ta,560,4*D,8,'bolt',99);pshots[pshots.length-1].stun=1;haptic(30)}
-  else if(id==='rally'){P.hp=Math.min(P.maxHp,P.hp+5);if(S.adv!=='berserker'){P.shield=true;P.shT=0}hud();puff(P,'#7fd66b',20,200);haptic(30)}
-  else if(id==='cataclysm'){shock(130,4);P.quakeN=2;P.quakeT=.4}
-  else if(id==='shadowstep'){puff(P,'#22242b',12);P.x=t.x+Math.cos(ta)*(t.r+24);P.y=t.y+Math.sin(ta)*(t.r+24);clamp(P,14);P.face=ta+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);hurtM(t,5*D);haptic(35)}
-  else if(id==='knives'){for(let k=-2;k<=2;k++)pshot(ta+k*.15,620,2*D,3,'arrow',0);haptic(25)}
-  else if(id==='smoke'){P.inv=Math.max(P.inv,2);P.amb=3;shots=shots.filter(s=>dist(s,P)>130);puff(P,'#3a3d47',34,220);ring(P,130);haptic(40)}
-  else if(id==='venom'){t.dotT=6;t.dotD=.6*D;t.dotK=.5;puff(t,'#7fd66b',14,160);hurtM(t,3*D);haptic(30)}
-  else if(id==='mark'){t.markT=6;ring(t,t.r+40);puff(t,'#b8263d',14,120);haptic(30)}
-  else if(id==='cuts'){P.cutN=8;P.cutT=0;P.cutM=t;P.inv=Math.max(P.inv,1.9)}
-  else if(id==='nova'){for(let k=0;k<14;k++)pshot(k*TAU/14,380,2*D,5,'bolt',pw(3));shots=shots.filter(s=>dist(s,P)>140);ring(P,140);haptic(40)}
-  else if(id==='chain'){const near3=mons.filter(m=>!m.hidden).sort((a,b)=>dist(a,P)-dist(b,P)).slice(0,3);for(const m of near3)if(mons.includes(m)){for(let k=1;k<=6;k++)bits.push({x:P.x+(m.x-P.x)*k/6+rand()*14-7,y:P.y+(m.y-P.y)*k/6+rand()*14-7,vx:0,vy:0,life:.3,max:.3,c:'#8fd3ff',r:3});hurtM(m,3*D)}haptic(30)}
-  else if(id==='frost'){field('frost',at.x,at.y,110,4,.5,D,true);haptic(30)}
-  else if(id==='meteor'){meteor(at,95,.8,10*D);haptic(30)}
-  else if(id==='warp'){shots=[];for(const m of mons)m.slow=Math.max(m.slow||0,5);ring(P,300);haptic(40)}
-  else if(id==='starfall'){P.starN=7;P.starT=0}
-  else if(id==='volley'){for(let k=-3;k<=3;k++)pshot(ta+k*.13,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);haptic(25)}
-  else if(id==='tumble'){rush(ta+Math.PI,0,0);for(const k of[-.12,0,.12])pshot(ta+k,720,1.5*D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);haptic(25)}
-  else if(id==='pin'){pshot(ta,820,4*D,5,'arrow',99);pshots[pshots.length-1].slow=3;haptic(35)}
-  else if(id==='rain'){field('rain',at.x,at.y,95,3,.3,D,false);haptic(30)}
-  else if(id==='boom'){pshot(ta,700,2*D,5,'arrow',0);pshots[pshots.length-1].boom=4*D;haptic(30)}
-  else if(id==='storm'){P.fireT=2.5;P.fireK=0}
-  else if(id==='lance'){pshot(ta,560,5*D,9,'orb',99);haptic(35)}
-  else if(id==='mend'){P.hp=Math.min(P.maxHp,P.hp+5);hud();shock(100,2);puff(P,'#ffe08a',24,260)}
-  else if(id==='flash'){shots=shots.filter(s=>dist(s,P)>220);ring(P,220);puff(P,'#fff',30,320);for(const m of mons)if(!m.hidden&&dist(m,P)<220+m.r)m.stun=m.boss?1.2:2.5;haptic(40)}
-  else if(id==='halo'){field('halo',P.x,P.y,120,5,.5,D,false);puff(P,'#ffe08a',20,200);haptic(30)}
-  else if(id==='renew'){P.renewT=8;P.renewK=0;puff(P,'#7fd66b',20,200);haptic(30)}
-  else if(id==='wrath'){P.hp=P.maxHp;hud();puff(P,'#ffe08a',40,420);shock(260,10)}
-  else if(id==='army'){for(const a of allies)if(a.extra===1)puff(a,'#e7dfcd',6);allies=allies.filter(a=>a.extra!==1); // a new army replaces the old one, so the cap holds
-    for(let k=0;k<4;k++){const a=ally('thrall',9);a.extra=1;allies.push(a);puff(a,'#7fd66b',6)}haptic([30,40,60])}
-  else if(id==='drain'){for(let k=1;k<=6;k++)bits.push({x:t.x+(P.x-t.x)*k/6,y:t.y+(P.y-t.y)*k/6,vx:0,vy:0,life:.4,max:.4,c:'#7fd66b',r:3});P.hp=Math.min(P.maxHp,P.hp+2);hud();hurtM(t,3*D);haptic(30)}
-  else if(id==='grasp'){t.stun=t.boss?1.2:2.5;puff(t,'#7fd66b',20,180);ring(t,t.r+30);hurtM(t,3*D);haptic(35)}
-  else if(id==='burst'){const th=allies.filter(a=>a.kind==='thrall');allies=allies.filter(a=>a.kind!=='thrall');P.sumT=Math.max(P.sumT,2);S.shake=.25;noise(.25,.35,900,150);haptic(50);
-    for(const a of th){rings.push({x:a.x,y:a.y,life:.4,max:.4,r:70,fx:true});puff(a,'#7fd66b',10,220);for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,a)<70+m.r)hurtM(m,2*D,true)}}
-  else if(id==='plague'){ring(P,260);for(const m of mons)if(!m.hidden&&dist(m,P)<260+m.r){m.dotT=6;m.dotD=.6*D;m.dotK=.5;puff(m,'#7fd66b',10,120)}haptic(30)}
-  else if(id==='legion'){P.legT=8;for(let k=0;k<10;k++){const a=ally('thrall',8);a.extra=2;allies.push(a);puff(a,'#7fd66b',6)}}
-  P.mxS[si]=sk[2]*skMul(si);P.cdS[si]=P.mxS[si];syncSkills();
+const debuff=(m,o,D)=>{if(o.slow)m.slow=Math.max(m.slow||0,o.slow);if(o.stun)m.stun=m.boss?o.stun:o.stun*2;if(o.dot){m.dotT=6;m.dotD=o.dot*D;m.dotK=.5;puff(m,'#7fd66b',10,120)}if(o.mark){m.markT=o.mark;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+40,fx:true});puff(m,'#b8263d',14,120)}};
+const pierceOf=g=>g==='pw3'?pw(3):g==='barb'?(S.adv==='sharpshooter'?99:S.b.spec):g;
+// one effect of a skill. x = {t: nearest monster or null, ta: angle to it, at: its position or a spot ahead, D: damage multiplier}
+function cast(op,x){
+  const[o,a,b,c,d,e,f,g,h]=op,{t,ta,at,D}=x,ring=(p,r)=>rings.push({x:p.x,y:p.y,life:.5,max:.5,r,fx:true});
+  switch(o){
+  case'shock':shock(a,b);break;                                   // radius, damage
+  case'rush':rush(ta,a*D,b);break;                                // damage, stun: dash through the target
+  case'back':rush(ta+Math.PI,0,0);break;                          // untouchable roll away from the target
+  case'buff':P[a]=Math.max(P[a]||0,b);puff(P,'#d6a544',14,180);break; // timer name, seconds
+  case'heal':P.hp=a==='full'?P.maxHp:Math.min(P.maxHp,P.hp+a);hud();puff(P,'#7fd66b',18,200);break;
+  case'shield':if(S.adv!=='berserker'){P.shield=true;P.shT=0}break;
+  case'fan':for(let k=0;k<a;k++){pshot(ta+(k-(a-1)/2)*b,c,d*D,e,f,pierceOf(g));if(h){const p=pshots[pshots.length-1];if(h.boom)p.boom=h.boom*D;if(h.slow)p.slow=h.slow;if(h.stun)p.stun=h.stun}}break; // count, spread, speed, damage, radius, kind, pierce, extras
+  case'ringp':for(let k=0;k<a;k++)pshot(k*TAU/a,b,c*D,d,e,pierceOf(f));break; // count, speed, damage, radius, kind, pierce
+  case'blast':meteor(a==='at'?at:P,b,c,d*D,e);break;              // where, radius, delay, damage, extras
+  case'line':for(let k=1;k<=a;k++)meteor({x:P.x+Math.cos(ta)*k*b,y:P.y+Math.sin(ta)*k*b},c,.3+k*.15,d*D);break; // count, spacing, radius, damage
+  case'field':field(a,b==='at'?at.x:P.x,b==='at'?at.y:P.y,c,d,e,f*D,g);break; // kind, where, radius, seconds, tick, damage per tick, slows
+  case'hit':debuff(t,b,D);if(a){puff(t,'#dfe6ec',12,200);hurtM(t,a*D)}break; // damage, debuffs: the target
+  case'near':for(const m of[...mons])if(!m.hidden&&dist(m,P)<a+m.r)debuff(m,b,D);break; // radius, debuffs: every monster around you
+  case'summon':for(let k=0;k<b;k++){const al=ally(a,c);al.extra=2;allies.push(al);puff(al,'#7fd66b',6)}break; // kind, count, seconds
+  case'clear':shots=shots.filter(s=>dist(s,P)>a);break;
+  case'tele':puff(P,'#22242b',12);P.x=t.x+Math.cos(ta)*(t.r+24);P.y=t.y+Math.sin(ta)*(t.r+24);clamp(P,14);P.face=ta+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);break;
+  case'pull':case'knock':for(const m of mons)if(!m.hidden&&m.st!=='leap'&&dist(m,P)<a+m.r){const g2=angTo(P,m),dd=dist(m,P),nd=o==='pull'?Math.max(m.r+50,dd-(m.boss?90:400)):dd+(m.boss?80:160);m.x=P.x+Math.cos(g2)*nd;m.y=P.y+Math.sin(g2)*nd;clamp(m,m.r);if(m.st==='charge'||m.st==='lunge'){m.st='dazed';m.t=.6}}break;
+  case'seq':if(a==='quake'){P.quakeN=2;P.quakeT=.4}else if(a==='cuts'){P.cutN=8;P.cutT=0;P.cutM=t;P.inv=Math.max(P.inv,1.9)}else{P.starN=7;P.starT=0}break;
+  case'ring':ring(P,a);break;
+  case'ringT':ring(t,t.r+a);puff(t,'#7fd66b',20,180);break;
+  case'beam':for(let k=1;k<=6;k++)bits.push({x:t.x+(P.x-t.x)*k/6,y:t.y+(P.y-t.y)*k/6,vx:0,vy:0,life:.4,max:.4,c:'#7fd66b',r:3});break;
+  case'chain':{const n3=mons.filter(m=>!m.hidden).sort((p,q)=>dist(p,P)-dist(q,P)).slice(0,3);for(const m of n3)if(mons.includes(m)){for(let k=1;k<=6;k++)bits.push({x:P.x+(m.x-P.x)*k/6+rand()*14-7,y:P.y+(m.y-P.y)*k/6+rand()*14-7,vx:0,vy:0,life:.3,max:.3,c:'#8fd3ff',r:3});hurtM(m,3*D)}break}
+  case'army':for(const al of allies)if(al.extra===1)puff(al,'#e7dfcd',6);allies=allies.filter(al=>al.extra!==1); // a new army replaces the old one, so the cap holds
+    for(let k=0;k<4;k++){const al=ally('thrall',9);al.extra=1;allies.push(al);puff(al,'#7fd66b',6)}break;
+  case'burst':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);S.shake=.25;noise(.25,.35,900,150);
+    for(const al of th){ring(al,70);puff(al,'#7fd66b',10,220);for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,al)<70+m.r)hurtM(m,2*D,true)}break}
+  case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);P.hp=Math.min(P.maxHp,P.hp+Math.min(8,2*th.length));hud();break}
+  }
 }
-function meteor(at,r,dur,dmg){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg};clamp(z,10);zones.push(z)}
+function skill(si){
+  const c=cls(),sk=SKILLS[c][si],need=sk[5];
+  let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
+  // nothing to use it on: keep the skill ready instead of wasting the cooldown
+  if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')){SND.fizzle();return false}
+  const x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()};
+  P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
+  for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam')&&!mons.includes(t))continue;cast(op,x)}
+  P.mxS[si]=sk[2]*skMul(si);P.cdS[si]=P.mxS[si];syncSkills();return true;
+}
+function meteor(at,r,dur,dmg,ex){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,stun:ex&&ex.stun};clamp(z,10);zones.push(z)}
 // skills that play out over time
 function channels(dt){
-  if(P.stormT>0){P.stormT-=dt;P.inv=Math.max(P.inv,.05);if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2);P.atk=.16;P.swing+=2}}
+  if(P.stormT>0){P.stormT-=dt;if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2);P.atk=.16;P.swing+=2}}
   if(P.quakeN>0&&(P.quakeT-=dt)<=0){P.quakeT=.4;shock(P.quakeN===2?190:250,4);P.quakeN--}
   if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');hurtM(m,3*dmgMul())}}
   if(P.starN>0&&(P.starT-=dt)<=0){P.starT=.35;P.starN--;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160};meteor({x:at.x+rand()*60-30,y:at.y+rand()*60-30},80,.6,6*dmgMul())}
@@ -485,7 +583,7 @@ function channels(dt){
 const slotSkill=i=>{const si=S.load[i];return cls()&&si<known()?si:-1};
 function syncSkills(){const c=cls();for(let i=0;i<4;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0]}
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100):1);
+  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
   P.moving=l>.15;
@@ -494,8 +592,8 @@ function playerStep(dt){
     if(rand()<.6)bits.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,c:has('skin')?'#c68863':'#e7dfcd',r:6})}
   else if(P.moving){P.x+=mx*spd*dt;P.y+=my*spd*dt;P.face=Math.atan2(my,mx);P.walk+=dt*11}
   clamp(P,14);
-  for(const k of['inv','atk','cd','dashCd','amb','rageT','guardT','legT'])if(P[k]>0)P[k]-=dt;
-  for(let i=0;i<6;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
+  for(const k of['inv','atk','cd','dashCd','amb','rageT','guardT','legT','fleetT','stoneT'])if(P[k]>0)P[k]-=dt;
+  for(let i=0;i<10;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
   if(S.mode==='play')channels(dt);
   if((want.atk||keys.atk)&&P.cd<=0)strike(want.pt);
   want.atk=false;want.pt=null;
@@ -535,7 +633,7 @@ function step(dt){
   for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){const g=angTo(a,to),sp=a.kind==='wolf'?250:175;a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r)}
-    else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?2:1),true);leech()}
+    else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1),true);leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
   for(const f of fields){f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
@@ -561,7 +659,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL)s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r)hurtM(m,z.dmg)}else if(dist(z,P)<z.r)hurtP(2+tier(),'zone')}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;hurtM(m,z.dmg)}}else if(dist(z,P)<z.r)hurtP(2+tier(),'zone')}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24){f.dead=true;P.hp=Math.min(P.maxHp,P.hp+3);hud();SND.pickup();haptic(15)}
   morsels=morsels.filter(f=>!f.dead);
@@ -835,7 +933,7 @@ function hud(){
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0);
-  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0],cdS:[0,0,0,0,0,0],mxS:[0,0,0,0,0,0],rageT:0,guardT:0,legT:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false};
+  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false};
 }
 function startLevel(n){
   if(n>=8&&S.cls&&!S.eq)S.eq=basicSet(S.cls);eqSync();
@@ -853,8 +951,22 @@ function reward(){
   P.inv=0;S.level++;S.mode='reward';hud();
   const up=S.rank&&S.rank!==r0,rk=up?'Rank up. You have climbed from rank '+r0+' to rank '+S.rank+'.':'';
   if(up){SND.rankUp();setTimeout(()=>haptic([30,50,30,50,30,50,200]),500)}
-  if(n>=8&&S.cls)return dropScreen(n,rk,()=>reward2(n));
+  if(n>=8&&S.cls)return dropScreen(n,rk,()=>newSkill(n,()=>reward2(n)));
   reward2(n);
+}
+// a level that teaches a skill says so; with more than four known you choose which four to carry
+function newSkill(n,next){
+  const k=known(),si=k-1;if(k<=known(n)||n<10)return next(); // the skills of levels 10 and 11 are announced by the power-up screens
+  const sk=CLASSES[S.cls].skills[si],free=S.load.findIndex(v=>v>=k-1&&v!==si); // a slot still holding a skill not learned yet
+  if(k<=4&&!S.load.includes(si)&&free>=0)S.load[free]=si;
+  show({soft:true,kick:'New skill · level '+sk.level,title:sk.name,body:sk.text,keys:k>4?'You know '+k+' skills and carry four. You can change them now, or later from the pause screen.':'',btns:k>4?[['Choose my four',()=>loadout(next,si)],['Keep my four',next]]:[['Go on',next]]});
+}
+function loadout(done,fresh){
+  const c=CLASSES[S.cls],k=known(),again=()=>{syncSkills();loadout(done,fresh)};
+  show({wide:true,kick:'Skills · '+c.name,title:'Choose your four',body:'You carry four skills, on keys 1 to 4. Pick a skill you are not carrying to swap it in.',
+    cards:c.skills.slice(0,k).map((sk,i)=>{const slot=S.load.indexOf(i);return{title:sk.name,sub:slot>=0?'Carried · key '+(slot+1):i===fresh?'New · not carried':'Not carried',col:slot>=0?'':'#958ea3',body:sk.text,
+      fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>({title:c.skills[v].name,sub:'Key '+(j+1),body:c.skills[v].text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}})),btns:[['Back',again]]})}}),
+    btns:[['Done',done]]});
 }
 // every boss from level 9 on drops one item for your class: melt it into what you carry, wear it instead, or break it for scrap
 function dropScreen(n,rk,next){
@@ -869,8 +981,8 @@ function reward2(n){
   if(n<7){const p=PARTS[n],lacks=PARTS.slice(n+1).map(x=>x.name.toLowerCase());
     return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>startLevel(S.level)]]})}
   const c=CLASSES[S.cls];
-  if(n<11){const p=c.pows[n-8],s2=c.skills[1],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a second skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1, 2 and 3 (E, Q and R also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your third skill button is live.':'Your third skill is on key 3 (or R).'):'',btns:[['Go on',()=>startLevel(S.level)]]})}
+  if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
+    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 4 (E, Q, R and F also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>startLevel(S.level)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;startLevel(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
@@ -879,26 +991,29 @@ function reward2(n){
     cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;startLevel(S.level)}}})});
 }
 function chooseClass(){
-  S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
-  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first skill. The next two levels teach two more skills, each with its own cooldown, and after level 50 the class can be upgraded.',
-    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skill: '+c.skills[0].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);startLevel(8)}}))});
+  S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
+  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown, and you carry four at a time. After level 50 the class can be upgraded.',
+    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=[0,1,2,3];startLevel(8)}}))});
+}
+function pauseShow(){
+  const btns=[['Resume',()=>pause(false)]];if(known()>4)btns.push(['Skills',()=>loadout(pauseShow)]);
+  show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
 }
 function pause(on){
-  if(on){if(S.paused||S.mode!=='play'&&S.mode!=='clear')return;S.paused=true;for(const k in keys)keys[k]=false;joy.x=joy.y=0;SND.pause(true);
-    show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc, P or Enter to go on.',btns:[['Resume',()=>pause(false)]]})}
-  else if(S.paused){S.paused=false;$('ov').hidden=true;SND.pause(false)}
+  if(on){if(S.paused||S.mode!=='play'&&S.mode!=='clear')return;S.paused=true;for(const k in keys)keys[k]=false;joy.x=joy.y=0;SND.pause(true);pauseShow()}
+  else if(S.paused){S.paused=false;$('ov').hidden=true;SND.pause(false);syncSkills()}
   const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed',S.paused);
 }
-function save(n){const eq=S.eq&&{};if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};pref('level',n);pref('run',JSON.stringify({cls:S.cls,adv:S.adv,b:S.b,eq,scrap:S.scrap}))}
+function save(n){const eq=S.eq&&{};if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};pref('level',n);pref('run',JSON.stringify({cls:S.cls,adv:S.adv,b:S.b,eq,scrap:S.scrap,load:S.load}))}
 function title(saved){
   S.mode='title';S.level=0;freshBody();P.y=H/2+40;mons=[];allies=[];boss=null;hud();
-  const btns=[['Rise',()=>{S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;startLevel(0)}]];
+  const btns=[['Rise',()=>{S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];startLevel(0)}]];
   if(saved>0)btns.unshift(['Continue at level '+(saved+1),()=>saved>=8&&!CLASSES[S.cls]?chooseClass():startLevel(saved)]);
   show({kick:'Bones first. Legend later.',title:'You wake as bare bones',body:'Each monster you kill gives part of a body back: organs, then skin, then the five senses. Once you are whole you choose a class. Every level after that makes it stronger, and after level 50 it can be upgraded.',keys:matchMedia('(pointer:coarse)').matches?'Stick to move. Strike aims at the nearest monster.':'WASD or arrows to move. Space or click to strike. Esc or P to pause.',btns});
 }
 
 /* ---------- input ---------- */
-const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'sk0',l:'sk0','1':'sk0',q:'sk1','2':'sk1',r:'sk2','3':'sk2'};
+const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'sk0',l:'sk0','1':'sk0',q:'sk1','2':'sk1',r:'sk2','3':'sk2',f:'sk3','4':'sk3'};
 addEventListener('keydown',e=>{
   const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];
   if((e.key==='Escape'||e.key==='p'||e.key==='P')&&!e.repeat&&(S.paused||S.mode==='play'||S.mode==='clear')){e.preventDefault();pause(!S.paused);return}
@@ -919,17 +1034,21 @@ const padUp=()=>{joy.x=joy.y=0;knob.style.transform=''};pad.addEventListener('po
 $('bAtk').addEventListener('pointerdown',e=>{want.atk=true;keys.atk=true;e.preventDefault()});
 for(const ev of['pointerup','pointercancel','pointerleave'])$('bAtk').addEventListener(ev,()=>keys.atk=false);
 $('bDash').addEventListener('pointerdown',e=>{want.dash=true;e.preventDefault()});
-// skill buttons (touch) and the skill bar (keyboard): both show name and seconds left; MB.skills carries the same data
+// Four skill buttons (touch) and a skill bar under the vitals (keyboard). Both show the skill's name and the seconds left; MB.skills carries the same data.
+// The touch cluster becomes a 3 x 2 grid: skills 1-4 in the left two columns, Dash above Strike on the right.
 const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
-{const acts=$('bSkill').parentNode;for(let i=1;i<3;i++){const b=document.createElement('button');b.type='button';b.id='bSkill'+(i+1);b.hidden=true;acts.appendChild(b);skB.push(b)}
+{const acts=$('bSkill').parentNode;for(let i=1;i<4;i++){const b=document.createElement('button');b.type='button';b.id='bSkill'+(i+1);b.hidden=true;acts.appendChild(b);skB.push(b)}
   skBar.id='skillBar';skBar.hidden=true;skBar.setAttribute('aria-label','Skills');
   skB.forEach((b,i)=>{b.classList.add('sk');b.textContent='';for(const k of['n','c']){const e=document.createElement('span');e.className=k;b.appendChild(e)}
     b.addEventListener('pointerdown',e=>{want.sk[i]=true;e.preventDefault()});
     const li=document.createElement('li'),kb=document.createElement('kbd');kb.textContent=i+1;li.appendChild(kb);for(const k of['n','c']){const e=document.createElement('span');e.className=k;li.appendChild(e)}skBar.appendChild(li);skL.push(li)});
   document.querySelector('.vitals').after(skBar);
-  const st=document.createElement('style');st.textContent=`
-.touch .acts{max-width:216px}
-.touch .acts button.sk{width:62px;height:62px;padding:2px;font-size:.66rem;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;background:linear-gradient(to top,var(--stone-2) calc(var(--cd,0)*100%),var(--stone) 0)}
+  const st=document.createElement('style');st.id='mbSkillCss';st.textContent=`
+.touch .acts{display:grid;grid-template-columns:64px 64px 84px;grid-template-rows:64px 84px;gap:10px;max-width:none}
+.touch .acts button{width:auto;height:auto;min-width:0;padding:2px}
+#bSkill{grid-area:1/1}#bSkill2{grid-area:1/2}#bSkill3{grid-area:2/1}#bSkill4{grid-area:2/2}
+#bDash{grid-area:1/3;border-radius:32px}#bAtk{grid-area:2/3}
+.touch .acts button.sk{border-radius:14px;font-size:.66rem;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;align-self:center;height:64px;background:linear-gradient(to top,var(--stone-2) calc(var(--cd,0)*100%),var(--stone) 0)}
 .touch .acts button.sk:not(:disabled){border-color:var(--marrow)}
 .sk .c,#skillBar .c{color:var(--marrow);font-weight:600;font-variant-numeric:tabular-nums}
 .sk .c{font-size:.95rem}.sk .c:empty{display:none}
@@ -938,12 +1057,12 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 #skillBar li.ready{border-color:var(--marrow);color:var(--bone)}#skillBar li.locked{opacity:.45}
 #skillBar .c{margin-left:auto}
 @media (pointer:coarse){#skillBar{display:none}}
-@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){.touch .acts{max-width:190px}.touch .acts button.sk{width:54px;height:54px;font-size:.58rem}.sk .c{font-size:.85rem}}`;document.head.appendChild(st)}
-let skShown=null;const skKey=['','',''],skF=[-1,-1,-1];
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){.touch .acts{grid-template-columns:58px 58px 76px;grid-template-rows:58px 76px;gap:8px;max-width:none}.touch .acts button{width:auto;height:auto}.touch .acts button.sk{height:58px;font-size:.6rem}.sk .c{font-size:.85rem}}`;document.head.appendChild(st)}
+let skShown=null;const skKey=['','','',''],skF=[-1,-1,-1,-1];
 function skillUi(){
   const on=!!cls()&&S.mode!=='title';if(on!==skShown){skShown=on;skBar.hidden=!on;for(const b of skB)b.hidden=!on}
   if(!on)return;
-  for(let i=0;i<3;i++){const s=SK[i],txt=!s.unlocked?'Lv '+(9+i):s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',key=s.name+'|'+txt+'|'+s.unlocked;
+  for(let i=0;i<4;i++){const s=SK[i],txt=!s.unlocked?'Lv '+SKLV[S.load[i]]:s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',key=s.name+'|'+txt+'|'+s.unlocked;
     if(key!==skKey[i]){skKey[i]=key;const b=skB[i],li=skL[i];b.children[0].textContent=li.children[1].textContent=s.name;b.children[1].textContent=txt;li.children[2].textContent=txt||'ready';
       b.disabled=!s.ready;li.className=s.ready?'ready':s.unlocked?'':'locked';b.setAttribute('aria-label',s.name+(s.unlocked?s.cd>0?', '+txt+' seconds':', ready':', locked'))}
     const f=s.unlocked&&s.max?Math.ceil(s.cd/s.max*40)/40:0;if(f!==skF[i]){skF[i]=f;skB[i].style.setProperty('--cd',f);skL[i].style.setProperty('--cd',f)}}
@@ -975,18 +1094,19 @@ function start(data){
   try{const r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{};
     S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
+    S.load=okLoad(r.load)?r.load.slice():[0,1,2,3]; // older saves carry the first four skills
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
-  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0}
+  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3]}
   eqSync();
   $('snd').setAttribute('aria-pressed',!muted);$('hap').setAttribute('aria-pressed',hapOn);
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=okLoad(r.load)?r.load.slice():[0,1,2,3];
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
-    startLevel(n)},kill:()=>boss&&mons.includes(boss)&&hurtM(boss,1e9)};
+    startLevel(n)},kill:()=>boss&&mons.includes(boss)&&hurtM(boss,1e9),skill:si=>skill(si),reward,loadout,dropScreen};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();
