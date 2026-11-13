@@ -51,7 +51,7 @@ function M(hex,shade){
   var key=hex+'|'+(shade||0),m=MATS[key];if(m)return m;
   _c.set(hex);if(shade>0)_c.lerp(new T.Color(0xffffff),shade);else if(shade<0)_c.multiplyScalar(1+shade);
   m=new T.MeshStandardMaterial({color:_c.getHex(),roughness:.82,metalness:.04,flatShading:true});
-  m.emissive.copy(_c).multiplyScalar(.14);
+  m.emissive.copy(_c).multiplyScalar(.06);m.userData.mbBody=true;
   return MATS[key]=m;
 }
 function fx(){
@@ -60,6 +60,7 @@ function fx(){
   FX={
     eye:glow(0x5a4410,0xffd95e,1.5),eyeRed:glow(0x400008,0xff2238,1.5),ring:glow(0x2a0308,0xc8142e,1.25),star:glow(0x5a4410,0xffcf5a,1.4),
     pupil:new T.MeshBasicMaterial({color:0x08070a}),voidM:new T.MeshBasicMaterial({color:0x050408}),
+    eyeGreen:glow(0x103a10,0x7fe85a,1.5),ember:glow(0x5a1a04,0xff7a22,1.5),iris:glow(0x4a2a00,0xffb428,1.5),irisHot:glow(0x5a0a00,0xff4a2a,2),
     white:new T.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:1,roughness:1})
   };
   var cv=document.createElement('canvas');cv.width=cv.height=64;var x=cv.getContext('2d'),g=x.createRadialGradient(32,32,6,32,32,32);
@@ -86,7 +87,7 @@ function spike(mat,par,x,y,z,dx,dy,dz,len,rad){var o=mk(G.cone,mat,par,x,y,z);or
 function grp(par,x,y,z){var g=new T.Group();g.position.set(x||0,y||0,z||0);par.add(g);return g}
 function eye(par,list,x,y,z,er,nx,ny,nz,red,lo){
   var l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;nx/=l;ny/=l;nz/=l;
-  mk(lo?G.sphLo:G.sph,red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
+  mk(lo?G.sphLo:G.sph,red==='g'?FX.eyeGreen:red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
   var pu=mk(G.sphLo,FX.pupil,par,x+nx*er*.7,y+ny*er*.7,z+nz*er*.7,er*.5,er*.5,er*.5,true);
   list.push({pu:pu,x:pu.position.x,er:er});
 }
@@ -108,6 +109,7 @@ var BUILD={},ANIM={};
 var CFG={
   crawler:{bob:.03,spd:5,y0:0,br:.03,top:1.25},hound:{bob:.04,spd:6,y0:0,br:.03,top:1.95},witch:{bob:.1,spd:2.2,y0:.2,br:.02,top:2.7},
   fist:{bob:.03,spd:2.5,y0:0,br:.03,top:2.2},mother:{bob:.02,spd:1.8,y0:0,br:.05,top:2},mite:{bob:.08,spd:14,y0:0,br:0,top:1.4},
+  bomber:{bob:.03,spd:3,y0:0,br:.05,top:1.75},summoner:{bob:.08,spd:2,y0:.14,br:.02,top:3.1,k:.92},beamer:{bob:.12,spd:2.4,y0:.3,br:.02,top:2.45},
   burrower:{bob:0,spd:2,y0:0,br:.02,top:2.2},mimic:{bob:.05,spd:3,y0:0,br:.03,top:2},hollow:{bob:.07,spd:1.7,y0:.22,br:.02,top:2.95,k:.86}
 };
 
@@ -357,11 +359,164 @@ ANIM.hollow=function(p,m,t,tt,st,look){
   p.head.rotation.y=ch||wind?0:look*.6;p.head.rotation.x=wind?-.3:ch?.35:dz?.6:0;p.head.rotation.z=dz?.25*sin(tt*3):0;
 };
 
+// Cinder Toad: squat, wide-mouthed, a smouldering crater in its back. Swells before it lobs, hops away when crowded.
+BUILD.bomber=function(b,m,p){
+  var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.35),x,i;
+  mk(G.sph,c,b,0,.68,-.05,1.08,.66,1.02);mk(G.sph,dk,b,0,.34,-.05,1.0,.3,.95);
+  p.sac=mk(G.sph,lt,b,0,.5,.62,.6,.42,.5);
+  p.head=grp(b,0,.92,.62);
+  mk(G.sph,c,p.head,0,0,0,.74,.4,.56);
+  mk(G.box,FX.voidM,p.head,0,-.1,.4,1.0,.05,.3,true);
+  for(x=-1;x<=1;x+=2){mk(G.sphLo,c,p.head,x*.42,.3,.08,.24,.24,.24);eye(p.head,p.eyes,x*.44,.36,.2,.17,x*.3,.3,1)}
+  // the crater and its coals
+  mk(ringGeo('toadRim',7,.34,0,2.2,.3,.15),dk,b,0,1.16,-.3);
+  p.coal=mk(G.sphLo,FX.ember,b,0,1.2,-.3,.3,.16,.3,true);
+  var spots=[[.72,.98,-.1,.15],[-.7,.95,-.25,.17],[.45,1.02,-.72,.14],[-.4,1.05,-.75,.13],[.85,.7,-.5,.13],[-.88,.68,.1,.12]];
+  p.pust=[];for(i=0;i<spots.length;i++)p.pust.push({o:mk(G.sphLo,FX.ember,b,spots[i][0],spots[i][1],spots[i][2],spots[i][3],spots[i][3],spots[i][3],true),r:spots[i][3]});
+  p.legs=[];
+  for(i=0;i<4;i++){
+    var sd=i%2?1:-1,front=i<2,o=grp(b,sd*(front?.72:.82),front?.42:.5,front?.5:-.5);
+    if(front){seg(G.cyl,dk,o,0,0,0,sd*.2,-.4,.25,.13);mk(G.sph,dk,o,sd*.24,-.4,.36,.2,.08,.26)}
+    else{mk(G.sph,c,o,sd*.08,.06,0,.36,.4,.52);seg(G.cyl,dk,o,sd*.1,-.1,.3,sd*.3,-.46,-.1,.13);mk(G.sph,dk,o,sd*.36,-.48,.14,.22,.08,.4)}
+    p.legs.push({o:o,front:front,sd:sd});
+  }
+};
+ANIM.bomber=function(p,m,t,tt,st){
+  var wind=st==='wind',leap=st==='leap',i,q,k,L,lift=m.lift||0;
+  k=wind?1.5+.12*sin(t*40):1+.14*sin(tt*3.2);p.sac.scale.set(.6*k,.42*k,.5*k);
+  for(i=0;i<p.pust.length;i++){q=p.pust[i];k=q.r*(1+.25*sin(tt*4+i*1.9)+(wind?.5:0));q.o.scale.set(k,k,k)}
+  k=wind?1.5+.3*sin(t*30):1+.2*sin(tt*5);p.coal.scale.set(.3*k,.16*k,.3*k);
+  p.head.rotation.x=wind?-.35:leap?.15:.04*sin(tt*2);
+  p.body.rotation.x+=wind?-.16:leap?.2-lift*.5:0;
+  for(i=0;i<4;i++){L=p.legs[i];L.o.rotation.x=leap?(L.front?-.7:1.1)*min(1,lift*2.5+.3):wind?(L.front?.25:-.2):sin(t*7+i*PI)*.12}
+};
+
+// Grave Caller: a tall hooded thing with a collar of ribs and a bell-staff. Raises both arms to call husks out of the floor.
+BUILD.summoner=function(b,m,p){
+  var s=m.s,c=M(s.col),dk=M(s.col,-.55),lt=M(s.col,.3),bone=M(BONE),x;
+  p.robe=grp(b,0,0,0);
+  mk(G.robe,c,p.robe,0,0,0,.82,1.22,.82);mk(ringGeo('hem8',8,.74,.02,-2.6,.34,.24),dk,p.robe,0,0,0,.84,1,.84);
+  mk(merged('callerStrips',function(add){for(var i=0;i<5;i++){var a=i*TAU/5+.3;add(G.box,cos(a)*.5,.7,sin(a)*.5,cos(a)*.25,-1,sin(a)*.25,.16,1.1,.03)}}),dk,p.robe);
+  mk(ringGeo('callerRibs',8,.36,0,.25,.62,.09,.2),bone,b,0,1.72,0);
+  mk(G.cone,dk,b,0,1.5,0,.5,.5,.46);
+  p.head=grp(b,0,2.2,.02);
+  mk(G.sph,dk,p.head,0,0,-.04,.42,.48,.46);spike(dk,p.head,0,.3,-.12,0,1,-.25,.8,.3);
+  mk(G.sph,FX.voidM,p.head,0,-.05,.24,.31,.34,.24,true);
+  eyesFace(p.head,p.eyes,s.eyes||3,0,-.06,.44,.12,.07,'g');
+  p.arms=[];
+  for(x=-1;x<=1;x+=2){
+    var a=grp(b,x*.44,1.72,.05);
+    seg(G.cyl,dk,a,0,0,0,x*.3,-.5,.3,.09);var h=grp(a,x*.3,-.5,.3);mk(G.ico,bone,h,0,0,0,.13,.13,.13);mk(claw3(),bone,h,0,0,0,.18,.18,.18);
+    if(x>0){p.staff=grp(h,0,0,0);seg(G.cyl,M('#3a2c20'),p.staff,0,-1.25,0,0,1.25,0,.05);
+      mk(G.torus,bone,p.staff,0,1.42,0,.22,.4,.22).rotation.x=PI/2;p.orb=mk(G.sphLo,FX.eyeGreen,p.staff,0,1.42,0,.13,.13,.13,true)}
+    p.arms.push({o:a,x:x});
+  }
+};
+ANIM.summoner=function(p,m,t,tt,st,look){
+  var wind=st==='wind',i,A,k;
+  for(i=0;i<2;i++){A=p.arms[i];A.o.rotation.x=wind?-2.3+.08*sin(t*30+i):-.2+sin(tt*1.5+i*2)*.12;A.o.rotation.z=A.x*(wind?.5:.12)}
+  p.staff.rotation.x=wind?2.2:.25+sin(tt*1.2)*.06;
+  k=wind?.26+.08*sin(t*32):.13+.03*sin(tt*4);p.orb.scale.set(k,k,k);
+  p.robe.rotation.z=sin(tt*1.4)*.05;p.robe.rotation.x=sin(tt*1.1)*.04-.03;
+  p.head.rotation.y=look*.6;p.head.rotation.x=wind?-.4:.12;
+};
+
+// Lidless Eye: a floating eyeball in a horned shell, nerves trailing under it. It turns to wherever its beam points.
+BUILD.beamer=function(b,m,p){
+  var s=m.s,c=M(s.col),dk=M(s.col,-.55),sclera=M('#e9e2d2'),n=s.spikes||5,i;
+  p.ball=grp(b,0,1.3,0);
+  mk(G.sph,sclera,p.ball,0,0,.06,.9,.9,.9);
+  mk(G.sph,c,p.ball,0,.02,-.16,.98,.98,.9);
+  mk(ringGeo('eyeLash'+n,n,.74,0,.5,.62,.17,.3),dk,p.ball,0,0,-.05).rotation.x=-PI/2;
+  mk(merged('eyeVeins',function(add){for(var i=0;i<7;i++){var a=i*TAU/7+.2;add(G.box,cos(a)*.6,sin(a)*.6,.68,cos(a),sin(a),-.75,.035,.36,.02)}}),M('#b8263d'),p.ball,0,0,0,1,1,1,true);
+  p.iris=mk(G.sph,FX.iris,p.ball,0,0,.6,.5,.5,.4,true);
+  p.pupil=mk(G.sph,FX.pupil,p.ball,0,0,.86,.22,.3,.18,true);
+  p.nerves=[];
+  for(i=0;i<4;i++){var a=i*TAU/4+.6,o=grp(b,cos(a)*.34,.52,sin(a)*.34-.1);seg(G.cyl,dk,o,0,0,0,0,-.3,0,.085);var o2=grp(o,0,-.3,0);seg(G.cone,dk,o2,0,0,0,0,-.42,0,.085);mk(G.sphLo,dk,o2,0,0,0,.085,.085,.085);p.nerves.push({a:o,b:o2,ph:i*1.7})}
+};
+ANIM.beamer=function(p,m,t,tt,st,look){
+  var wind=st==='wind',beam=st==='beam',i,q,k;
+  p.ball.rotation.y=wind||beam?0:look*.5;p.ball.rotation.x=beam?.22:wind?.12:.05*sin(tt*1.7);
+  var mat=beam||wind&&sin(t*38)>0?FX.irisHot:FX.iris;if(p.iris.material!==FX.white&&p.iris.material!==mat)p.iris.material=mat;
+  k=beam?1.12+.06*sin(t*50):wind?.8+.25*(1-max(0,min(1,(m.t||0)/.95))):1+.05*sin(tt*3);p.iris.scale.set(.5*k,.5*k,.4);
+  k=beam?.5:wind?1.3:1;p.pupil.scale.set(.22*k,.3*k,.18);
+  for(i=0;i<p.nerves.length;i++){q=p.nerves[i];q.a.rotation.x=sin(tt*2.2+q.ph)*.3+(beam?.5:0);q.a.rotation.z=cos(tt*1.8+q.ph)*.25;q.b.rotation.x=sin(tt*3+q.ph)*.4}
+  if(beam)p.body.position.y+=.03*sin(t*60);
+};
+
+/* ---------- status and modifier dressing (shared materials, built lazily per monster, nothing allocated per frame) ---------- */
+var FXM=null,MODS=['shielded','splitting','burning','swift','vampiric','thorned'];
+function fxm(){
+  if(FXM)return FXM;
+  var add=function(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})};
+  FXM={
+    ward:add(0xcfe6ff,.3),wardRim:new T.MeshBasicMaterial({color:0xe8f4ff,transparent:true,opacity:.22,wireframe:true,depthWrite:false,fog:false,toneMapped:false}),
+    shell:new T.MeshStandardMaterial({color:0x8fb0e8,emissive:0x2a56b0,emissiveIntensity:.9,roughness:.3,metalness:.3,flatShading:true}),
+    shellEdge:new T.MeshBasicMaterial({color:0xa9c8ff,transparent:true,opacity:.55,wireframe:true,depthWrite:false,fog:false,toneMapped:false}),
+    flame:add(0xff8a2a,.9),flameCore:add(0xffe08a,.9),streak:add(0xdff3ff,.5),blood:add(0xb00a1c,.75),
+    drop:new T.MeshStandardMaterial({color:0x7a0612,emissive:0xc0101e,emissiveIntensity:.8,roughness:.3}),
+    thorn:new T.MeshStandardMaterial({color:0xe7dfcd,emissive:0x2a2620,roughness:.6,flatShading:true}),
+    thornTip:new T.MeshStandardMaterial({color:0x8c2f39,emissive:0x2a0508,roughness:.5,flatShading:true}),
+    seam:new T.MeshBasicMaterial({color:0x8fe02a,fog:false,toneMapped:false}),seamGlow:add(0x58c010,.3),
+    dot:add(0x7fe85a,.8),mark:new T.MeshBasicMaterial({color:0xff2a40,fog:false,toneMapped:false,transparent:true,opacity:.95,depthTest:false}),
+    burst:add(0xff6a5a,.6),frost:add(0x8fd3ff,.45)
+  };
+  return FXM;
+}
+// tinted twins of a body material, cached on the material itself so every monster of that colour shares them
+var VAR={rage:new Map(),slow:new Map()};
+function variant(mat,kind){
+  if(!mat.userData||!mat.userData.mbBody)return mat;
+  var map=VAR[kind],v=map.get(mat);if(v)return v;
+  v=mat.clone();v.userData={};
+  if(kind==='rage'){v.color.lerp(_c.set(0xff2a30),.28);v.emissive.setRGB(.85,.05,.07);v.emissiveIntensity=.5}
+  else{v.color.lerp(_c.set(0x3f8cff),.6);v.emissive.setRGB(.05,.16,.4);v.emissiveIntensity=.5}
+  map.set(mat,v);return v;
+}
+function fxMesh(geo,mat,par,x,y,z,sx,sy,sz){
+  var o=new T.Mesh(geo,mat);o.position.set(x||0,y||0,z||0);if(sx!==undefined)o.scale.set(sx,sy===undefined?sx:sy,sz===undefined?sx:sz);o.castShadow=false;par.add(o);return o;
+}
+var DRESS={
+  stars:function(u){var st=grp(u.root,0,u.cfg.top,u.ai==='hound'?.7:0),i;for(i=0;i<3;i++){var a=i*TAU/3;fxMesh(G.oct,FX.star,st,cos(a)*.62,0,sin(a)*.62,.15,.21,.15)}return st},
+  ward:function(u){var g=grp(u.fx,0,u.top*.5,0);fxMesh(G.sph,FXM.ward,g,0,0,0,1.38,u.top*.62,1.38).renderOrder=5;fxMesh(G.ico1,FXM.wardRim,g,0,0,0,1.4,u.top*.63,1.4).renderOrder=5;return g},
+  shielded:function(u){var g=grp(u.fx,0,u.top*.5,0),i;for(i=0;i<3;i++){var a=i*TAU/3,h=grp(g,cos(a)*1.3,0,sin(a)*1.3);h.rotation.y=PI/2-a;
+      fxMesh(merged('shieldPlate',function(add){add(G.box,0,.06,0,0,1,0,.52,.5,.07);add(G.cone4,0,-.19,0,0,-1,0,.37,.4,.05);add(G.box,0,.06,.04,0,1,0,.1,.5,.05)}),FXM.shell,h).castShadow=true}return g},
+  burning:function(u){var g=grp(u.fx),i;for(i=0;i<6;i++){var f=grp(g);fxMesh(G.cone4,FXM.flame,f,0,0,0,.2,.6,.2);fxMesh(G.cone4,FXM.flameCore,f,0,0,0,.1,.34,.1)}return g},
+  swift:function(u){var g=grp(u.fx),i;for(i=0;i<4;i++)fxMesh(G.box,FXM.streak,g,(i-1.5)*.5,.35+((i*7)%3)*.42,-1.5,.05,.05,1.5);return g},
+  vampiric:function(u){var g=grp(u.fx),i;fxMesh(G.aura,auraMat(0xb00a1c),g,0,.05,0,1.9,1,1.9).renderOrder=1;for(i=0;i<3;i++)fxMesh(G.sphLo,FXM.drop,g,0,0,0,.12,.17,.12);return g},
+  thorned:function(u){var g=grp(u.fx);
+    fxMesh(ringGeo('thornA',11,.82,0,.3,.7,.14),FXM.thorn,g,0,u.top*.3+.12,0).castShadow=true;
+    fxMesh(ringGeo('thornB',7,.6,0,1.1,.55,.12,.4),FXM.thorn,g,0,u.top*.5+.1,0);return g},
+  splitting:function(u){var g=grp(u.root,0,u.cfg.top*.47,0);var a=fxMesh(G.torus,FXM.seam,g,0,0,0,1,1,1);a.rotation.z=PI/2;a.scale.set(u.cfg.top*.5,.3,.92);
+    var b=fxMesh(G.torus,FXM.seamGlow,g,0,0,0,1,1,1);b.rotation.z=PI/2;b.scale.set(u.cfg.top*.52,.9,.95);return g},
+  dot:function(u){var g=grp(u.fx),i;for(i=0;i<5;i++)fxMesh(G.sphLo,FXM.dot,g,0,0,0,.14);return g},
+  mark:function(u){var g=grp(u.fx,0,u.top+.55,0);g.renderOrder=7;fxMesh(G.torus,FXM.mark,g,0,0,0,.5,.6,.5).renderOrder=7;
+    fxMesh(merged('markTicks',function(add){for(var i=0;i<4;i++){var a=i*TAU/4;add(G.box,cos(a)*.62,0,sin(a)*.62,cos(a),0,sin(a),.07,.36,.07)}}),FXM.mark,g).renderOrder=7;return g},
+  burst:function(u){return fxMesh(G.sph,FXM.burst,u.fx,0,u.top*.5,0,1)},
+  slow:function(u){return fxMesh(G.aura,auraMat(0x8fd3ff),u.fx,0,.06,0,1.5,1,1.5)}
+};
+function dress(u,k,on){
+  var o=u.f[k];
+  if(!on){if(o)o.visible=false;return null}
+  if(!o)o=u.f[k]=DRESS[k](u);
+  o.visible=true;return o;
+}
+// closest existing body for an ai id this file has no model for
+function pickAi(m){
+  if(BUILD[m.ai])return m.ai;if(ALIAS[m.ai])return ALIAS[m.ai];if(BUILD[m.kind])return m.kind;
+  var s=m.s||{};
+  if(s.ai&&BUILD[s.ai])return s.ai;
+  if(s.void)return'hollow';if(s.hood)return'witch';if(s.pust)return'mother';if(s.mask)return'mimic';if(s.teeth)return'burrower';
+  if(s.legs)return(m.r||s.r||20)<13?'mite':'crawler';if(s.spikes)return s.spikes>4?'hound':'fist';
+  return'mimic';
+}
+var ALIAS={husk:'mite',splitter:'mimic',lobber:'bomber',caller:'summoner',sweeper:'beamer'};
+
 /* ---------- interface ---------- */
 function wrap(a){a=(a+PI)%TAU;if(a<0)a+=TAU;return a-PI}
 function create(m,MB){
-  geos();fx();
-  var s=m.s||{},ai=BUILD[m.ai]?m.ai:BUILD[m.kind]?m.kind:'mimic';
+  geos();fx();fxm();
+  var s=m.s||{},ai=pickAi(m);
   if(!m.s)m={s:{col:'#888888',eyes:2},ai:ai,r:m.r||20,seed:0,boss:m.boss};
   var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
   REG=[];
@@ -369,12 +524,9 @@ function create(m,MB){
   var meshes=REG,mats=[],i;REG=null;
   for(i=0;i<meshes.length;i++)mats.push(meshes[i].material);
   root.scale.setScalar(r*(cfg.k||1));
-  var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,fl:false,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,stars:null,aura:null,r:r};
-  if(ai==='hound'||ai==='hollow'){
-    var st=grp(root,0,cfg.top,ai==='hound'?.7:0);st.visible=false;
-    for(i=0;i<3;i++){var a=i*TAU/3,o=new T.Mesh(G.oct,FX.star);o.position.set(cos(a)*.62,0,sin(a)*.62);o.scale.set(.15,.21,.15);st.add(o)}
-    u.stars=st;
-  }
+  var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,mode:0,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,aura:null,r:r,
+    fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x,pz:m.y,mv:0,ma:0,auraCol:m.s.col,rageMats:null};
+  u.fx.scale.setScalar(r);
   if(m.boss&&ai!=='mimic'){
     var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;g.add(au);u.aura=au;
   }
@@ -383,28 +535,33 @@ function create(m,MB){
 }
 function update(g,m,MB,dt){
   var u=g.userData.mb;if(!u)return;
-  var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,tt=t+seed,st=m.st,cfg=u.cfg,p=u.p,body=u.body,root=u.root,i;
+  var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st,cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
   dt=dt>0?min(dt,.1):1/60;
-  var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));if(u.aura)u.aura.scale.setScalar(r*2.3)}
+  var rage=!!m.rage,stun=m.stun>0;
+  if(rage)u.extra+=dt*.8; // enraged: everything idles faster
+  var tt=t+seed+u.extra;
+  var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));u.fx.scale.setScalar(r);if(u.aura)u.aura.scale.setScalar(r*2.3)}
   // facing
-  var a=Math.atan2(P.y-m.y,P.x-m.x),fast=st==='charge'||st==='lunge',face=fast?m.ang:a;
+  var a=P?Math.atan2(P.y-m.y,P.x-m.x):0,fast=st==='charge'||st==='lunge',face=fast&&typeof m.ang==='number'?m.ang:a;
   if(u.ai==='hound'&&st==='idle'&&typeof m.side==='number')face=a+.9*m.side;
+  else if(u.ai==='beamer'&&(st==='wind'||st==='beam')&&typeof m.ba==='number')face=m.ba;
   else if(u.ai==='mite')face=a+sin(t*3+seed)*.6;
   var want=PI/2-face;
-  if(!u.init){u.init=true;u.rot=want}else u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
+  if(!u.init){u.init=true;u.rot=want}else if(!stun)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
   root.rotation.y=u.rot;
   var look=wrap(PI/2-a-u.rot);look=look>1.1?1.1:look<-1.1?-1.1:look;
   // pose targets
   var sx=1,sy=1,sz=1,tilt=0,roll=0,shake=0,lift=m.lift||0;
   if(st==='wind'){sy=.8;sx=sz=1.1;tilt=-.1;shake=1}
   else if(fast){sz=1.28;sx=.9;sy=.9;tilt=.2}
-  else if(st==='dazed'){sy=.86;sx=sz=1.05;tilt=.16;roll=sin(tt*3)*.12}
+  else if(st==='dazed'||stun){sy=.86;sx=sz=1.05;tilt=.16;roll=sin(tt*3)*.12}
   else if(st==='leap'){sy=1.12-.1*sin(lift*PI);sx=sz=.94}
+  if(rage&&!shake)shake=.22;
   if(u.prev==='leap'&&st!=='leap')u.slam=.3;u.prev=st;
-  if(u.slam>0){u.slam=max(0,u.slam-dt);var q=u.slam/.3;sy*=1-.32*q;sx*=1+.2*q;sz*=1+.2*q}
-  var k=min(1,dt*16);
+  if(u.slam>0){u.slam=max(0,u.slam-dt);q=u.slam/.3;sy*=1-.32*q;sx*=1+.2*q;sz*=1+.2*q}
+  k=min(1,dt*16);
   u.sx+=(sx-u.sx)*k;u.sy+=(sy-u.sy)*k;u.sz+=(sz-u.sz)*k;u.tilt+=(tilt-u.tilt)*k;u.shake+=(shake-u.shake)*k;
-  var br=1+cfg.br*sin(tt*cfg.spd*.8);
+  var br=1+cfg.br*(rage?1.8:1)*sin(tt*cfg.spd*.8);
   body.scale.set(u.sx*br,u.sy*(2-br),u.sz*br);
   body.rotation.set(u.tilt,0,roll);
   body.position.y=cfg.y0+(st==='idle'||st==='up'?cfg.bob*(.5+.5*sin(tt*cfg.spd)):0);
@@ -412,15 +569,63 @@ function update(g,m,MB,dt){
   ANIM[u.ai](p,m,t,tt,st,look,u,dt);
   // eyes follow the player
   var E=p.eyes;for(i=0;i<E.length;i++)E[i].pu.position.x=E[i].x+look*E[i].er*.38;
-  // dazed stars
-  if(u.stars){var dz=st==='dazed';u.stars.visible=dz;if(dz){u.stars.rotation.y=t*5;u.stars.position.y=cfg.top*u.sy+.08*sin(t*7)}}
+  // dazed or stunned: stars
+  var dz=st==='dazed'||stun;
+  if(dz||u.f.stars){o=dress(u,'stars',dz);if(o){o.rotation.y=t*5;o.position.y=cfg.top*u.sy+.08*sin(t*7)}}
+  // enrage and phase changes: a burst, then a red pulse that stays
+  var ph=m.phase||1;
+  if(rage!==u.rage||ph!==u.phase){if(rage&&!u.rage||ph>u.phase)u.burst=.55;u.rage=rage;u.phase=ph}
+  if(u.burst>0||u.f.burst){
+    u.burst=max(0,u.burst-dt);o=dress(u,'burst',u.burst>0);
+    if(o){q=1-u.burst/.55;k=1.1+q*2.6;o.scale.set(k,k*.8,k);FXM.burst.opacity=.42*(1-q)*(1-q)}
+  }
   // boss aura stays on the ground while the body leaps
-  if(u.aura){u.aura.position.y=.8-g.position.y;u.aura.material.opacity=.5+.12*sin(t*2.4)}
-  // hit flash
-  var on=m.flash>0;
-  if(on!==u.fl){u.fl=on;var ms=u.meshes,mt=u.mats;for(i=0;i<ms.length;i++)ms[i].material=on?FX.white:mt[i]}
+  if(u.aura){
+    var ac=rage?'#ff2038':u.auraCol;if(ac!==u.auraNow){u.auraNow=ac;u.aura.material=auraMat(ac)}
+    u.aura.position.y=.8-g.position.y;
+    if(rage){k=r*(2.5+.25*sin(t*9));u.aura.scale.set(k,k,k);u.aura.material.opacity=.62+.2*sin(t*9)}
+    else{u.aura.material.opacity=.5+.12*sin(t*2.4)}
+  }
+  // body materials: hit flash, then chill, then rage
+  var mode=m.flash>0?1:m.slow>0?3:rage?2:0;
+  if(mode!==u.mode){
+    u.mode=mode;var ms=u.meshes,mt=u.mats,kind=mode===2?'rage':'slow';
+    for(i=0;i<ms.length;i++)ms[i].material=mode===0?mt[i]:mode===1?FX.white:variant(mt[i],kind);
+    if(mode===2&&!u.rageMats){u.rageMats=[];for(i=0;i<mt.length;i++){o=variant(mt[i],'rage');if(o!==mt[i]&&u.rageMats.indexOf(o)<0)u.rageMats.push(o)}}
+  }
+  if(mode===2&&u.rageMats){k=.42+.3*sin(t*7.5);for(i=0;i<u.rageMats.length;i++)u.rageMats[i].emissiveIntensity=k}
+  // statuses
+  var F=u.f,top=u.top,on;
+  on=m.slow>0;if(on||F.slow){o=dress(u,'slow',on);if(o){o.position.y=.06-g.position.y/r;o.rotation.y=t*.7}}
+  on=m.ward>0;if(on||F.ward){o=dress(u,'ward',on);if(o){k=1+.05*sin(t*11);o.scale.set(k,k,k);o.rotation.y=t*.8;FXM.ward.opacity=.26+.1*sin(t*11)}}
+  on=m.dotT>0;if(on||F.dot){o=dress(u,'dot',on);if(o)for(i=0;i<o.children.length;i++){q=(tt*.85+i*.2)%1;k=i*2.4+seed;
+    o.children[i].position.set(cos(k+q*2)*(1.12-.3*q),.25+q*top*1.05,sin(k+q*2)*(1.12-.3*q));k=.2*(1-q*.7);o.children[i].scale.set(k,k*1.3,k)}}
+  on=m.markT>0;if(on||F.mark){o=dress(u,'mark',on);if(o){o.rotation.y=t*2.2;k=1+.14*sin(t*9);o.scale.set(k,k,k);o.position.y=top+.6+.06*sin(t*5)}}
+  // modifiers
+  var mods=m.mods,nm=mods?mods.length:0;
+  if(nm||u.nm){
+    u.nm=nm;
+    // how fast and which way it is moving, for the streaks
+    var vx=(m.x-u.px)/dt,vz=(m.y-u.pz)/dt,sp=Math.sqrt(vx*vx+vz*vz);u.px=m.x;u.pz=m.y;
+    if(sp>12&&sp<1500)u.ma=Math.atan2(vz,vx);u.mv+=((sp>12?min(1,sp/120):0)-u.mv)*min(1,dt*8);
+    for(i=0;i<MODS.length;i++){
+      k=MODS[i];on=nm>0&&mods.indexOf(k)>=0;
+      if(!on&&!F[k])continue;
+      o=dress(u,k,on);if(!o)continue;
+      var j,c;
+      if(k==='shielded'){o.rotation.y=t*1.1+seed;o.position.y=top*.5+.08*sin(t*2.3);q=m.ward>0?1.12:1;o.scale.set(q,1,q)}
+      else if(k==='burning'){for(j=0;j<o.children.length;j++){c=o.children[j];q=(tt*1.6+j*.37)%1;var ba=j*TAU/6+seed+sin(tt+j)*.3;
+        c.position.set(cos(ba)*(1.14-.2*q),.2+((j*5)%3)*.3*top*.4+q*top*.6,sin(ba)*(1.14-.2*q));var fs=(1-q)*(1+.3*sin(t*31+j));c.scale.set(fs,fs*(1+q),fs)}}
+      else if(k==='swift'){o.rotation.y=PI/2-u.ma;q=.25+.75*u.mv;FXM.streak.opacity=.5;
+        for(j=0;j<o.children.length;j++){c=o.children[j];var sl=(.5+.9*q)*(1+.3*sin(t*17+j*2));c.scale.z=sl;c.position.z=-.9-sl*.5-.25*sin(t*13+j);c.visible=q>.3||j<2}}
+      else if(k==='vampiric'){c=o.children[0];c.position.y=.05-g.position.y/r;q=1.9+.2*sin(t*3);c.scale.set(q,1,q);
+        for(j=1;j<o.children.length;j++){c=o.children[j];ba=t*2.2+j*TAU/3;c.position.set(cos(ba)*1.15,top*.45+.3*sin(t*3+j),sin(ba)*1.15)}}
+      else if(k==='thorned'){o.rotation.y=sin(tt*1.3)*.12;q=1+(st==='wind'?.12:.03)*sin(t*(st==='wind'?30:3));o.scale.set(q,1,q)}
+      else if(k==='splitting'){q=.5+.5*sin(t*5+seed);FXM.seamGlow.opacity=.15+.25*q;o.scale.set(1+.4*q,1,1)}
+    }
+  }
 }
 window.MBModels.monster={create:create,update:update,
   // optional helpers for the renderer: world height of the top of the head, and a no-op dispose (geometry and materials are shared)
-  height:function(m){var c=CFG[m.ai]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:function(){}};
+  height:function(m){var c=CFG[pickAi(m)]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:function(){}};
 })();

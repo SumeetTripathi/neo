@@ -85,6 +85,95 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
   .touch{align-items:flex-end}.touch .acts{max-width:150px;gap:8px}.touch .acts button{width:68px;height:68px}
   .cards button{padding:7px 10px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.35rem}
 }
+/* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them. Layered over the grid game.js injects. ---- */
+:root{--mb-btn:1}
+.wrap #pad{width:calc(120px*max(1,var(--mb-btn)));height:calc(120px*max(1,var(--mb-btn)))}
+.wrap .touch .acts{grid-template-columns:calc(64px*var(--mb-btn)) calc(64px*var(--mb-btn)) calc(84px*var(--mb-btn));grid-template-rows:calc(64px*var(--mb-btn)) calc(84px*var(--mb-btn));gap:calc(10px*var(--mb-btn))}
+.wrap .touch .acts button{font-size:calc(1rem*var(--mb-btn))}
+.wrap .touch .acts button.sk{height:calc(64px*var(--mb-btn));font-size:calc(.66rem*var(--mb-btn))}
+.mb-left .touch{flex-direction:row-reverse}
+.mb-left .wrap .touch .acts{grid-template-columns:calc(84px*var(--mb-btn)) calc(64px*var(--mb-btn)) calc(64px*var(--mb-btn))}
+.mb-left #bDash{grid-area:1/1}.mb-left #bAtk{grid-area:2/1}
+.mb-left #bSkill{grid-area:1/2}.mb-left #bSkill2{grid-area:1/3}.mb-left #bSkill3{grid-area:2/2}.mb-left #bSkill4{grid-area:2/3}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
+  .wrap .touch .acts{grid-template-columns:calc(58px*var(--mb-btn)) calc(58px*var(--mb-btn)) calc(76px*var(--mb-btn));grid-template-rows:calc(58px*var(--mb-btn)) calc(76px*var(--mb-btn));gap:calc(8px*var(--mb-btn))}
+  .wrap .touch .acts button.sk{height:calc(58px*var(--mb-btn));font-size:calc(.6rem*var(--mb-btn))}
+  .mb-left .wrap .touch .acts{grid-template-columns:calc(76px*var(--mb-btn)) calc(58px*var(--mb-btn)) calc(58px*var(--mb-btn))}
+}
+
+/* ---- extras.js: settings, records and story layer over the arena; hint toast ---- */
+#mbx{grid-area:1/1;position:relative;z-index:3;display:grid;place-items:center;padding:16px;box-sizing:border-box;min-width:0;min-height:0;overflow:auto;background:rgba(13,12,17,.95)}
+.mbx-panel{box-sizing:border-box;width:100%;max-width:680px;min-width:0;display:flex;flex-direction:column;gap:12px;align-items:stretch;border:1px solid var(--stone-2);background:var(--ink);padding:18px 22px;outline:0}
+.mbx-panel .kick{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--marrow);margin:0;text-align:center}
+.mbx-panel h2{font-family:var(--display);font-weight:400;font-size:2.1rem;line-height:1;margin:0;text-align:center;text-wrap:balance}
+.mbx-panel p{margin:0;text-wrap:pretty}
+.mbx-panel .dim{color:var(--ash);font-size:.9rem}
+.mbx-panel .btns{margin-top:2px}
+.mbx-panel .btns button{min-height:40px}
+.mbx-rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:4px 28px}
+.mbx-row{display:grid;grid-template-columns:116px minmax(0,1fr);align-items:center;gap:12px;min-height:44px;border:0;margin:0;padding:0;min-width:0}
+.mbx-row>.lab,.mbx-row>legend{padding:0;float:left;white-space:nowrap}
+.mbx-row .val{color:var(--ash);font-size:.85rem;font-variant-numeric:tabular-nums;min-width:3.2em;text-align:right}
+.mbx-ctl{display:flex;align-items:center;gap:10px;min-width:0}
+.mbx-ctl input[type=range]{-webkit-appearance:none;appearance:none;flex:1;min-width:0;height:40px;margin:0;background:transparent;cursor:pointer;accent-color:var(--marrow)}
+.mbx-ctl input[type=range]::-webkit-slider-runnable-track{height:6px;background:linear-gradient(to right,var(--marrow) var(--fill,50%),var(--stone-2) 0);border:0}
+.mbx-ctl input[type=range]::-moz-range-track{height:6px;background:var(--stone-2);border:0}
+.mbx-ctl input[type=range]::-moz-range-progress{height:6px;background:var(--marrow)}
+.mbx-ctl input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:26px;margin-top:-10px;background:var(--bone);border:1px solid var(--ink);border-radius:0}
+.mbx-ctl input[type=range]::-moz-range-thumb{width:18px;height:26px;background:var(--bone);border:1px solid var(--ink);border-radius:0}
+.mbx-ctl input[type=range]:focus-visible{outline:2px solid var(--marrow);outline-offset:2px}
+.mbx-seg{display:flex;flex:1;min-width:0}
+.mbx-seg label{flex:1;position:relative;display:block;min-width:0}
+.mbx-seg input,.mbx-sw input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
+.mbx-seg span{display:block;text-align:center;padding:7px 6px;border:1px solid var(--ash);background:var(--stone);margin-left:-1px;color:var(--bone)}
+.mbx-seg label:first-child span{margin-left:0}
+.mbx-seg input:checked+span{background:var(--bone);color:var(--ink);border-color:var(--bone);font-weight:600}
+.mbx-seg input:focus-visible+span,.mbx-sw input:focus-visible+span{outline:2px solid var(--marrow);outline-offset:2px;position:relative;z-index:1}
+.mbx-sw{position:relative;display:inline-flex;align-items:center;gap:10px;min-height:40px;cursor:pointer}
+.mbx-sw span{display:block;width:52px;height:26px;border:1px solid var(--ash);background:var(--stone);position:relative;flex:none}
+.mbx-sw span::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:18px;background:var(--ash);transition:transform .12s}
+.mbx-sw input:checked+span{border-color:var(--marrow)}
+.mbx-sw input:checked+span::after{transform:translateX(24px);background:var(--marrow)}
+.mbx-sw em{font-style:normal;color:var(--ash);font-size:.85rem}
+.mbx-panel textarea{font:14px/1.35 ui-monospace,Menlo,Consolas,monospace;color:var(--bone);background:var(--stone);border:1px solid var(--ash);padding:8px 10px;width:100%;box-sizing:border-box;min-height:92px;resize:none;border-radius:0;word-break:break-all;user-select:text;-webkit-user-select:text}
+.mbx-panel textarea:focus-visible{outline:2px solid var(--marrow);outline-offset:2px}
+.mbx-msg{min-height:1.4em;font-size:.92rem;color:var(--ash);text-align:center}
+.mbx-msg.bad{color:#ff8497}.mbx-msg.good{color:var(--marrow)}
+.mbx-wide{max-width:780px}
+.mbx-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(104px,1fr));gap:8px}
+.mbx-tiles div{border:1px solid var(--stone-2);padding:7px 10px;min-width:0}
+.mbx-tiles b{display:block;font-family:var(--display);font-weight:400;font-size:1.7rem;line-height:1.05}
+.mbx-tiles small,.mbx-rec h3{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ash);font-weight:400;margin:0}
+.mbx-rec{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:12px 26px;align-items:start}
+.mbx-rec h3{color:var(--marrow);margin-bottom:4px}
+.mbx-rec table{border-collapse:collapse;width:100%;font-size:.9rem;font-variant-numeric:tabular-nums}
+.mbx-rec th,.mbx-rec td{text-align:right;padding:3px 0 3px 10px;border-bottom:1px solid var(--stone-2);font-weight:400}
+.mbx-rec th:first-child,.mbx-rec td:first-child{text-align:left;padding-left:0}
+.mbx-rec thead th{color:var(--ash);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase}
+.mbx-rec ol{list-style:none;margin:0;padding:0;font-size:.9rem}
+.mbx-rec ol li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--stone-2)}
+.mbx-rec ol li span:last-child{color:var(--marrow);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mbx-story{max-width:560px;text-align:center;gap:14px;padding:26px 30px;cursor:pointer;animation:mbxIn .5s ease-out}
+.mbx-story .tale{font-size:1.12rem;line-height:1.55;font-style:italic}
+@keyframes mbxIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+#mbHint{grid-area:1/1;position:relative;z-index:2;align-self:start;justify-self:center;margin:12px 12px 0;max-width:min(430px,calc(100% - 24px));box-sizing:border-box;pointer-events:none;
+  background:rgba(13,12,17,.9);border:1px solid var(--marrow);border-left-width:4px;padding:7px 14px;font-size:.95rem;line-height:1.35;text-align:left;opacity:0;transform:translateY(-6px);transition:opacity .35s,transform .35s}
+#mbHint.on{opacity:1;transform:none}
+#mbHint b{display:block;font-weight:400;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:var(--marrow)}
+.panel .mbx-note{color:var(--ash);font-size:.9rem;border-top:1px solid var(--stone-2);padding-top:8px;align-self:stretch}
+.panel .mbx-note b{color:var(--marrow);font-weight:600}
+@media (prefers-reduced-motion:reduce){.mbx-story{animation:none}#mbHint{transition:none}}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
+  #mbx{padding:8px;width:100%;height:100%;background:var(--ink)}
+  /* a screen is up (title, reward, pause, settings): the floating stick and buttons would only cover it */
+  .stage:has(#ov:not([hidden]))~.touch,.stage:has(#mbx:not([hidden]))~.touch{visibility:hidden}
+  .mbx-panel{padding:10px 18px;gap:6px}.mbx-panel h2{font-size:1.6rem}.mbx-panel p{font-size:.92rem;line-height:1.35}
+  .mbx-row{min-height:40px}.mbx-rows{gap:0 24px}
+  .mbx-panel textarea{min-height:64px;font-size:12px}
+  .mbx-story{padding:14px 22px;gap:8px}.mbx-story .tale{font-size:1rem;line-height:1.45}
+  .mbx-tiles b{font-size:1.35rem}.mbx-tiles div{padding:4px 8px}.mbx-rec table,.mbx-rec ol{font-size:.82rem}
+  #mbHint{margin-top:40px;font-size:.85rem;max-width:min(360px,calc(100% - 24px))}
+}
 </style>
 
 <main class="wrap">
@@ -114,7 +203,7 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
     <div id="pad"><div id="knob"></div></div>
     <div class="acts"><button id="bDash" type="button">Dash</button><button id="bAtk" type="button" class="primary">Strike</button><button id="bSkill" type="button" hidden>Skill</button></div>
   </div>
-  <p class="kbd"><kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>E</kbd> for your class skill, once you earn it</p>
+  <p class="kbd"><kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> for class skills · <kbd>Esc</kbd> to pause</p>
 </main>
 
 <script src="vendor/three.min.js"></script>

@@ -181,20 +181,55 @@ const SPEC={
  wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:245,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
  king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1100,col:'#8c2f39',eyes:3,void:1,spikes:11},
  mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
+ // generated levels only: a toad that lobs bombs, a caller that hides behind its husks, an eye that sweeps a beam
+ bomber:{name:'Cinder Toad',r:27,hp:240,col:'#c9642f',eyes:2,pust:1},
+ summoner:{name:'Grave Caller',r:21,hp:220,col:'#4f8f8a',eyes:3,hood:1},
+ beamer:{name:'Lidless Eye',r:25,hp:230,col:'#c2a640',eyes:1,spikes:5},
+ husk:{name:'Husk',ai:'mite',r:12,hp:6,col:'#a9b7a0',eyes:2,legs:4},
 };
 // levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
 const AREAS=[['The Ash Road',28],['The Drowned Fen',165],['The Bone Peaks',215],['The Black Court',285],['The Endless Dark',340]];
 const PRE=['Ashen','Dread','Rotting','Gilded','Howling','Pale','Iron','Blighted','Starved','Elder'];
-const POOL=['crawler','hound','witch','fist','mother','burrower'];
+const POOL=['crawler','hound','witch','fist','beamer','burrower','bomber','summoner','mother'];
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
-const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1350};
+const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1350,bomber:560,summoner:400,beamer:540};
 const genMul=n=>{const k=Math.max(0,n-12);return 1+.062*k+.0055*k*k};
+// Everything about a level follows from its number, so a retry meets the same room and the same monster.
+// Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
+const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
+const MODHP={shielded:.9,vampiric:.9,splitting:.9};
+function modsOf(n,kind,tyrant){
+  if(n<14||tyrant||n<30&&n%3===0)return[];
+  const i=(n*7+1)%6,out=[MODS[i]];if(n>=40&&n%2===0)out.push(MODS[(i+1+n%4)%6]);
+  return out.map(x=>x==='shielded'&&kind==='summoner'?'swift':x).filter((x,j,l)=>l.indexOf(x)===j); // the caller already has a ward of its own
+}
+// Waves from level 14: some levels open with one or two packs of lesser monsters before the boss enters. Tyrant levels never do.
+const wavesOf=n=>n<13?0:[1,0,2,0,0][(n-13)%5];
+// Rooms: which obstacles stand where. Anchor sets are mirror-symmetric and keep clear of both spawn points; solid things are never combined closer than a boss is wide.
+const QA=[[250,190],[710,190],[250,410],[710,410]],QB=[[300,300],[660,300]],QC=[[480,300]],QD=[[165,300],[795,300]],QE=[[360,205],[600,205],[360,395],[600,395]];
+const ROOMS=[[],[['pillar',QB]],[['pillar',QA]],[['spikes',QE]],[['pillar',QC],['spikes',QE]],[['brazier',QB]],[['pit',QB]],[['spikes',QE],['spikes',QC]],[['brazier',QA]],[['pit',QD],['spikes',QB]],[['pillar',QA],['brazier',QC]],[['pit',QC],['pillar',QD]]];
+// levels 1-3 are bare; the crypt and the first trade levels bring in one thing at a time (pillars, spikes, braziers, pits); after that the room follows from the level number
+const roomOf=(n,tyrant)=>n<3?0:n<12?[1,2,3,4,2,5,6,7,8][n-3]:tyrant?8:(n*7+2)%12;
+const cap1=x=>x[0].toUpperCase()+x.slice(1);
 function levelDef(n){
-  if(n<LEVELS.length){const L=LEVELS[n];return{title:L.title,hint:L.hint,kind:L.boss,spec:SPEC[L.boss],hue:100}}
-  const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],mult=genMul(n);
-  const spec={...base,ai:kind,crown:tyrant?1:0,name:tyrant?'Tyrant of '+area[0].replace('The ',''):PRE[n%10]+' '+base.name.replace('The ',''),hp:Math.round(GENHP[kind]*mult),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
-  return{title:area[0],hint:tyrant?'A tyrant holds this ground.':N===50?'':'Stronger than the last. So are you.',kind,spec,hue:area[1]};
+  if(n<LEVELS.length){const L=LEVELS[n];return{title:L.title,hint:L.hint,kind:L.boss,spec:SPEC[L.boss],hue:100,waves:0,mods:[],room:roomOf(n)}}
+  const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],waves=wavesOf(n),mods=modsOf(n,kind,tyrant);
+  let hp=GENHP[kind]*genMul(n)*[1,.8,.68][waves];for(const k of mods)hp*=MODHP[k]||1;
+  const name=tyrant?'Tyrant of '+area[0].replace('The ',''):(mods[0]?cap1(mods[0])+' ':'')+PRE[n%10]+' '+base.name.replace('The ','')+(mods[1]?', '+cap1(mods[1]):'');
+  const spec={...base,ai:kind,crown:tyrant?1:0,name,hp:Math.round(hp),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
+  return{title:area[0],hint:tyrant?'A tyrant holds this ground.':N===50?'':waves>1?'Two packs come first. Then it does.':waves?'Its pack comes first. Then it does.':'Stronger than the last. So are you.',kind,spec,hue:area[1],waves,mods,room:roomOf(n,tyrant)};
+}
+// a small, weaker copy of a pool monster: wave packs and what a splitting boss sheds
+function lesserSpec(kind,n,hp){const base=SPEC[kind];return{...base,ai:base.ai||kind,name:'Lesser '+base.name.replace('The ',''),r:Math.round(base.r*.72),hp:Math.max(6,Math.round(hp))}}
+function buildRoom(n,room){
+  const out=[],quick=Math.max(.75,1-Math.max(0,n-12)*.006); // traps cycle a little faster deep down
+  for(const[kind,set]of ROOMS[room]||[])set.forEach(([x,y],i)=>{
+    const o={kind,x,y,r:kind==='pillar'?26:kind==='pit'?(set===QC?54:46):kind==='spikes'?36:62,on:false,t:0,warn:false,per:0,core:0};
+    if(kind==='spikes'){o.per=3.4*quick;o.t=(i%2)*o.per*.35} // every trap starts inside its quiet stretch, so nothing fires without its warning
+    if(kind==='brazier'){o.per=4.6*quick;o.core=13;o.t=i/set.length*o.per*.45}
+    out.push(o)});
+  return out;
 }
 
 /* ---------- equipment: three slots, four rarities, dropped by every boss from level 9 on ---------- */
@@ -218,15 +253,29 @@ function dropItem(n){
   return item(S.cls,SLOTS[Math.floor(rand()*3)],x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0);
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,spec:0});
-const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:[0,1,2,3]};
-let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null;
+const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:[0,1,2,3],wave:null};
+let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[];
+/* ---------- settings, events and run counters, shared with extras.js through MB ---------- */
+const SET={music:.6,sfx:.8,haptic:1,btn:1,left:false,gfx:'high',hints:true};
+// the valid form of a setting, or undefined when the key or the value makes no sense
+function setClean(k,v){
+  if(k==='music'||k==='sfx'||k==='haptic'||k==='btn'){if(typeof v==='string'&&v.trim()!=='')v=+v;if(typeof v!=='number'||!isFinite(v))return;return k==='btn'?Math.max(.8,Math.min(1.4,v)):Math.max(0,Math.min(1,v))}
+  if(k==='left'||k==='hints')return typeof v==='boolean'?v:undefined;
+  if(k==='gfx')return v==='high'||v==='low'?v:undefined;
+}
+const LIS={};
+function on(name,fn){if(typeof fn!=='function')return()=>{};(LIS[name]||(LIS[name]=[])).push(fn);return()=>{const l=LIS[name],i=l.indexOf(fn);if(i>=0)l.splice(i,1)}}
+function emit(name,data){for(const f of(LIS[name]||[]).slice())try{f(data)}catch(e){console.error('Marrowborn: a listener for "'+name+'" failed',e)}}
+// counters for the current run; levelTime restarts with every level, the rest are saved with the run
+const ST={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,levelTime:0,bestLevel:0};
+const stReset=()=>{for(const k in ST)ST[k]=0};
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
 const adv=k=>(ADV[S.adv]||{})[k];
 const dmgMul=()=>(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
 const cdMul=()=>1/((P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1); // Phantom only speeds up Shadowstep
-const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1);
+const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1)*(m.spdK||1);
 const melee=c=>!c||c==='tank'||c==='fighter'||c==='assassin';
 const mspd=()=>S.level<8?1:Math.min(1.7,1.25+Math.max(0,S.level-12)*.01);
 // what a blow costs: a touch is 1 while you are learning and 2 from level 4, then climbs with your health. Charges, lunges and ground blasts (heavy=1) hit half again as hard; brushing against a monster (heavy=-1) is lighter, and so are bolts before level 9.
@@ -287,9 +336,9 @@ function buildFloor(key){
 }
 
 /* ---------- sound: muffled through bone until you have ears ---------- */
-let AC,master,lp,muted=false,bed=null,nbuf;
+let AC,master,fx,lp,muted=false,bed=null,nbuf;
 const live=()=>AC&&!muted&&!document.hidden;
-function audio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.45;lp=AC.createBiquadFilter();lp.type='lowpass';master.connect(lp);lp.connect(AC.destination);tune();startBed()}catch(e){AC=null}}
+function audio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.45;fx=AC.createGain();fx.gain.value=SET.sfx/.8;fx.connect(master);lp=AC.createBiquadFilter();lp.type='lowpass';master.connect(lp);lp.connect(AC.destination);tune();startBed()}catch(e){AC=null}}
 // one oscillator voice: f -> f2 over d seconds, starting `at` seconds from now
 function sfx(f,d=.1,type='square',v=.3,f2,at=0){
   if(!live())return;try{
@@ -297,7 +346,7 @@ function sfx(f,d=.1,type='square',v=.3,f2,at=0){
   const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+at;o.type=type;
   o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
   g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
-  o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.02)}catch(e){}
+  o.connect(g);g.connect(fx);o.start(t);o.stop(t+d+.02)}catch(e){}
 }
 // without ears everything is muffled, but still loud enough for a phone speaker
 function tune(){if(!AC)return;const h=has('hearing'),t=AC.currentTime;lp.frequency.setTargetAtTime(h?18000:700,t,.05);master.gain.setTargetAtTime(h?.45:.7,t,.05)}
@@ -307,7 +356,7 @@ function noise(d=.12,v=.3,f,f2,at=0){
   if(!nbuf){nbuf=AC.createBuffer(1,AC.sampleRate*.5,AC.sampleRate);const ch=nbuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1}
   const n=AC.createBufferSource(),g=AC.createGain(),t=AC.currentTime+at;n.buffer=nbuf;n.loop=true;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
   if(f){const q=AC.createBiquadFilter();q.type='bandpass';q.Q.value=1.4;q.frequency.setValueAtTime(f,t);if(f2)q.frequency.exponentialRampToValueAtTime(f2,t+d);n.connect(q);q.connect(g)}else n.connect(g);
-  g.connect(master);n.start(t,Math.random()*.3);n.stop(t+d+.02)}catch(e){}
+  g.connect(fx);n.start(t,Math.random()*.3);n.stop(t+d+.02)}catch(e){}
 }
 // soft-attack voice for the ambient bed
 function voice(f,d,v,type,dest,at=0){try{const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+at;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+Math.min(.12,d*.2));g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(dest);o.start(t);o.stop(t+d+.05)}catch(e){}}
@@ -321,17 +370,38 @@ function startBed(){
   const ng=AC.createGain(),dl=AC.createDelay(1),fb=AC.createGain();dl.delayTime.value=.47;fb.gain.value=.36;ng.connect(g);ng.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(g);
   bed={g,ng,next:AC.currentTime+3,hb:0,i:4};setInterval(bedTick,300);bedLevel();
 }
-function bedLevel(){if(bed)try{bed.g.gain.setTargetAtTime(muted?0:.11,AC.currentTime,.4)}catch(e){}}
+function bedLevel(){if(bed)try{bed.g.gain.setTargetAtTime(muted?0:.11*SET.music/.6,AC.currentTime,.4)}catch(e){}}
 function bedTick(){
   if(!bed||!live()||AC.state!=='running')return;const t=AC.currentTime,play=S.mode==='play'&&!S.paused;
   if(t>=bed.next){bed.i=Math.max(0,Math.min(SCALE.length-1,bed.i+Math.floor(Math.random()*5)-2));const f=SCALE[bed.i]*(S.mode==='dead'?.5:1);
     voice(f,2.6,.5,'triangle',bed.ng);if(Math.random()<.3)voice(f*1.5,2.2,.22,'sine',bed.ng,.24);bed.next=t+(play?1.5+Math.random()*1.7:2.6+Math.random()*2.6)}
   if(play&&P&&has('organs')&&P.hp<=Math.max(2,P.maxHp*.3)&&t>=bed.hb){voice(58,.16,1.6,'sine',bed.g);voice(50,.2,1.2,'sine',bed.g,.17);bed.hb=t+.72}
 }
-let hapOn=true,hapT=0;
-// short ticks are rate-limited to one per 60 ms; patterns and heavy hits always go through
-function haptic(p){if(!hapOn)return;const now=performance.now(),big=Array.isArray(p)||p>=40;if(!big&&now-hapT<60)return;hapT=now;try{if(window.Android&&Android.vibrate)Android.vibrate(String(p));else if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+let hapOn=true,hapT=0,hapLast=1;
+// short ticks are rate-limited to one per 60 ms; patterns and heavy hits always go through. The haptic setting scales how long each buzz lasts (pauses keep their length).
+function haptic(p){if(!hapOn||!(SET.haptic>0))return;const now=performance.now(),big=Array.isArray(p)||p>=40;if(!big&&now-hapT<60)return;hapT=now;
+  const k=SET.haptic;if(k<1)p=Array.isArray(p)?p.map((v,i)=>i%2?v:Math.max(1,Math.round(v*k))):Math.max(1,Math.round(p*k));try{if(window.Android&&Android.vibrate)Android.vibrate(String(p));else if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 const pref=(k,v)=>{try{localStorage.setItem('marrowborn.'+k,v)}catch(e){}};
+// settings: stored as one JSON object; the old Sound and Haptics toggles stay in step with it
+function setLoad(){
+  try{const o=JSON.parse(localStorage.getItem('marrowborn.settings')||'null');
+    if(o&&typeof o==='object'){for(const k in SET){const v=setClean(k,o[k]);if(v!==undefined)SET[k]=v}}
+    else if(localStorage.getItem('marrowborn.nohap')==='1')SET.haptic=0;
+    muted=localStorage.getItem('marrowborn.mute')==='1'}catch(e){}
+  hapOn=SET.haptic>0;if(hapOn)hapLast=SET.haptic;setApply();
+}
+function setApply(){
+  if(AC)try{fx.gain.setTargetAtTime(SET.sfx/.8,AC.currentTime,.05)}catch(e){}
+  bedLevel();
+  $('snd').setAttribute('aria-pressed',!muted&&(SET.music>0||SET.sfx>0));$('hap').setAttribute('aria-pressed',SET.haptic>0);
+}
+function setSetting(key,value){
+  const v=Object.prototype.hasOwnProperty.call(SET,key)?setClean(key,value):undefined;if(v===undefined)return false;
+  SET[key]=v;
+  if(key==='haptic'){hapOn=v>0;if(hapOn)hapLast=v;pref('nohap',hapOn?0:1)}
+  if((key==='music'||key==='sfx')&&v>0&&muted){muted=false;pref('mute',0)} // turning a volume up also un-mutes
+  pref('settings',JSON.stringify(SET));setApply();emit('settings',{key,value:v});return true;
+}
 const chime=()=>[330,415,494,660].forEach((f,i)=>sfx(f,.35,'triangle',.25,0,i*.11));
 let hitT=0;
 const SND={
@@ -376,16 +446,79 @@ const SND={
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const angTo=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x);
 function clamp(e,r){const x=Math.max(WALL+r,Math.min(W-WALL-r,e.x)),y=Math.max(WALL+r,Math.min(H-WALL-r,e.y));const hit=x!==e.x||y!==e.y;e.x=x;e.y=y;return hit}
-function move(m,a,spd,dt){m.x+=Math.cos(a)*spd*dt;m.y+=Math.sin(a)*spd*dt;m.moving=true;return clamp(m,m.r)}
+/* ---------- rooms: pillars and brazier bowls are solid, pits are holes that walkers go around ---------- */
+const solidR=o=>o.kind==='pillar'?o.r:o.kind==='brazier'?o.core:0;
+// push a body out of everything solid (and out of pits when pits is set); true when it was touching something
+function collide(e,r,pits){
+  let hit=false;
+  for(const o of obstacles){const R=o.kind==='pit'?(pits?o.r-8:0):solidR(o);if(!R)continue;
+    const dx=e.x-o.x,dy=e.y-o.y,d=Math.hypot(dx,dy),min=R+r;
+    if(d<min){if(d<.01)e.x=o.x+min;else{e.x=o.x+dx/d*min;e.y=o.y+dy/d*min}hit=true}}
+  if(hit)clamp(e,r);return hit;
+}
+// Steering: when something solid lies in the way, head for its edge instead. The side is kept for a moment so a walker does not dither, and flipped by the caller if it stops making ground.
+function steer(m,a,dp=dist(m,P)){
+  const ux=Math.cos(a),uy=Math.sin(a);let best=null,bg=46,bR=0,bd=0;
+  for(const o of obstacles){const R=o.kind==='pit'?o.r-8:solidR(o);if(!R)continue;
+    const dx=o.x-m.x,dy=o.y-m.y,d=Math.hypot(dx,dy);if(dx*ux+dy*uy<=0||dp<d-R)continue; // behind us, or the player stands in front of it
+    const gap=d-R-m.r;if(Math.abs(dx*uy-dy*ux)<R+m.r+3&&gap<bg){bg=gap;best=o;bR=R;bd=d}}
+  if(!best){return a}
+  const ao=Math.atan2(best.y-m.y,best.x-m.x);
+  if(m.avO!==best||!(m.avT>0)){m.avO=best;m.avS=Math.sin(ao-a)>=0?1:-1}
+  m.avT=.5;
+  return ao-m.avS*Math.asin(Math.min(1,(bR+m.r+5)/bd));
+}
+// raw: a charge or a lunge goes straight and reports running into something solid, the way it reports a wall
+function move(m,a,spd,dt,raw){
+  const room=obstacles.length&&!m.hidden,ox=m.x,oy=m.y;
+  if(m.avT>0)m.avT-=dt;if(room&&!raw)a=steer(m,a);
+  m.x+=Math.cos(a)*spd*dt;m.y+=Math.sin(a)*spd*dt;m.moving=true;
+  let hit=false;if(room&&collide(m,m.r,true)&&raw)hit=(m.x-ox)*Math.cos(a)+(m.y-oy)*Math.sin(a)<spd*dt*.35;
+  return clamp(m,m.r)||hit;
+}
+const blocked=p=>{for(const o of obstacles){const R=solidR(o);if(R&&Math.hypot(p.x-o.x,p.y-o.y)<R+1)return true}return false};
+// how far a ray from (x,y) along angle a gets before a wall or something solid stops it
+function rayLen(x,y,a){
+  const ux=Math.cos(a),uy=Math.sin(a);let t=1e9;
+  if(ux>1e-6)t=Math.min(t,(W-WALL-x)/ux);else if(ux<-1e-6)t=Math.min(t,(WALL-x)/ux);
+  if(uy>1e-6)t=Math.min(t,(H-WALL-y)/uy);else if(uy<-1e-6)t=Math.min(t,(WALL-y)/uy);
+  for(const o of obstacles){const R=solidR(o);if(!R)continue;const dx=o.x-x,dy=o.y-y,al=dx*ux+dy*uy,lat2=dx*dx+dy*dy-al*al;if(al>0&&lat2<R*R)t=Math.min(t,Math.max(0,al-Math.sqrt(R*R-lat2)))}
+  return Math.max(0,t);
+}
+function segDist(p,x,y,a,len){const ux=Math.cos(a),uy=Math.sin(a),al=Math.max(0,Math.min(len,(p.x-x)*ux+(p.y-y)*uy));return Math.hypot(p.x-x-ux*al,p.y-y-uy*al)}
 function shoot(x,y,a,spd,r=6){shots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r})}
 function ringShot(m,n,spd,off=0){for(let i=0;i<n;i++)shoot(m.x,m.y,off+i*TAU/n,spd)}
-function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z)}
+function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z);return z}
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
-function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=S.level<12?4:Math.round(4*Math.pow(genMul(S.level),.8));if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0};clamp(m,m.r);mons.push(m);return m}
+const miteHp=()=>S.level<8?2:S.level<12?4:Math.round(4*Math.pow(genMul(S.level),.8));
+function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=miteHp();if(kind==='husk')hp=Math.round(miteHp()*1.5);if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,mods:[],ward:0,beam:null};clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);mons.push(m);return m}
+function lesser(kind,x,y,hp){const m=spawn(kind,x,y,false,lesserSpec(kind,S.level,hp));m.lesser=true;m.t=1+rand()*.6;puff(m,col(m.s.col),10);return m}
+// a wave pack: one or two lesser monsters and a handful of mites, spread along the far side of the room from you
+const LESSER=['crawler','hound','witch','fist','bomber'];
+function spawnWave(){
+  const n=S.level,w=S.wave,big=w.n>1?2:1,far=P.y>H/2?150:H-150,base=GENHP,total=4+(n>=30?1:0)-(big>1?1:0);
+  for(let j=0;j<big;j++){const kind=LESSER[(n+w.n*2+j*3)%LESSER.length];lesser(kind,W/2+(big>1?(j?170:-170):0),far,base[kind]*genMul(n)*.085)}
+  for(let j=0;j<total;j++){const m=spawn('mite',W/2+(j-(total-1)/2)*70,far+(P.y>H/2?60:-60));m.t=1}
+  w.hp0=mons.reduce((a,m)=>a+m.maxHp,0);S.waveT=.9;
+  $('bossName').textContent='Wave '+w.n+' of '+w.of;
+  floats.push({x:W/2,y:far-50,txt:w.of>1?'Pack '+w.n+' of '+w.of:'The pack',life:1.6,c:'#d6a544'});sfx(150,.4,'sawtooth',.2,90);
+}
+// the boss of a wave level walks in once the packs are dead, on the far side of the room from you
+function enterBoss(){
+  const L=S.L;S.wave=null;boss=spawn(L.kind,W/2,P.y>H/2?140:H-140,true,L.spec);arm(boss,L);boss.t=1.4;boss.ward=1;
+  rings.push({x:boss.x,y:boss.y,life:.7,max:.7,r:boss.r+120,fx:true});puff(boss,col(boss.s.col),26,240);S.shake=Math.max(S.shake,.3);SND.roar();haptic([30,30,80]);
+  floats.push({x:boss.x,y:boss.y-boss.r-20,txt:L.spec.name,life:1.8,c:'#ff5b6e'});$('bossName').textContent=L.spec.name;
+}
+// give a boss its modifiers
+function arm(m,L){m.mods=(L.mods||[]).slice();if(m.mods.includes('swift'))m.spdK=1.2;m.shT=5;m.burnT=2.5;m.tenth=9;m.splitN=2}
+function bossBar(){
+  if(boss)$('bossFill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';
+  else if(S.wave){let hp=0;for(const m of mons)hp+=Math.max(0,m.hp);$('bossFill').style.width=Math.min(100,hp/(S.wave.hp0||1)*100)+'%'}
+}
 function reshuffle(){
   mons=mons.filter(m=>!m.decoy);
   const spot=()=>{let p;do{p={x:WALL+60+rand()*(W-2*WALL-120),y:WALL+60+rand()*(H-2*WALL-120)}}while(dist(p,P)<210);return p};
-  Object.assign(boss,spot());puff(boss,col('#3fa596'));
+  Object.assign(boss,spot());collide(boss,boss.r,true);puff(boss,col('#3fa596'));
   for(let i=0;i<(boss.rage?4:3);i++){const p=spot(),d=spawn('mimic',p.x,p.y);d.decoy=true;d.t=1+rand()*2;d.side=rand()<.5?-1:1;puff(d,col('#3fa596'))}
 }
 
@@ -393,7 +526,7 @@ function reshuffle(){
 function chargeStates(m,dt,a,next,E){
   if(m.st==='wind'){if(m.t>.22)m.ang=a; // the line of the charge locks just before it goes, so a sidestep at the last moment works
     if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
-  else if(m.st==='charge'){const hit=move(m,m.ang,540,dt);if(hit||(m.t-=dt)<=0){
+  else if(m.st==='charge'){const hit=move(m,m.ang,540,dt,true);if(hit||(m.t-=dt)<=0){
     if(hit){S.shake=.25;sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
     if(E&&!m.again&&S.level>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
     else{m.again=0;m.st='dazed';m.t=hit?(E?1:1.5):.6}}}
@@ -405,7 +538,7 @@ const AI={
     const E=m.rage;
     if(m.st==='idle'){move(m,a,80,dt);m.t-=dt;if(m.t<=0&&d<170){m.st='wind';m.t=.52;m.ang=a;m.again=0;if(S.level>=12)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,190)}}
     else if(m.st==='wind'){if((m.t-=dt)<=0){m.st='lunge';m.t=.28}}
-    else{move(m,m.ang,400,dt);if((m.t-=dt)<=0){if(E&&S.level>=3)ringShot(m,6,140,a);if(E&&!m.again){m.again=1;m.st='wind';m.t=.4;m.ang=a}else{m.st='idle';m.t=1.15}}}
+    else{move(m,m.ang,400,dt,true);if((m.t-=dt)<=0){if(E&&S.level>=3)ringShot(m,6,140,a);if(E&&!m.again){m.again=1;m.st='wind';m.t=.4;m.ang=a}else{m.st='idle';m.t=1.15}}}
   },
   hound(m,dt,a){
     const E=m.rage;
@@ -431,10 +564,50 @@ const AI={
       if(E)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,160,8);else if(m.n%2===0)shoot(m.x,m.y,a,150,8);m.t=1.4}
   },
   mite(m,dt,a){move(m,a+Math.sin(S.t*3+m.seed)*.6,125,dt)},
+  // Cinder Toad: keeps its distance and lobs bombs where you are and where you are going. Crowd it and it drops one at its own feet and hops away.
+  bomber(m,dt,a,d){
+    const E=m.rage;if(m.hopT>0)m.hopT-=dt;
+    if(m.st==='leap'){m.t-=dt;const p=Math.min(1,1-m.t/m.dur);m.x=m.sx+(m.tx-m.sx)*p;m.y=m.sy+(m.ty-m.sy)*p;m.lift=Math.sin(p*Math.PI)*.6;clamp(m,m.r);if(m.t<=0){m.lift=0;m.st='idle';m.t=Math.max(m.t,.5)}return}
+    if(m.st==='wind'){if((m.t-=dt)<=0){
+      const lob=(x,y,r,dur)=>{const z=zone(x,y,r,dur,m);z.sx=m.x;z.sy=m.y},lx=P.x+(P.vx||0)*.55,ly=P.y+(P.vy||0)*.55,b=rand()*TAU;
+      lob(P.x,P.y,64,1.05);lob(lx,ly,60,1.2);
+      for(let i=0;i<(E?3:1);i++){const g=b+i*TAU/3;lob(P.x+Math.cos(g)*125,P.y+Math.sin(g)*125,58,1.35)}
+      sfx(240,.25,'triangle',.2,90);m.st='idle';m.t=E?1.2:1.7}return}
+    if(move(m,d<170?a+Math.PI:d>330?a:a+Math.PI/2*m.side,d<170?62:70,dt))m.side*=-1;
+    if(d<m.r+78&&!(m.hopT>0)){m.hopT=4.5;zone(m.x,m.y,m.r+60,.8,m);
+      const g=a+Math.PI+(rand()-.5)*1.4,to={x:m.x+Math.cos(g)*240,y:m.y+Math.sin(g)*240};clamp(to,m.r);collide(to,m.r,true);
+      m.st='leap';m.t=m.dur=.5;m.sx=m.x;m.sy=m.y;m.tx=to.x;m.ty=to.y;sfx(300,.2,'sine',.2,600)}
+    else if((m.t-=dt)<=0){m.st='wind';m.t=.45}
+  },
+  // Grave Caller: raises husks and cannot be hurt while two or more of them stand. Thin them out and it is open until it has raised the next lot.
+  summoner(m,dt,a,d){
+    const E=m.rage,full=E?4:3;let mine=0;for(const x of mons)if(x.owner===m)mine++;
+    if(mine>=2)m.ward=Math.max(m.ward,.15);
+    if(m.st==='wind'){if((m.t-=dt)<=0){
+      for(let i=mine;i<full;i++){const g=a+(i-(full-1)/2)*.7,h=spawn('husk',m.x+Math.cos(g)*(m.r+34),m.y+Math.sin(g)*(m.r+34));h.owner=m;h.t=0;puff(h,'#7fd66b',8)}
+      sfx(140,.5,'sawtooth',.2,70);m.st='idle';m.t=E?4:5}return}
+    if(m.slide>0)m.slide-=dt;
+    if(move(m,m.slide>0?a+Math.PI/2*m.side:d<230?a+Math.PI:d>380?a:a+Math.PI/2*m.side,d<230?80:60,dt)){m.side*=-1;m.slide=.7}
+    if((m.sh=(m.sh||1.5)-dt)<=0){m.sh=1.9;if(E)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,180);else shoot(m.x,m.y,a,180);sfx(420,.1,'sine',.15,210)}
+    if(mine>=2)m.t=E?4:5;else if((m.t-=dt)<=0){m.st='wind';m.t=.9} // the count to the next raising only runs while it stands open
+  },
+  // Lidless Eye: a thin line finds you, locks, and becomes a beam that sweeps after you. Dash through it, get behind a pillar, or stay close where it turns slowly.
+  beamer(m,dt,a,d){
+    const E=m.rage;
+    if(m.st==='idle'){m.beam=null;if(move(m,d>250?a:a+Math.PI/2*m.side,d>250?72:46,dt))m.side*=-1;
+      if((m.sh=(m.sh||1.2)-dt)<=0){m.sh=E?1.6:2.3;for(const k of[-.22,0,.22])shoot(m.x,m.y,a+k,185);sfx(520,.1,'sine',.15,260)}
+      if((m.t-=dt)<=0){m.st='wind';m.t=.95;m.ba=a;sfx(900,.9,'sine',.12,1500)}}
+    else if(m.st==='wind'){if(m.t>.4)m.ba=a; // the line locks before it fires, so stepping off it at the last moment works
+      if((m.t-=dt)<=0){m.st='beam';m.t=E?3:2.4;m.bs=Math.sin(a-m.ba)>=0?1:-1;S.shake=Math.max(S.shake,.15);sfx(110,.5,'sawtooth',.25,70);noise(.4,.2,2400,600)}}
+    else{m.ba+=m.bs*(E?.8:.68)*dt;if((m.t-=dt)<=0){m.st='idle';m.t=E?1.3:1.9;m.beam=null;return}}
+    if(m.st==='idle')return;
+    const n=E?2:1,on=m.st==='beam';if(!m.beam||m.beam.rays.length!==n)m.beam={on,w:12,rays:Array.from({length:n},()=>({a:0,len:0}))};
+    m.beam.on=on;m.beam.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(on&&segDist(P,m.x,m.y,r.a,r.len)<m.beam.w+9)hurtP(blow(0),'beam')});
+  },
   burrower(m,dt,a){
     const E=m.rage;
     if(m.st==='idle'){m.st='under';m.t=1.6;m.hidden=true}
-    else if(m.st==='under'){move(m,a,E?195:165,dt);if((m.t-=dt)<=0){m.st='rise';m.t=.7;zone(m.x,m.y,75,.7,m)}}
+    else if(m.st==='under'){move(m,a,E?195:165,dt);if((m.t-=dt)<=0){m.st='rise';m.t=.7;collide(m,m.r,true);zone(m.x,m.y,75,.7,m)}} // it digs under everything and comes up beside it
     else if(m.st==='rise'){if((m.t-=dt)<=0){m.hidden=false;m.st='up';m.t=E?1.5:2;m.spit=.6;ringShot(m,8,170,rand()*TAU);if(E)m.vol=.3;puff(m,col('#c0823c'),14)}}
     else{if(m.vol>0&&(m.vol-=dt)<=0)ringShot(m,8,170,rand()*TAU);
       if((m.spit-=dt)<=0){m.spit=.8;shoot(m.x,m.y,a,190)} // it spits while it is up, so standing in front of it is not free
@@ -474,14 +647,19 @@ function hurtM(m,d,quiet){
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
   if(m.markT>0)d*=1.5;
-  const before=m.hp;m.hp-=d;m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
+  const before=m.hp;m.hp-=d;ST.dmgDealt+=Math.max(0,Math.min(d,before));m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
   const ch=m.maxHp/5;if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({x:m.x,y:m.y});
   if(m.boss&&m.hp>0){if(m.ai==='hollow'){const ph=m.hp<=m.maxHp/3?3:m.hp<=m.maxHp*2/3?2:1;if(ph>(m.phase||1)){m.phase=ph;phaseShift(m)}}else if(!m.rage&&m.hp<=m.maxHp*.4)enrage(m)}
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
+  if(m.mods.length&&m.hp>0){
+    if(m.mods.includes('thorned')){const t=Math.floor(m.hp/m.maxHp*10);if(t<m.tenth){m.tenth=t;ringShot(m,8,150,rand()*TAU);puff(m,'#e7dfcd',8,200);sfx(700,.12,'square',.12,300)}}
+    if(m.mods.includes('splitting')&&m.splitN>0&&m.hp<=m.maxHp*m.splitN/3){m.splitN--;const g=rand()*TAU,c=lesser(m.kind,m.x+Math.cos(g)*(m.r+30),m.y+Math.sin(g)*(m.r+30),m.maxHp*.07);c.s.col=m.s.col;
+      rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+70,fx:true});floats.push({x:m.x,y:m.y-m.r-18,txt:'It splits',life:1.3,c:'#ff5b6e'});sfx(200,.3,'sawtooth',.2,400)}
+  }
   if(m.hp<=0){
-    mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);
-    if(m.boss){mons=[];shots=[];pshots=[];zones=[];fields=[];S.mode='clear';S.clearT=1.2;S.shake=.4;SND.bossDeath();haptic([60,40,220]);S.stop=.12}
-    else if(has('taste')&&rand()<.35)morsels.push({x:m.x,y:m.y});
+    mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;
+    if(m.boss){mons=[];shots=[];pshots=[];zones=[];fields=[];S.mode='clear';S.clearT=1.2;S.shake=.4;SND.bossDeath();haptic([60,40,220]);S.stop=.12;emit('bossdead',{level:S.level,time:ST.levelTime,cls:S.cls})}
+    else if(has('taste')&&rand()<.35){const f={x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}
   }
 }
 function hurtP(d,src){
@@ -491,17 +669,20 @@ function hurtP(d,src){
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
   if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   if(P.stoneT>0)d=Math.ceil(d/2);
-  P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
+  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
+  if(boss&&boss.hp>0&&boss.mods.includes('vampiric')&&boss.hp<boss.maxHp){const h=Math.min(boss.maxHp-boss.hp,Math.round(boss.maxHp*.04));boss.hp+=h;puff(boss,'#b8263d',12,140);floats.push({x:boss.x,y:boss.y-boss.r-10,txt:'+'+h,life:1,c:'#7fd66b'})}
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
-  if(P.hp<=0){S.mode='dead';SND.dead();
-    show({kick:'You came apart',title:has('skin')?'Flesh fails':'A pile of bones again',body:'You keep everything you have won back so far. '+S.L.spec.name+' is still waiting.',btns:[['Try level '+(S.level+1)+' again',()=>startLevel(S.level)]]})}
+  if(P.hp<=0){S.mode='dead';SND.dead();ST.deaths++;save(S.level);
+    show({kick:'You came apart',title:has('skin')?'Flesh fails':'A pile of bones again',body:'You keep everything you have won back so far. '+S.L.spec.name+' is still waiting.',btns:[['Try level '+(S.level+1)+' again',()=>startLevel(S.level)]]});
+    emit('death',{level:S.level})}
 }
 
 /* ---------- player ---------- */
 const keys={},want={atk:false,dash:false,skill:false,sk:[false,false,false,false],pt:null},joy={x:0,y:0};
 function aim(pt,range,spd){
   if(pt)return Math.atan2(pt.y-P.y,pt.x-P.x);
-  let best=null,bd=range;for(const m of mons){if(m.hidden)continue;const d=dist(m,P)-m.r;if(d<bd&&(has('sight')||d<FOG)){bd=d;best=m}}
+  // nearest first, but never something warded while anything else is in reach, and with a ranged weapon the boss wins unless something small is close enough to bite
+  let best=null,bd=1e9;const far=range>500;for(const m of mons){if(m.hidden)continue;const d=dist(m,P)-m.r;if(d<range&&(has('sight')||d<FOG)){const sc=d+(m.ward>.3?2000:0)-(far&&m.boss?200:0);if(sc<bd){bd=sc;best=m}}}
   if(best&&spd&&best.vx!==undefined&&best.st!=='charge'&&best.st!=='lunge'){const k=Math.min(.6,dist(best,P)/spd);return Math.atan2(best.y+best.vy*k-P.y,best.x+best.vx*k-P.x)} // auto-aim leads a moving target
   return best?angTo(P,best):P.face;
 }
@@ -553,7 +734,7 @@ function cast(op,x){
   case'near':for(const m of[...mons])if(!m.hidden&&dist(m,P)<a+m.r)debuff(m,b,D);break; // radius, debuffs: every monster around you
   case'summon':for(let k=0;k<b;k++){const al=ally(a,c);al.extra=2;allies.push(al);puff(al,'#7fd66b',6)}break; // kind, count, seconds
   case'clear':shots=shots.filter(s=>dist(s,P)>a);break;
-  case'tele':puff(P,'#22242b',12);P.x=t.x+Math.cos(ta)*(t.r+24);P.y=t.y+Math.sin(ta)*(t.r+24);clamp(P,14);P.face=ta+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);break;
+  case'tele':puff(P,'#22242b',12);P.x=t.x+Math.cos(ta)*(t.r+24);P.y=t.y+Math.sin(ta)*(t.r+24);clamp(P,14);collide(P,14,true);P.face=ta+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);break;
   case'pull':case'knock':for(const m of mons)if(!m.hidden&&m.st!=='leap'&&dist(m,P)<a+m.r){const g2=angTo(P,m),dd=dist(m,P),nd=o==='pull'?Math.max(m.r+50,dd-(m.boss?90:400)):dd+(m.boss?80:160);m.x=P.x+Math.cos(g2)*nd;m.y=P.y+Math.sin(g2)*nd;clamp(m,m.r);if(m.st==='charge'||m.st==='lunge'){m.st='dazed';m.t=.6}}break;
   case'seq':if(a==='quake'){P.quakeN=2;P.quakeT=.4}else if(a==='cuts'){P.cutN=8;P.cutT=0;P.cutM=t;P.inv=Math.max(P.inv,1.9)}else{P.starN=7;P.starT=0}break;
   case'ring':ring(P,a);break;
@@ -582,7 +763,7 @@ function meteor(at,r,dur,dmg,ex){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,
 function channels(dt){
   if(P.stormT>0){P.stormT-=dt;if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2);P.atk=.16;P.swing+=2}}
   if(P.quakeN>0&&(P.quakeT-=dt)<=0){P.quakeT=.4;shock(P.quakeN===2?190:250,4);P.quakeN--}
-  if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');hurtM(m,3*dmgMul())}}
+  if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);collide(P,14,true);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');hurtM(m,3*dmgMul())}}
   if(P.starN>0&&(P.starT-=dt)<=0){P.starT=.35;P.starN--;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160};meteor({x:at.x+rand()*60-30,y:at.y+rand()*60-30},80,.6,6*dmgMul())}
   if(P.fireT>0){P.fireT-=dt;if((P.fireK-=dt)<=0){P.fireK=.1;const a=aim(null,1200);P.swing=a;P.atk=.1;pshot(a+rand()*.1-.05,720,dmgMul(),3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow()}}
   if(P.renewT>0){P.renewT-=dt;if((P.renewK+=dt)>=1){P.renewK=0;if(P.hp<P.maxHp){healP(.04);puff(P,'#7fd66b',4,80)}}}
@@ -590,16 +771,34 @@ function channels(dt){
 // slot i (0-3) carries skill S.load[i] once that skill is learned
 const slotSkill=i=>{const si=S.load[i];return cls()&&si<known()?si:-1};
 function syncSkills(){const c=cls();for(let i=0;i<4;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0]}
+// the room against the player: pillars push back, a pit swallows you unless you are dashing across it, raised spikes and burning braziers hurt
+function roomP(){
+  collide(P,14,false);
+  if(P.dashT>0)return;
+  let pit=null,clear=true;for(const o of obstacles)if(o.kind==='pit'){const d=dist(o,P);if(d<o.r-6)pit=o;if(d<o.r+8)clear=false}
+  if(pit){puff(P,'#0b0a0f',16,120);P.x=P.safeX;P.y=P.safeY;S.shake=Math.max(S.shake,.25);sfx(300,.35,'sine',.25,60);floats.push({x:pit.x,y:pit.y-10,txt:'You fall',life:1,c:'#ff5b6e'});hurtP(blow(0),'pit');if(S.mode==='play'){P.inv=Math.max(P.inv,.8);puff(P,'#e7dfcd',10)}return}
+  if(clear){P.safeX=P.x;P.safeY=P.y}
+  if(S.banner>1.5)return;
+  for(const o of obstacles)if(o.on&&dist(o,P)<o.r-(o.kind==='spikes'?4:0)){hurtP(blow(0),o.kind);break}
+}
+// traps keep their own time: off, a warning, then on
+function roomStep(dt){
+  for(const o of obstacles){if(!o.per)continue;o.t=(o.t+dt)%o.per;
+    const sp=o.kind==='spikes',onAt=o.per*(sp?.7:.65),warnAt=onAt-(sp?.7:.8),was=o.on;o.on=o.t>=onAt;o.warn=!o.on&&o.t>=warnAt;
+    if(o.on&&!was){const near=dist(o,P)<260;if(sp){if(near)sfx(1500,.07,'square',.1,700)}else{if(near){sfx(160,.4,'sawtooth',.14,80);noise(.4,.14,500,1500)}puff(o,'#ff8a4c',12,220)}}
+    if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
+}
 function playerStep(dt){
   const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
-  P.moving=l>.15;
+  P.moving=l>.15;const ox=P.x,oy=P.y;
   if(P.dashT>0){P.dashT-=dt;const v=P.rushHit?780:640;P.x+=P.dx*v*dt;P.y+=P.dy*v*dt;
     if(P.rushHit){for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushStun)m.stun=m.boss?P.rushStun*.7:P.rushStun*2;if(P.rushD)hurtM(m,P.rushD)}if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
     if(rand()<.6)bits.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,c:has('skin')?'#c68863':'#e7dfcd',r:6})}
   else if(P.moving){P.x+=mx*spd*dt;P.y+=my*spd*dt;P.face=Math.atan2(my,mx);P.walk+=dt*11}
-  clamp(P,14);
+  clamp(P,14);if(obstacles.length)roomP();
+  P.vx=(P.x-ox)/dt;P.vy=(P.y-oy)/dt;
   for(const k of['inv','atk','cd','dashCd','amb','rageT','guardT','legT','fleetT','stoneT'])if(P[k]>0)P[k]-=dt;
   for(let i=0;i<10;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
   if(S.mode==='play')channels(dt);
@@ -607,7 +806,7 @@ function playerStep(dt){
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
   if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){
-    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink()}
+    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink()}
     else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash()}
     haptic(10)}
   want.dash=false;
@@ -630,6 +829,7 @@ function step(dt){
   if(S.mode!=='play'&&S.mode!=='clear')return;
   playerStep(dt);
   for(const p of pshots){p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL){p.dead=true;continue}
+    if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
       p.hit.add(m);if(p.slow)m.slow=Math.max(m.slow||0,p.slow);if(p.stun)m.stun=m.boss?p.stun*.7:p.stun*2;hurtM(m,d);
@@ -639,9 +839,9 @@ function step(dt){
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
   if(S.mode!=='play'||S.banner>1.5)return;
-  for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0);if(d<bd){bd=d;t=m}}
+  for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
-    if(d>stop){const g=angTo(a,to),sp=a.kind==='wolf'?250:200;a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r)}
+    if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
     else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1),true);leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
@@ -651,14 +851,24 @@ function step(dt){
     if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp)healP(.04)}}
   fields=fields.filter(f=>f.t<f.dur);
   if(S.mode!=='play')return;
-  if(act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
+  if(obstacles.length)roomStep(dt);
+  if(S.wave&&!boss&&!mons.length&&(S.waveT-=dt)<=0){if(S.wave.n<S.wave.of){S.wave.n++;spawnWave()}else enterBoss()}
+  if(act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&boss.ai!=='summoner'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
   for(const m of[...mons]){
     if(S.mode!=='play')break;if(!mons.includes(m))continue; // the boss or the player died earlier in this loop
     m.moving=false;if(m.flash>0)m.flash-=dt;if(m.ward>0)m.ward-=dt;const ox=m.x,oy=m.y;
     if(m.markT>0)m.markT-=dt;
     if(m.dotT>0){m.dotT-=dt;if((m.dotK-=dt)<=0){m.dotK=.5;hurtM(m,m.dotD,true);if(!mons.includes(m))continue}}
     let k=aiK(m);if(m.slow>0){m.slow-=dt;k*=.5}
-    if(m.stun>0)m.stun-=dt;else AI[m.ai](m,dt*k,angTo(m,P),dist(m,P));
+    if(m.stun>0){m.stun-=dt;m.beam=null}else AI[m.ai](m,dt*k,angTo(m,P),dist(m,P));
+    if(S.mode!=='play')break;if(!mons.includes(m))continue;
+    if(obstacles.length&&!m.hidden&&m.st!=='leap'){collide(m,m.r,true);
+      // a walker that is trying to move and getting nowhere tries the other way round
+      if(m.moving&&Math.hypot(m.x-ox,m.y-oy)<12*dt){if((m.stk=(m.stk||0)+dt)>.45){m.stk=0;m.avS=-(m.avS||1);m.avT=1.2;m.side*=-1}}else m.stk=0}
+    if(m.mods.length&&!(m.stun>0)){
+      if(m.mods.includes('shielded')&&(m.shT-=dt)<=0){m.shT=9;m.ward=2.5;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+50,fx:true});sfx(880,.3,'sine',.14,1320)}
+      if(m.mods.includes('burning')){if(rand()<dt*10)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y+rand()*m.r-m.r/2,vx:rand()*30-15,vy:-60-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5});
+        if((m.burnT-=dt)<=0){m.burnT=3.2;if(!m.hidden&&m.st!=='leap')zone(m.x,m.y,m.r+40,1,m)}}}
     m.vx=(m.x-ox)/dt;m.vy=(m.y-oy)/dt;
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
@@ -666,7 +876,7 @@ function step(dt){
   }
   if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(blow(S.level<8?-1:0),'shot');s.dead=true}
-    if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL)s.dead=true}
+    if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
     if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;hurtM(m,z.dmg)}}else if(dist(z,P)<z.r)hurtP(blow(1),'zone')}}
@@ -696,8 +906,37 @@ function drawMon(m){
   if(s.teeth){circ(0,0,r*.62);ctx.fillStyle='#120b08';ctx.fill();ctx.fillStyle=col('#e7dfcd');for(let i=0;i<9;i++){const b=i*TAU/9+S.t;ctx.beginPath();ctx.moveTo(Math.cos(b-.16)*r*.62,Math.sin(b-.16)*r*.62);ctx.lineTo(Math.cos(b)*r*.3,Math.sin(b)*r*.3);ctx.lineTo(Math.cos(b+.16)*r*.62,Math.sin(b+.16)*r*.62);ctx.fill()}}
   for(let i=0;i<s.eyes;i++){const b=a+(i-(s.eyes-1)/2)*(s.eyes>3?.42:.62),ex=Math.cos(b)*r*.5,ey=Math.sin(b)*r*.5,er=Math.max(2.5,r*.16);
     circ(ex,ey,er);ctx.fillStyle=col(s.void?'#ff5b6e':'#ffd95e');ctx.fill();circ(ex+Math.cos(a)*er*.4,ey+Math.sin(a)*er*.4,er*.45);ctx.fillStyle='#0a0a0a';ctx.fill();circ(ex-er*.3,ey-er*.35,er*.22);ctx.fillStyle='rgba(255,255,255,.85)';ctx.fill()}
+  if(m.mods.length){
+    if(m.mods.includes('thorned')){ctx.fillStyle=col('#e7dfcd');for(let i=0;i<12;i++){const b=i*TAU/12+.2;ctx.beginPath();ctx.moveTo(Math.cos(b-.1)*r,Math.sin(b-.1)*r);ctx.lineTo(Math.cos(b)*r*1.28,Math.sin(b)*r*1.28);ctx.lineTo(Math.cos(b+.1)*r,Math.sin(b+.1)*r);ctx.fill()}}
+    if(m.mods.includes('vampiric')){circ(0,0,r+5+Math.sin(S.t*4)*1.5);ctx.strokeStyle='rgba(184,38,61,.8)';ctx.lineWidth=3;ctx.stroke()}
+    if(m.mods.includes('splitting')){ctx.strokeStyle='rgba(11,10,15,.85)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-r*.15,-r);ctx.lineTo(r*.12,-r*.3);ctx.lineTo(-r*.1,r*.3);ctx.lineTo(r*.15,r);ctx.stroke()}
+    if(m.mods.includes('swift')&&m.moving){ctx.strokeStyle='rgba(231,223,205,.5)';ctx.lineWidth=2;const b=Math.atan2(m.vy||0,m.vx||0)+Math.PI;for(const k of[-.5,0,.5])line(Math.cos(b+k)*r*1.15,Math.sin(b+k)*r*1.15,Math.cos(b+k)*r*1.15+Math.cos(b)*14,Math.sin(b+k)*r*1.15+Math.sin(b)*14)}}
+  if(m.ward>0){circ(0,0,r+8);ctx.fillStyle='rgba(143,211,255,.12)';ctx.fill();ctx.strokeStyle=`rgba(143,211,255,${.55+.3*Math.sin(S.t*8)})`;ctx.lineWidth=2.5;ctx.stroke()}
   if(m.st==='dazed'){ctx.fillStyle=col('#d6a544');for(let i=0;i<3;i++){const b=S.t*5+i*TAU/3;circ(Math.cos(b)*r*.7,-r-8+Math.sin(b)*4,3);ctx.fill()}}
   ctx.restore();
+}
+// the room, flat on the floor: pits, spike plates, brazier reach and bowl, pillars
+function drawRoom(){
+  for(const o of obstacles){const x=o.x,y=o.y,r=o.r;
+    if(o.kind==='pit'){const g=ctx.createRadialGradient(x,y,r*.2,x,y,r);g.addColorStop(0,'#000');g.addColorStop(.82,'#050408');g.addColorStop(1,'rgba(5,4,8,.55)');circ(x,y,r);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle=col('#6d6478');ctx.lineWidth=3;ctx.stroke();circ(x,y,r-5);ctx.strokeStyle='rgba(0,0,0,.7)';ctx.lineWidth=2.5;ctx.stroke()}
+    else if(o.kind==='spikes'){const k=o.on?1:o.warn?.3+.1*Math.sin(S.t*30):0;
+      circ(x,y,r);ctx.fillStyle=o.on?'rgba(184,38,61,.3)':o.warn?'rgba(214,165,68,.16)':'rgba(8,7,12,.5)';ctx.fill();ctx.strokeStyle=o.on?'#ff5b6e':o.warn?'#d6a544':'rgba(231,223,205,.28)';ctx.lineWidth=o.on||o.warn?2.5:1.5;ctx.stroke();
+      for(let i=0;i<9;i++){const b=i*TAU/8,px=i<8?x+Math.cos(b)*r*.62:x,py=i<8?y+Math.sin(b)*r*.62:y;
+        if(k>0){ctx.fillStyle=o.on?'#e7dfcd':'#b9b2c6';ctx.beginPath();ctx.moveTo(px-4.5,py+3);ctx.lineTo(px,py+3-20*k);ctx.lineTo(px+4.5,py+3);ctx.fill()}else{circ(px,py,2.6);ctx.fillStyle='rgba(0,0,0,.75)';ctx.fill()}}}
+    else if(o.kind==='brazier'){
+      if(o.on){const g=ctx.createRadialGradient(x,y,4,x,y,r);g.addColorStop(0,'rgba(255,217,94,.6)');g.addColorStop(.6,'rgba(255,138,76,.42)');g.addColorStop(1,'rgba(184,38,61,.12)');circ(x,y,r);ctx.fillStyle=g;ctx.fill()}
+      else if(o.warn){circ(x,y,r);ctx.fillStyle=`rgba(214,165,68,${.1+.08*Math.sin(S.t*24)})`;ctx.fill()}
+      ctx.setLineDash([7,7]);circ(x,y,r);ctx.strokeStyle=o.on?'#ff8a4c':o.warn?'#d6a544':'rgba(255,138,76,.3)';ctx.lineWidth=o.on||o.warn?2.5:1.5;ctx.stroke();ctx.setLineDash([]);
+      circ(x,y,o.core+3);ctx.fillStyle=col('#3a3340');ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=2.5;ctx.stroke();circ(x,y,o.core-3);ctx.fillStyle=o.on?'#ffd95e':o.warn?'#ff8a4c':'#7a2a22';ctx.fill()}
+    else{ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.ellipse(x+7,y+9,r,r*.9,0,0,TAU);ctx.fill();
+      const g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.1,x,y,r);g.addColorStop(0,col('#a8a2b3'));g.addColorStop(.7,col('#6d6478'));g.addColorStop(1,col('#3a3340'));circ(x,y,r);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=3;ctx.stroke();
+      circ(x,y,r*.62);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke()}}
+}
+function drawBeams(){
+  for(const m of mons){const b=m.beam;if(!b||m.hidden)continue;ctx.lineCap='round';
+    for(const r of b.rays){const ex=m.x+Math.cos(r.a)*r.len,ey=m.y+Math.sin(r.a)*r.len;
+      if(b.on){ctx.strokeStyle='rgba(255,91,110,.35)';ctx.lineWidth=b.w*2+10;line(m.x,m.y,ex,ey);ctx.strokeStyle='#ff8a4c';ctx.lineWidth=b.w*2;line(m.x,m.y,ex,ey);ctx.strokeStyle='#fff';ctx.lineWidth=b.w*.7;line(m.x,m.y,ex,ey);circ(ex,ey,b.w+4+Math.sin(S.t*40)*3);ctx.fillStyle='#ffd95e';ctx.fill()}
+      else{ctx.setLineDash([10,8]);ctx.strokeStyle='rgba(214,165,68,.85)';ctx.lineWidth=2.5;line(m.x,m.y,ex,ey);ctx.setLineDash([])}}}
 }
 function skeleton(org,sw,t){
   const B='#eee6d2',Bs='#b3a88e',O='#15121b',bob=Math.sin(t*3)*.5;
@@ -880,9 +1119,11 @@ function draw(){
   ctx.drawImage(floor(),0,0);
   if(sight&&!act2()){ctx.globalCompositeOperation='lighter';for(const[x,y]of[[WALL,WALL],[W-WALL,WALL],[WALL,H-WALL],[W-WALL,H-WALL]]){const R=210+Math.sin(S.t*9+x)*10,g=ctx.createRadialGradient(x,y,4,x,y,R);g.addColorStop(0,'rgba(255,170,70,.42)');g.addColorStop(1,'rgba(255,120,40,0)');ctx.fillStyle=g;ctx.fillRect(x-R,y-R,R*2,R*2)}ctx.globalCompositeOperation='source-over'}
   if(sight){ctx.fillStyle='rgba(255,236,190,.3)';for(let i=0;i<26;i++){const x=(i*137.5+S.t*(6+i%5))%W,y=(i*89.3+Math.sin(S.t*.4+i)*30+S.t*(3+i%3)+60)%H;circ(x,y,1+(i%3)*.5);ctx.fill()}}
+  if(obstacles.length)drawRoom();
   for(const f of fields){circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
   for(const f of morsels){circ(f.x,f.y+Math.sin(S.t*4)*2,8);ctx.fillStyle='#d1213f';ctx.fill();circ(f.x-2,f.y-3+Math.sin(S.t*4)*2,2.5);ctx.fillStyle='#ffb3bf';ctx.fill()}
   for(const m of mons)drawMon(m);
+  drawBeams();
   for(const s of shots){if(sight){circ(s.x,s.y,s.r+5);ctx.fillStyle='rgba(255,138,76,.28)';ctx.fill()}circ(s.x,s.y,s.r);ctx.fillStyle=col('#ff8a4c');ctx.fill();circ(s.x,s.y,s.r*.45);ctx.fillStyle='#fff';ctx.fill()}
   for(const a of allies)drawAlly(a);
   for(const p of pshots){
@@ -901,7 +1142,8 @@ function draw(){
   for(const r of rings){if(!r.fx&&(r.under?!has('hearing'):sight))continue;const k=1-r.life/r.max,hot=r.under||r.fx;ctx.globalAlpha=(1-k)*(hot?.9:.5);ctx.strokeStyle=hot?'#d6a544':'#e7dfcd';ctx.lineWidth=hot?3:1.5;circ(r.x,r.y,6+r.r*k);ctx.stroke()}
   ctx.globalAlpha=1;
   if(has('touch')){
-    for(const z of zones){const k=z.t/z.dur;circ(z.x,z.y,z.r);ctx.fillStyle=z.mine?`rgba(143,211,255,${.1+.25*k})`:`rgba(184,38,61,${.12+.25*k})`;ctx.fill();ctx.strokeStyle=z.mine?'#8fd3ff':'#d6a544';ctx.lineWidth=2;ctx.stroke();circ(z.x,z.y,z.r*k);ctx.strokeStyle='rgba(231,223,205,.8)';ctx.stroke()}
+    for(const z of zones){const k=z.t/z.dur;circ(z.x,z.y,z.r);ctx.fillStyle=z.mine?`rgba(143,211,255,${.1+.25*k})`:`rgba(184,38,61,${.12+.25*k})`;ctx.fill();ctx.strokeStyle=z.mine?'#8fd3ff':'#d6a544';ctx.lineWidth=2;ctx.stroke();circ(z.x,z.y,z.r*k);ctx.strokeStyle='rgba(231,223,205,.8)';ctx.stroke();
+      if(z.sx!==undefined){const bx=z.sx+(z.x-z.sx)*k,by=z.sy+(z.y-z.sy)*k-Math.sin(k*Math.PI)*70;circ(bx,by,7);ctx.fillStyle='#22242b';ctx.fill();ctx.strokeStyle='#ff8a4c';ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=2}}
     ctx.fillStyle='#d6a544';ctx.font='700 30px Spectral,Georgia,serif';ctx.textAlign='center';
     for(const m of mons)if(m.st==='wind')ctx.fillText('!',m.x,m.y-m.r-12);
   }
@@ -912,12 +1154,14 @@ function draw(){
     ctx.fillStyle='#e7dfcd';ctx.font='58px "Pirata One",Georgia,serif';ctx.fillText(L.title,W/2,286);
     ctx.fillStyle='#b9b2c6';ctx.font='italic 20px Spectral,Georgia,serif';ctx.fillText(L.hint,W/2,322);ctx.globalAlpha=1;
   }
-  if(boss)$('bossFill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';
+  bossBar();
 }
 
 /* ---------- screens ---------- */
-function show(o){
-  $('ovKick').textContent=o.kick||'';$('ovTitle').textContent=o.title;$('ovTitle').style.color=o.col||'';$('ovBody').textContent=o.body||'';$('ovBody').hidden=!o.body;$('ovKeys').textContent=o.keys||'';$('ovKeys').hidden=!o.keys;
+let lastScreen=null; // the last screen the game itself put up, so MB.api.hide() can hand the overlay back
+function show(o,foreign){
+  if(!foreign)lastScreen=o;
+  $('ovKick').textContent=o.kick||'';$('ovTitle').textContent=o.title||'';$('ovTitle').style.color=o.col||'';$('ovBody').textContent=o.body||'';$('ovBody').hidden=!o.body;$('ovKeys').textContent=o.keys||'';$('ovKeys').hidden=!o.keys;
   const cd=$('ovCards');cd.textContent='';cd.hidden=!o.cards;
   (o.cards||[]).forEach(c=>{const e=document.createElement('button');e.type='button';
     for(const[tag,txt]of[['b',c.title],['small',c.sub],['span',c.body]]){const x=document.createElement(tag);x.textContent=txt;e.appendChild(x)}
@@ -943,20 +1187,39 @@ function hud(){
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0);
-  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false};
+  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
+}
+// dev only: __mb.over = {kind, mods, waves, room} replaces parts of a generated level, for testing one thing at a time
+function devDef(L,n){
+  const o=window.__mb&&window.__mb.over;if(!o||n<12)return L;
+  if(o.kind&&GENHP[o.kind]){const b=SPEC[o.kind];L.kind=o.kind;L.spec={...b,ai:o.kind,crown:0,name:PRE[n%10]+' '+b.name.replace('The ',''),hp:Math.round(GENHP[o.kind]*genMul(n)),col:TINT[(n*3)%10],r:b.r+2};L.mods=[];L.waves=0}
+  if(o.mods)L.mods=o.mods.filter(x=>MODS.includes(x));if(o.waves>=0)L.waves=Math.min(2,o.waves|0);if(o.room>=0&&ROOMS[o.room])L.room=o.room;
+  return L;
+}
+// begin(n) is how every screen starts a level: it gives extras.js the chance to show an interlude first (MB.interlude returns true and calls done() when it is over)
+let beginTok=0;
+function begin(n){
+  const tok=++beginTok;let went=false;const done=()=>{if(went||tok!==beginTok)return;went=true;startLevel(n)};
+  if(typeof MB.interlude==='function'){$('ov').hidden=true;let wait=false;try{wait=MB.interlude(n,done)===true}catch(e){console.error('Marrowborn: interlude failed',e)}if(wait)return}
+  done();
 }
 function startLevel(n){
+  beginTok++;
   if(n>=8&&S.cls&&!S.eq)S.eq=basicSet(S.cls);eqSync();
-  S.level=n;S.mode='play';S.banner=2.8;S.shake=0;S.stop=0;const L=S.L=levelDef(n);freshBody();
+  S.level=n;S.mode='play';S.banner=2.8;S.shake=0;S.stop=0;const L=S.L=devDef(levelDef(n),n);freshBody();
   mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];S.elite=4;
-  S.paused=false;SND.levelStart();boss=spawn(L.kind,W/2,140,true,L.spec);boss.t=1.2;
+  S.paused=false;SND.levelStart();obstacles=buildRoom(n,L.room);boss=null;S.wave=null;
+  if(L.waves){S.wave={n:1,of:L.waves};spawnWave();for(const m of mons)m.t+=.4}
+  else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2}
   if(L.kind==='mimic')reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
-  $('bossName').textContent=L.spec.name;
+  if(!S.wave)$('bossName').textContent=L.spec.name;
+  ST.levelTime=0;ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Level '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
+  emit('levelstart',{level:n,L});
 }
 function reward(){
-  haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n);allies=[];
+  haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n);allies=[];emit('reward',{level:n});
   if(n===7)return chooseClass();
   P.inv=0;S.level++;S.mode='reward';hud();
   const up=S.rank&&S.rank!==r0,rk=up?'Rank up. You have climbed from rank '+r0+' to rank '+S.rank+'.':'';
@@ -989,41 +1252,106 @@ function dropScreen(n,rk,next){
 }
 function reward2(n){
   if(n<7){const p=PARTS[n],lacks=PARTS.slice(n+1).map(x=>x.name.toLowerCase());
-    return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>startLevel(S.level)]]})}
+    return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>begin(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 4 (E, Q, R and F also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>startLevel(S.level)]]})}
+    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 4 (E, Q, R and F also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
-    cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;startLevel(S.level)}}))});
+    cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;begin(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
   show({wide:true,kick:n===11?'The Flayed King is dead. The road goes on.':'Level '+(n+1)+' cleared',title:'Choose a boon',
-    cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;startLevel(S.level)}}})});
+    cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;begin(S.level)}}})});
 }
 function chooseClass(){
   S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
   show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown, and you carry four at a time. After level 50 the class can be upgraded.',
-    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=[0,1,2,3];startLevel(8)}}))});
+    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=[0,1,2,3];emit('classpicked',{cls:id});begin(8)}}))});
 }
 function pauseShow(){
   const btns=[['Resume',()=>pause(false)]];if(known()>4)btns.push(['Skills',()=>loadout(pauseShow)]);
+  if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',pauseShow)]);
   show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
 }
 function pause(on){
   if(on){if(S.paused||S.mode!=='play'&&S.mode!=='clear')return;S.paused=true;for(const k in keys)keys[k]=false;joy.x=joy.y=0;SND.pause(true);pauseShow()}
   else if(S.paused){S.paused=false;$('ov').hidden=true;SND.pause(false);syncSkills()}
-  const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed',S.paused);
+  else return;
+  const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed',S.paused);emit('pause',{paused:S.paused});
 }
-function save(n){const eq=S.eq&&{};if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};pref('level',n);pref('run',JSON.stringify({cls:S.cls,adv:S.adv,b:S.b,eq,scrap:S.scrap,load:S.load}))}
+// The run as a plain object: what is written to localStorage and what MB.api.getSave() hands out. level is where "Continue" resumes.
+let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:[0,1,2,3],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
+function snapshot(n){
+  const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+}
+function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,st:SAVE.stats}))}
+const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+// read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
+function applyRun(r){
+  try{r=r&&typeof r==='object'?r:{};
+    S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
+    const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
+    S.load=okLoad(r.load)?r.load.slice():[0,1,2,3]; // older saves carry the first four skills
+    // older saves have no equipment: they get the basic set
+    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
+    stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
+  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];stReset()}
+  eqSync();
+}
+// MB.api.loadSave is strict where applyRun is forgiving: anything that is not exactly a save is refused and nothing changes
+function checkSave(o){
+  const int=(v,lo,hi)=>Number.isInteger(v)&&v>=lo&&v<=hi;
+  if(!o||typeof o!=='object'||Array.isArray(o)||o.v!==1||!int(o.level,0,9998))return null;
+  if(o.cls!==null&&!(typeof o.cls==='string'&&own(CLASSES,o.cls)))return null;
+  const c=o.cls;if(!c&&(o.level>8||o.adv||o.eq))return null;
+  if(o.adv!==null&&o.adv!==undefined&&!(c&&CLASSES[c].adv.some(a=>a[0]===o.adv)))return null;
+  const b=noBoons();if(!o.b||typeof o.b!=='object')return null;
+  for(const k in b){const v=o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
+  let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400))return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up}}}
+  if(!int(o.scrap,0,999)||!okLoad(o.load))return null;
+  const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
+  if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
+  return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load:o.load.slice(),st,level:o.level};
+}
+function loadSave(o){
+  const r=checkSave(o);if(!r)return false;
+  if(S.paused){S.paused=false;const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed','false')}
+  applyRun(r);save(r.level);title(r.level);return true;
+}
+function storedLevel(){try{return Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0))}catch(e){return SAVE.level}}
+function newRun(){S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];stReset()}
+// a hook set by extras.js; `back` puts the screen it was opened from back up
+function hook(name,back){try{MB[name](back)}catch(e){console.error('Marrowborn: '+name+' failed',e);back()}}
+let titleSaved=0;
 function title(saved){
-  S.mode='title';S.level=0;freshBody();P.y=H/2+40;mons=[];allies=[];boss=null;hud();
-  const btns=[['Rise',()=>{S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];startLevel(0)}]];
+  titleSaved=saved===undefined?storedLevel():saved;beginTok++;
+  S.mode='title';S.level=0;S.paused=false;S.wave=null;freshBody();P.y=H/2+40;mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];morsels=[];obstacles=[];boss=null;hud();
+  $('lvl').textContent='A crypt. A pile of bones.';$('bossName').textContent='—';
+  titleShow();emit('title');
+}
+function titleShow(){
+  const saved=titleSaved,btns=[['Rise',()=>{newRun();begin(0)}]];
   // start as a whole person at the class choice; nothing is saved until a class is picked
-  btns.push(['Skip to class selection',()=>{chooseClass();freshBody();hud()}]);
+  btns.push(['Skip to class selection',()=>{stReset();chooseClass();freshBody();hud()}]);
   if(saved>0)btns.unshift(['Continue at level '+(saved+1),()=>saved>=8&&!CLASSES[S.cls]?chooseClass():startLevel(saved)]);
+  if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',titleShow)]);
+  if(typeof MB.openRecords==='function')btns.push(['Records',()=>hook('openRecords',titleShow)]);
   show({kick:'Bones first. Legend later.',title:'You wake as bare bones',body:'Each monster you kill gives part of a body back: organs, then skin, then the five senses. Once you are whole you choose a class. Every level after that makes it stronger, and after level 50 it can be upgraded.',keys:matchMedia('(pointer:coarse)').matches?'Stick to move. Strike aims at the nearest monster.':'WASD or arrows to move. Space or click to strike. Esc or P to pause.',btns});
 }
-
+// what extras.js may call
+const API={
+  show:o=>show(o||{},true),
+  // hands the overlay back to the game: gone during play, otherwise the screen the game needs (title, pause, reward, death)
+  hide(){if(S.mode==='title')titleShow();else if(S.paused)pauseShow();else if(S.mode==='play'||S.mode==='clear'||!lastScreen)$('ov').hidden=true;else show(lastScreen)},
+  startLevel:n=>{n=Math.floor(+n);if(!(n>=0&&n<=9998))return false;if(n>=8&&!CLASSES[S.cls]){chooseClass();return true}startLevel(n);return true},
+  title:()=>title(),
+  refreshTitle(){if(S.mode==='title'&&!$('ov').hidden&&lastScreen&&lastScreen.kick==='Bones first. Legend later.')titleShow()},
+  getSave:()=>JSON.parse(JSON.stringify({...SAVE,rank:S.cls?rank(SAVE.level):''})),
+  loadSave,
+  sfx(name,...a){audio();if(typeof SND[name]==='function'&&own(SND,name)){SND[name](...a);return true}return false},
+  haptic:p=>haptic(p),
+};
 /* ---------- input ---------- */
 const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'sk0',l:'sk0','1':'sk0',q:'sk1','2':'sk1',r:'sk2','3':'sk2',f:'sk3','4':'sk3'};
 addEventListener('keydown',e=>{
@@ -1081,8 +1409,10 @@ function skillUi(){
       b.disabled=!s.ready;li.className=s.ready?'ready':s.unlocked?'':'locked';b.setAttribute('aria-label',s.name+(s.unlocked?s.cd>0?', '+txt+' seconds':', ready':', locked'))}
     const f=s.unlocked&&s.max?Math.ceil(s.cd/s.max*40)/40:0;if(f!==skF[i]){skF[i]=f;skB[i].style.setProperty('--cd',f);skL[i].style.setProperty('--cd',f)}}
 }
-$('snd').onclick=()=>{audio();muted=!muted;$('snd').setAttribute('aria-pressed',!muted);pref('mute',muted?1:0);bedLevel();sfx(520,.08,'triangle',.2);$('snd').blur()};
-$('hap').onclick=()=>{hapOn=!hapOn;$('hap').setAttribute('aria-pressed',hapOn);pref('nohap',hapOn?0:1);haptic(40);$('hap').blur()};
+$('snd').onclick=()=>{audio();const wasOn=!muted&&(SET.music>0||SET.sfx>0);muted=wasOn;pref('mute',muted?1:0);
+  if(!wasOn&&!(SET.music>0||SET.sfx>0)){SET.music=.6;SET.sfx=.8;pref('settings',JSON.stringify(SET))} // both volumes were at zero: the button brings the defaults back
+  setApply();emit('settings',{key:'mute',value:muted});sfx(520,.08,'triangle',.2);$('snd').blur()};
+$('hap').onclick=()=>{setSetting('haptic',SET.haptic>0?0:hapLast);haptic(40);$('hap').blur()};
 // a pause button beside the toggles, for touch screens
 {const pb=document.createElement('button');pb.id='pauseB';pb.type='button';pb.className='tog';pb.textContent='Pause';pb.setAttribute('aria-pressed','false');pb.onclick=()=>{audio();pause(!S.paused);pb.blur()};$('hap').after(pb);
   const st=document.createElement('style');st.textContent='#pauseB[aria-pressed="false"]{opacity:1;text-decoration:none}';document.head.appendChild(st)}
@@ -1090,37 +1420,29 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){pause(true
 
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
-window.MB={W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,RAR,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
+window.MB={settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,RAR,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
   get P(){return P},get mons(){return mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return boss}};
 let last=0;
 let fast=1;
-function tick(dt){if(S.paused){S.t+=dt;return}if(S.stop>0)S.stop-=dt;else step(dt)}
+function tick(dt){if(S.paused){S.t+=dt;return}if(S.mode==='play'){ST.time+=dt;ST.levelTime+=dt}if(S.stop>0)S.stop-=dt;else step(dt)}
 function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);skillUi();
   const R=MB.renderer;
   if(R&&R.ok){try{R.draw(dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
-  if(boss)$('bossFill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';requestAnimationFrame(frame)}
+  bossBar();requestAnimationFrame(frame)}
 function start(data){
-  let saved=0;const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
-  try{saved=Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0));muted=localStorage.getItem('marrowborn.mute')==='1';hapOn=localStorage.getItem('marrowborn.nohap')!=='1'}catch(e){}
-  // a damaged or hand-edited save must not be able to break the run
-  try{const r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{};
-    S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
-    const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
-    S.load=okLoad(r.load)?r.load.slice():[0,1,2,3]; // older saves carry the first four skills
-    // older saves have no equipment: they get the basic set
-    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
-  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3]}
-  eqSync();
-  $('snd').setAttribute('aria-pressed',!muted);$('hap').setAttribute('aria-pressed',hapOn);
+  let saved=storedLevel();
+  setLoad();
+  let r={};try{r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{}}catch(e){}
+  applyRun(r);SAVE=snapshot(saved);
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=okLoad(r.load)?r.load.slice():[0,1,2,3];
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=okLoad(r.load)?r.load.slice():[0,1,2,3];
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
-    startLevel(n)},kill:()=>boss&&mons.includes(boss)&&hurtM(boss,1e9),skill:si=>skill(si),reward,loadout,dropScreen};
+    startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();
