@@ -50,7 +50,7 @@ const CLASSES={
   ['Forked Bolt','Every cast throws three bolts in a spread.'],
   ['Nova','A new skill. A ring of bolts bursts out of you and erases enemy bolts nearby.'],
   ['Arcane Lance','Your bolts pass straight through everything they hit.']]},
- ranger:{name:'Ranger',gear:'Bow, hood, quiver',hp:2,text:'Fast arrows at long range, and the quickest feet of the three. 12 health.',pows:[
+ ranger:{name:'Ranger',gear:'Bow, hood, quiver',hp:2,text:'Fast arrows at long range, and quick feet. 12 health.',pows:[
   ['Quickdraw','You loose arrows much faster.'],
   ['Volley','A new skill. Loose a fan of seven arrows at once.'],
   ['Longshot','Arrows that fly more than a few strides hit for double.']]},
@@ -106,7 +106,7 @@ function levelDef(n){
 }
 
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,spec:0});
-const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null};
+const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:''};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],bits=[],rings=[],floats=[],morsels=[],boss=null;
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
@@ -117,6 +117,9 @@ const skMul=()=>Math.pow(.88,S.b.focus)*(adv('k')||1);
 const melee=c=>!c||c==='tank'||c==='fighter'||c==='assassin';
 const mspd=()=>S.level<8?1:Math.min(1.7,1.25+Math.max(0,S.level-12)*.01);
 const tier=()=>S.level<12?0:Math.floor((S.level-12)/15);
+// rank climbs with the levels once you have a trade: E at level 9, S by level 50, then S+1, S+2... every ten levels
+const RANKS=[[50,'S'],[41,'A'],[32,'B'],[23,'C'],[15,'D'],[9,'E']];
+function rank(n=S.level){if(!S.cls||n<8)return'';const N=n+1;if(N>=60)return'S+'+Math.floor((N-50)/10);for(const[a,r]of RANKS)if(N>=a)return r;return''}
 const fmt=d=>d%1?d.toFixed(1):''+d;
 const has=id=>PARTS.findIndex(p=>p.id===id)<S.level;
 
@@ -168,29 +171,84 @@ function buildFloor(key){
 }
 
 /* ---------- sound: muffled through bone until you have ears ---------- */
-let AC,master,lp,muted=false;
-function audio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.45;lp=AC.createBiquadFilter();lp.type='lowpass';master.connect(lp);lp.connect(AC.destination)}catch(e){AC=null}}
-function sfx(f,d=.1,type='square',v=.3,f2){
-  if(!AC||muted)return;try{
+let AC,master,lp,muted=false,bed=null,nbuf;
+const live=()=>AC&&!muted&&!document.hidden;
+function audio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.45;lp=AC.createBiquadFilter();lp.type='lowpass';master.connect(lp);lp.connect(AC.destination);tune();startBed()}catch(e){AC=null}}
+// one oscillator voice: f -> f2 over d seconds, starting `at` seconds from now
+function sfx(f,d=.1,type='square',v=.3,f2,at=0){
+  if(!live())return;try{
   if(AC.state==='suspended')AC.resume();
-  tune();
-  const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime;o.type=type;
+  const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+at;o.type=type;
   o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
   g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
   o.connect(g);g.connect(master);o.start(t);o.stop(t+d+.02)}catch(e){}
 }
 // without ears everything is muffled, but still loud enough for a phone speaker
-function tune(){const h=has('hearing');lp.frequency.value=h?18000:700;master.gain.value=h?.45:.7}
-let nbuf;
-function noise(d=.12,v=.3){
-  if(!AC||muted)return;try{tune();
+function tune(){if(!AC)return;const h=has('hearing'),t=AC.currentTime;lp.frequency.setTargetAtTime(h?18000:700,t,.05);master.gain.setTargetAtTime(h?.45:.7,t,.05)}
+// noise burst; with f it is band-passed and swept f -> f2 (whooshes, clangs, rattles)
+function noise(d=.12,v=.3,f,f2,at=0){
+  if(!live())return;try{
   if(!nbuf){nbuf=AC.createBuffer(1,AC.sampleRate*.5,AC.sampleRate);const ch=nbuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1}
-  const n=AC.createBufferSource(),g=AC.createGain(),t=AC.currentTime;n.buffer=nbuf;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);n.connect(g);g.connect(master);n.start(t);n.stop(t+d)}catch(e){}
+  const n=AC.createBufferSource(),g=AC.createGain(),t=AC.currentTime+at;n.buffer=nbuf;n.loop=true;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
+  if(f){const q=AC.createBiquadFilter();q.type='bandpass';q.Q.value=1.4;q.frequency.setValueAtTime(f,t);if(f2)q.frequency.exponentialRampToValueAtTime(f2,t+d);n.connect(q);q.connect(g)}else n.connect(g);
+  g.connect(master);n.start(t,Math.random()*.3);n.stop(t+d+.02)}catch(e){}
 }
-let hapOn=true;
-function haptic(p){if(!hapOn)return;try{if(window.Android&&Android.vibrate)Android.vibrate(String(p));else if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
+// soft-attack voice for the ambient bed
+function voice(f,d,v,type,dest,at=0){try{const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+at;o.type=type;o.frequency.value=f;g.gain.setValueAtTime(.0001,t);g.gain.linearRampToValueAtTime(v,t+Math.min(.12,d*.2));g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g);g.connect(dest);o.start(t);o.stop(t+d+.05)}catch(e){}}
+// ambient bed: a low detuned drone under a slow filter sweep, sparse minor-key notes with an echo, and a heartbeat when you are close to death
+const SCALE=[110,130.81,146.83,164.81,196,220,261.63,293.66,329.63];
+function startBed(){
+  const g=AC.createGain();g.gain.value=0;g.connect(master);
+  const f=AC.createBiquadFilter();f.type='lowpass';f.frequency.value=230;f.Q.value=1.5;f.connect(g);
+  for(const[hz,ty,v]of[[55,'sawtooth',.4],[55.35,'sawtooth',.4],[82.41,'triangle',.3],[27.5,'sine',.5]]){const o=AC.createOscillator(),og=AC.createGain();o.type=ty;o.frequency.value=hz;og.gain.value=v;o.connect(og);og.connect(f);o.start()}
+  const l=AC.createOscillator(),lg=AC.createGain();l.frequency.value=.06;lg.gain.value=80;l.connect(lg);lg.connect(f.frequency);l.start();
+  const ng=AC.createGain(),dl=AC.createDelay(1),fb=AC.createGain();dl.delayTime.value=.47;fb.gain.value=.36;ng.connect(g);ng.connect(dl);dl.connect(fb);fb.connect(dl);dl.connect(g);
+  bed={g,ng,next:AC.currentTime+3,hb:0,i:4};setInterval(bedTick,300);bedLevel();
+}
+function bedLevel(){if(bed)try{bed.g.gain.setTargetAtTime(muted?0:.11,AC.currentTime,.4)}catch(e){}}
+function bedTick(){
+  if(!bed||!live()||AC.state!=='running')return;const t=AC.currentTime,play=S.mode==='play'&&!S.paused;
+  if(t>=bed.next){bed.i=Math.max(0,Math.min(SCALE.length-1,bed.i+Math.floor(Math.random()*5)-2));const f=SCALE[bed.i]*(S.mode==='dead'?.5:1);
+    voice(f,2.6,.5,'triangle',bed.ng);if(Math.random()<.3)voice(f*1.5,2.2,.22,'sine',bed.ng,.24);bed.next=t+(play?1.5+Math.random()*1.7:2.6+Math.random()*2.6)}
+  if(play&&P&&has('organs')&&P.hp<=Math.max(2,P.maxHp*.3)&&t>=bed.hb){voice(58,.16,1.6,'sine',bed.g);voice(50,.2,1.2,'sine',bed.g,.17);bed.hb=t+.72}
+}
+let hapOn=true,hapT=0;
+// short ticks are rate-limited to one per 60 ms; patterns and heavy hits always go through
+function haptic(p){if(!hapOn)return;const now=performance.now(),big=Array.isArray(p)||p>=40;if(!big&&now-hapT<60)return;hapT=now;try{if(window.Android&&Android.vibrate)Android.vibrate(String(p));else if(navigator.vibrate)navigator.vibrate(p)}catch(e){}}
 const pref=(k,v)=>{try{localStorage.setItem('marrowborn.'+k,v)}catch(e){}};
-const chime=()=>[330,415,494,660].forEach((f,i)=>setTimeout(()=>sfx(f,.35,'triangle',.25),i*110));
+const chime=()=>[330,415,494,660].forEach((f,i)=>sfx(f,.35,'triangle',.25,0,i*.11));
+let hitT=0;
+const SND={
+  swing(c){
+    if(c==='fighter'){noise(.15,.3,900,220);sfx(170,.12,'sawtooth',.13,80)}
+    else if(c==='tank'){noise(.13,.28,700,200);sfx(240,.09,'triangle',.2,110)}
+    else if(c==='assassin'){noise(.06,.24,3200,1400);sfx(620,.05,'triangle',.1,300)}
+    else{noise(.09,.22,1300,420);sfx(320,.08,'triangle',.15,120)}},
+  bolt(){sfx(880,.14,'sine',.16,420);sfx(1760,.06,'triangle',.06,1320)},
+  arrow(){sfx(1300,.05,'triangle',.12,500);noise(.05,.12,4200,2600)},
+  skull(){sfx(260,.18,'sawtooth',.12,90);sfx(130,.2,'sine',.14,65)},
+  orb(){sfx(1040,.16,'sine',.15,1560);sfx(1560,.2,'sine',.05,2080,.04)},
+  hit(quiet){const n=performance.now();if(n-hitT<45)return;hitT=n;const k=.88+Math.random()*.26;sfx(150*k,.09,'square',quiet?.12:.27,70);noise(.06,quiet?.08:.2,1900,500)},
+  hurt(){sfx(200,.25,'sawtooth',.33,50);sfx(92,.3,'sine',.4,45);noise(.18,.33,800,200)},
+  block(){sfx(950,.2,'square',.2,640);sfx(1432,.26,'square',.12,1180);noise(.08,.3,4200,2400)},
+  dash(){noise(.14,.2,500,2600);sfx(500,.12,'sine',.12,900)},
+  blink(){sfx(1400,.12,'sine',.16,500);sfx(500,.14,'sine',.12,1900,.09);noise(.1,.1,5000,2000)},
+  skill(c){
+    if(c==='fighter'){noise(.4,.3,400,1800);sfx(140,.35,'sawtooth',.16,260)}
+    else if(c==='assassin'){noise(.12,.25,2600,600);sfx(1200,.16,'sawtooth',.16,110);sfx(90,.16,'sine',.3,50,.1)}
+    else if(c==='healer'){[523.25,659.25,783.99,1046.5].forEach((f,i)=>sfx(f,.5,'sine',.17,0,i*.07))}
+    else if(c==='tank'){sfx(60,.5,'sine',.5,32);noise(.4,.4,300,80);sfx(110,.3,'square',.16,40)}
+    else if(c==='mage'){sfx(300,.4,'sine',.24,1300);sfx(600,.4,'triangle',.08,2600);noise(.35,.14,1500,6000)}
+    else if(c==='necro'){sfx(120,.5,'sawtooth',.22,240);for(let i=0;i<5;i++)noise(.03,.2,2400,1800,.08+i*.07)}
+    else for(let i=0;i<3;i++){sfx(1250-i*120,.06,'triangle',.14,480,i*.045);noise(.05,.1,4200,2600,i*.045)}},
+  fizzle(){sfx(220,.08,'triangle',.12,160)},
+  pickup(){sfx(600,.1,'sine',.2,900);sfx(900,.16,'sine',.18,1350,.08)},
+  levelStart(){sfx(196,.7,'triangle',.2,98);sfx(146.83,.9,'sine',.16,73,.05);sfx(392,.5,'sine',.05,388,.02)},
+  bossDeath(){sfx(90,.7,'sawtooth',.36,30);noise(.6,.4,1200,90);[392,311,233,155].forEach((f,i)=>sfx(f,.4,'triangle',.14,f*.97,.15+i*.12))},
+  rankUp(){[392,523.25,659.25,783.99,1046.5].forEach((f,i)=>{sfx(f,.3+i*.06,'triangle',.22,0,.5+i*.1);sfx(f*2,.2,'sine',.05,0,.5+i*.1)})},
+  dead(){sfx(120,.9,'sawtooth',.36,30);[220,207.65,164.81,110].forEach((f,i)=>sfx(f,.6,'triangle',.14,0,.2+i*.22))},
+  pause(on){sfx(on?520:390,.08,'triangle',.14,on?390:520)},
+};
 
 /* ---------- helpers ---------- */
 const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
@@ -199,7 +257,7 @@ function clamp(e,r){const x=Math.max(WALL+r,Math.min(W-WALL-r,e.x)),y=Math.max(W
 function move(m,a,spd,dt){m.x+=Math.cos(a)*spd*dt;m.y+=Math.sin(a)*spd*dt;m.moving=true;return clamp(m,m.r)}
 function shoot(x,y,a,spd,r=6){shots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r})}
 function ringShot(m,n,spd,off=0){for(let i=0;i<n;i++)shoot(m.x,m.y,off+i*TAU/n,spd)}
-function zone(x,y,r,dur){const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z)}
+function zone(x,y,r,dur){dur/=mspd();const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z)}
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
 function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=12)hp=Math.round(2*(1+(S.level-12)*.1));const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0};clamp(m,m.r);mons.push(m);return m}
 function reshuffle(){
@@ -211,7 +269,7 @@ function reshuffle(){
 
 /* ---------- monsters ---------- */
 function chargeStates(m,dt,a,next){
-  if(m.st==='wind'){m.ang=a;if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70)}}
+  if(m.st==='wind'){m.ang=a;if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
   else if(m.st==='charge'){const hit=move(m,m.ang,540,dt);if(hit||(m.t-=dt)<=0){m.st='dazed';m.t=hit?1.5:.6;if(hit){S.shake=.25;sfx(70,.2,'square',.35,40)}}}
   else if((m.t-=dt)<=0){m.st='idle';m.t=next}
 }
@@ -253,31 +311,32 @@ const AI={
   },
   hollow(m,dt,a){
     const mad=m.hp<m.maxHp/2;
+    if(m.vol>0&&(m.vol-=dt)<=0)ringShot(m,12,160,a+.26);
     if(m.st==='idle'){move(m,a,mad?88:62,dt);if((m.t-=dt)<=0){const k=m.n++%4;
       if(k===0){m.st='wind';m.t=.7}
-      else if(k===1){ringShot(m,12,160,a);if(mad)setTimeout(()=>{if(S.mode==='play'&&m.hp>0)ringShot(m,12,160,a+.26)},350);m.t=1.5}
+      else if(k===1){ringShot(m,12,160,a);if(mad)m.vol=.35;m.t=1.5}
       else if(k===2){zone(P.x,P.y,85,.9);for(let i=0;i<3;i++){const b=a+i*TAU/3;zone(P.x+Math.cos(b)*150,P.y+Math.sin(b)*150,70,1.25)}m.t=1.7}
       else{for(let i=0;i<(mad?3:2);i++)if(mons.length<6){const b=rand()*TAU;spawn('mite',m.x+Math.cos(b)*50,m.y+Math.sin(b)*50)}m.t=1.4}}}
     else chargeStates(m,dt,a,1);
   },
 };
-function hurtM(m,d){
+function hurtM(m,d,quiet){
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
-  const before=m.hp;m.hp-=d;m.flash=.12;puff(m,col(m.s.col),5,120);sfx(150,.09,'square',.3,70);noise(.06,.2);haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
+  const before=m.hp;m.hp-=d;m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
   const ch=m.maxHp/5;if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({x:m.x,y:m.y});
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
   if(m.hp<=0){
     mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);
-    if(m.boss){mons=[];shots=[];pshots=[];zones=[];S.mode='clear';S.clearT=1.2;S.shake=.4;sfx(90,.6,'sawtooth',.4,30);noise(.5,.4);haptic([60,40,220]);S.stop=.12}
+    if(m.boss){mons=[];shots=[];pshots=[];zones=[];S.mode='clear';S.clearT=1.2;S.shake=.4;SND.bossDeath();haptic([60,40,220]);S.stop=.12}
     else if(has('taste')&&rand()<.35)morsels.push({x:m.x,y:m.y});
   }
 }
 function hurtP(d){
   if(P.inv>0||S.mode!=='play')return;
-  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);sfx(950,.16,'square',.3,320);noise(.1,.3);haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){P.hp=Math.min(P.maxHp,P.hp+2);hud()}if(pw(1))shock(115,2);return}
-  P.hp-=d;P.inv=1;S.shake=.3;noise(.18,.35);haptic(P.hp>0?70:[120,60,320]);S.stop=.06;if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);sfx(200,.25,'sawtooth',.35,50);hud();
-  if(P.hp<=0&&S.adv==='saint'&&!P.saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'})}
-  if(P.hp<=0){S.mode='dead';sfx(120,.8,'sawtooth',.4,30);
+  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){P.hp=Math.min(P.maxHp,P.hp+2);hud()}if(pw(1))shock(115,2);return}
+  P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
+  if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
+  if(P.hp<=0){S.mode='dead';SND.dead();
     show({kick:'You came apart',title:has('skin')?'Flesh fails':'A pile of bones again',body:'You keep everything you have won back so far. '+S.L.spec.name+' is still waiting.',btns:[['Try level '+(S.level+1)+' again',()=>startLevel(S.level)]]})}
 }
 
@@ -299,14 +358,14 @@ function leech(){if(cls()==='necro'&&pw(3)&&++P.lc%10===0&&P.hp<P.maxHp){P.hp++;
 function strike(pt){
   const c=cls(),a=aim(pt,melee(c)?170:1200),D=dmgMul(),H=cdMul();P.swing=a;
   if(c==='mage'){P.atk=.14;P.cd=.45*H;const n=1+(pw(1)?2:0)+S.b.spec+(S.adv==='archmage'?2:0);
-    for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}sfx(880,.14,'sine',.18,420);return}
-  if(c==='ranger'){P.atk=.1;P.cd=(pw(1)?.17:.28)*H;pshot(a,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);sfx(1300,.05,'triangle',.14,500);return}
-  if(c==='necro'){P.atk=.14;P.cd=.5*H;pshot(a,400,1.5*D,5,'skull',S.adv==='reaper');sfx(260,.18,'sawtooth',.16,90);return}
-  if(c==='healer'){P.atk=.14;P.cd=.4*H;pshot(a,460,1.5*D,5,'orb',S.adv==='inquisitor');sfx(1040,.16,'sine',.18,1560);return}
+    for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}SND.bolt();return}
+  if(c==='ranger'){P.atk=.1;P.cd=(pw(1)?.17:.28)*H;pshot(a,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow();return}
+  if(c==='necro'){P.atk=.14;P.cd=.5*H;pshot(a,400,1.5*D,5,'skull',S.adv==='reaper');SND.skull();return}
+  if(c==='healer'){P.atk=.14;P.cd=.4*H;pshot(a,460,1.5*D,5,'orb',S.adv==='inquisitor');SND.orb();return}
   const M={tank:[2,.42,78,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.5,.2,60,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
   let dmg=M[0]*D;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0}
   const twice=c==='assassin'&&pw(1);
-  P.atk=.16;P.cd=M[1]*H;sfx(c==='tank'||c==='fighter'?240:c==='assassin'?520:320,.08,'triangle',.2,c==='assassin'?260:110);
+  P.atk=.16;P.cd=M[1]*H;SND.swing(c);
   for(const m of[...mons]){
     if(m.hidden||!mons.includes(m))continue;const d=dist(m,P);
     if(d<M[2]+m.r){const da=Math.atan2(Math.sin(angTo(P,m)-a),Math.cos(angTo(P,m)-a));
@@ -314,15 +373,18 @@ function strike(pt){
   }
 }
 function skill(){
-  const c=cls(),D=dmgMul();P.atk=.16;let cd=6;
+  const c=cls(),D=dmgMul();let cd=6;
+  if(c==='assassin'){let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
+    if(!t){SND.fizzle();return} // nothing above ground to step to: keep the skill ready
+    const g=angTo(P,t);puff(P,'#22242b',12);P.x=t.x+Math.cos(g)*(t.r+24);P.y=t.y+Math.sin(g)*(t.r+24);clamp(P,14);P.face=g+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);hurtM(t,5*D);haptic(35);cd=5}
+  P.atk=.16;SND.skill(c);
   if(c==='fighter'){shock(115,3);puff(P,'#dfe6ec',20,280);cd=5}
-  else if(c==='assassin'){let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
-    if(!t)cd=0;else{const g=angTo(P,t);puff(P,'#22242b',12);P.x=t.x+Math.cos(g)*(t.r+24);P.y=t.y+Math.sin(g)*(t.r+24);clamp(P,14);P.face=g+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);hurtM(t,5*D);sfx(700,.18,'sawtooth',.25,120);haptic(35);cd=5}}
-  else if(c==='healer'){P.hp=Math.min(P.maxHp,P.hp+5);hud();shock(100,2);puff(P,'#ffe08a',24,260);sfx(520,.5,'sine',.3,1040);cd=10}
+  else if(c==='healer'){P.hp=Math.min(P.maxHp,P.hp+5);hud();shock(100,2);puff(P,'#ffe08a',24,260);cd=10}
   else if(c==='tank'){shock(125,4);puff(P,'#d6a544',24,300)}
-  else if(c==='mage'){for(let i=0;i<14;i++)pshot(i*TAU/14,380,2*D,5,'bolt',pw(3));shots=shots.filter(s=>dist(s,P)>140);rings.push({x:P.x,y:P.y,life:.4,max:.4,r:140,fx:true});sfx(300,.4,'sine',.3,1200);haptic(40);cd=7}
-  else if(c==='necro'){for(let i=0;i<4;i++){const t=ally('thrall',9);t.extra=true;allies.push(t);puff(t,'#7fd66b',6)}sfx(120,.5,'sawtooth',.3,240);haptic([30,40,60]);cd=9}
-  else{const a=aim(null,1200);P.swing=a;for(let i=-3;i<=3;i++)pshot(a+i*.13,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);sfx(900,.15,'triangle',.25,300);haptic(25);cd=4.5}
+  else if(c==='mage'){for(let i=0;i<14;i++)pshot(i*TAU/14,380,2*D,5,'bolt',pw(3));shots=shots.filter(s=>dist(s,P)>140);rings.push({x:P.x,y:P.y,life:.4,max:.4,r:140,fx:true});haptic(40);cd=7}
+  else if(c==='necro'){for(const a of allies)if(a.extra){a.life=0;puff(a,'#e7dfcd',6)}allies=allies.filter(a=>!a.extra); // a new army replaces the old one, so the cap holds
+    for(let i=0;i<4;i++){const t=ally('thrall',9);t.extra=true;allies.push(t);puff(t,'#7fd66b',6)}haptic([30,40,60]);cd=9}
+  else if(c==='ranger'){const a=aim(null,1200);P.swing=a;for(let i=-3;i<=3;i++)pshot(a+i*.13,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);haptic(25);cd=4.5}
   P.skCd=cd*skMul();
 }
 function playerStep(dt){
@@ -337,8 +399,8 @@ function playerStep(dt){
   if((want.atk||keys.atk)&&P.cd<=0)strike(want.pt);
   want.atk=false;want.pt=null;
   if(want.dash&&has('organs')&&P.dashCd<=0){
-    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;sfx(1400,.15,'sine',.18,500)}
-    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);sfx(500,.12,'sine',.15,900)}
+    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink()}
+    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash()}
     haptic(10)}
   want.dash=false;
   if(want.skill&&pw(2)&&P.skCd<=0)skill();
@@ -371,22 +433,24 @@ function step(dt){
   for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){const g=angTo(a,to),sp=a.kind==='wolf'?250:175;a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r)}
-    else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul());leech()}
+    else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul(),true);leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
   if(act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
   for(const m of[...mons]){
+    if(S.mode!=='play')break;if(!mons.includes(m))continue; // the boss or the player died earlier in this loop
     m.moving=false;if(m.flash>0)m.flash-=dt;
     AI[m.ai](m,dt*mspd(),angTo(m,P),dist(m,P));
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
     if(!m.hidden&&m.st!=='leap'&&dist(m,P)<m.r+11)hurtP((m.st==='charge'?2:1)+tier());
   }
+  if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(1+tier());s.dead=true}
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL)s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);if(dist(z,P)<z.r)hurtP(2+tier())}}
   zones=zones.filter(z=>!z.dead);
-  for(const f of morsels)if(dist(f,P)<24){f.dead=true;P.hp=Math.min(P.maxHp,P.hp+3);hud();sfx(600,.2,'sine',.25,900);haptic(15)}
+  for(const f of morsels)if(dist(f,P)<24){f.dead=true;P.hp=Math.min(P.maxHp,P.hp+3);hud();SND.pickup();haptic(15)}
   morsels=morsels.filter(f=>!f.dead);
 }
 
@@ -643,14 +707,15 @@ function show(o){
 }
 function hud(){
   const nb=Object.values(S.b).reduce((a,b)=>a+b,0),cn=()=>S.adv?CLASSES[S.cls].adv.find(a=>a[0]===S.adv)[1]:CLASSES[S.cls].name;
-  const chips=act2()&&S.cls?[[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
+  S.rank=rank();tune();
+  const chips=act2()&&S.cls?[['Rank '+S.rank,true],[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
   $('ledger').textContent='';chips.forEach(([name,on])=>{const li=document.createElement('li');li.textContent=name;if(on)li.className='on';$('ledger').appendChild(li)});
   const hp=$('hp');hp.textContent='';
   if(!P)return;
   if(has('touch')){for(let i=0;i<P.maxHp;i++){const e=document.createElement('i');if(i>=P.hp)e.className='off';hp.appendChild(e)}hp.setAttribute('aria-label',P.hp+' of '+P.maxHp+' health')}
   else{const e=document.createElement('em');e.textContent='Numb. No nerves to feel wounds with. You rattle when you are close to breaking.';hp.appendChild(e)}
   $('bDash').disabled=!has('organs');$('bDash').textContent=cls()==='mage'?'Blink':'Dash';
-  $('bSkill').hidden=!cls();$('bSkill').disabled=!pw(2);if(cls()&&pw(2))$('bSkill').textContent=CLASSES[S.cls].pows[1][0];
+  $('bSkill').hidden=!cls();$('bSkill').disabled=!pw(2)||P.skCd>0;P.skUi=pw(2)&&P.skCd<=0;if(cls()&&pw(2))$('bSkill').textContent=CLASSES[S.cls].pows[1][0];
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0);
@@ -659,26 +724,28 @@ function freshBody(){
 function startLevel(n){
   S.level=n;S.mode='play';S.banner=2.8;S.shake=0;S.stop=0;const L=S.L=levelDef(n);freshBody();
   mons=[];shots=[];pshots=[];allies=[];zones=[];bits=[];rings=[];floats=[];morsels=[];S.elite=4;
-  sfx(196,.5,'triangle',.22,98);boss=spawn(L.kind,W/2,140,true,L.spec);boss.t=1.2;
+  S.paused=false;SND.levelStart();boss=spawn(L.kind,W/2,140,true,L.spec);boss.t=1.2;
   if(L.kind==='mimic')reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
-  $('lvl').textContent='Level '+(n+1)+' · '+L.title;$('bossName').textContent=L.spec.name;
-  $('ov').hidden=true;save(n);hud();
+  $('bossName').textContent=L.spec.name;
+  $('ov').hidden=true;save(n);hud();$('lvl').textContent='Level '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
 }
 function reward(){
-  haptic([40,60,40,60,140]);chime();const n=S.level;allies=[];
+  haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n);allies=[];
   if(n===7)return chooseClass();
   P.inv=0;S.level++;S.mode='reward';hud();
+  const up=S.rank&&S.rank!==r0,rk=up?'Rank up. You have climbed from rank '+r0+' to rank '+S.rank+'.':'';
+  if(up){SND.rankUp();setTimeout(()=>haptic([30,50,30,50,30,50,200]),500)}
   if(n<7){const p=PARTS[n],lacks=PARTS.slice(n+1).map(x=>x.name.toLowerCase());
-    return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.',btns:[['Go deeper',()=>startLevel(S.level)]]})}
+    return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>startLevel(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8];
     return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1],keys:n===9?'Use it with E on a keyboard, or the '+p[0]+' button on a touch screen. A gold ring at your feet means it is ready.':'',btns:[['Go on',()=>startLevel(S.level)]]})}
-  if(n===49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
+  if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',keys:rk,
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;startLevel(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
-  show({wide:true,kick:n===11?'The Flayed King is dead. The road goes on.':'Level '+(n+1)+' cleared',title:'Choose a boon',
+  show({wide:true,kick:n===11?'The Flayed King is dead. The road goes on.':'Level '+(n+1)+' cleared',title:'Choose a boon',keys:rk,
     cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;startLevel(S.level)}}})});
 }
 function chooseClass(){
@@ -686,26 +753,34 @@ function chooseClass(){
   show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class. Each level after this adds to its power, and after level 50 it can be upgraded.',
     cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text,fn:()=>{S.cls=id;startLevel(8)}}))});
 }
+function pause(on){
+  if(on){if(S.paused||S.mode!=='play'&&S.mode!=='clear')return;S.paused=true;for(const k in keys)keys[k]=false;joy.x=joy.y=0;SND.pause(true);
+    show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.',keys:matchMedia('(pointer:coarse)').matches?'':'Esc, P or Enter to go on.',btns:[['Resume',()=>pause(false)]]})}
+  else if(S.paused){S.paused=false;$('ov').hidden=true;SND.pause(false)}
+  const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed',S.paused);
+}
 function save(n){pref('level',n);pref('run',JSON.stringify({cls:S.cls,adv:S.adv,b:S.b}))}
 function title(saved){
   S.mode='title';S.level=0;freshBody();P.y=H/2+40;mons=[];allies=[];boss=null;hud();
   const btns=[['Rise',()=>{S.cls=null;S.adv=null;S.b=noBoons();startLevel(0)}]];
   if(saved>0)btns.unshift(['Continue at level '+(saved+1),()=>saved>=8&&!CLASSES[S.cls]?chooseClass():startLevel(saved)]);
-  show({kick:'Bones first. Legend later.',title:'You wake as bare bones',body:'Each monster you kill gives part of a body back: organs, then skin, then the five senses. Once you are whole you choose a class. Every level after that makes it stronger, and after level 50 it can be upgraded.',keys:matchMedia('(pointer:coarse)').matches?'Stick to move. Strike aims at the nearest monster.':'WASD or arrows to move. Space or click to strike.',btns});
+  show({kick:'Bones first. Legend later.',title:'You wake as bare bones',body:'Each monster you kill gives part of a body back: organs, then skin, then the five senses. Once you are whole you choose a class. Every level after that makes it stronger, and after level 50 it can be upgraded.',keys:matchMedia('(pointer:coarse)').matches?'Stick to move. Strike aims at the nearest monster.':'WASD or arrows to move. Space or click to strike. Esc or P to pause.',btns});
 }
 
 /* ---------- input ---------- */
 const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'skill',l:'skill'};
 addEventListener('keydown',e=>{
   const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];
+  if((e.key==='Escape'||e.key==='p'||e.key==='P')&&!e.repeat&&(S.paused||S.mode==='play'||S.mode==='clear')){e.preventDefault();pause(!S.paused);return}
   if(e.key==='Enter'&&!$('ov').hidden){$('ovBtns').querySelector('button')?.click();return}
   if(!k||e.target.tagName==='BUTTON'&&k==='atk'&&!$('ov').hidden)return;
   if(S.mode==='play'||S.mode==='clear')e.preventDefault();
+  if(S.paused)return;
   if(k==='atk'&&!e.repeat)want.atk=true;if(k==='dash'&&!e.repeat)want.dash=true;if(k==='skill'&&!e.repeat)want.skill=true;keys[k]=true;
 });
 addEventListener('keyup',e=>{const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];if(k)keys[k]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
-cv.addEventListener('pointerdown',e=>{if(S.mode!=='play')return;const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};e.preventDefault()});
+cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:(e.clientX-r.left)/r.width*W,y:(e.clientY-r.top)/r.height*H};e.preventDefault()});
 const pad=$('pad'),knob=$('knob');
 function padMove(e){const r=pad.getBoundingClientRect();let x=(e.clientX-r.left-r.width/2)/40,y=(e.clientY-r.top-r.height/2)/40;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}joy.x=x;joy.y=y;knob.style.transform=`translate(${x*34}px,${y*34}px)`}
 pad.addEventListener('pointerdown',e=>{pad.setPointerCapture(e.pointerId);padMove(e)});
@@ -715,27 +790,39 @@ $('bAtk').addEventListener('pointerdown',e=>{want.atk=true;keys.atk=true;e.preve
 for(const ev of['pointerup','pointercancel','pointerleave'])$('bAtk').addEventListener(ev,()=>keys.atk=false);
 $('bDash').addEventListener('pointerdown',e=>{want.dash=true;e.preventDefault()});
 $('bSkill').addEventListener('pointerdown',e=>{want.skill=true;e.preventDefault()});
-$('snd').onclick=()=>{audio();muted=!muted;$('snd').setAttribute('aria-pressed',!muted);pref('mute',muted?1:0);sfx(520,.08,'triangle',.2)};
-$('hap').onclick=()=>{hapOn=!hapOn;$('hap').setAttribute('aria-pressed',hapOn);pref('nohap',hapOn?0:1);haptic(30)};
+$('snd').onclick=()=>{audio();muted=!muted;$('snd').setAttribute('aria-pressed',!muted);pref('mute',muted?1:0);bedLevel();sfx(520,.08,'triangle',.2);$('snd').blur()};
+$('hap').onclick=()=>{hapOn=!hapOn;$('hap').setAttribute('aria-pressed',hapOn);pref('nohap',hapOn?0:1);haptic(40);$('hap').blur()};
+// a pause button beside the toggles, for touch screens
+{const pb=document.createElement('button');pb.id='pauseB';pb.type='button';pb.className='tog';pb.textContent='Pause';pb.setAttribute('aria-pressed','false');pb.onclick=()=>{audio();pause(!S.paused);pb.blur()};$('hap').after(pb);
+  const st=document.createElement('style');st.textContent='#pauseB[aria-pressed="false"]{opacity:1;text-decoration:none}';document.head.appendChild(st)}
+document.addEventListener('visibilitychange',()=>{if(document.hidden){pause(true);if(AC)try{AC.suspend()}catch(e){}}else if(AC&&!muted)try{AC.resume()}catch(e){}});
 
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
-window.MB={W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,
+window.MB={W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,
   get P(){return P},get mons(){return mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return boss}};
 let last=0;
-function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;if(S.stop>0)S.stop-=dt;else step(dt);
+let fast=1;
+function tick(dt){if(S.paused){S.t+=dt;return}if(S.stop>0)S.stop-=dt;else step(dt)}
+function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);
   const R=MB.renderer;
   if(R&&R.ok){try{R.draw(dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
   if(boss)$('bossFill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';requestAnimationFrame(frame)}
 function start(data){
-  let saved=0;try{saved=+localStorage.getItem('marrowborn.level')||0;const r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}');S.cls=CLASSES[r.cls]?r.cls:null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);muted=localStorage.getItem('marrowborn.mute')==='1';hapOn=localStorage.getItem('marrowborn.nohap')!=='1'}catch(e){}
+  let saved=0;const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
+  try{saved=Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0));muted=localStorage.getItem('marrowborn.mute')==='1';hapOn=localStorage.getItem('marrowborn.nohap')!=='1'}catch(e){}
+  // a damaged or hand-edited save must not be able to break the run
+  try{const r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{};
+    S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
+    const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
+  }catch(e){S.cls=S.adv=null;S.b=noBoons()}
   $('snd').setAttribute('aria-pressed',!muted);$('hap').setAttribute('aria-pressed',hapOn);
-  if(data&&data.level>0)saved=data.level;
+  if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,kill:()=>boss&&mons.includes(boss)&&hurtM(boss,1e9)};
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);startLevel(n)},kill:()=>boss&&mons.includes(boss)&&hurtM(boss,1e9)};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();
