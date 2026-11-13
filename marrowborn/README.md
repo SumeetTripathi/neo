@@ -8,16 +8,28 @@ without touch your health is hidden.
 
 This folder is self-contained and is not part of the url-shortening Maven build.
 
-| Level | Monster | Reward |
+| Levels | What happens |
+|---|---|
+| 1 to 8 | One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. |
+| 9 to 11 | You choose a class and get its basic equipment. Each level adds one class power; the second is an active skill. |
+| 12 | The Flayed King. |
+| 13 to 50 | Generated levels with scaling monsters and a tyrant every tenth level. Each clear offers a choice of three boons. |
+| After 50 | You choose one of two upgrades for your class, then the levels continue without end. |
+
+Classes follow the usual hunter archetypes:
+
+| Class | Plays as | Upgrades after level 50 |
 |---|---|---|
-| 1 Bare Bones | Gravecrawler | Organs (more health, dash) |
-| 2 A Beating Heart | Bonehound | Skin (more health, slow healing) |
-| 3 Thin Skin | Tallow Witch | Touch (health bar, attack warnings) |
-| 4 First Touch | Gravel Fist | Sight (full view, colour) |
-| 5 Open Eyes | Brood Mother | Hearing (clear sound, hear burrowing) |
-| 6 Listening | The Burrower | Smell (tell the real Mimic from copies) |
-| 7 Scent | The Mimic | Taste (eat morsels to heal) |
-| 8 Whole | The Hollow | You are human |
+| Fighter | Fast greatsword, no defence | Champion, Duelist |
+| Tank | Sword and a shield that blocks hits | Paladin, Berserker |
+| Assassin | Twin daggers, short dash cooldown, triple hit after a dash | Nightblade, Phantom |
+| Mage | Ranged bolts, blink instead of dash | Archmage, Pyromancer |
+| Ranger | Fast long-range arrows | Sharpshooter, Beastmaster |
+| Healer | Ranged light orbs, steady self-healing | Saint, Inquisitor |
+| Necromancer | Bone spears and skeleton thralls that fight for you | Lich, Reaper |
+
+Sound is synthesised in the page (muffled until you win your ears). Haptics use the
+phone's vibration motor; both can be switched off in the game.
 
 ## Layout
 
@@ -28,7 +40,7 @@ This folder is self-contained and is not part of the url-shortening Maven build.
 ## Play in a browser
 
 Open `web/index.html`. WASD or arrows to move, Space or click to strike, Shift to dash
-(after level 1). On a touch screen there is a thumb stick with Strike and Dash buttons.
+(after level 1), E for the class skill. On a touch screen there is a thumb stick with Strike and Dash buttons.
 Progress is saved in the browser.
 
 ## Build the Android app

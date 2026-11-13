@@ -2,9 +2,13 @@ package com.marrowborn.game;
 
 import android.app.Activity;
 import android.os.Build;
+import android.content.Context;
 import android.os.Bundle;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
 import android.view.View;
 import android.view.WindowManager;
+import android.webkit.JavascriptInterface;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 
@@ -27,8 +31,29 @@ public class MainActivity extends Activity {
         s.setDomStorageEnabled(true);
         s.setMediaPlaybackRequiresUserGesture(false);
         s.setSupportZoom(false);
+        web.addJavascriptInterface(new Bridge((Vibrator) getSystemService(Context.VIBRATOR_SERVICE)), "Android");
         setContentView(web);
         if (b == null) web.loadUrl("file:///android_asset/index.html"); else web.restoreState(b);
+    }
+
+    /** Haptics for the game: the page calls Android.vibrate("40") or Android.vibrate("60,40,200"). */
+    public static class Bridge {
+        private final Vibrator vib;
+        Bridge(Vibrator v) { vib = v; }
+
+        @JavascriptInterface public void vibrate(String pattern) {
+            if (vib == null || !vib.hasVibrator()) return;
+            try {
+                String[] parts = pattern.split(",");
+                long[] p = new long[parts.length + 1];
+                p[0] = 0; // the web pattern starts with a buzz, Android's starts with a wait
+                for (int i = 0; i < parts.length; i++) p[i + 1] = Math.min(600, Math.max(0, Long.parseLong(parts[i].trim())));
+                if (Build.VERSION.SDK_INT >= 26) {
+                    vib.vibrate(parts.length == 1 ? VibrationEffect.createOneShot(Math.max(1, p[1]), VibrationEffect.DEFAULT_AMPLITUDE)
+                                                  : VibrationEffect.createWaveform(p, -1));
+                } else if (parts.length == 1) vib.vibrate(p[1]); else vib.vibrate(p, -1);
+            } catch (Exception ignored) { }
+        }
     }
 
     private void immersive() {

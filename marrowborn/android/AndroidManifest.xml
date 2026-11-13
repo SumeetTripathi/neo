@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.marrowborn.game" android:versionCode="1" android:versionName="1.0">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.marrowborn.game" android:versionCode="2" android:versionName="2.0">
+  <uses-permission android:name="android.permission.VIBRATE"/>
   <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="34"/>
   <application android:label="Marrowborn" android:icon="@mipmap/ic_launcher" android:theme="@style/App" android:allowBackup="true" android:hardwareAccelerated="true">
     <activity android:name=".MainActivity" android:exported="true" android:screenOrientation="sensorLandscape" android:configChanges="orientation|screenSize|keyboardHidden|keyboard|navigation|screenLayout|smallestScreenSize">
