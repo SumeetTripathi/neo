@@ -430,6 +430,9 @@ function syncEnv(){
 
 /* ---------- pools for the short-lived things ---------- */
 const blobMat=new THREE.MeshBasicMaterial({map:glowTex,color:0x000000,transparent:true,opacity:.85,depthWrite:false,fog:false});
+const pbeamCore=new THREE.MeshBasicMaterial({color:0xeaf6ff,toneMapped:false,fog:false}),
+  pbeamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:0x3f9cff,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
+  pbeamLine=new THREE.MeshBasicMaterial({color:0x8fd3ff,transparent:true,opacity:.6,depthWrite:false,toneMapped:false,fog:false});
 const beamCore=new THREE.MeshBasicMaterial({color:0xfff2c8,toneMapped:false,fog:false}),
   beamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:0xffa02a,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
   beamLine=new THREE.MeshBasicMaterial({color:0xff4a3a,transparent:true,opacity:.7,depthWrite:false,toneMapped:false,fog:false});
@@ -486,6 +489,9 @@ const pools={
   field:new Pool(()=>{const m=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:fieldTexture('frost'),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=.45;m.renderOrder=1;return m}),
   beam:new Pool(()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.box,beamCore),glow=new THREE.Mesh(G.quad,beamGlow),line=new THREE.Mesh(G.box,beamLine);
     glow.position.y=-SHOT_Y+.8;glow.renderOrder=3;line.position.y=-SHOT_Y+1;line.renderOrder=3;core.renderOrder=5;g.add(core,glow,line);g.userData={core,glow,line};return g}),
+  pbeam:new Pool(()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.box,pbeamCore),glow=new THREE.Mesh(G.quad,pbeamGlow),line=new THREE.Mesh(G.box,pbeamLine);
+    glow.position.y=-SHOT_Y+.8;glow.renderOrder=3;line.position.y=-SHOT_Y+1;line.renderOrder=3;core.renderOrder=5;g.add(core,glow,line);g.userData={core,glow,line};return g}),
+  pbomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.bolt),halo=new THREE.Sprite(glowMat(0x4fb4ff,.9));b.scale.setScalar(5.5);b.castShadow=true;halo.scale.setScalar(30);g.add(b,halo);return g}),
   bomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.dark),halo=new THREE.Sprite(glowMat(0xff7a30,.9)),f=new THREE.Mesh(G.sphere,mCore.e);b.scale.setScalar(6.5);b.castShadow=true;halo.scale.setScalar(30);f.scale.setScalar(2.2);f.position.y=6.5;g.add(b,halo,f);return g}),
   blob:new Pool(()=>{const m=new THREE.Mesh(G.quad,blobMat);m.renderOrder=0;return m}),
   ring:new Pool(()=>{const m=new THREE.Mesh(G.ring,new THREE.MeshBasicMaterial({color:0xe9b548,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.1;m.renderOrder=4;return m}),
@@ -687,20 +693,47 @@ function updateEnt(rec,name,e,dt,phMake,phUpdate){
 }
 let playerRec=null,stamp=0;
 const monMap=new Map(),allyMap=new Map();
+// Allies that carry a monster spec (bound or tamed pets and whatever they raise) are drawn with the monster bodies; the model reads pet/owner and builds the friendly variant.
+const isPet=e=>!!(e&&(e.pet||e.owner==='necro'||e.owner==='beast')&&(e.s||e.ai));
+const dying=[]; // pets that left the list in the middle of a fight: they fade out where they stood
+let dyingLevel=-1;
+function dropEnt(rec){ents.remove(rec.g);if(rec.pet&&rec.real){const M=modelOf('monster');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}}
 function syncMap(map,list,name,dt,phMake,phUpdate,sight){
   const P=MB.P;
   for(let i=0;i<list.length;i++){
-    const e=list[i];let rec=map.get(e);
-    if(!rec){rec=makeEnt(name,e,phMake);map.set(e,rec)}
+    const e=list[i];if(!e)continue;let rec=map.get(e);
+    if(!rec){const pet=name==='ally'&&isPet(e);rec=pet?makeEnt('monster',e,phMonster):makeEnt(name,e,phMake);rec.pet=pet;rec.e=e;map.set(e,rec)}
     rec.stamp=stamp;
-    let hide=!!e.hidden;
+    let hide=!!e.hidden||(rec.pet&&(e.dead||e.hp<=0));
     if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=FOG+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
     rec.g.position.set(e.x,(e.lift||0)*LIFT,e.y);rec.g.visible=!hide;
-    updateEnt(rec,name,e,dt,phMake,phUpdate);
+    if(rec.pet){
+      if(e.dead||e.hp<=0){if(!rec.gone){rec.gone=true;startFade(rec)}continue} // still listed but dead: its ghost is already fading
+      rec.gone=false;updateEnt(rec,'monster',e,dt,phMonster,phMonsterUpdate);
+    }else updateEnt(rec,name,e,dt,phMake,phUpdate);
     if(hide)rec.g.visible=false;
     else if(Q.low){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
   }
-  if(map.size>list.length)for(const[e,rec]of map)if(rec.stamp!==stamp){ents.remove(rec.g);map.delete(e)}
+  if(map.size>list.length||(map.size&&!list.length))for(const[e,rec]of map)if(rec.stamp!==stamp){
+    map.delete(e);
+    if(rec.pet&&!rec.gone&&rec.g.visible&&MB.S.mode==='play'&&MB.S.level===dyingLevel)startFade(rec,true);else dropEnt(rec);
+  }
+}
+// own=true: the record has left the map and the fading copy is the record's own group; otherwise a ghost twin is made so the listed pet can come back later
+function startFade(rec,own){
+  let g=rec.g;const M=rec.real&&modelOf('monster');
+  if(!M||typeof M.fade!=='function'){if(own)dropEnt(rec);return}
+  if(!own){ // the pet object stays in the list (dead for this level): fade a twin, keep the record
+    try{g=M.create(rec.e,MB);g.position.copy(rec.g.position);g.position.y=0;const a=rec.g.userData.mb,b=g.userData.mb;if(a&&b){b.root.rotation.y=a.root.rotation.y;b.born=9;b.grown=false}ents.add(g)}catch(e){return}
+  }
+  g.visible=true;dying.push({g,t:0,pet:true,real:true});
+}
+function syncDying(dt){
+  if(MB.S.level!==dyingLevel||MB.S.mode==='title'){for(let i=0;i<dying.length;i++)dropEnt(dying[i]);dying.length=0;dyingLevel=MB.S.level;return}
+  const M=modelOf('monster');
+  for(let i=dying.length-1;i>=0;i--){const d=dying[i];d.t+=dt;
+    if(d.t>=.8||!M){dropEnt(d);dying.splice(i,1);continue}
+    try{M.fade(d.g,d.t/.8)}catch(e){dropEnt(d);dying.splice(i,1)}}
 }
 
 /* ---------- camera ---------- */
@@ -805,6 +838,19 @@ function drawOverlay(sight){
     for(let i=0;i<mons.length;i++){const m=mons[i];if(m.st!=='wind')continue;
       toScreen(m.x,m.r*2.3+16+(m.lift||0)*LIFT,m.y);ctx.fillStyle='#0d0c11';ctx.fillText('!',sp.x+1.5,sp.y+1.5);ctx.fillStyle='#d6a544';ctx.fillText('!',sp.x,sp.y)}
   }
+  // pets: a small health bar over the head, in the owner's colour (also one more thing no hostile monster has)
+  {const al=R.testAllies||MB.allies||NONE,MM=modelOf('monster');
+    for(let i=0;i<al.length;i++){const a=al[i];if(!a||!a.pet||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))continue;
+      let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
+      toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)continue;
+      const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=sp.x-bw/2,by=sp.y-8;
+      ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
+      ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
+      ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
+      ctx.strokeStyle=beast?'rgba(207,234,255,.9)':'rgba(125,255,140,.85)';ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,8);
+      // a small heart-shaped pip marks it as yours
+      ctx.fillStyle=beast?'#cfeaff':'#7dff8c';ctx.beginPath();ctx.moveTo(bx-9,by-1);ctx.lineTo(bx-5,by+2.5);ctx.lineTo(bx-9,by+6);ctx.lineTo(bx-13,by+2.5);ctx.closePath();ctx.fill();
+      ctx.strokeStyle='rgba(8,8,12,.8)';ctx.stroke()}}
   if(S.banner>0&&S.mode==='play'&&S.L){
     const L=S.L;ctx.globalAlpha=Math.min(1,S.banner/.6);ctx.textAlign='center';
     ctx.fillStyle='rgba(13,12,17,.72)';ctx.fillRect(0,196,W,150);
@@ -878,7 +924,9 @@ function draw(dt){
     if(low){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70,1,56)}
   }else if(playerRec)playerRec.g.visible=false;
   syncMap(monMap,MB.mons,'monster',dt,phMonster,phMonsterUpdate,sight);
-  syncMap(allyMap,MB.allies,'ally',dt,phAlly,phAllyUpdate,true);
+  const allies=R.testAllies||MB.allies||NONE;
+  syncDying(dt);
+  syncMap(allyMap,allies,'ally',dt,phAlly,phAllyUpdate,true);
 
   // projectiles
   const shots=MB.shots;
@@ -903,7 +951,13 @@ function draw(dt){
       u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
       if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
       else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}}
-  {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=pools.bomb.get();
+  for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue; // a pet's beam is the same shape in friendly blue
+    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j],o=pools.pbeam.get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12;
+      o.position.set(m.x+Math.cos(ry.a)*len/2,SHOT_Y,m.y+Math.sin(ry.a)*len/2);o.rotation.y=-ry.a;
+      u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
+      if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
+      else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}
+  {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=(z.mine?pools.pbomb:pools.bomb).get();
     o.position.set(z.sx+(z.x-z.sx)*q,12+Math.sin(q*Math.PI)*(70+z.dur*40),z.sy+(z.y-z.sy)*q);o.rotation.x=t*7+i}}
   if(sight){const rs=MB.rings,hear=MB.has('hearing');
     for(let i=0;i<rs.length;i++){const r=rs[i];if(!r.fx&&!(r.under&&hear))continue;
@@ -959,5 +1013,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.ok=true;
 })();

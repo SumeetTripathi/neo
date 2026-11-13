@@ -46,12 +46,21 @@ function ringGeo(key,n,r0,y,slope,len,rad,off){
 }
 
 /* ---------- materials ---------- */
-var MATS={},FX=null,_c=new T.Color();
+var MATS={},FX=null,_c=new T.Color(),_c2=new T.Color(),_hsl={h:0,s:0,l:0};
+// PV = pet variant of the monster being built: 0 hostile, 'necro' (bound dead: dark, drained, green-lit) or 'beast' (tamed: warm natural hide).
+// Each variant has its own cached material set, so a pet never shares (or recolours) the materials of the hostile monsters around it.
+var PV=0;
 function M(hex,shade){
-  var key=hex+'|'+(shade||0),m=MATS[key];if(m)return m;
-  _c.set(hex);if(shade>0)_c.lerp(new T.Color(0xffffff),shade);else if(shade<0)_c.multiplyScalar(1+shade);
+  var key=(PV?PV+'|':'')+hex+'|'+(shade||0),m=MATS[key];if(m)return m;
+  _c.set(hex);
+  if(PV==='necro'){
+    if(hex===BONE)_c.setRGB(.5,.62,.5);
+    else{_c.getHSL(_hsl);_c.setHSL(_hsl.h*.4+.27,min(.3,_hsl.s*.3+.08),max(.1,min(.19,_hsl.l*.42)))}
+  }else if(PV==='beast'&&hex!==BONE)_c.lerp(_c2.set(0xa07c4c),.3);
+  if(shade>0)_c.lerp(_c2.set(PV==='necro'?0x8fae94:0xffffff),PV==='necro'?shade*.7:shade);else if(shade<0)_c.multiplyScalar(1+shade);
   m=new T.MeshStandardMaterial({color:_c.getHex(),roughness:.82,metalness:.04,flatShading:true});
-  m.emissive.copy(_c).multiplyScalar(.06);m.userData.mbBody=true;
+  if(PV==='necro')m.emissive.setRGB(.012,.07,.03);else m.emissive.copy(_c).multiplyScalar(.06);
+  m.userData.mbBody=true;
   return MATS[key]=m;
 }
 function fx(){
@@ -61,7 +70,12 @@ function fx(){
     eye:glow(0x5a4410,0xffd95e,1.5),eyeRed:glow(0x400008,0xff2238,1.5),ring:glow(0x2a0308,0xc8142e,1.25),star:glow(0x5a4410,0xffcf5a,1.4),
     pupil:new T.MeshBasicMaterial({color:0x08070a}),voidM:new T.MeshBasicMaterial({color:0x050408}),
     eyeGreen:glow(0x103a10,0x7fe85a,1.5),ember:glow(0x5a1a04,0xff7a22,1.5),iris:glow(0x4a2a00,0xffb428,1.5),irisHot:glow(0x5a0a00,0xff4a2a,2),
-    white:new T.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:1,roughness:1})
+    white:new T.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:1,roughness:1}),
+    // pet eyes and glows
+    eyeBlue:glow(0x1c3a5a,0xa8dcff,1.5),emberN:glow(0x0c3a14,0x4fe86a,1.4),ringN:glow(0x06280e,0x35d85a,1.25),ringB:glow(0x10283a,0x7cc4ff,1.2),
+    irisN:glow(0x0c3a14,0x5cf07a,1.5),irisNHot:glow(0x1a5a20,0xb4ffc0,2.2),irisB:glow(0x12324a,0x8fd0ff,1.5),irisBHot:glow(0x2a5a7a,0xe4f6ff,2.2),
+    leather:new T.MeshStandardMaterial({color:0x8a5527,emissive:0x2a1608,roughness:.7,flatShading:true}),
+    brass:new T.MeshStandardMaterial({color:0xe2b04a,emissive:0x8a5a10,emissiveIntensity:.9,roughness:.3,metalness:.6})
   };
   var cv=document.createElement('canvas');cv.width=cv.height=64;var x=cv.getContext('2d'),g=x.createRadialGradient(32,32,6,32,32,32);
   g.addColorStop(0,'rgba(255,255,255,.75)');g.addColorStop(.45,'rgba(255,255,255,.4)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);
@@ -87,7 +101,7 @@ function spike(mat,par,x,y,z,dx,dy,dz,len,rad){var o=mk(G.cone,mat,par,x,y,z);or
 function grp(par,x,y,z){var g=new T.Group();g.position.set(x||0,y||0,z||0);par.add(g);return g}
 function eye(par,list,x,y,z,er,nx,ny,nz,red,lo){
   var l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;nx/=l;ny/=l;nz/=l;
-  mk(lo?G.sphLo:G.sph,red==='g'?FX.eyeGreen:red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
+  mk(lo?G.sphLo:G.sph,PV==='necro'?FX.eyeGreen:PV==='beast'?FX.eyeBlue:red==='g'?FX.eyeGreen:red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
   var pu=mk(G.sphLo,FX.pupil,par,x+nx*er*.7,y+ny*er*.7,z+nz*er*.7,er*.5,er*.5,er*.5,true);
   list.push({pu:pu,x:pu.position.x,er:er});
 }
@@ -347,7 +361,7 @@ BUILD.hollow=function(b,m,p){
   }
 };
 ANIM.hollow=function(p,m,t,tt,st,look){
-  var mad=m.hp<m.maxHp/2,wind=st==='wind',ch=st==='charge',dz=st==='dazed',i,A;
+  var mad=m.hp>0&&m.maxHp>0&&m.hp<m.maxHp/2,wind=st==='wind',ch=st==='charge',dz=st==='dazed',i,A;
   p.spin.rotation.y=-t*(ch?5:wind?3.4:mad?1.5:.6);
   p.ring.rotation.z=sin(tt*1.1)*.25;p.ring.rotation.x=.35+cos(tt*.9)*.2;p.ring2.rotation.x=-.5+sin(tt*1.3)*.3;p.ring2.rotation.z=cos(tt*1.2)*.4;
   var g=.76*(1+(mad?.09:.04)*sin(tt*(mad?9:4)));p.ring.scale.set(g,.7,g);
@@ -434,10 +448,10 @@ BUILD.beamer=function(b,m,p){
   p.nerves=[];
   for(i=0;i<4;i++){var a=i*TAU/4+.6,o=grp(b,cos(a)*.34,.52,sin(a)*.34-.1);seg(G.cyl,dk,o,0,0,0,0,-.3,0,.085);var o2=grp(o,0,-.3,0);seg(G.cone,dk,o2,0,0,0,0,-.42,0,.085);mk(G.sphLo,dk,o2,0,0,0,.085,.085,.085);p.nerves.push({a:o,b:o2,ph:i*1.7})}
 };
-ANIM.beamer=function(p,m,t,tt,st,look){
+ANIM.beamer=function(p,m,t,tt,st,look,u){
   var wind=st==='wind',beam=st==='beam',i,q,k;
   p.ball.rotation.y=wind||beam?0:look*.5;p.ball.rotation.x=beam?.22:wind?.12:.05*sin(tt*1.7);
-  var mat=beam||wind&&sin(t*38)>0?FX.irisHot:FX.iris;if(p.iris.material!==FX.white&&p.iris.material!==mat)p.iris.material=mat;
+  var hot=beam||wind&&sin(t*38)>0,mat=u&&u.pv?(u.pv==='necro'?(hot?FX.irisNHot:FX.irisN):(hot?FX.irisBHot:FX.irisB)):hot?FX.irisHot:FX.iris;if(p.iris.material!==FX.white&&p.iris.material!==u.ghost&&p.iris.material!==mat)p.iris.material=mat;
   k=beam?1.12+.06*sin(t*50):wind?.8+.25*(1-max(0,min(1,(m.t||0)/.95))):1+.05*sin(tt*3);p.iris.scale.set(.5*k,.5*k,.4);
   k=beam?.5:wind?1.3:1;p.pupil.scale.set(.22*k,.3*k,.18);
   for(i=0;i<p.nerves.length;i++){q=p.nerves[i];q.a.rotation.x=sin(tt*2.2+q.ph)*.3+(beam?.5:0);q.a.rotation.z=cos(tt*1.8+q.ph)*.25;q.b.rotation.x=sin(tt*3+q.ph)*.4}
@@ -514,35 +528,171 @@ var ALIAS={husk:'mite',splitter:'mimic',lobber:'bomber',caller:'summoner',sweepe
 
 /* ---------- interface ---------- */
 function wrap(a){a=(a+PI)%TAU;if(a<0)a+=TAU;return a-PI}
+/* ---------- pets (allies drawn with the monster bodies) ---------- */
+// which variant an entity is: anything flagged pet, or owned by a class, is friendly
+function petKind(m,MB){
+  if(!m||!(m.pet||m.owner==='necro'||m.owner==='beast'))return 0;
+  if(m.owner==='beast'||m.owner==='necro')return m.owner;
+  var c=null;try{c=MB&&MB.S&&MB.S.cls}catch(e){}
+  return c==='ranger'?'beast':'necro';
+}
+// ground marks: a rune circle with a green glow for the bound dead, a broken blue-white ring for the tamed
+var PTEX={};
+function petTex(pv){
+  if(PTEX[pv])return PTEX[pv];
+  var cv=document.createElement('canvas');cv.width=cv.height=256;var x=cv.getContext('2d'),g,i,a;
+  x.translate(128,128);x.lineCap='round';
+  if(pv==='necro'){
+    g=x.createRadialGradient(0,0,8,0,0,126);g.addColorStop(0,'rgba(70,255,120,.5)');g.addColorStop(.5,'rgba(50,230,100,.3)');g.addColorStop(.8,'rgba(40,200,90,.14)');g.addColorStop(1,'rgba(40,200,90,0)');
+    x.fillStyle=g;x.beginPath();x.arc(0,0,126,0,TAU);x.fill();
+    x.strokeStyle='rgba(150,255,170,.95)';x.lineWidth=5;x.beginPath();x.arc(0,0,92,0,TAU);x.stroke();
+    x.lineWidth=2.5;x.beginPath();x.arc(0,0,78,0,TAU);x.stroke();
+    x.lineWidth=4;for(i=0;i<9;i++){a=i*TAU/9;x.beginPath();x.moveTo(cos(a)*80,sin(a)*80);x.lineTo(cos(a+.16)*90,sin(a+.16)*90);x.stroke()}
+    x.lineWidth=3;x.beginPath();for(i=0;i<=5;i++){a=i*2/5*TAU-PI/2;x[i?'lineTo':'moveTo'](cos(a)*76,sin(a)*76)}x.stroke();
+  }else{
+    g=x.createRadialGradient(0,0,30,0,0,126);g.addColorStop(0,'rgba(150,215,255,.1)');g.addColorStop(.7,'rgba(150,215,255,.26)');g.addColorStop(1,'rgba(150,215,255,0)');
+    x.fillStyle=g;x.beginPath();x.arc(0,0,126,0,TAU);x.fill();
+    x.strokeStyle='rgba(18,40,66,.6)';x.lineWidth=15;for(i=0;i<4;i++){a=i*TAU/4;x.beginPath();x.arc(0,0,96,a+.2,a+TAU/4-.2);x.stroke()}
+    x.strokeStyle='rgba(236,248,255,1)';x.lineWidth=9;for(i=0;i<4;i++){a=i*TAU/4;x.beginPath();x.arc(0,0,96,a+.2,a+TAU/4-.2);x.stroke()}
+    x.strokeStyle='rgba(140,205,255,.95)';x.lineWidth=3;x.beginPath();x.arc(0,0,80,0,TAU);x.stroke();
+    x.fillStyle='rgba(236,248,255,1)';for(i=0;i<4;i++){a=i*TAU/4;x.beginPath();x.arc(cos(a)*96,sin(a)*96,6,0,TAU);x.fill()}
+  }
+  return PTEX[pv]=new T.CanvasTexture(cv);
+}
+var PM=null;
+function petMats(){
+  if(PM)return PM;
+  var add=function(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})};
+  return PM={necro:add(0x7dff8c,.95),beast:add(0xcfeaff,.95),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2)};
+}
+// where the collar or harness of a tamed beast sits: [parent part or 0 = body, x,y,z, radius, squash, axis ('y' upright neck, 'z' around a lying body), tag distance]
+var COLLAR={crawler:[0,0,.55,.43,.5,.8,'z'],hound:[0,0,1.14,.66,.5,1,'z'],witch:[0,0,1.6,0,.36,1,'y'],fist:[0,0,1.5,.08,.5,1,'y'],mother:[0,0,1.16,-.08,.9,1,'y'],
+  mite:[0,0,.78,.3,.74,.8,'z'],burrower:['worm',0,.62,.05,.76,1,'y'],mimic:[0,0,1.08,-.08,.76,1,'y'],hollow:[0,0,1.96,-.42,.3,1,'y'],bomber:[0,0,.66,.3,1.0,.64,'z'],
+  summoner:[0,0,1.98,0,.3,1,'y'],beamer:['ball',0,0,-.28,.96,1,'z']};
+function petDress(u,g,m,pv){
+  var pm=petMats(),big=!!m.pet,r=u.r,own=u.own,i,o;
+  // ground mark (stays on the floor while the body leaps); its material belongs to this pet so it can pulse and fade
+  var gm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:pv==='necro'?.8:.95,depthWrite:false,fog:false,toneMapped:false});
+  own.push(gm);
+  o=new T.Mesh(pm.quad,gm);o.position.y=1.2;o.renderOrder=2;g.add(o);u.gmark=o;u.gmat=gm;u.gk=pv==='necro'?(big?4.6:4):(big?4:3.6);
+  // entry: a ring racing outward and motes rising
+  var sm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+  own.push(sm);o=new T.Mesh(pm.quad,sm);o.position.y=1.6;o.renderOrder=3;o.visible=false;g.add(o);u.sring=o;u.smat=sm;
+  u.motes=grp(g);u.motes.visible=false;for(i=0;i<(big?8:4);i++)fxMesh(G.sphLo,pm[pv],u.motes,0,0,0,1);
+  if(pv==='necro'){
+    // two slow wisps keep circling the bound dead
+    u.wisps=grp(u.fx);for(i=0;i<(big?3:1);i++)fxMesh(G.sphLo,pm.necro,u.wisps,0,0,0,.09,.13,.09);
+  }else{
+    var c=COLLAR[u.ai];
+    if(c){
+      var par=c[0]&&u.p[c[0]]||u.body,col=grp(par,c[1],c[2],c[3]);
+      if(c[6]==='z')col.rotation.x=PI/2;
+      var band=mk0(G.torus,FX.leather,col,0,0,0,c[4],c[4]*1.5,c[4]*c[5]);
+      var tag=mk0(G.sphLo,FX.brass,col,0,c[6]==='z'?0:-.02,c[6]==='z'?-c[4]*c[5]-.1:c[4]+.06,.11,.13,.11);
+      if(c[6]==='y'){tag.position.set(0,-.1,c[4]+.05)}
+      u.meshes.push(band,tag);u.mats.push(FX.leather,FX.brass);
+    }
+  }
+}
+function mk0(geo,mat,par,x,y,z,sx,sy,sz){var o=new T.Mesh(geo,mat);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;par.add(o);return o}
+
 function create(m,MB){
   geos();fx();fxm();
-  var s=m.s||{},ai=pickAi(m);
-  if(!m.s)m={s:{col:'#888888',eyes:2},ai:ai,r:m.r||20,seed:0,boss:m.boss};
+  var s=m.s||{},ai=pickAi(m),pv=petKind(m,MB);
+  if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st};
   var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
-  REG=[];
-  BUILD[ai](body,m,p,root);
-  var meshes=REG,mats=[],i;REG=null;
+  REG=[];PV=pv;
+  try{BUILD[ai](body,m,p,root)}finally{PV=0}
+  var meshes=REG,mats=[],i,o;REG=null;
+  if(pv){ // the few glowing parts that are not tinted through M(): no hostile reds or ambers left on a pet
+    for(i=0;i<meshes.length;i++){o=meshes[i].material;
+      if(pv==='necro')o=o===FX.eye||o===FX.eyeRed?FX.eyeGreen:o===FX.ember?FX.emberN:o===FX.ring?FX.ringN:o===FX.iris?FX.irisN:o;
+      else o=o===FX.eye||o===FX.eyeRed?FX.eyeBlue:o===FX.ring?FX.ringB:o===FX.iris?FX.irisB:o;
+      meshes[i].material=o}
+  }
   for(i=0;i<meshes.length;i++)mats.push(meshes[i].material);
   root.scale.setScalar(r*(cfg.k||1));
   var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,mode:0,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,aura:null,r:r,
-    fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x,pz:m.y,mv:0,ma:0,auraCol:m.s.col,rageMats:null};
+    fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x||0,pz:m.y||0,mv:0,ma:0,auraCol:m.s.col,rageMats:null,
+    pv:pv,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0};
   u.fx.scale.setScalar(r);
-  if(m.boss&&ai!=='mimic'){
+  if(pv){u.own=[];petDress(u,g,m,pv)}
+  else if(m.boss&&ai!=='mimic'){
     var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;g.add(au);u.aura=au;
   }
-  g.userData.mb=u;g.name='mon:'+ai;
+  g.userData.mb=u;g.name=(pv?'pet:':'mon:')+ai;
   return g;
 }
+// what a pet looks at: an explicit target if the game gives one, else the nearest monster that is not underground
+var _f={x:0,y:0,ok:false};
+function petFocus(m,MB){
+  var t=m.target||m.tgt,ms,i,q,d,bd=1e12,dx,dy;_f.ok=false;
+  if(t&&typeof t.x==='number'&&typeof t.y==='number'&&!t.hidden){_f.x=t.x;_f.y=t.y;_f.ok=true;return _f}
+  if(typeof m.tx==='number'&&typeof m.ty==='number'){_f.x=m.tx;_f.y=m.ty;_f.ok=true;return _f}
+  ms=MB.mons;if(!ms)return _f;
+  for(i=0;i<ms.length;i++){q=ms[i];if(!q||q.hidden||q===m)continue;dx=q.x-m.x;dy=q.y-m.y;d=dx*dx+dy*dy;if(d<bd){bd=d;_f.x=q.x;_f.y=q.y;_f.ok=true}}
+  return _f;
+}
+// everything that marks a pet as a pet; runs after the normal monster update
+function petUpdate(g,m,u,t,dt,r){
+  var k,q,i,o,n,pv=u.pv,seed=m.seed||0,ground=1.2-g.position.y,big=!!m.pet;
+  u.born+=dt;
+  // entry: the body swells into place out of the ring
+  q=u.born<.55?u.born/.55:1;
+  if(q<1||!u.grown){k=q<1?(.25+.75*q)*(1+.22*sin(q*PI)):1;u.root.scale.setScalar(r*(u.cfg.k||1)*k);u.grown=q>=1}
+  var fade=u.fa>0?1-u.fa:1;
+  k=r*u.gk*(.9+.1*min(1,u.born*3));if(k<30)k=30;
+  o=u.gmark;o.position.y=ground;o.rotation.y=pv==='necro'?-t*.35+seed:t*.5+seed;o.scale.set(k,1,k);
+  u.gmat.opacity=(pv==='necro'?.74+.16*sin(t*2.6+seed):.9+.08*sin(t*3+seed))*fade;
+  o=u.sring;
+  if(u.born<.9&&!u.fa){
+    q=u.born/.9;o.visible=true;o.position.y=ground+.4;k=max(30,r*u.gk)*(.5+1.9*q);o.scale.set(k,1,k);o.rotation.y=t*2;u.smat.opacity=.95*(1-q)*(1-q);
+  }else if(o.visible)o.visible=false;
+  o=u.motes;
+  if(u.born<1.25&&!u.fa){
+    o.visible=true;n=o.children.length;
+    for(i=0;i<n;i++){q=u.born/1.25*1.35-i*.045;q=q<0?0:q>1?1:q;k=i*TAU/n+seed+q*2.2;var rr=r*(1.25-.5*q),c=o.children[i];
+      c.position.set(cos(k)*rr,-g.position.y+2+q*u.top*r*1.35,sin(k)*rr);k=r*.11*sin(q*PI)*(big?1:.8);c.scale.set(k,k*1.7,k)}
+  }else if(o.visible)o.visible=false;
+  if(u.wisps){o=u.wisps;n=o.children.length;for(i=0;i<n;i++){k=t*1.5+i*TAU/n+seed;o.children[i].position.set(cos(k)*1.25,u.top*(.35+.25*i)+.18*sin(t*2.3+i*2),sin(k)*1.25)}}
+}
+// death: the body turns to light and thins out (q 0..1). The ghost material belongs to this one pet.
+function fade(g,q){
+  var u=g&&g.userData&&g.userData.mb;if(!u)return;
+  var i,k,r=u.r,necro=u.pv!=='beast';q=q<0?0:q>1?1:q;
+  if(!u.ghost){
+    u.ghost=new T.MeshBasicMaterial({color:necro?0x4be070:0xbfe2ff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+    if(!u.own)u.own=[];u.own.push(u.ghost);
+    for(i=0;i<u.meshes.length;i++){u.meshes[i].material=u.ghost;u.meshes[i].castShadow=false}
+    u.mode=-1;u.fx.visible=false;if(u.aura)u.aura.visible=false;if(u.sring)u.sring.visible=false;if(u.motes)u.motes.visible=false;
+  }
+  u.fa=max(.001,q);
+  u.ghost.opacity=.85*(1-q)*(1-q);
+  k=r*(u.cfg.k||1);u.root.scale.set(k*(1-.45*q),k*(necro?1-.6*q:1+.35*q),k*(1-.45*q));
+  u.root.position.y=necro?0:q*r*.9;
+  if(u.gmark){k=max(30,r*u.gk)*(1-.5*q);u.gmark.scale.set(k,1,k);u.gmat.opacity=.85*(1-q)}
+}
+function dispose(g){
+  var u=g&&g.userData&&g.userData.mb;if(!u||!u.own)return;
+  for(var i=0;i<u.own.length;i++)u.own[i].dispose(); // only this pet's own materials; textures, geometry and the cached sets are shared
+  u.own.length=0;
+}
 function update(g,m,MB,dt){
-  var u=g.userData.mb;if(!u)return;
-  var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st,cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
+  var u=g.userData.mb;if(!u||u.ghost)return;
+  var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st||'idle',cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
   dt=dt>0?min(dt,.1):1/60;
   var rage=!!m.rage,stun=m.stun>0;
   if(rage)u.extra+=dt*.8; // enraged: everything idles faster
   var tt=t+seed+u.extra;
   var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));u.fx.scale.setScalar(r);if(u.aura)u.aura.scale.setScalar(r*2.3)}
   // facing
-  var a=P?Math.atan2(P.y-m.y,P.x-m.x):0,fast=st==='charge'||st==='lunge',face=fast&&typeof m.ang==='number'?m.ang:a;
+  var a=P?Math.atan2(P.y-m.y,P.x-m.x):0;
+  if(u.pv){ // a pet watches its prey, not its master; with nothing to fight it looks where it is walking
+    o=petFocus(m,MB);
+    if(o.ok)a=Math.atan2(o.y-m.y,o.x-m.x);
+    else{k=m.x-u.hx;q=m.y-u.hz;if(k*k+q*q>36){u.ha=Math.atan2(q,k);u.hx=m.x;u.hz=m.y}a=typeof u.ha==='number'?u.ha:a+PI}
+  }
+  var fast=st==='charge'||st==='lunge',face=fast&&typeof m.ang==='number'?m.ang:a;
   if(u.ai==='hound'&&st==='idle'&&typeof m.side==='number')face=a+.9*m.side;
   else if(u.ai==='beamer'&&(st==='wind'||st==='beam')&&typeof m.ba==='number')face=m.ba;
   else if(u.ai==='mite')face=a+sin(t*3+seed)*.6;
@@ -567,6 +717,7 @@ function update(g,m,MB,dt){
   body.position.y=cfg.y0+(st==='idle'||st==='up'?cfg.bob*(.5+.5*sin(tt*cfg.spd)):0);
   if(u.shake>.02)root.position.set(sin(t*91+seed)*.07*r*u.shake,0,cos(t*77+seed)*.05*r*u.shake);else root.position.set(0,0,0);
   ANIM[u.ai](p,m,t,tt,st,look,u,dt);
+  if(u.pv)petUpdate(g,m,u,t,dt,r);
   // eyes follow the player
   var E=p.eyes;for(i=0;i<E.length;i++)E[i].pu.position.x=E[i].x+look*E[i].er*.38;
   // dazed or stunned: stars
@@ -625,7 +776,7 @@ function update(g,m,MB,dt){
     }
   }
 }
-window.MBModels.monster={create:create,update:update,
+window.MBModels.monster={create:create,update:update,fade:fade,petKind:petKind,
   // optional helpers for the renderer: world height of the top of the head, and a no-op dispose (geometry and materials are shared)
-  height:function(m){var c=CFG[pickAi(m)]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:function(){}};
+  height:function(m){var c=CFG[pickAi(m)]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:dispose};
 })();
