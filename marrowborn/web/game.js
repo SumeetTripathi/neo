@@ -193,7 +193,7 @@ const PRE=['Ashen','Dread','Rotting','Gilded','Howling','Pale','Iron','Blighted'
 const POOL=['crawler','hound','witch','fist','beamer','burrower','bomber','summoner','mother'];
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
-const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1350,bomber:560,summoner:400,beamer:540};
+const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
 const genMul=n=>{const k=Math.max(0,n-12);return 1+.062*k+.0055*k*k};
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
