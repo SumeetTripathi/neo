@@ -108,7 +108,7 @@ var BUILD={},ANIM={};
 var CFG={
   crawler:{bob:.03,spd:5,y0:0,br:.03,top:1.25},hound:{bob:.04,spd:6,y0:0,br:.03,top:1.95},witch:{bob:.1,spd:2.2,y0:.2,br:.02,top:2.7},
   fist:{bob:.03,spd:2.5,y0:0,br:.03,top:2.2},mother:{bob:.02,spd:1.8,y0:0,br:.05,top:2},mite:{bob:.08,spd:14,y0:0,br:0,top:1.4},
-  burrower:{bob:0,spd:2,y0:0,br:.02,top:2.2},mimic:{bob:.05,spd:3,y0:0,br:.03,top:2},hollow:{bob:.07,spd:1.7,y0:.22,br:.02,top:2.95}
+  burrower:{bob:0,spd:2,y0:0,br:.02,top:2.2},mimic:{bob:.05,spd:3,y0:0,br:.03,top:2},hollow:{bob:.07,spd:1.7,y0:.22,br:.02,top:2.95,k:.86}
 };
 
 BUILD.crawler=function(b,m,p){
@@ -368,7 +368,7 @@ function create(m,MB){
   BUILD[ai](body,m,p,root);
   var meshes=REG,mats=[],i;REG=null;
   for(i=0;i<meshes.length;i++)mats.push(meshes[i].material);
-  root.scale.setScalar(r);
+  root.scale.setScalar(r*(cfg.k||1));
   var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,fl:false,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,stars:null,aura:null,r:r};
   if(ai==='hound'||ai==='hollow'){
     var st=grp(root,0,cfg.top,ai==='hound'?.7:0);st.visible=false;
@@ -385,7 +385,7 @@ function update(g,m,MB,dt){
   var u=g.userData.mb;if(!u)return;
   var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,tt=t+seed,st=m.st,cfg=u.cfg,p=u.p,body=u.body,root=u.root,i;
   dt=dt>0?min(dt,.1):1/60;
-  var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r);if(u.aura)u.aura.scale.setScalar(r*2.3)}
+  var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));if(u.aura)u.aura.scale.setScalar(r*2.3)}
   // facing
   var a=Math.atan2(P.y-m.y,P.x-m.x),fast=st==='charge'||st==='lunge',face=fast?m.ang:a;
   if(u.ai==='hound'&&st==='idle'&&typeof m.side==='number')face=a+.9*m.side;
@@ -422,5 +422,5 @@ function update(g,m,MB,dt){
 }
 window.MBModels.monster={create:create,update:update,
   // optional helpers for the renderer: world height of the top of the head, and a no-op dispose (geometry and materials are shared)
-  height:function(m){var c=CFG[m.ai]||CFG.mimic;return c.top*(m.r||20)},dispose:function(){}};
+  height:function(m){var c=CFG[m.ai]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:function(){}};
 })();

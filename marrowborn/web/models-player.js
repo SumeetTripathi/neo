@@ -327,7 +327,7 @@ const player={
         if(wt==='great'){lx+=(-1.1-lx)*ab;le+=(-.5-le)*ab;lz+=-.5*ab}
       }
     }
-    rx-=dl*.2;lx+=dl*.9;
+    rx-=dl*.2;lx+=dl*.55;
     s.torso.rotation.set(mb*.06+(mel?ab*.14:0),twist+spin,0);s.torso.position.y=br*.25;s.torso.scale.y=1+br*.012;
     s.armR.rotation.set(rx,0,rz+rat*Math.sin(t*83)*.14);s.foreR.rotation.x=re;
     s.armL.rotation.set(lx,0,lz+rat*Math.sin(t*77)*.14);s.foreL.rotation.x=le;
