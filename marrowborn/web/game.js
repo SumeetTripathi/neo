@@ -1438,7 +1438,7 @@ function start(data){
   let saved=storedLevel();
   setLoad();
   let r={};try{r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{}}catch(e){}
-  applyRun(r);SAVE=snapshot(saved);
+  applyRun(r);SAVE=snapshot(S.cls?saved:Math.min(saved,8)); // without a class the furthest a run can stand is the class choice
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
