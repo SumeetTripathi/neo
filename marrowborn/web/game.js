@@ -202,7 +202,8 @@ const MODHP={shielded:.9,vampiric:.9,splitting:.9};
 function modsOf(n,kind,tyrant){
   if(n<14||tyrant||n<30&&n%3===0)return[];
   const i=(n*7+1)%6,out=[MODS[i]];if(n>=40&&n%2===0)out.push(MODS[(i+1+n%4)%6]);
-  return out.map(x=>x==='shielded'&&kind==='summoner'?'swift':x).filter((x,j,l)=>l.indexOf(x)===j); // the caller already has a ward of its own
+  // copies of something that shoots or breeds would bury you, so those are shielded instead; the caller already has a ward of its own, so it is swift instead
+  return out.map(x=>x==='splitting'&&['witch','mother','beamer','summoner'].includes(kind)?'shielded':x).map(x=>x==='shielded'&&kind==='summoner'?'swift':x).filter((x,j,l)=>l.indexOf(x)===j);
 }
 // Waves from level 14: some levels open with one or two packs of lesser monsters before the boss enters. Tyrant levels never do.
 const wavesOf=n=>n<13?0:[1,0,2,0,0][(n-13)%5];
@@ -492,7 +493,7 @@ function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z={x,y,r,t:0,dur};clamp(z,
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
 const miteHp=()=>S.level<8?2:S.level<12?4:Math.round(4*Math.pow(genMul(S.level),.8));
 function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=miteHp();if(kind==='husk')hp=Math.round(miteHp()*1.5);if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,mods:[],ward:0,beam:null};clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);mons.push(m);return m}
-function lesser(kind,x,y,hp){const m=spawn(kind,x,y,false,lesserSpec(kind,S.level,hp));m.lesser=true;m.t=1+rand()*.6;puff(m,col(m.s.col),10);return m}
+function lesser(kind,x,y,hp){const m=spawn(kind,x,y,false,lesserSpec(kind,S.level,hp));m.lesser=true;m.spdK=.8;m.t=1+rand()*.6;puff(m,col(m.s.col),10);return m}
 // a wave pack: one or two lesser monsters and a handful of mites, spread along the far side of the room from you
 const LESSER=['crawler','hound','witch','fist','bomber'];
 function spawnWave(){
@@ -548,7 +549,7 @@ const AI={
   witch(m,dt,a,d){
     const E=m.rage;if(m.slide>0)m.slide-=dt;
     const dir=m.slide>0?a+Math.PI/2*m.side:d<200?a+Math.PI:d>330?a:a+Math.PI/2*m.side;
-    if(move(m,dir,d<200?(S.level<8?78:98):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind
+    if(move(m,dir,d<200?(S.level<8?78:98/mspd()):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind; deeper down her clock quickens but her retreat does not, or nothing on foot could reach her
     if((m.t-=dt)<=0){m.n++;if(m.n%(E?2:3)===0)ringShot(m,E?12:10,150,a);else for(const k of E?[-.5,-.25,0,.25,.5]:[-.25,0,.25])shoot(m.x,m.y,a+k,200);
       if(E&&S.level>=3&&m.n%2)zone(P.x,P.y,70,1,m);m.t=1.25;sfx(520,.12,'sine',.2,260)}
   },
@@ -572,9 +573,9 @@ const AI={
       const lob=(x,y,r,dur)=>{const z=zone(x,y,r,dur,m);z.sx=m.x;z.sy=m.y},lx=P.x+(P.vx||0)*.55,ly=P.y+(P.vy||0)*.55,b=rand()*TAU;
       lob(P.x,P.y,64,1.05);lob(lx,ly,60,1.2);
       for(let i=0;i<(E?3:1);i++){const g=b+i*TAU/3;lob(P.x+Math.cos(g)*125,P.y+Math.sin(g)*125,58,1.35)}
-      sfx(240,.25,'triangle',.2,90);m.st='idle';m.t=E?1.2:1.7}return}
-    if(move(m,d<170?a+Math.PI:d>330?a:a+Math.PI/2*m.side,d<170?62:70,dt))m.side*=-1;
-    if(d<m.r+78&&!(m.hopT>0)){m.hopT=4.5;zone(m.x,m.y,m.r+60,.8,m);
+      sfx(240,.25,'triangle',.2,90);m.st='idle';m.t=E?1.2:1.7;m.rest=1}return}
+    if(m.rest>0)m.rest-=dt;else if(move(m,d<170?a+Math.PI:d>330?a:a+Math.PI/2*m.side,(d<170?62:70)/mspd(),dt))m.side*=-1; // it sits where it threw from for a second: the opening for anyone on foot
+    if(d<m.r+78&&!(m.hopT>0)){m.hopT=6;zone(m.x,m.y,m.r+60,.8,m);
       const g=a+Math.PI+(rand()-.5)*1.4,to={x:m.x+Math.cos(g)*240,y:m.y+Math.sin(g)*240};clamp(to,m.r);collide(to,m.r,true);
       m.st='leap';m.t=m.dur=.5;m.sx=m.x;m.sy=m.y;m.tx=to.x;m.ty=to.y;sfx(300,.2,'sine',.2,600)}
     else if((m.t-=dt)<=0){m.st='wind';m.t=.45}
@@ -835,6 +836,7 @@ function step(dt){
       p.hit.add(m);if(p.slow)m.slow=Math.max(m.slow||0,p.slow);if(p.stun)m.stun=m.boss?p.stun*.7:p.stun*2;hurtM(m,d);
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
+      if(!m.boss&&!mons.includes(m))continue; // a shot that kills something small flies on, so a swarm cannot soak up every single bolt
       if(p.pierce>0)p.pierce--;else{p.dead=true;break}}}
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;

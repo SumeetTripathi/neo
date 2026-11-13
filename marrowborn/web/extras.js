@@ -60,7 +60,7 @@ function ensureLayer(){
 function openView(cls,label,build,v){
   if(!ensureLayer())return false;
   panel.textContent='';panel.className='mbx-panel'+(cls?' '+cls:'');panel.setAttribute('aria-label',label);panel.onclick=null;
-  view=v||{};
+  view=v||{};layer.className=cls==='mbx-story'?'mbx-veil':'';
   var focus=build(panel);
   layer.hidden=false;layer.scrollTop=0;
   var ov=$('ov');if(ov)try{ov.inert=true}catch(e){}
@@ -457,8 +457,7 @@ guard('hints',function(){
       show(hn);poll.gap=1e9;return}}
   }
   poll.gap=-9;poll.atk=false;
-  var wasCur=null;
-  setInterval(function(){try{var before=cur;poll();if(before&&!cur)poll.gap=playT;if(!before&&!cur&&poll.gap>1e8)poll.gap=playT;wasCur=cur}catch(e){}},200);
+  setInterval(function(){try{var before=cur;poll();if(before&&!cur)poll.gap=playT;if(!before&&!cur&&poll.gap>1e8)poll.gap=playT}catch(e){}},200);
   // equipment: explained on the first drop screen, as a line in that panel
   listen('reward',function(d){
     if(!enabled()||seen.indexOf('gear')>=0||num(d.level)<8)return;

@@ -429,7 +429,7 @@ function syncEnv(){
 }
 
 /* ---------- pools for the short-lived things ---------- */
-const blobMat=new THREE.MeshBasicMaterial({map:glowTex,color:0x000000,transparent:true,opacity:.62,depthWrite:false,fog:false});
+const blobMat=new THREE.MeshBasicMaterial({map:glowTex,color:0x000000,transparent:true,opacity:.85,depthWrite:false,fog:false});
 const beamCore=new THREE.MeshBasicMaterial({color:0xfff2c8,toneMapped:false,fog:false}),
   beamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:0xffa02a,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
   beamLine=new THREE.MeshBasicMaterial({color:0xff4a3a,transparent:true,opacity:.7,depthWrite:false,toneMapped:false,fog:false});
@@ -610,7 +610,7 @@ function syncObstacles(dt,sight){
       // a pillar standing between the camera and the player turns to glass
       let hide=false;if(P){const dx=Math.abs(P.x-o.x),dz=o.y-P.y;hide=dx<u.r+12&&dz>2&&dz<u.h*.8+12}
       u.p.material=hide?OB.ghost:OB.stone;u.p.castShadow=!hide||!low;
-      if(low){const b=pools.blob.get();b.position.set(o.x+u.r*.25,.5,o.y-u.r*.2);b.scale.set(u.r*3.6,1,u.r*3.2)}
+      if(low){const b=pools.blob.get();b.position.set(o.x+u.r*.3,.5,o.y-u.r*.25);b.scale.set(u.r*6,1,u.r*5.2)}
     }else if(u.kind==='spikes'){
       const e=.1+.9*u.up+(o.warn&&!o.on?.06*Math.sin(t*46+o.x):0);u.sp.scale.set(u.r,28*e,u.r);u.sp.position.y=-1.5;
       u.ring.visible=!!(o.on||o.warn);u.ring.material=o.on?OB.warn:OB.hot;
@@ -698,7 +698,7 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight){
     rec.g.position.set(e.x,(e.lift||0)*LIFT,e.y);rec.g.visible=!hide;
     updateEnt(rec,name,e,dt,phMake,phUpdate);
     if(hide)rec.g.visible=false;
-    else if(Q.low){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*3.1*k,1,r*2.5*k)}
+    else if(Q.low){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
   }
   if(map.size>list.length)for(const[e,rec]of map)if(rec.stamp!==stamp){ents.remove(rec.g);map.delete(e)}
 }
@@ -730,7 +730,8 @@ function resize(){
 const bb={x0:0,x1:0,z0:0,z1:0,h:0};
 function grow(x,z,r,h){if(x-r<bb.x0)bb.x0=x-r;if(x+r>bb.x1)bb.x1=x+r;if(z-r<bb.z0)bb.z0=z-r;if(z+r>bb.z1)bb.z1=z+r;if(h>bb.h)bb.h=h}
 function onScreen(x,y,z,top){v3.set(x,y,z).project(camera);return Math.abs(v3.x)<=.93&&v3.y>=-.88&&v3.y<=top}
-function bbFits(){return onScreen(bb.x0,0,bb.z1,.95)&&onScreen(bb.x1,0,bb.z1,.95)&&onScreen(bb.x0,bb.h,bb.z0,.94)&&onScreen(bb.x1,bb.h,bb.z0,.94)}
+function bbFits(){const top=viewW&&viewW<640?.74:.92; // on a phone the health and boss bars lie over the top of the view
+  return onScreen(bb.x0,0,bb.z1,.95)&&onScreen(bb.x1,0,bb.z1,.95)&&onScreen(bb.x0,bb.h,bb.z0,top)&&onScreen(bb.x1,bb.h,bb.z0,top)}
 const want={x:W/2,z:H/2,zoom:.72};
 function frameWant(sight){
   const P=MB.P;
@@ -745,7 +746,7 @@ function frameWant(sight){
   {const rx=430,rz=300;if(bb.x0<P.x-rx)bb.x0=P.x-rx;if(bb.x1>P.x+rx)bb.x1=P.x+rx;if(bb.z0<P.y-rz)bb.z0=P.y-rz;if(bb.z1>P.y+rz)bb.z1=P.y+rz}
   if(bb.x0<0)bb.x0=0;if(bb.x1>W)bb.x1=W;if(bb.z0<0)bb.z0=0;if(bb.z1>H)bb.z1=H;
   // lean a third of the way from the player to the middle of the group
-  const fx=P.x+((bb.x0+bb.x1)/2-P.x)*.6,fz=P.y+((bb.z0+bb.z1)/2-P.y)*.6,base=viewW&&viewW<640?.64:.7;
+  const fx=P.x+((bb.x0+bb.x1)/2-P.x)*.6,fz=P.y+((bb.z0+bb.z1)/2-P.y)*.6,base=viewW&&viewW<640?.6:.7;
   for(let z=base;;z+=.05){
     if(z>=1){want.x=W/2;want.z=H/2-4;want.zoom=1;return}
     const f=(z-base)/(1-base),fol=.62*(1-f*f);
@@ -857,7 +858,7 @@ function draw(dt){
     f.fl.visible=lit;
     if(lit){
       if(i<nL){const l=points[i];l.color.copy(env.lightColor);
-        if(low){l.intensity=env.lightI*1.5*PT_K;l.distance=env.lightD*1.7;l.position.set(i?W*.76:W*.24,170,H*.45)}
+        if(low){l.intensity=env.lightI*1.1*PT_K;l.distance=env.lightD*1.7;l.position.set(i?W*.76:W*.24,170,H*.45)}
         else{l.intensity=env.lightI*fl*PT_K;l.distance=env.lightD;l.position.set(CORNERS[i][0]+(i%2?-46:46),f.y+78,CORNERS[i][1]+(i<2?46:-46))}}
       if(env.fire){f.f1.scale.set(30*fl,48*fl+4*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+10+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(15,24*fl,1);f.halo.material.opacity=.3*fl}
       else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.16*fl;const c=env.crystals[i];if(c){c.rotation.y=t*.6+i;c.position.y=f.y+Math.sin(t*1.4+i*1.9)*2.5}}
@@ -874,7 +875,7 @@ function draw(dt){
     if(!playerRec)playerRec=makeEnt('player',P,phPlayer);
     playerRec.g.position.set(P.x,0,P.y);playerRec.g.visible=true;
     updateEnt(playerRec,'player',P,dt,phPlayer,phPlayerUpdate);
-    if(low){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(38,1,30)}
+    if(low){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70,1,56)}
   }else if(playerRec)playerRec.g.visible=false;
   syncMap(monMap,MB.mons,'monster',dt,phMonster,phMonsterUpdate,sight);
   syncMap(allyMap,MB.allies,'ally',dt,phAlly,phAllyUpdate,true);
@@ -958,5 +959,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R._scene=scene;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.ok=true;
 })();
