@@ -990,7 +990,7 @@ const want={x:W/2,z:H/2,zoom:.72};
 function frameWant(sight){
   const P=MB.P;
   if(!P){want.x=W/2;want.z=H/2-4;want.zoom=sight?.72:.58;return}
-  if(!sight){want.x=W/2+(P.x-W/2)*.8;want.z=H/2+(P.y-H/2)*.8-4;want.zoom=.58;return}
+  if(!sight){want.x=W/2+(P.x-W/2)*.8;want.z=H/2+(P.y-H/2)*.8-4;want.zoom=.48;return}
   bb.x0=bb.x1=P.x;bb.z0=bb.z1=P.y;bb.h=0;grow(P.x,P.y,46,66);
   const B=MB.boss,mons=MB.mons,zs=MB.zones;
   if(B&&B.hp>0&&!B.hidden)grow(B.x,B.y,B.r+16,B.r*2.5+(B.lift||0)*LIFT);
@@ -1000,7 +1000,7 @@ function frameWant(sight){
   {const rx=430,rz=300;if(bb.x0<P.x-rx)bb.x0=P.x-rx;if(bb.x1>P.x+rx)bb.x1=P.x+rx;if(bb.z0<P.y-rz)bb.z0=P.y-rz;if(bb.z1>P.y+rz)bb.z1=P.y+rz}
   if(bb.x0<0)bb.x0=0;if(bb.x1>W)bb.x1=W;if(bb.z0<0)bb.z0=0;if(bb.z1>H)bb.z1=H;
   // lean a third of the way from the player to the middle of the group
-  const fx=P.x+((bb.x0+bb.x1)/2-P.x)*.6,fz=P.y+((bb.z0+bb.z1)/2-P.y)*.6,base=viewW&&viewW<640?.6:.7;
+  const fx=P.x+((bb.x0+bb.x1)/2-P.x)*.6,fz=P.y+((bb.z0+bb.z1)/2-P.y)*.6,base=viewW&&viewW<640?.5:.58;
   for(let z=base;;z+=.05){
     if(z>=1){want.x=W/2;want.z=H/2-4;want.zoom=1;return}
     const f=(z-base)/(1-base),fol=.62*(1-f*f);
