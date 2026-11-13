@@ -34,7 +34,7 @@ const hemi=new THREE.HemisphereLight(0x8a94b8,0x1a1410,.5);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,.8);
 sun.position.set(W/2-300,620,H/2+300);sun.target.position.set(W/2,0,H/2);
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
-{const c=sun.shadow.camera;c.left=-600;c.right=600;c.top=470;c.bottom=-470;c.near=100;c.far=1500;c.updateProjectionMatrix()}
+{const c=sun.shadow.camera;c.left=-560;c.right=560;c.top=420;c.bottom=-420;c.near=100;c.far=1500;c.updateProjectionMatrix()}
 sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;sun.shadow.radius=2;
 scene.add(sun,sun.target);
 const CORNERS=[[WALL+9,WALL+9],[W-WALL-9,WALL+9],[WALL+9,H-WALL-9],[W-WALL-9,H-WALL-9]];
@@ -155,7 +155,7 @@ function buildEnv(key){
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:ftex,bumpMap:ftex,bumpScale:1.6,roughness:.86,metalness:.04}));
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
   const btex=brickTexture(crypt?226:hue,crypt?9:6);
-  const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x3c3c46,roughness:.95});
+  const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x2c2c35,roughness:.95});
   const mats=[side,side,top,top,side,side];
   if(crypt){
     const T=260,hN=92,hS=14;
@@ -453,18 +453,18 @@ function draw(dt){
     points[0].color.setHex(0xffffff);points[0].intensity=1.5;points[0].distance=FOG*2.2;points[0].position.set(P?P.x:W/2,120,(P?P.y:H/2)+30);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else if(env.crypt){
-    hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.26;
-    sun.color.setHex(0xcfd8f6);sun.intensity=.85;
+    hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.22;
+    sun.color.setHex(0xcfd8f6);sun.intensity=1.0;
   }else{
-    hemi.color.setHSL(env.hue/360,.1,.62);hemi.groundColor.setHSL(env.hue/360,.12,.1);hemi.intensity=.3;
-    sun.color.setHex(0xe6e9f2);sun.intensity=1.0;
+    hemi.color.setHSL(env.hue/360,.1,.62);hemi.groundColor.setHSL(env.hue/360,.12,.1);hemi.intensity=.26;
+    sun.color.setHex(0xe6e9f2);sun.intensity=1.05;
   }
   for(let i=0;i<4;i++){
     const f=env.flames[i],lit=sight,fl=1+.13*Math.sin(t*9+f.ph)+.07*Math.sin(t*23.7+f.ph*2.3);
     f.fl.visible=lit;
     if(lit){
-      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?2.9:1.15)*fl;l.distance=env.crypt?720:460;l.position.set(CORNERS[i][0]+(i%2?-30:30),f.y+70,CORNERS[i][1]+(i<2?30:-30));
-      if(env.crypt){f.f1.scale.set(22*fl,34*fl+3*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+7+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(11,16*fl,1);f.halo.material.opacity=.2*fl}
+      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?4.6:1.6)*fl;l.distance=env.crypt?500:400;l.position.set(CORNERS[i][0]+(i%2?-46:46),f.y+78,CORNERS[i][1]+(i<2?46:-46));
+      if(env.crypt){f.f1.scale.set(30*fl,48*fl+4*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+10+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(15,24*fl,1);f.halo.material.opacity=.3*fl}
       else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.16*fl;env.crystals[i].rotation.y=t*.6+i}
     }
   }
