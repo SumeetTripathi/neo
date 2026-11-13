@@ -410,6 +410,11 @@ function drawOverlay(sight){
       ctx.globalAlpha=Math.max(0,(1-q)*(hot?.9:.62));ctx.strokeStyle=hot?'#d6a544':'#e7dfcd';ctx.lineWidth=hot?3:1.8;
       ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx,el.ry,0,0,TAU);ctx.stroke()}
     ctx.globalAlpha=1;
+    // ...and so does the weight of a blow about to land, once there are nerves to feel it
+    if(MB.has('touch')){const zs=MB.zones;
+      for(let i=0;i<zs.length;i++){const z=zs[i],q=Math.min(1,z.t/z.dur),el=groundEllipse(z.x,z.y,z.r);
+        ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx,el.ry,0,0,TAU);ctx.fillStyle='rgba(184,38,61,'+(.14+.3*q)+')';ctx.fill();ctx.strokeStyle='#d6a544';ctx.lineWidth=2;ctx.stroke();
+        ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx*q,el.ry*q,0,0,TAU);ctx.strokeStyle='rgba(231,223,205,.8)';ctx.stroke()}}
   }
   else if(sight){ctx.fillStyle=vignette();ctx.fillRect(0,0,W,H)}
   const floats=MB.floats;
@@ -418,8 +423,7 @@ function drawOverlay(sight){
     ctx.globalAlpha=1}
   if(MB.has('touch')){
     const mons=MB.mons;ctx.font='700 30px Spectral,Georgia,serif';ctx.textAlign='center';
-    for(let i=0;i<mons.length;i++){const m=mons[i];if(m.st!=='wind'||m.hidden)continue;
-      if(!sight&&P&&Math.hypot(m.x-P.x,m.y-P.y)>FOG+m.r)continue;
+    for(let i=0;i<mons.length;i++){const m=mons[i];if(m.st!=='wind')continue;
       toScreen(m.x,m.r*2.3+16+(m.lift||0)*LIFT,m.y);ctx.fillStyle='#0d0c11';ctx.fillText('!',sp.x+1.5,sp.y+1.5);ctx.fillStyle='#d6a544';ctx.fillText('!',sp.x,sp.y)}
   }
   if(S.banner>0&&S.mode==='play'&&S.L){
@@ -450,7 +454,7 @@ function draw(dt){
   if(!sight){
     hemi.color.setHex(0xaab0c0);hemi.groundColor.setHex(0x1c1c22);hemi.intensity=.5;
     sun.color.setHex(0xffffff);sun.intensity=.85;
-    points[0].color.setHex(0xffffff);points[0].intensity=1.5;points[0].distance=FOG*2.2;points[0].position.set(P?P.x:W/2,120,(P?P.y:H/2)+30);
+    points[0].color.setHex(0xffffff);points[0].intensity=1.05;points[0].distance=FOG*2.4;points[0].position.set(P?P.x:W/2,140,(P?P.y:H/2)+34);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else if(env.crypt){
     hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.22;
@@ -491,7 +495,7 @@ function draw(dt){
     else{o.scale.setScalar(r);o.userData.core.scale.setScalar(.85)}}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
-  if(MB.has('touch')){const zs=MB.zones;
+  if(sight&&MB.has('touch')){const zs=MB.zones;
     for(let i=0;i<zs.length;i++){const z=zs[i],q=Math.min(1,z.t/z.dur),o=pools.zone.get(),u=o.userData;o.position.set(z.x,0,z.y);
       u.disc.scale.setScalar(z.r);u.rim.scale.setScalar(z.r);u.grow.scale.setScalar(Math.max(.01,z.r*q));u.disc.material.opacity=.16+.4*q+(q>.8?.12*Math.sin(t*40):0)}}
   if(sight){const rs=MB.rings,hear=MB.has('hearing');
