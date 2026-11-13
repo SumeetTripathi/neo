@@ -3,6 +3,9 @@
 // and forward = +Z, then scaled by m.r. Hierarchy: group (renderer owns position/visible) > root (facing,
 // scale, wind-up shake) > body (bob, squash and stretch) > parts. Geometries are shared, materials are
 // cached by colour, and update() allocates nothing.
+// Look: cel-shaded through window.MBStyle (toon / glow / outline) when the renderer provides it; without it the same
+// shapes are drawn with this file's own standard materials and no outlines. Cached materials are never mutated:
+// rage, chill and pet tints are further cached variants, and the few materials that pulse are owned by this file.
 window.MBModels=window.MBModels||{};
 (function(){
 'use strict';
@@ -47,6 +50,26 @@ function ringGeo(key,n,r0,y,slope,len,rad,off){
 
 /* ---------- materials ---------- */
 var MATS={},FX=null,_c=new T.Color(),_c2=new T.Color(),_hsl={h:0,s:0,l:0};
+var BODY=new WeakMap(); // body material -> its colour, so a tinted twin can be asked for
+// cel material from the shared style kit, or this file's own flat-shaded standard material when the kit is missing
+function toonM(hex,o){
+  var S=window.MBStyle,m=null;
+  if(S&&typeof S.toon==='function')try{m=S.toon(hex,o)}catch(e){m=null}
+  if(m&&m.isMaterial)return m;
+  var key='t'+hex+(o?JSON.stringify(o):'');m=MATS[key];if(m)return m;
+  var p={color:hex,roughness:.82,metalness:.04,flatShading:true};
+  if(o&&o.emissive!==undefined){p.emissive=o.emissive;p.emissiveIntensity=o.emissiveIntensity===undefined?1:o.emissiveIntensity}
+  return MATS[key]=new T.MeshStandardMaterial(p);
+}
+function glowM(hex,op){
+  var S=window.MBStyle,m=null;
+  if(S&&typeof S.glow==='function')try{m=S.glow(hex,{opacity:op})}catch(e){m=null}
+  if(m&&m.isMaterial)return m;
+  var key='g'+hex+'|'+op;
+  return MATS[key]||(MATS[key]=new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op,blending:T.AdditiveBlending,depthWrite:false,fog:false}));
+}
+function pal(k,d){var S=window.MBStyle;return S&&S.palette&&typeof S.palette[k]==='number'?S.palette[k]:d}
+function ink(o,th){var S=window.MBStyle;if(S&&typeof S.outline==='function')try{S.outline(o,{thickness:th||1})}catch(e){}}
 // PV = pet variant of the monster being built: 0 hostile, 'necro' (bound dead: dark, drained, green-lit) or 'beast' (tamed: warm natural hide).
 // Each variant has its own cached material set, so a pet never shares (or recolours) the materials of the hostile monsters around it.
 var PV=0;
@@ -58,30 +81,31 @@ function M(hex,shade){
     else{_c.getHSL(_hsl);_c.setHSL(_hsl.h*.4+.27,min(.3,_hsl.s*.3+.08),max(.1,min(.19,_hsl.l*.42)))}
   }else if(PV==='beast'&&hex!==BONE)_c.lerp(_c2.set(0xa07c4c),.3);
   if(shade>0)_c.lerp(_c2.set(PV==='necro'?0x8fae94:0xffffff),PV==='necro'?shade*.7:shade);else if(shade<0)_c.multiplyScalar(1+shade);
-  m=new T.MeshStandardMaterial({color:_c.getHex(),roughness:.82,metalness:.04,flatShading:true});
-  if(PV==='necro')m.emissive.setRGB(.012,.07,.03);else m.emissive.copy(_c).multiplyScalar(.06);
-  m.userData.mbBody=true;
+  var h=_c.getHex();
+  m=PV==='necro'?toonM(h,{emissive:0x0a3a18,emissiveIntensity:.5}):toonM(h);
+  BODY.set(m,h);
   return MATS[key]=m;
 }
 function fx(){
   if(FX)return FX;
-  var glow=function(c,e,i){return new T.MeshStandardMaterial({color:c,emissive:e,emissiveIntensity:i,roughness:.4})};
+  var glow=function(c,e,i){return toonM(c,{emissive:e,emissiveIntensity:i,rim:false})},foe=pal('foe',0xff2d55);
   FX={
-    eye:glow(0x5a4410,0xffd95e,1.5),eyeRed:glow(0x400008,0xff2238,1.5),ring:glow(0x2a0308,0xc8142e,1.25),star:glow(0x5a4410,0xffcf5a,1.4),
+    eye:glow(0x5a4410,0xffd95e,1.5),eyeRed:glow(0x400008,0xff2238,1.6),ring:glow(0x2a0308,foe,1.35),star:glow(0x5a4410,0xffcf5a,1.4),
     pupil:new T.MeshBasicMaterial({color:0x08070a}),voidM:new T.MeshBasicMaterial({color:0x050408}),
     eyeGreen:glow(0x103a10,0x7fe85a,1.5),ember:glow(0x5a1a04,0xff7a22,1.5),iris:glow(0x4a2a00,0xffb428,1.5),irisHot:glow(0x5a0a00,0xff4a2a,2),
-    white:new T.MeshStandardMaterial({color:0xffffff,emissive:0xffffff,emissiveIntensity:1,roughness:1}),
+    crack:glow(0x400008,foe,1.3),crackN:glow(0x06280e,0x4fe86a,1.2),crackB:glow(0x10283a,0x9fd8ff,1.1),
+    white:new T.MeshBasicMaterial({color:0xffffff}),
     // pet eyes and glows
     eyeBlue:glow(0x1c3a5a,0xa8dcff,1.5),emberN:glow(0x0c3a14,0x4fe86a,1.4),ringN:glow(0x06280e,0x35d85a,1.25),ringB:glow(0x10283a,0x7cc4ff,1.2),
     irisN:glow(0x0c3a14,0x5cf07a,1.5),irisNHot:glow(0x1a5a20,0xb4ffc0,2.2),irisB:glow(0x12324a,0x8fd0ff,1.5),irisBHot:glow(0x2a5a7a,0xe4f6ff,2.2),
-    leather:new T.MeshStandardMaterial({color:0x8a5527,emissive:0x2a1608,roughness:.7,flatShading:true}),
-    brass:new T.MeshStandardMaterial({color:0xe2b04a,emissive:0x8a5a10,emissiveIntensity:.9,roughness:.3,metalness:.6})
+    leather:toonM(0x8a5527),brass:toonM(0xe2b04a,{emissive:0x8a5a10,emissiveIntensity:.9})
   };
   var cv=document.createElement('canvas');cv.width=cv.height=64;var x=cv.getContext('2d'),g=x.createRadialGradient(32,32,6,32,32,32);
   g.addColorStop(0,'rgba(255,255,255,.75)');g.addColorStop(.45,'rgba(255,255,255,.4)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.fillRect(0,0,64,64);
   FX.auraTex=new T.CanvasTexture(cv);FX.auras={};
   return FX;
 }
+// ground auras pulse, so they are this file's own materials (one per colour)
 function auraMat(hex){
   var a=FX.auras[hex];if(a)return a;
   return FX.auras[hex]=new T.MeshBasicMaterial({color:hex,map:FX.auraTex,transparent:true,opacity:.55,blending:T.AdditiveBlending,depthWrite:false,fog:false});
@@ -92,7 +116,7 @@ var REG=null; // meshes of the monster being built (for the white hit flash)
 function mk(geo,mat,par,x,y,z,sx,sy,sz,noShadow){
   var o=new T.Mesh(geo,mat);o.position.set(x||0,y||0,z||0);
   if(sx!==undefined)o.scale.set(sx,sy===undefined?sx:sy,sz===undefined?sx:sz);
-  o.castShadow=!noShadow;par.add(o);REG.push(o);return o;
+  o.castShadow=!noShadow;if(noShadow)o.userData.noOutline=true;par.add(o);REG.push(o);return o;
 }
 function seg(geo,mat,par,ax,ay,az,bx,by,bz,rad){
   var dx=bx-ax,dy=by-ay,dz=bz-az,o=mk(geo,mat,par,ax,ay,az);orient(o,dx,dy,dz);o.scale.set(rad,Math.sqrt(dx*dx+dy*dy+dz*dz),rad);return o;
@@ -465,42 +489,44 @@ function fxm(){
   var add=function(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})};
   FXM={
     ward:add(0xcfe6ff,.3),wardRim:new T.MeshBasicMaterial({color:0xe8f4ff,transparent:true,opacity:.22,wireframe:true,depthWrite:false,fog:false,toneMapped:false}),
-    shell:new T.MeshStandardMaterial({color:0x8fb0e8,emissive:0x2a56b0,emissiveIntensity:.9,roughness:.3,metalness:.3,flatShading:true}),
+    shell:toonM(0x8fb0e8,{emissive:0x2a56b0,emissiveIntensity:.9}),
     shellEdge:new T.MeshBasicMaterial({color:0xa9c8ff,transparent:true,opacity:.55,wireframe:true,depthWrite:false,fog:false,toneMapped:false}),
     flame:add(0xff8a2a,.9),flameCore:add(0xffe08a,.9),streak:add(0xdff3ff,.5),blood:add(0xb00a1c,.75),
-    drop:new T.MeshStandardMaterial({color:0x7a0612,emissive:0xc0101e,emissiveIntensity:.8,roughness:.3}),
-    thorn:new T.MeshStandardMaterial({color:0xe7dfcd,emissive:0x2a2620,roughness:.6,flatShading:true}),
-    thornTip:new T.MeshStandardMaterial({color:0x8c2f39,emissive:0x2a0508,roughness:.5,flatShading:true}),
+    drop:toonM(0x7a0612,{emissive:0xc0101e,emissiveIntensity:.8}),
+    thorn:toonM(0xe7dfcd),
+    thornTip:toonM(0x8c2f39),
     seam:new T.MeshBasicMaterial({color:0x8fe02a,fog:false,toneMapped:false}),seamGlow:add(0x58c010,.3),
     dot:add(0x7fe85a,.8),mark:new T.MeshBasicMaterial({color:0xff2a40,fog:false,toneMapped:false,transparent:true,opacity:.95,depthTest:false}),
     burst:add(0xff6a5a,.6),frost:add(0x8fd3ff,.45)
   };
   return FXM;
 }
-// tinted twins of a body material, cached on the material itself so every monster of that colour shares them
-var VAR={rage:new Map(),slow:new Map()};
+// tinted twins of a body material: further cached variants (rage has a dim and a bright one, for the pulse), shared by every monster of that colour
+var VAR={rage:new Map(),rage1:new Map(),slow:new Map()};
 function variant(mat,kind){
-  if(!mat.userData||!mat.userData.mbBody)return mat;
+  var h=BODY.get(mat);if(h===undefined)return mat;
   var map=VAR[kind],v=map.get(mat);if(v)return v;
-  v=mat.clone();v.userData={};
-  if(kind==='rage'){v.color.lerp(_c.set(0xff2a30),.28);v.emissive.setRGB(.85,.05,.07);v.emissiveIntensity=.5}
-  else{v.color.lerp(_c.set(0x3f8cff),.6);v.emissive.setRGB(.05,.16,.4);v.emissiveIntensity=.5}
+  _c.setHex(h);
+  if(kind==='slow'){_c.lerp(_c2.set(0x3f8cff),.6);v=toonM(_c.getHex(),{emissive:0x1a3f9a,emissiveIntensity:.5})}
+  else{_c.lerp(_c2.set(0xff2a30),.28);v=toonM(_c.getHex(),{emissive:0xff1a26,emissiveIntensity:kind==='rage1'?.72:.3})}
   map.set(mat,v);return v;
 }
 function fxMesh(geo,mat,par,x,y,z,sx,sy,sz){
-  var o=new T.Mesh(geo,mat);o.position.set(x||0,y||0,z||0);if(sx!==undefined)o.scale.set(sx,sy===undefined?sx:sy,sz===undefined?sx:sz);o.castShadow=false;par.add(o);return o;
+  var o=new T.Mesh(geo,mat);o.position.set(x||0,y||0,z||0);if(sx!==undefined)o.scale.set(sx,sy===undefined?sx:sy,sz===undefined?sx:sz);o.castShadow=false;o.userData.noOutline=true;par.add(o);return o;
 }
+// the solid dressings (ward plates, thorns) are inked like the body
+function solid(o){o.userData.noOutline=false;o.castShadow=true;return o}
 var DRESS={
   stars:function(u){var st=grp(u.root,0,u.cfg.top,u.ai==='hound'?.7:0),i;for(i=0;i<3;i++){var a=i*TAU/3;fxMesh(G.oct,FX.star,st,cos(a)*.62,0,sin(a)*.62,.15,.21,.15)}return st},
   ward:function(u){var g=grp(u.fx,0,u.top*.5,0);fxMesh(G.sph,FXM.ward,g,0,0,0,1.38,u.top*.62,1.38).renderOrder=5;fxMesh(G.ico1,FXM.wardRim,g,0,0,0,1.4,u.top*.63,1.4).renderOrder=5;return g},
   shielded:function(u){var g=grp(u.fx,0,u.top*.5,0),i;for(i=0;i<3;i++){var a=i*TAU/3,h=grp(g,cos(a)*1.3,0,sin(a)*1.3);h.rotation.y=PI/2-a;
-      fxMesh(merged('shieldPlate',function(add){add(G.box,0,.06,0,0,1,0,.52,.5,.07);add(G.cone4,0,-.19,0,0,-1,0,.37,.4,.05);add(G.box,0,.06,.04,0,1,0,.1,.5,.05)}),FXM.shell,h).castShadow=true}return g},
+      solid(fxMesh(merged('shieldPlate',function(add){add(G.box,0,.06,0,0,1,0,.52,.5,.07);add(G.cone4,0,-.19,0,0,-1,0,.37,.4,.05);add(G.box,0,.06,.04,0,1,0,.1,.5,.05)}),FXM.shell,h))}ink(g,u.lw);return g},
   burning:function(u){var g=grp(u.fx),i;for(i=0;i<6;i++){var f=grp(g);fxMesh(G.cone4,FXM.flame,f,0,0,0,.2,.6,.2);fxMesh(G.cone4,FXM.flameCore,f,0,0,0,.1,.34,.1)}return g},
   swift:function(u){var g=grp(u.fx),i;for(i=0;i<4;i++)fxMesh(G.box,FXM.streak,g,(i-1.5)*.5,.35+((i*7)%3)*.42,-1.5,.05,.05,1.5);return g},
   vampiric:function(u){var g=grp(u.fx),i;fxMesh(G.aura,auraMat(0xb00a1c),g,0,.05,0,1.9,1,1.9).renderOrder=1;for(i=0;i<3;i++)fxMesh(G.sphLo,FXM.drop,g,0,0,0,.12,.17,.12);return g},
   thorned:function(u){var g=grp(u.fx);
-    fxMesh(ringGeo('thornA',11,.82,0,.3,.7,.14),FXM.thorn,g,0,u.top*.3+.12,0).castShadow=true;
-    fxMesh(ringGeo('thornB',7,.6,0,1.1,.55,.12,.4),FXM.thorn,g,0,u.top*.5+.1,0);return g},
+    solid(fxMesh(ringGeo('thornA',11,.82,0,.3,.8,.14),FXM.thorn,g,0,u.top*.3+.12,0));
+    solid(fxMesh(ringGeo('thornB',7,.6,0,1.1,.62,.12,.4),FXM.thorn,g,0,u.top*.5+.1,0));ink(g,u.lw);return g},
   splitting:function(u){var g=grp(u.root,0,u.cfg.top*.47,0);var a=fxMesh(G.torus,FXM.seam,g,0,0,0,1,1,1);a.rotation.z=PI/2;a.scale.set(u.cfg.top*.5,.3,.92);
     var b=fxMesh(G.torus,FXM.seamGlow,g,0,0,0,1,1,1);b.rotation.z=PI/2;b.scale.set(u.cfg.top*.52,.9,.95);return g},
   dot:function(u){var g=grp(u.fx),i;for(i=0;i<5;i++)fxMesh(G.sphLo,FXM.dot,g,0,0,0,.14);return g},
@@ -608,8 +634,8 @@ function create(m,MB){
   var meshes=REG,mats=[],i,o;REG=null;
   if(pv){ // the few glowing parts that are not tinted through M(): no hostile reds or ambers left on a pet
     for(i=0;i<meshes.length;i++){o=meshes[i].material;
-      if(pv==='necro')o=o===FX.eye||o===FX.eyeRed?FX.eyeGreen:o===FX.ember?FX.emberN:o===FX.ring?FX.ringN:o===FX.iris?FX.irisN:o;
-      else o=o===FX.eye||o===FX.eyeRed?FX.eyeBlue:o===FX.ring?FX.ringB:o===FX.iris?FX.irisB:o;
+      if(pv==='necro')o=o===FX.eye||o===FX.eyeRed?FX.eyeGreen:o===FX.ember?FX.emberN:o===FX.ring?FX.ringN:o===FX.iris?FX.irisN:o===FX.crack?FX.crackN:o;
+      else o=o===FX.eye||o===FX.eyeRed?FX.eyeBlue:o===FX.ring?FX.ringB:o===FX.iris?FX.irisB:o===FX.crack?FX.crackB:o;
       meshes[i].material=o}
   }
   for(i=0;i<meshes.length;i++)mats.push(meshes[i].material);
@@ -666,7 +692,8 @@ function fade(g,q){
   if(!u.ghost){
     u.ghost=new T.MeshBasicMaterial({color:necro?0x4be070:0xbfe2ff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
     if(!u.own)u.own=[];u.own.push(u.ghost);
-    for(i=0;i<u.meshes.length;i++){u.meshes[i].material=u.ghost;u.meshes[i].castShadow=false}
+    for(i=0;i<u.meshes.length;i++){u.meshes[i].material=u.ghost;u.meshes[i].castShadow=false;k=u.meshes[i].userData.mbLineMesh;if(k)k.visible=false}
+    if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=false;if(u.crown)u.crown.visible=false;
     u.mode=-1;u.fx.visible=false;if(u.aura)u.aura.visible=false;if(u.sring)u.sring.visible=false;if(u.motes)u.motes.visible=false;
   }
   u.fa=max(.001,q);
@@ -741,13 +768,14 @@ function update(g,m,MB,dt){
     else{u.aura.material.opacity=.5+.12*sin(t*2.4)}
   }
   // body materials: hit flash, then chill, then rage
-  var mode=m.flash>0?1:m.slow>0?3:rage?2:0;
+  var mode=m.flash>0?1:m.slow>0?3:rage?2:0,ms,mt;
   if(mode!==u.mode){
-    u.mode=mode;var ms=u.meshes,mt=u.mats,kind=mode===2?'rage':'slow';
+    u.mode=mode;ms=u.meshes;mt=u.mats;var kind=mode===2?'rage':'slow';
     for(i=0;i<ms.length;i++)ms[i].material=mode===0?mt[i]:mode===1?FX.white:variant(mt[i],kind);
-    if(mode===2&&!u.rageMats){u.rageMats=[];for(i=0;i<mt.length;i++){o=variant(mt[i],'rage');if(o!==mt[i]&&u.rageMats.indexOf(o)<0)u.rageMats.push(o)}}
+    u.rl=0;
   }
-  if(mode===2&&u.rageMats){k=.42+.3*sin(t*7.5);for(i=0;i<u.rageMats.length;i++)u.rageMats[i].emissiveIntensity=k}
+  // rage beats between two cached tints (a hard cel pulse, nothing mutated)
+  if(mode===2){k=sin(t*7.5)>.2?1:0;if(k!==u.rl){u.rl=k;ms=u.meshes;mt=u.mats;for(i=0;i<ms.length;i++)ms[i].material=variant(mt[i],k?'rage1':'rage')}}
   // statuses
   var F=u.f,top=u.top,on;
   on=m.slow>0;if(on||F.slow){o=dress(u,'slow',on);if(o){o.position.y=.06-g.position.y/r;o.rotation.y=t*.7}}

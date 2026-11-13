@@ -182,7 +182,7 @@ function panel(b,slot,M,len,w0,w1,ry,trim,fork){
 }
 // sword: grip, swept guard, dark diamond blade, burning edges
 function sword(b,slot,len,w,grip,edge,gold,single){
-  const dk=mat(0x2a2c3c),st=mat(C.steel),lea=mat(0x241c22);
+  const dk=mat(0x3c4260),st=mat(C.steelL),lea=mat(0x241c22);
   b.cy(slot,lea,0,-grip/2+1.4,0,.75,.75,grip+2.6,0,0,0,1,6);b.co(slot,gold,0,-grip-.9,0,1.2,2,PI,0,0,4);
   b.bx(slot,gold,w*.7,2.3,0,w*1.5,1.1,1.5,0,0,.38);b.bx(slot,gold,-w*.7,2.3,0,w*1.5,1.1,1.5,0,0,-.38);b.sp(slot,edge,0,2.2,0,1.15,1,1,1.3);
   if(single){ // cleaver: straight spine, edge on one side, clipped point
@@ -274,7 +274,7 @@ function buildHuman(b,s,ud,st,c,adv,tier){
     for(const[u,k]of adv==='champion'?[['armL',1],['armR',-1]]:[['armL',1]]){b.sp(u,iron,k*.5,.9,0,3.5,1.1,.78,1.1);b.sp(u,iron,k*1.4,-1.3,0,3,1,.7,1.05);b.spike(u,iron,k*1.5,1.6,0,k*.9,1,0,4.6,1.5,.6);
       b.fine=true;b.to(u,tr,k*.6,.5,0,3.5,.42,1.05);b.fine=false}
     // headband: knot and two tails in the band slot
-    const R=lit(acc,.45,0xc2401c);b.to('head',R,0,6.6,0,4.75,.8,1.02);s.band.position.set(.6,6.4,-4.7);
+    const R=lit(acc,.45,0xc2401c);b.to('head',R,0,7.5,-.2,4.5,.6,1.02,0,HP-.16);s.band.position.set(.6,6.8,-4.6);
     b.cy('band',R,.9,-3.6,-.2,.9,1.3,7.6,0,0,.14,.2,6);b.cy('band',R,-.8,-2.9,-.5,.8,1.1,6,0,0,-.2,.2,6);b.sp('band',R,0,0,0,1.15);
     b.cy('legL',iron,0,-UL+.6,.9,2.3,2.5,3,0,0,0,1,6);b.cy('legR',iron,0,-UL+.6,.9,2.3,2.5,3,0,0,0,1,6);
   }else if(c==='tank'){
@@ -424,7 +424,7 @@ function rebuildPlayer(g,MB){
   // power wisps: more of them with an upgrade and with every rank
   ud.nw=Math.min(WISPS,(adv?3:0)+Math.max(0,tier-1));
   for(let i=0;i<WISPS;i++)ud.wisps[i].visible=false;
-  ink(g,1);
+  ink(g,.75);
 }
 const _white=new T.Color(0xffffff);
 
@@ -539,7 +539,7 @@ const T_TREE=[['body'],['head','body'],['armL','body'],['armR','body'],['legL'],
 const W_TREE=[['body'],['head','body'],['tail','body'],['legFL'],['legFR'],['legBL'],['legBR']];
 // Thrall: a hunched skeleton of soot-dark bone under a torn shroud, green fire in its eyes and ribs, smoke around its feet
 function buildThrall(s){
-  const b=new Builder(s),B=mat(0x2a3136),Bl=mat(0x46535a),O=mat(0x07090b),E=lit(C.green,2,0xffffff),Sh=mat(0x12181c),smoke=mat(0x0c1210,{transparent:true,opacity:.5,depthWrite:false});
+  const b=new Builder(s),B=mat(0x3d4a52),Bl=mat(0x61737c),O=mat(0x07090b),E=lit(C.green,2,0xffffff),Sh=mat(0x12181c),smoke=mat(0x0c1210,{transparent:true,opacity:.5,depthWrite:false});
   s.body.position.set(0,10.5,0);s.legL.position.set(2.3,10.5,0);s.legR.position.set(-2.3,10.5,0);s.head.position.set(0,11.4,1.4);s.armL.position.set(4.6,9.4,.6);s.armR.position.set(-4.6,9.4,.6);
   b.to('body',B,0,0,0,2.5,1.1,.75);
   for(let y=1.6;y<=10;y+=2.2)b.sp('body',B,0,y,-.8,1.05);

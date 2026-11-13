@@ -54,7 +54,7 @@ const CLASSES={
   ['Quickdraw','You loose arrows much faster.'],
   ['Volley','A new skill. Loose a fan of seven arrows at once.'],
   ['Longshot','Arrows that fly more than a few strides hit for double.']]},
- necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. A boss you kill can be bound to fight for you. 11 health.',pows:[
+ necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. Bosses you kill can be bound to fight for you. 11 health.',pows:[
   ['Grave Call','Thralls rise every 4 seconds, and you can hold four.'],
   ['Army of Bones','A new skill. Four extra thralls claw out of the ground at once.'],
   ['Soul Leech','Every tenth hit by you or your thralls heals you a little.']]},
@@ -66,8 +66,8 @@ const EXTRA={
  healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
  tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
  mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, and your skill recharges twice as fast.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
- ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires. A boss you kill can be tamed to fight for you as well.']]},
- necro:{boon:['Legion','One more thrall at your side, and your bound pet hits 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pet has 40% more health.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pet.']]},
+ ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires. Bosses you kill can be tamed, and two of them fight for you as well.']]},
+ necro:{boon:['Legion','One more thrall at your side, and your bound pets hit 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pets have 40% more health.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pets.']]},
 };
 for(const k in EXTRA)Object.assign(CLASSES[k],EXTRA[k]);
 // Ten active skills per class, six carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs].
@@ -826,11 +826,14 @@ function playerStep(dt){
 }
 
 /* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
-// PETS.roster holds up to three: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active is the one that walks with you, or -1.
+// PETS.roster holds up to eight: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
+// up to three for a Necromancer, two (beside the wolf) for a Beastmaster. Several pets share the work: each has the health and the bite of PETK[how many are out - 1] of a lone pet.
 // In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
-const PETS={roster:[],active:-1,down:false,dmg:0},PETMAX=3,PLVMAX=25,PETD=1,PETHP=1.5;
+const PETS={roster:[],active:[],down:false,dmg:0,fielded:[]},PETMAX=8,PLVMAX=25,PETD=1,PETHP=2.2,PETK=[1,.65,.5],MINIONS=4;
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
-const petOn=()=>petOwner()?PETS.roster[PETS.active]||null:null;
+const petCap=()=>({necro:3,beast:2})[petOwner()]||0;
+// the roster entries that go with you, in order
+const petOn=()=>{const n=petCap(),out=[];for(const i of PETS.active){const e=PETS.roster[i];if(e&&out.length<n&&!out.includes(e))out.push(e)}return out};
 const petTag=e=>e.name+(e.plv?' +'+e.plv:'');
 const PERK={swift:'moves and acts faster',shielded:'takes less damage',burning:'hits harder',vampiric:'heals itself when it hits',thorned:'hurts whatever touches it',splitting:'gets up once after it falls'};
 const PETDO={crawler:'It lunges at its prey.',hound:'It charges through its prey.',witch:'It throws bolts from a distance.',fist:'It leaps and slams the ground.',mother:'It hatches mites that fight for you.',burrower:'It digs under its prey and erupts.',bomber:'It lobs bombs.',summoner:'It raises husks that fight for you.',beamer:'It sweeps a beam across the room.',mimic:'It circles its prey and throws bolts.',hollow:'It throws rings of bolts.',mite:'It bites.'};
@@ -838,12 +841,12 @@ const PETDO={crawler:'It lunges at its prey.',hound:'It charges through its prey
 const petTough=k=>Math.sqrt((GENHP[k]||560)/560);
 const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col,crown:e.crown?1:0,r:Math.round(Math.max(16,Math.min(30,e.r*.8)))});
 // A pet is rescaled every time it enters a fight: its health follows yours and its blows follow your damage, so an old pet keeps pace and a new one is no stronger.
-const petHp=e=>Math.max(6,Math.round(P.maxHp*PETHP*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
-const petPow=a=>PETD*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
-function makePet(e,frac=1,owner=petOwner()){
-  const s=petSpec(e),g=rand()*TAU,hp=petHp(e);
-  const a={kind:'pet',pet:true,owner:owner||'necro',e,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*46,y:P.y+Math.sin(g)*46,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
-    st:'idle',t:1.2,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:0,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
+const petHp=(e,k=1)=>Math.max(6,Math.round(P.maxHp*PETHP*k*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
+const petPow=a=>PETD*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
+function makePet(e,frac=1,owner=petOwner(),k=1,slot=0){
+  const s=petSpec(e),g=rand()*TAU,hp=petHp(e,k);
+  const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*46,y:P.y+Math.sin(g)*46,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
+    st:'idle',t:1.2+slot*.45,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:slot*.3,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);return a;
 }
 // what a mother or a caller pet raises: small, short-lived, cannot be hurt
@@ -853,6 +856,8 @@ function petMinion(a,kind,dmg,life){
   clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);allies.push(m);puff(m,a.owner==='necro'?'#7fd66b':'#8fd3ff',6);return m;
 }
 const minions=a=>{let n=0;for(const x of allies)if(x.par===a&&x.life>0)n++;return n};
+// a pet may raise one more while it has fewer than `per` of its own and all pets together have fewer than MINIONS
+const minionRoom=(a,per)=>{let all=0;for(const x of allies)if(x.minion&&x.life>0)all++;return all<MINIONS&&minions(a)<per};
 let byPet=null;
 // every blow a pet lands goes through here, so it can be counted and so perks can react
 function petHit(m,d,a){if(!mons.includes(m))return;byPet=a||true;hurtM(m,d,true);byPet=null;leech()}
@@ -861,10 +866,10 @@ function petBlast(a,at,r,dur,dmg){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg
 function hurtPet(a,d){
   if(a.minion||a.inv>0||a.hidden||a.st==='leap'||a.hp<=0||S.mode!=='play')return;
   if(a.perk==='shielded')d=Math.max(1,Math.round(d*.7));
-  a.hp-=d;a.inv=1;a.flash=.15;puff(a,col(a.s.col),5,120);floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+d,life:.6,c:'#ffb3bf'});
+  a.hp-=d;a.inv=1.4;a.flash=.15;puff(a,col(a.s.col),5,120);floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+d,life:.6,c:'#ffb3bf'});
   if(a.hp>0)return;
   if(a.up){a.up=false;a.hp=Math.ceil(a.maxHp/2);a.inv=1.5;puff(a,'#d6a544',14,180);floats.push({x:a.x,y:a.y-a.r-20,txt:'Gets up',life:1.2,c:'#d6a544'});return}
-  a.hp=0;a.life=0;a.beam=null;PETS.down=true;puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
+  a.hp=0;a.life=0;a.beam=null;a.e.down=true;a.e.frac=0;PETS.down=petOn().every(e=>e.down);puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
 }
 // who a pet goes for: the nearest monster above ground, but the boss unless something small is close, and nothing warded while there is a choice
 function petTarget(a){let t=null,bd=1e9;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,a)-m.r-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}return t}
@@ -905,7 +910,7 @@ const PETAI={
     if((a.t-=dt)<=0&&d<340){const k=Math.max(0,d-t.r-a.r-6),to={x:a.x+Math.cos(g)*k,y:a.y+Math.sin(g)*k};clamp(to,a.r);if(obstacles.length)collide(to,a.r,true);
       a.st='leap';a.t=a.dur=.7;a.sx=a.x;a.sy=a.y;a.tx=to.x;a.ty=to.y;petBlast(a,t,88,.7,6*D)}
   },
-  mother(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,230,60);if((a.t-=dt)<=0){a.t=2.2;if(minions(a)<3){petMinion(a,'mite',.8*D,7);sfx(300,.12,'sine',.08,500)}}},
+  mother(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,230,60);if((a.t-=dt)<=0){a.t=2.2;if(minionRoom(a,3)){petMinion(a,'mite',.8*D,7);sfx(300,.12,'sine',.08,500)}}},
   burrower(a,dt,t,g,d,D){
     if(a.st==='idle'){a.st='under';a.t=1.5;a.hidden=true;puff(a,col(a.s.col),8)}
     else if(a.st==='under'){const near=d<t.r+a.r+14;if(!near)petMove(a,g,200,dt,true,d);if(near||(a.t-=dt)<=0){a.st='rise';a.t=.5;if(obstacles.length){a.hidden=false;collide(a,a.r,true);a.hidden=true}petBlast(a,a,80,.5,5.4*D)}}
@@ -917,9 +922,9 @@ const PETAI={
     petKeep(a,dt,t,g,d,160,290,70);if((a.t-=dt)<=0&&d<440){a.st='wind';a.t=.35}
   },
   summoner(a,dt,t,g,d,D){
-    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=3;for(let i=minions(a);i<2;i++)petMinion(a,'husk',.9*D,8);sfx(140,.4,'sawtooth',.1,70)}return}
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=3;for(let i=0;i<2&&minionRoom(a,2);i++)petMinion(a,'husk',.9*D,8);sfx(140,.4,'sawtooth',.1,70)}return}
     petKeep(a,dt,t,g,d,160,290,65);if(a.cd<=0){a.cd=1.6;petShot(a,g,360,D)}
-    if((a.t-=dt)<=0){if(minions(a)<2){a.st='wind';a.t=.6}else a.t=1}
+    if((a.t-=dt)<=0){if(minionRoom(a,2)){a.st='wind';a.t=.6}else a.t=1}
   },
   beamer(a,dt,t,g,d,D){
     if(a.st==='idle'){a.beam=null;petKeep(a,dt,t,g,d,140,270,60);if(a.cd<=0){a.cd=1.3;petShot(a,g,360,.8*D)}if((a.t-=dt)<=0){a.st='wind';a.t=.6;a.ba=g}}
@@ -944,6 +949,9 @@ function petStep(a,dt){
     else{a.st='idle';a.hidden=false;a.beam=null;a.t=Math.min(a.t,.8);const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);if(d>to.r+a.r+44||!to.r&&d>70){const g=angTo(a,to);a.face=g;petMove(a,g,220,dt,false,d)}}
   }
   if(a.st==='charge'||a.st==='lunge')a.face=a.ang;
+  // pets keep a little room between them, so two never stand on one spot
+  else if(!a.minion&&!a.hidden&&a.st!=='leap'&&a.st!=='dazed')for(const b of allies){if(b===a||!b.pet||b.minion||b.hidden||b.st==='leap')continue;const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy),min=a.r+b.r+14;
+    if(d<min){const g=d>1?Math.atan2(dy,dx):a.slot*2.1+1,p=Math.min(min-d,90*dt);a.x+=Math.cos(g)*p;a.y+=Math.sin(g)*p;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}}
   if(obstacles.length&&!a.hidden&&a.st!=='leap'&&a.moving){if(Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
 }
 // what a monster does to pets: its touch, its charge and its beam hurt them
@@ -952,10 +960,16 @@ function monVsPets(m){
     if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,a)<m.r+a.r){hurtPet(a,blow(m.st==='charge'||m.st==='lunge'?1:-1));if(a.perk==='thorned')petHit(m,1.5*petPow(a),a)}
     else if(m.beam&&m.beam.on&&!m.hidden)for(const r of m.beam.rays)if(segDist(a,m.x,m.y,r.a,r.len)<m.beam.w+a.r*.6){hurtPet(a,blow(0));break}}
 }
-// the active pet takes its place beside you at the start of a level, or when it is chosen from the pause screen
-function fieldPet(frac){
-  allies=allies.filter(a=>!a.pet);const e=petOn();if(!e||PETS.down||!P)return null;
-  const a=makePet(e,frac);allies.push(a);PETS.fielded=e;puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150);return a;
+// The active pets take their places beside you at the start of a level (mid false), or when the choice changes from the pause screen (mid true).
+// Mid-fight nothing is healed by the change: a pet keeps the share of health it had, and one that steps in fresh takes the lowest share on the field.
+function fieldPets(mid){
+  const old=allies.filter(a=>a.pet&&!a.minion);for(const a of old)a.e.frac=a.hp/a.maxHp;
+  allies=allies.filter(a=>!a.pet);if(!P)return[];
+  if(!mid)for(const e of PETS.roster){e.down=false;e.frac=undefined}
+  const on=petOn(),out=on.filter(e=>!e.down),k=PETK[Math.min(PETK.length,on.length)-1]||1,low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
+  out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),k,i);if(was){a.x=was.x;a.y=was.y}
+    allies.push(a);made.push(a);if(!PETS.fielded.includes(e))PETS.fielded.push(e);if(!was)puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150)});
+  PETS.down=on.length>0&&on.every(e=>e.down);return made;
 }
 
 /* ---------- loop ---------- */
@@ -1014,11 +1028,11 @@ function step(dt){
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
     if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,P)<m.r+11)hurtP(blow(m.st==='charge'||m.st==='lunge'&&S.level>=3?1:-1),m.ai+':'+m.st); // brushing against a monster is light; its telegraphed attack is not
-    if(PETS.fielded&&S.mode==='play')monVsPets(m);
+    if(PETS.fielded.length&&S.mode==='play')monVsPets(m);
   }
   if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(blow(S.level<8?-1:0),'shot');s.dead=true}
-    else for(const a of allies)if(a.pet&&!(a.inv>0)&&dist(s,a)<s.r+a.r*.7)hurtPet(a,blow(0)); // a bolt hurts a pet in its path and flies on
+    else for(const a of allies)if(a.pet&&!(a.inv>0)&&dist(s,a)<s.r+a.r*.7)hurtPet(a,blow(-1)); // a bolt hurts a pet in its path and flies on
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
@@ -1332,7 +1346,7 @@ function show(o,foreign){
 function hud(){
   const nb=Object.values(S.b).reduce((a,b)=>a+b,0),cn=()=>S.adv?CLASSES[S.cls].adv.find(a=>a[0]===S.adv)[1]:CLASSES[S.cls].name;
   S.rank=rank();tune();
-  const chips=act2()&&S.cls?[['Rank '+S.rank,true],[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn()?[['Pet · '+petTag(petOn()),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
+  const chips=act2()&&S.cls?[['Rank '+S.rank,true],[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn().length?[[petOn().length>1?petOn().length+' pets':'Pet · '+petTag(petOn()[0]),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
   $('ledger').textContent='';chips.forEach(([name,on])=>{const li=document.createElement('li');li.textContent=name;if(on)li.className='on';$('ledger').appendChild(li)});
   if(act2()&&S.cls&&S.eq)for(const sl of SLOTS){const it=S.eq[sl],li=document.createElement('li');li.textContent=itemName(it);li.title=it.rarity+' '+sl+': '+itemLine(it);li.style.cssText='opacity:1;color:'+RAR[it.r][1]+';border-color:'+RAR[it.r][1];$('ledger').appendChild(li)}
   const hp=$('hp');hp.textContent='';
@@ -1371,7 +1385,7 @@ function startLevel(n){
   else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2}
   if(L.kind==='mimic')reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
-  PETS.down=false;PETS.fielded=null;PETS.dmg=0;fieldPet();
+  PETS.down=false;PETS.fielded=[];PETS.dmg=0;fieldPets();
   if(!S.wave)$('bossName').textContent=L.spec.name;
   ST.levelTime=0;ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Level '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
@@ -1379,7 +1393,7 @@ function startLevel(n){
 }
 function reward(){
   haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n);allies=[];emit('reward',{level:n});
-  {const e=PETS.fielded;PETS.fielded=null;if(e&&PETS.roster.includes(e))e.plv=Math.min(PLVMAX,e.plv+1)} // the pet that was sent into this fight grows a little
+  for(const e of PETS.fielded)if(PETS.roster.includes(e))e.plv=Math.min(PLVMAX,e.plv+1);PETS.fielded=[]; // every pet that was sent into this fight grows a little
   if(n===7)return chooseClass();
   P.inv=0;S.level++;S.mode='reward';hud();
   const up=S.rank&&S.rank!==r0,rk=up?'Rank up. You have climbed from rank '+r0+' to rank '+S.rank+'.':'';
@@ -1406,44 +1420,49 @@ function loadout(done,fresh){
 function petEntry(n,L){const s=L.spec,gen=n>=LEVELS.length,ty=!!s.crown;
   return{kind:L.kind,ai:s.ai||L.kind,name:gen&&!ty?PRE[n%10]+' '+SPEC[L.kind].name.replace('The ',''):s.name,col:s.col,r:s.r,plv:0,perk:(L.mods||[])[0]||null,crown:ty?1:0}}
 const petLine=e=>PETDO[e.ai]+(e.perk?' It '+PERK[e.perk]+'.':'')+(e.plv?' It has grown '+e.plv+(e.plv>1?' times':' time')+', and is stronger for it.':'');
+// PETS.active holds roster indices; these keep it right when the roster changes
+const petActive=e=>PETS.active.includes(PETS.roster.indexOf(e));
+function petDrop(i){PETS.roster.splice(i,1);PETS.active=PETS.active.filter(v=>v!==i).map(v=>v>i?v-1:v)}
+const petWord=n=>n===1?'one goes':n===2?'two go':'three go';
 // After the drop, a Necromancer may bind the boss and a Beastmaster may tame it. Always optional. Tyrants and the Flayed King can only rarely be taken.
 function bindScreen(n,next){
   const own=petOwner(),L=S.L;if(!own||n<8||!L||L.kind==='mimic')return next();
   const rare=!!L.spec.crown,dv=window.__mb?window.__mb.bind:undefined; // dev: __mb.bind = true or false decides instead of the dice
   if(!(typeof dv==='boolean'?dv:!rare||rand()<.15))return next();
-  const e=petEntry(n,L),nec=own==='necro',R=PETS.roster,full=R.length>=PETMAX;
-  const take=out=>()=>{if(out>=0){R.splice(out,1);if(PETS.active===out)PETS.active=-1;else if(PETS.active>out)PETS.active--}R.push(e);
-    if(PETS.active<0){PETS.active=R.length-1;return next()} // an empty place at your side is filled at once
+  const e=petEntry(n,L),nec=own==='necro',R=PETS.roster,full=R.length>=PETMAX,cap=petCap();
+  const take=out=>()=>{if(out>=0)petDrop(out);R.push(e);
+    if(petOn().length<cap){PETS.active.push(R.length-1);return next()} // a free place at your side is filled at once
     petPick(next,e)};
   const leave={title:'Leave it',sub:'Walk on',col:'var(--ash)',body:'Take nothing. You can '+(nec?'bind':'tame')+' another boss later.',fn:next};
   show({wide:true,col:nec?'var(--pet-necro)':'var(--pet-beast)',kick:rare?(nec?'A tyrant, yours to bind':'A tyrant, yours to tame'):nec?'The dead can be bound':'It can be tamed',title:e.name,
-    body:(nec?'Bind it and it rises to fight beside you. ':'Tame it and it fights beside you. ')+petLine(e)+' You can keep '+PETMAX+' pets, and one goes with you into each level.'+(full?' You already keep '+PETMAX+': to take this one, let one go.':''),
-    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release for '+e.name,col:'var(--warn)',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
+    body:(nec?'Bind it and it rises to fight beside you. ':'Tame it and it fights beside you. ')+petLine(e)+' You can keep '+PETMAX+' pets, and up to '+petWord(cap)+' with you into each level.'+(full?' You already keep '+PETMAX+': to take this one, let one go.':''),
+    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release'+(petActive(p)?' · with you':''),col:'var(--warn)',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
       :[{title:nec?'Bind it':'Tame it',sub:R.length?'Pet '+(R.length+1)+' of '+PETMAX:'Your first pet',col:nec?'var(--pet-necro)':'var(--pet-beast)',body:e.name+' joins you. It is as strong as the level you take it into, however old it is.',fn:take(-1)},leave]});
 }
-// which pet goes with you
+// every place at your side is taken and a new pet has joined: the new one goes with you unless you say otherwise, and one has to wait
 function petPick(next,fresh){
-  show({wide:true,kick:petOwner()==='necro'?'Bound':'Tamed',title:'Who goes with you?',body:'One pet fights beside you in each level. The others wait. You can change this from the pause screen.',
-    cards:PETS.roster.map((p,i)=>({title:petTag(p),sub:p===fresh?'New':i===PETS.active?'With you now':'Waiting',col:i===PETS.active?'':'var(--ash)',body:petLine(p),fn:()=>{PETS.active=i;next()}}))});
+  const on=petOn(),R=PETS.roster;
+  show({wide:true,kick:petOwner()==='necro'?'Bound':'Tamed',title:'Who waits behind?',body:'Only '+(petCap()===2?'two pets':'three pets')+' can go with you. Pick the one that waits this time. You can change this from the pause screen.',
+    cards:[...on,fresh].map(p=>({title:petTag(p),sub:p===fresh?'New':'With you now',col:p===fresh?'var(--ash)':'',body:petLine(p),fn:()=>{if(p!==fresh)PETS.active[PETS.active.indexOf(R.indexOf(p))]=R.indexOf(fresh);next()}}))});
 }
-function petChoose(i){
-  if(!PETS.roster[i]||i===PETS.active)return;PETS.active=i;
-  if(S.mode==='play'&&!PETS.down){const cur=allies.find(a=>a.pet&&!a.minion);fieldPet(cur?cur.hp/cur.maxHp:1)} // it steps in as hurt as the one it replaces
-  if(S.mode==='play'||S.mode==='clear')save(S.level);hud();
+const petSaved=()=>{if(S.mode==='play'||S.mode==='clear')save(S.level);hud()};
+// send a pet out (in place of `out`, a roster index, when every place is taken), call one back, or put one first
+function petSend(i,out){
+  const A=PETS.active;if(!PETS.roster[i]||A.includes(i))return;
+  if(out>=0&&A.includes(out))A[A.indexOf(out)]=i;else if(petOn().length<petCap())A.push(i);else return;
+  if(S.mode==='play')fieldPets(true);petSaved();
 }
-function petRelease(i){
-  const R=PETS.roster;if(!R[i])return;const act=i===PETS.active;R.splice(i,1);
-  if(act){PETS.active=R.length?0:-1;if(S.mode==='play'){allies=allies.filter(a=>!a.pet);if(R.length)PETS.down=true}} // the next one comes with the next level
-  else if(PETS.active>i)PETS.active--;
-  if(S.mode==='play'||S.mode==='clear')save(S.level);hud();
-}
+function petBack(i){if(!PETS.active.includes(i))return;PETS.active=PETS.active.filter(v=>v!==i);if(S.mode==='play')fieldPets(true);petSaved()}
+function petFirst(i){if(!PETS.active.includes(i))return;PETS.active=[i,...PETS.active.filter(v=>v!==i)];if(S.mode==='play')fieldPets(true);petSaved()}
+function petRelease(i){if(!PETS.roster[i])return;petDrop(i);if(S.mode==='play')fieldPets(true);petSaved()}
 function petsScreen(back){
-  const R=PETS.roster,nec=petOwner()==='necro',again=()=>petsScreen(back);
-  show({wide:true,kick:'Pets · '+R.length+' of '+PETMAX,title:nec?'Your bound dead':'Your tamed beasts',
-    body:R.length?'Pick a pet to send it out or to release it.'+(PETS.down?' The one with you has fallen. A pet comes back with the next level.':''):'You keep none. Kill a boss, and you may '+(nec?'bind':'tame')+' it.',
-    cards:R.map((p,i)=>({title:petTag(p),sub:i===PETS.active?(PETS.down?'Fallen · back next level':'With you'):'Waiting',col:i===PETS.active?'':'var(--ash)',body:petLine(p),fn:()=>{
-      const act=i===PETS.active;show({kick:act?'With you':'Waiting',title:petTag(p),body:petLine(p),btns:[...(act?[]:[['Send it out',()=>{petChoose(i);again()}]]),['Back',again],
-        ['Release',()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',again],['Release it',()=>{petRelease(PETS.roster.indexOf(p));again()}]]})]]})}})),
+  const R=PETS.roster,nec=petOwner()==='necro',again=()=>petsScreen(back),cap=petCap(),on=petOn();
+  show({wide:true,kick:'Pets · '+R.length+' of '+PETMAX+' kept · '+on.length+' of '+cap+' with you',title:nec?'Your bound dead':'Your tamed beasts',
+    body:R.length?'Pick a pet to send it out, call it back or release it. The more that fight at once, the weaker each one is.'+(on.some(e=>e.down)?' A pet that has fallen comes back with the next level.':''):'You keep none. Kill a boss, and you may '+(nec?'bind':'tame')+' it.',
+    cards:R.map((p,i)=>{const act=on.includes(p),nth=on.indexOf(p)+1;return{title:petTag(p),sub:act?(p.down?'Fallen · back next level':'With you · '+nth):'Waiting',col:act?'':'var(--ash)',body:petLine(p),fn:()=>{
+      const send=()=>on.length<cap?(petSend(i,-1),again()):show({wide:true,kick:'Send out '+p.name,title:'In place of which?',cards:on.map(q=>({title:petTag(q),sub:q.down?'Fallen':'With you',body:petLine(q),fn:()=>{petSend(i,R.indexOf(q));again()}})),btns:[['Back',again]]});
+      show({kick:act?'With you':'Waiting',title:petTag(p),body:petLine(p),btns:[['Back',again],...(act?[['Call it back',()=>{petBack(i);again()}],...(nth>1?[['Put it first',()=>{petFirst(i);again()}]]:[])]:[['Send it out',send]]),
+        ['Release',()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',again],['Release it',()=>{petRelease(R.indexOf(p));again()}]]})]]})}}}),
     btns:[['Back',back]]});
 }
 // every boss from level 9 on drops one item for your class: melt it into what you carry, wear it instead, or break it for scrap
@@ -1487,7 +1506,11 @@ function pause(on){
 }
 // The run as a plain object: what is written to localStorage and what MB.api.getSave() hands out. level is where "Continue" resumes.
 // pets in a save: only what cannot be worked out again
-const petsClear=()=>{PETS.roster.length=0;PETS.active=-1;PETS.down=false;PETS.fielded=null};
+const petsClear=()=>{PETS.roster.length=0;PETS.active=[];PETS.down=false;PETS.fielded=[]};
+// the active list out of a save: a list of roster indices, or the single index older saves carry. null when it makes no sense.
+function actIn(v,len,cap){if(v===undefined||v===null)v=len?[len-1]:[];if(Number.isInteger(v))v=v<0?[]:[v];
+  return Array.isArray(v)&&v.length<=cap&&v.every((x,i)=>Number.isInteger(x)&&x>=0&&x<len&&v.indexOf(x)===i)?v.slice():null}
+const capOf=(c,a)=>c==='necro'?3:c==='ranger'&&a==='beastmaster'?2:0;
 const petOut=e=>({kind:e.kind,name:e.name,col:e.col,r:e.r,plv:e.plv,perk:e.perk||null,crown:e.crown?1:0});
 function petIn(p){
   if(!p||typeof p!=='object'||typeof p.kind!=='string'||!own(SPEC,p.kind)||p.kind==='mite'||p.kind==='husk')return null;
@@ -1497,10 +1520,10 @@ function petIn(p){
   return{kind:p.kind,ai:SPEC[p.kind].ai||p.kind,name:p.name.trim(),col:p.col.toLowerCase(),r:p.r,plv:p.plv,perk:p.perk||null,crown:p.crown?1:0};
 }
 const canPet=(c,a)=>c==='necro'||c==='ranger'&&a==='beastmaster';
-let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:-1,stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
+let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
   const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};
-  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active,stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
 function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
@@ -1513,7 +1536,8 @@ function applyRun(r){
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
     // older saves have no pets; a broken entry is dropped, the rest are kept
-    petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETMAX)){const e=petIn(p);if(e)PETS.roster.push(e)}const i=Math.floor(+r.pet);PETS.active=PETS.roster.length?(i>=0&&i<PETS.roster.length?i:0):-1}
+    petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETMAX)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length,cap=capOf(S.cls,S.adv);
+      PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i).slice(0,cap):r.pet,n,cap)||(n?[n-1]:[])}
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
   }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
   eqSync();
@@ -1529,8 +1553,8 @@ function checkSave(o){
   for(const k in b){const v=o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
   let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400))return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up}}}
   const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
-  let pets=[],pet=-1;if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETMAX||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
-    pet=o.pet===undefined?(pets.length?0:-1):o.pet;if(!int(pet,pets.length?0:-1,pets.length-1))return null}
+  let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETMAX||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
+    pet=actIn(o.pet,pets.length,capOf(c,o.adv));if(!pet)return null}
   const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
   if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
   return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load,pets,pet,st,level:o.level};
@@ -1632,16 +1656,18 @@ $('snd').onclick=()=>{audio();const wasOn=!muted&&(SET.music>0||SET.sfx>0);muted
   if(!wasOn&&!(SET.music>0||SET.sfx>0)){SET.music=.6;SET.sfx=.8;pref('settings',JSON.stringify(SET))} // both volumes were at zero: the button brings the defaults back
   setApply();emit('settings',{key:'mute',value:muted});sfx(520,.08,'triangle',.2);$('snd').blur()};
 $('hap').onclick=()=>{setSetting('haptic',SET.haptic>0?0:hapLast);haptic(40);$('hap').blur()};
-// the active pet's name and health, beside your own
-const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;
-{const n=document.createElement('span');n.className='lab';n.id='petName';const b=document.createElement('span');b.id='petBar';const f=document.createElement('span');f.id='petFill';b.appendChild(f);petHud.append(n,b);$('hp').after(petHud)}
-let petKey='';
+// the active pets' names and health, beside your own: up to three rows
+const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;const petRows=[];
+for(let i=0;i<3;i++){const row=document.createElement('span'),n=document.createElement('span'),b=document.createElement('span'),f=document.createElement('span');row.className='petRow';n.className='lab petName';b.className='petBar';f.className='petFill';b.appendChild(f);row.append(n,b);petHud.appendChild(row);petRows.push({row,n,f,key:''})}
+$('hp').after(petHud);
 function petUi(){
-  const e=S.mode!=='title'&&act2()?petOn():null,a=e&&allies.find(x=>x.pet&&!x.minion),own=petOwner(),k=e?petTag(e)+'|'+(PETS.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f')+'|'+own:'';
-  if(k===petKey)return;petKey=k;petHud.hidden=!e;if(!e)return;
-  const pct=PETS.down?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;
-  petHud.className=(own==='beast'?'beast':'')+(PETS.down?' down':'');$('petName').textContent=petTag(e)+(PETS.down?' · fallen':'');$('petFill').style.width=pct+'%';
-  petHud.setAttribute('aria-label','Pet: '+petTag(e)+(PETS.down?', fallen, back next level':', '+pct+'% health'));
+  const on=S.mode!=='title'&&act2()?petOn():[],own=petOwner();
+  if(petHud.hidden!==!on.length)petHud.hidden=!on.length;if(!on.length)return;
+  const cl=(own==='beast'?'beast':'')+' n'+on.length;if(petHud.className!==cl)petHud.className=cl;
+  petRows.forEach((r,i)=>{const e=on[i],a=e&&allies.find(x=>x.e===e&&!x.minion),key=e?petTag(e)+'|'+(e.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f'):'';
+    if(key===r.key)return;r.key=key;r.row.hidden=!e;if(!e)return;
+    const pct=e.down?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;r.row.className='petRow'+(e.down?' down':'');r.n.textContent=petTag(e)+(e.down?' · fallen':'');r.f.style.width=pct+'%';
+    r.row.setAttribute('aria-label','Pet: '+petTag(e)+(e.down?', fallen, back next level':', '+pct+'% health'))});
 }
 // a pause button beside the toggles, for touch screens
 {const pb=document.createElement('button');pb.id='pauseB';pb.type='button';pb.className='tog';pb.textContent='Pause';pb.setAttribute('aria-pressed','false');pb.onclick=()=>{audio();pause(!S.paused);pb.blur()};$('hap').after(pb);
@@ -1674,10 +1700,11 @@ if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen,
   // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
-  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;if(PETS.roster.length>=PETMAX)PETS.roster.shift();
+  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;if(PETS.roster.length>=PETMAX)petDrop(0);
     const e={kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,perk:MODS.includes(o.perk)?o.perk:null,crown:ty?1:0};
-    PETS.roster.push(e);PETS.active=PETS.roster.length-1;PETS.down=false;if(S.mode!=='play'||!P)return e;
-    if(petOwner()){const a=fieldPet();save(S.level);hud();return a}allies=allies.filter(a=>!a.pet);const a=makePet(e,1,o.owner==='beast'?'beast':'necro');allies.push(a);PETS.fielded=e;return a},PETS};
+    const cap=petCap()||3;PETS.roster.push(e);PETS.active.push(PETS.roster.length-1);while(PETS.active.length>cap)PETS.active.shift();if(S.mode!=='play'||!P)return e;
+    if(petOwner()){fieldPets(true);save(S.level);hud();return allies.find(a=>a.e===e)}
+    const k=PETK[PETS.active.length-1],a=makePet(e,1,o.owner==='beast'?'beast':'necro',k,PETS.active.length-1);allies.push(a);PETS.fielded.push(e);return a},PETS};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();

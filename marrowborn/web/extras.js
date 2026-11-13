@@ -439,8 +439,8 @@ guard('hints',function(){
       touch:'Need a breath? Pause is at the top of the screen. Settings are in there too.',keys:'Need a breath? Esc or P pauses. Settings are in there too.'},
     {id:'skills',t:.5,when:function(){return !!S().cls&&S().level>=8},until:function(){var sk=MB.skills;return !!(sk&&sk[0]&&sk[0].cd>0)},
       touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 and 2 use your skills. The bar under the arena counts the seconds until each is ready again.'},
-    {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active>=0&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
-      touch:'Your pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause to change pets.',keys:'Your pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause (Esc) to change pets.'}
+    {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active&&p.active.length&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
+      touch:'A pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause to choose which pets go with you.',keys:'A pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause (Esc) to choose which pets go with you.'}
   ];
   function mark(id){if(seen.indexOf(id)<0){seen.push(id);store.set('hints',seen)}}
   function hide(){box.classList.remove('on');cur=null}

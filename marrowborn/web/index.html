@@ -74,12 +74,15 @@ button:disabled{opacity:.35;cursor:default}
 #bSkill{grid-area:s1}#bSkill2{grid-area:s2}#bSkill3{grid-area:s3}#bSkill4{grid-area:s4}#bSkill5{grid-area:s5}#bSkill6{grid-area:s6}
 #bDash{grid-area:dash;border-radius:calc(30px*var(--mb-btn,1))}#bAtk{grid-area:atk;border-radius:calc(40px*var(--mb-btn,1))}
 @media (max-width:420px){.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
-#petHud{display:flex;align-items:center;gap:8px;min-width:0}
-#petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:var(--pet-necro)}
-#petBar{display:block;width:56px;height:6px;background:var(--stone-2);flex:none}
-#petFill{display:block;height:100%;width:100%;background:var(--pet-necro)}
-#petHud.beast #petName{color:var(--pet-beast)}#petHud.beast #petFill{background:var(--pet-beast)}
-#petHud.down #petName{color:var(--ash)}
+/* the active pets beside your health: #petHud holds up to three .petRow (name + bar); .beast = tamed (Beastmaster), .n1/.n2/.n3 = how many are out, .down = fallen this level */
+#petHud{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-width:0}
+.petRow{display:flex;align-items:center;gap:6px;min-width:0}
+.petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:var(--pet-necro)}
+#petHud.n3 .petName{max-width:130px}
+.petBar{display:block;width:48px;height:6px;background:var(--stone-2);flex:none}
+.petFill{display:block;height:100%;width:100%;background:var(--pet-necro)}
+#petHud.beast .petName{color:var(--pet-beast)}#petHud.beast .petFill{background:var(--pet-beast)}
+.petRow.down .petName{color:var(--ash)}
 .kbd{color:var(--ash);font-size:.9rem;margin:0}
 kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(--bone)}
 
@@ -107,7 +110,7 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
   .touch .acts button.sk{font-size:calc(.6rem*var(--mb-btn,1))}
   .mb-left .wrap .touch .acts{grid-template-columns:var(--s) var(--s);grid-template-areas:"s6 s5" "s4 s3" "s2 s1" "atk dash"}
   #bDash,#bAtk{border-radius:calc(22px*var(--mb-btn,1))}
-  #petName{max-width:120px}#petBar{width:40px}
+  #petHud{gap:2px 10px}.petName,#petHud.n3 .petName{max-width:96px}#petHud.n2 .petName{max-width:76px}#petHud.n3 .petName{max-width:54px}.petBar{width:32px}
   .cards button{padding:7px 10px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.35rem}
 }
 /* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them ---- */
