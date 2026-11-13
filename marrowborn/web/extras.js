@@ -81,7 +81,8 @@ function applyLayout(){
   var s=MB.settings||{},k=clamp(num(s.btn,1)||1,.8,1.4),phoneLand=false;
   try{phoneLand=matchMedia('(orientation:landscape) and (pointer:coarse) and (max-height:600px)').matches}catch(e){}
   // upright, the stick and the buttons share one row: do not let a large size push them off a narrow screen
-  if(!phoneLand){var room=(root.clientWidth||innerWidth||1000)-32;while(k>.8&&232*k+120*Math.max(1,k)+16>room)k-=.05}
+  // (the button grid is 216 px wide at size 1, 192 px on screens up to 420 px wide: see .touch .acts in index.html)
+  if(!phoneLand){var vw=root.clientWidth||innerWidth||1000,room=vw-32,narrow=vw<=420;while(k>.8&&(narrow?192:216)*k+120*Math.max(1,k)+(narrow?12:16)>room)k-=.05}
   root.style.setProperty('--mb-btn',(Math.round(Math.max(.8,k)*100)/100).toFixed(2));
   root.classList.toggle('mb-left',!!s.left);
 }
@@ -437,7 +438,9 @@ guard('hints',function(){
     {id:'pause',t:8,when:function(){return S().level>=2},
       touch:'Need a breath? Pause is at the top of the screen. Settings are in there too.',keys:'Need a breath? Esc or P pauses. Settings are in there too.'},
     {id:'skills',t:.5,when:function(){return !!S().cls&&S().level>=8},until:function(){var sk=MB.skills;return !!(sk&&sk[0]&&sk[0].cd>0)},
-      touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 and 2 use your skills. The bar under the arena counts the seconds until each is ready again.'}
+      touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 and 2 use your skills. The bar under the arena counts the seconds until each is ready again.'},
+    {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active>=0&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
+      touch:'Your pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause to change pets.',keys:'Your pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause (Esc) to change pets.'}
   ];
   function mark(id){if(seen.indexOf(id)<0){seen.push(id);store.set('hints',seen)}}
   function hide(){box.classList.remove('on');cur=null}

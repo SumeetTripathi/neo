@@ -548,7 +548,9 @@ function petTex(pv){
     x.strokeStyle='rgba(150,255,170,.95)';x.lineWidth=5;x.beginPath();x.arc(0,0,92,0,TAU);x.stroke();
     x.lineWidth=2.5;x.beginPath();x.arc(0,0,78,0,TAU);x.stroke();
     x.lineWidth=4;for(i=0;i<9;i++){a=i*TAU/9;x.beginPath();x.moveTo(cos(a)*80,sin(a)*80);x.lineTo(cos(a+.16)*90,sin(a+.16)*90);x.stroke()}
-    x.lineWidth=3;x.beginPath();for(i=0;i<=5;i++){a=i*2/5*TAU-PI/2;x[i?'lineTo':'moveTo'](cos(a)*76,sin(a)*76)}x.stroke();
+    // three hooked arcs turning about the middle: the knot that holds the dead to their keeper
+    x.lineWidth=3.5;for(i=0;i<3;i++){a=i*TAU/3;x.beginPath();x.arc(cos(a)*30,sin(a)*30,46,a-1.25,a+1.25);x.stroke();
+      x.beginPath();x.arc(cos(a+PI/3)*64,sin(a+PI/3)*64,5,0,TAU);x.stroke()}
   }else{
     g=x.createRadialGradient(0,0,30,0,0,126);g.addColorStop(0,'rgba(150,215,255,.1)');g.addColorStop(.7,'rgba(150,215,255,.26)');g.addColorStop(1,'rgba(150,215,255,0)');
     x.fillStyle=g;x.beginPath();x.arc(0,0,126,0,TAU);x.fill();
@@ -563,18 +565,18 @@ var PM=null;
 function petMats(){
   if(PM)return PM;
   var add=function(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})};
-  return PM={necro:add(0x7dff8c,.95),beast:add(0xcfeaff,.95),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2)};
+  return PM={necro:add(0x4fe86a,.9),beast:add(0x8fc8ff,.9),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2)};
 }
 // where the collar or harness of a tamed beast sits: [parent part or 0 = body, x,y,z, radius, squash, axis ('y' upright neck, 'z' around a lying body), tag distance]
 var COLLAR={crawler:[0,0,.55,.43,.5,.8,'z'],hound:[0,0,1.14,.66,.5,1,'z'],witch:[0,0,1.6,0,.36,1,'y'],fist:[0,0,1.5,.08,.5,1,'y'],mother:[0,0,1.16,-.08,.9,1,'y'],
   mite:[0,0,.78,.3,.74,.8,'z'],burrower:['worm',0,.62,.05,.76,1,'y'],mimic:[0,0,1.08,-.08,.76,1,'y'],hollow:[0,0,1.96,-.42,.3,1,'y'],bomber:[0,0,.66,.3,1.0,.64,'z'],
   summoner:[0,0,1.98,0,.3,1,'y'],beamer:['ball',0,0,-.28,.96,1,'z']};
 function petDress(u,g,m,pv){
-  var pm=petMats(),big=!!m.pet,r=u.r,own=u.own,i,o;
+  var pm=petMats(),big=!m.minion,r=u.r,own=u.own,i,o;
   // ground mark (stays on the floor while the body leaps); its material belongs to this pet so it can pulse and fade
   var gm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:pv==='necro'?.8:.95,depthWrite:false,fog:false,toneMapped:false});
   own.push(gm);
-  o=new T.Mesh(pm.quad,gm);o.position.y=1.2;o.renderOrder=2;g.add(o);u.gmark=o;u.gmat=gm;u.gk=pv==='necro'?(big?4.6:4):(big?4:3.6);
+  o=new T.Mesh(pm.quad,gm);o.position.y=1.2;o.renderOrder=2;g.add(o);u.gmark=o;u.gmat=gm;u.gk=pv==='necro'?(big?4.6:3.4):(big?4:3);u.gmin=big?34:22;
   // entry: a ring racing outward and motes rising
   var sm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
   own.push(sm);o=new T.Mesh(pm.quad,sm);o.position.y=1.6;o.renderOrder=3;o.visible=false;g.add(o);u.sring=o;u.smat=sm;
@@ -627,6 +629,7 @@ function create(m,MB){
 var _f={x:0,y:0,ok:false};
 function petFocus(m,MB){
   var t=m.target||m.tgt,ms,i,q,d,bd=1e12,dx,dy;_f.ok=false;
+  if(typeof m.face==='number'&&m.face===m.face){_f.x=m.x+cos(m.face)*100;_f.y=m.y+sin(m.face)*100;_f.ok=true;return _f} // the game says which way it is turned
   if(t&&typeof t.x==='number'&&typeof t.y==='number'&&!t.hidden){_f.x=t.x;_f.y=t.y;_f.ok=true;return _f}
   if(typeof m.tx==='number'&&typeof m.ty==='number'){_f.x=m.tx;_f.y=m.ty;_f.ok=true;return _f}
   ms=MB.mons;if(!ms)return _f;
@@ -635,24 +638,24 @@ function petFocus(m,MB){
 }
 // everything that marks a pet as a pet; runs after the normal monster update
 function petUpdate(g,m,u,t,dt,r){
-  var k,q,i,o,n,pv=u.pv,seed=m.seed||0,ground=1.2-g.position.y,big=!!m.pet;
-  u.born+=dt;
+  var k,q,i,o,n,pv=u.pv,seed=m.seed||0,ground=1.2-g.position.y;
+  if(u.t0===undefined)u.t0=t-u.born;u.born=max(0,t-u.t0); // game time, so the entry plays the same at any frame rate
   // entry: the body swells into place out of the ring
   q=u.born<.55?u.born/.55:1;
   if(q<1||!u.grown){k=q<1?(.25+.75*q)*(1+.22*sin(q*PI)):1;u.root.scale.setScalar(r*(u.cfg.k||1)*k);u.grown=q>=1}
   var fade=u.fa>0?1-u.fa:1;
-  k=r*u.gk*(.9+.1*min(1,u.born*3));if(k<30)k=30;
+  k=r*u.gk*(.9+.1*min(1,u.born*3));if(k<u.gmin)k=u.gmin;
   o=u.gmark;o.position.y=ground;o.rotation.y=pv==='necro'?-t*.35+seed:t*.5+seed;o.scale.set(k,1,k);
   u.gmat.opacity=(pv==='necro'?.74+.16*sin(t*2.6+seed):.9+.08*sin(t*3+seed))*fade;
   o=u.sring;
   if(u.born<.9&&!u.fa){
-    q=u.born/.9;o.visible=true;o.position.y=ground+.4;k=max(30,r*u.gk)*(.5+1.9*q);o.scale.set(k,1,k);o.rotation.y=t*2;u.smat.opacity=.95*(1-q)*(1-q);
+    q=u.born/.9;o.visible=true;o.position.y=ground+.4;k=max(u.gmin,r*u.gk)*(.5+1.9*q);o.scale.set(k,1,k);o.rotation.y=t*2;u.smat.opacity=.95*(1-q)*(1-q);
   }else if(o.visible)o.visible=false;
   o=u.motes;
   if(u.born<1.25&&!u.fa){
     o.visible=true;n=o.children.length;
     for(i=0;i<n;i++){q=u.born/1.25*1.35-i*.045;q=q<0?0:q>1?1:q;k=i*TAU/n+seed+q*2.2;var rr=r*(1.25-.5*q),c=o.children[i];
-      c.position.set(cos(k)*rr,-g.position.y+2+q*u.top*r*1.35,sin(k)*rr);k=r*.11*sin(q*PI)*(big?1:.8);c.scale.set(k,k*1.7,k)}
+      c.position.set(cos(k)*rr,-g.position.y+2+q*u.top*r*1.35,sin(k)*rr);k=max(1.3,r*.055)*sin(q*PI);c.scale.set(k,k*2,k)}
   }else if(o.visible)o.visible=false;
   if(u.wisps){o=u.wisps;n=o.children.length;for(i=0;i<n;i++){k=t*1.5+i*TAU/n+seed;o.children[i].position.set(cos(k)*1.25,u.top*(.35+.25*i)+.18*sin(t*2.3+i*2),sin(k)*1.25)}}
 }
@@ -670,7 +673,7 @@ function fade(g,q){
   u.ghost.opacity=.85*(1-q)*(1-q);
   k=r*(u.cfg.k||1);u.root.scale.set(k*(1-.45*q),k*(necro?1-.6*q:1+.35*q),k*(1-.45*q));
   u.root.position.y=necro?0:q*r*.9;
-  if(u.gmark){k=max(30,r*u.gk)*(1-.5*q);u.gmark.scale.set(k,1,k);u.gmat.opacity=.85*(1-q)}
+  if(u.gmark){k=max(u.gmin||30,r*u.gk)*(1-.5*q);u.gmark.scale.set(k,1,k);u.gmat.opacity=.85*(1-q)}
 }
 function dispose(g){
   var u=g&&g.userData&&g.userData.mb;if(!u||!u.own)return;
@@ -754,6 +757,7 @@ function update(g,m,MB,dt){
   on=m.markT>0;if(on||F.mark){o=dress(u,'mark',on);if(o){o.rotation.y=t*2.2;k=1+.14*sin(t*9);o.scale.set(k,k,k);o.position.y=top+.6+.06*sin(t*5)}}
   // modifiers
   var mods=m.mods,nm=mods?mods.length:0;
+  if(u.pv&&!nm&&typeof m.perk==='string'){if(!u.perk||u.perk[0]!==m.perk)u.perk=[m.perk];mods=u.perk;nm=1} // the one modifier a pet kept
   if(nm||u.nm){
     u.nm=nm;
     // how fast and which way it is moving, for the streaks
@@ -769,7 +773,7 @@ function update(g,m,MB,dt){
         c.position.set(cos(ba)*(1.14-.2*q),.2+((j*5)%3)*.3*top*.4+q*top*.6,sin(ba)*(1.14-.2*q));var fs=(1-q)*(1+.3*sin(t*31+j));c.scale.set(fs,fs*(1+q),fs)}}
       else if(k==='swift'){o.rotation.y=PI/2-u.ma;q=.25+.75*u.mv;FXM.streak.opacity=.5;
         for(j=0;j<o.children.length;j++){c=o.children[j];var sl=(.5+.9*q)*(1+.3*sin(t*17+j*2));c.scale.z=sl;c.position.z=-.9-sl*.5-.25*sin(t*13+j);c.visible=q>.3||j<2}}
-      else if(k==='vampiric'){c=o.children[0];c.position.y=.05-g.position.y/r;q=1.9+.2*sin(t*3);c.scale.set(q,1,q);
+      else if(k==='vampiric'){c=o.children[0];c.visible=!u.pv;c.position.y=.05-g.position.y/r;q=1.9+.2*sin(t*3);c.scale.set(q,1,q);
         for(j=1;j<o.children.length;j++){c=o.children[j];ba=t*2.2+j*TAU/3;c.position.set(cos(ba)*1.15,top*.45+.3*sin(t*3+j),sin(ba)*1.15)}}
       else if(k==='thorned'){o.rotation.y=sin(tt*1.3)*.12;q=1+(st==='wind'?.12:.03)*sin(t*(st==='wind'?30:3));o.scale.set(q,1,q)}
       else if(k==='splitting'){q=.5+.5*sin(t*5+seed);FXM.seamGlow.opacity=.15+.25*q;o.scale.set(1+.4*q,1,1)}

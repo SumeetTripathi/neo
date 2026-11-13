@@ -43,9 +43,10 @@ button:hover{filter:brightness(1.15)}
 button:focus-visible{outline:2px solid var(--marrow);outline-offset:2px}
 button:disabled{opacity:.35;cursor:default}
 .vitals{display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between}
-.vitals>div{display:flex;align-items:center;gap:10px;min-width:0}
+.vitals>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
 .lab{font-size:.78rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash)}
-#hp{display:flex;gap:4px;align-items:center}
+#hp{display:flex;flex-wrap:wrap;gap:4px;align-items:center;min-width:0}
+#hp.many{gap:2px 1px}#hp.many i{width:5px}#hp.lots i{width:3px}
 #hp i{width:11px;height:15px;background:var(--blood);display:block}
 #hp i.off{background:var(--stone-2)}
 #hp em{color:var(--ash);font-size:.92rem}
@@ -63,8 +64,21 @@ button:disabled{opacity:.35;cursor:default}
 @media (pointer:coarse){.touch{display:flex}.kbd{display:none}}
 #pad{width:120px;height:120px;border-radius:50%;border:1px solid var(--ash);background:var(--stone);position:relative;touch-action:none;flex:none}
 #knob{position:absolute;left:50%;top:50%;width:46px;height:46px;margin:-23px;border-radius:50%;background:var(--bone);opacity:.85}
-.touch .acts{display:flex;flex-wrap:wrap-reverse;justify-content:flex-end;gap:12px;max-width:180px}
-.touch .acts button{width:84px;height:84px;border-radius:50%;touch-action:none}
+/* Strike, Dash and six skills: a 3 x 3 grid. Skills fill two columns from the bottom up, so the first ones sit nearest the thumb; Dash sits above a tall Strike on the outside.
+   --s skill cell, --a Strike column, --g gap; all scale with the button-size setting (--mb-btn). */
+.touch .acts{--s:calc(60px*var(--mb-btn,1));--a:calc(80px*var(--mb-btn,1));--g:calc(8px*var(--mb-btn,1));
+  display:grid;grid-template-columns:var(--s) var(--s) var(--a);grid-template-rows:repeat(3,var(--s));gap:var(--g);grid-template-areas:"s5 s6 dash" "s3 s4 atk" "s1 s2 atk";flex:none;margin-left:auto}
+.touch .acts button{min-width:0;padding:2px;touch-action:none;font-size:calc(1rem*var(--mb-btn,1))}
+.touch .acts button.sk{font-size:calc(.66rem*var(--mb-btn,1))}
+#bSkill{grid-area:s1}#bSkill2{grid-area:s2}#bSkill3{grid-area:s3}#bSkill4{grid-area:s4}#bSkill5{grid-area:s5}#bSkill6{grid-area:s6}
+#bDash{grid-area:dash;border-radius:calc(30px*var(--mb-btn,1))}#bAtk{grid-area:atk;border-radius:calc(40px*var(--mb-btn,1))}
+@media (max-width:420px){.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
+#petHud{display:flex;align-items:center;gap:8px;min-width:0}
+#petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:#7fd66b}
+#petBar{display:block;width:56px;height:6px;background:var(--stone-2);flex:none}
+#petFill{display:block;height:100%;width:100%;background:#7fd66b}
+#petHud.beast #petName{color:#8fd3ff}#petHud.beast #petFill{background:#8fd3ff}
+#petHud.down #petName{color:var(--ash)}
 .kbd{color:var(--ash);font-size:.9rem;margin:0}
 kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(--bone)}
 
@@ -82,24 +96,15 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
   .vitals button{pointer-events:auto}#hp em{max-width:38vw;font-size:.72rem;line-height:1.2}#bossBar{width:22vw}
   .touch{position:fixed;z-index:2;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(18px,env(safe-area-inset-left,0px));right:max(18px,env(safe-area-inset-right,0px));pointer-events:none}
   #pad,.touch .acts{pointer-events:auto;opacity:.62}
-  .touch{align-items:flex-end}.touch .acts{max-width:150px;gap:8px}.touch .acts button{width:68px;height:68px}
+  .touch{align-items:flex-end;flex-wrap:nowrap}.touch .acts{--s:calc(56px*var(--mb-btn,1));--a:calc(76px*var(--mb-btn,1));--g:calc(7px*var(--mb-btn,1))}.touch .acts button.sk{font-size:calc(.6rem*var(--mb-btn,1))}
+  #petName{max-width:120px}#petBar{width:40px}
   .cards button{padding:7px 10px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.35rem}
 }
-/* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them. Layered over the grid game.js injects. ---- */
+/* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them ---- */
 :root{--mb-btn:1}
 .wrap #pad{width:calc(120px*max(1,var(--mb-btn)));height:calc(120px*max(1,var(--mb-btn)))}
-.wrap .touch .acts{grid-template-columns:calc(64px*var(--mb-btn)) calc(64px*var(--mb-btn)) calc(84px*var(--mb-btn));grid-template-rows:calc(64px*var(--mb-btn)) calc(84px*var(--mb-btn));gap:calc(10px*var(--mb-btn))}
-.wrap .touch .acts button{font-size:calc(1rem*var(--mb-btn))}
-.wrap .touch .acts button.sk{height:calc(64px*var(--mb-btn));font-size:calc(.66rem*var(--mb-btn))}
 .mb-left .touch{flex-direction:row-reverse}
-.mb-left .wrap .touch .acts{grid-template-columns:calc(84px*var(--mb-btn)) calc(64px*var(--mb-btn)) calc(64px*var(--mb-btn))}
-.mb-left #bDash{grid-area:1/1}.mb-left #bAtk{grid-area:2/1}
-.mb-left #bSkill{grid-area:1/2}.mb-left #bSkill2{grid-area:1/3}.mb-left #bSkill3{grid-area:2/2}.mb-left #bSkill4{grid-area:2/3}
-@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
-  .wrap .touch .acts{grid-template-columns:calc(58px*var(--mb-btn)) calc(58px*var(--mb-btn)) calc(76px*var(--mb-btn));grid-template-rows:calc(58px*var(--mb-btn)) calc(76px*var(--mb-btn));gap:calc(8px*var(--mb-btn))}
-  .wrap .touch .acts button.sk{height:calc(58px*var(--mb-btn));font-size:calc(.6rem*var(--mb-btn))}
-  .mb-left .wrap .touch .acts{grid-template-columns:calc(76px*var(--mb-btn)) calc(58px*var(--mb-btn)) calc(58px*var(--mb-btn))}
-}
+.mb-left .touch .acts{grid-template-columns:var(--a) var(--s) var(--s);grid-template-areas:"dash s6 s5" "atk s4 s3" "atk s2 s1";margin-left:0;margin-right:auto}
 
 /* ---- extras.js: settings, records and story layer over the arena; hint toast ---- */
 #mbx{grid-area:1/1;position:relative;z-index:3;display:grid;place-items:center;padding:16px;box-sizing:border-box;min-width:0;min-height:0;overflow:auto;background:var(--ink)}
@@ -208,7 +213,7 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
     <div id="pad"><div id="knob"></div></div>
     <div class="acts"><button id="bDash" type="button">Dash</button><button id="bAtk" type="button" class="primary">Strike</button><button id="bSkill" type="button" hidden>Skill</button></div>
   </div>
-  <p class="kbd"><kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> for class skills · <kbd>Esc</kbd> to pause</p>
+  <p class="kbd"><kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> to <kbd>6</kbd> for class skills · <kbd>Esc</kbd> to pause</p>
 </main>
 
 <script src="vendor/three.min.js"></script>

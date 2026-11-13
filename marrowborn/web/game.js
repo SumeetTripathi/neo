@@ -54,7 +54,7 @@ const CLASSES={
   ['Quickdraw','You loose arrows much faster.'],
   ['Volley','A new skill. Loose a fan of seven arrows at once.'],
   ['Longshot','Arrows that fly more than a few strides hit for double.']]},
- necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. 11 health.',pows:[
+ necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. A boss you kill can be bound to fight for you. 11 health.',pows:[
   ['Grave Call','Thralls rise every 4 seconds, and you can hold four.'],
   ['Army of Bones','A new skill. Four extra thralls claw out of the ground at once.'],
   ['Soul Leech','Every tenth hit by you or your thralls heals you a little.']]},
@@ -66,11 +66,11 @@ const EXTRA={
  healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
  tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
  mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, and your skill recharges twice as fast.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
- ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires.']]},
- necro:{boon:['Legion','One more thrall at your side.',5],adv:[['lich','Lich','Undeath','Three more thralls, and your thralls no longer crumble with time.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard.']]},
+ ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires. A boss you kill can be tamed to fight for you as well.']]},
+ necro:{boon:['Legion','One more thrall at your side, and your bound pet hits 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pet has 40% more health.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pet.']]},
 };
 for(const k in EXTRA)Object.assign(CLASSES[k],EXTRA[k]);
-// Ten active skills per class, four carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs].
+// Ten active skills per class, six carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs].
 // Effects are small shared building blocks run in order by cast() (see there for the arguments); damage numbers are multiples of your damage multiplier.
 // needs: 't' a monster above ground, 'near' one within reach, 'thrall' at least one thrall. A skill that cannot be used keeps its cooldown.
 const SKILLS={
@@ -155,9 +155,12 @@ const SKILLS={
 const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
 const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds.';
 for(const k in SKILLS){const c=CLASSES[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
-const SK=[0,1,2,3].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1}));
+const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1}));
 const known=(lv=S.level)=>S.cls&&lv>=8?SKLV.filter(l=>lv+1>=l).length:0;
-const okLoad=l=>Array.isArray(l)&&l.length===4&&l.every((v,i)=>Number.isInteger(v)&&v>=0&&v<10&&l.indexOf(v)===i);
+const NSK=6,load0=()=>[0,1,2,3,4,5];
+const okLoad=(l,n=NSK)=>Array.isArray(l)&&l.length===n&&l.every((v,i)=>Number.isInteger(v)&&v>=0&&v<10&&l.indexOf(v)===i);
+// a loadout as carried now, or null. Saves from when four skills were carried get the next skills in line on slots 5 and 6.
+const fixLoad=l=>{if(okLoad(l))return l.slice();if(!okLoad(l,4))return null;const out=l.slice();for(let v=0;out.length<NSK;v++)if(!out.includes(v))out.push(v);return out};
 
 const BOONS=[
  {id:'might',name:'Might',text:'+20% damage with everything you do.'},
@@ -238,7 +241,7 @@ const SLOTS=['weapon','armor','trinket'];
 const RAR=[['common','#b9b2c6',1,.15],['rare','#6ea3e0',1.5,.2],['epic','#b88cff',2.1,.3],['legendary','#d6a544',2.8,.4]]; // name, colour, stat multiplier, upgrade step it gives when melted down
 const QUAL=['Plain','Fine','Runed','Ancient'];
 const GEAR={fighter:['Greatsword','Harness','Headband'],tank:['Sword','Plate','Iron Band'],assassin:['Daggers','Shadow Wrap','Mask'],mage:['Staff','Robe','Hat'],ranger:['Bow','Hood','Quiver'],healer:['Sun Staff','White Robe','Circlet'],necro:['Skull Staff','Grave Robe','Bone Charm']};
-const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall damage',10,'%']};
+const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall and pet damage',10,'%']};
 const slotStats=(c,slot)=>slot==='weapon'?['dmg','spd']:slot==='armor'?['hp','guard']:['cdr',c==='tank'?'sh':c==='healer'?'mend':c==='necro'?'thr':'mv'];
 // an item is fully described by class, slot, rarity r (0-3), upgrade count lvl and upgrade total up; common items carry one stat line, the rest two
 function item(c,slot,r,lvl=0,up=0){return{slot,name:QUAL[r]+' '+GEAR[c][SLOTS.indexOf(slot)],rarity:RAR[r][0],r,lvl,up,keys:slotStats(c,slot).slice(0,r?2:1)}}
@@ -254,7 +257,7 @@ function dropItem(n){
   return item(S.cls,SLOTS[Math.floor(rand()*3)],x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0);
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,spec:0});
-const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:[0,1,2,3],wave:null};
+const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[];
 /* ---------- settings, events and run counters, shared with extras.js through MB ---------- */
 const SET={music:.6,sfx:.8,haptic:1,btn:1,left:false,gfx:'high',hints:true};
@@ -648,7 +651,9 @@ function hurtM(m,d,quiet){
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
   if(m.markT>0)d*=1.5;
-  const before=m.hp;m.hp-=d;ST.dmgDealt+=Math.max(0,Math.min(d,before));m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
+  const before=m.hp;m.hp-=d;ST.dmgDealt+=Math.max(0,Math.min(d,before));
+  if(byPet){PETS.dmg+=Math.max(0,Math.min(d,before));const a=byPet;if(a.perk==='vampiric'&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<.6)){a.vAt=S.t;a.hp=Math.min(a.maxHp,a.hp+Math.ceil(a.maxHp*.03))}}
+  m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
   const ch=m.maxHp/5;if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({x:m.x,y:m.y});
   if(m.boss&&m.hp>0){if(m.ai==='hollow'){const ph=m.hp<=m.maxHp/3?3:m.hp<=m.maxHp*2/3?2:1;if(ph>(m.phase||1)){m.phase=ph;phaseShift(m)}}else if(!m.rage&&m.hp<=m.maxHp*.4)enrage(m)}
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
@@ -679,7 +684,7 @@ function hurtP(d,src){
 }
 
 /* ---------- player ---------- */
-const keys={},want={atk:false,dash:false,skill:false,sk:[false,false,false,false],pt:null},joy={x:0,y:0};
+const keys={},want={atk:false,dash:false,skill:false,sk:[false,false,false,false,false,false],pt:null},joy={x:0,y:0};
 function aim(pt,range,spd){
   if(pt)return Math.atan2(pt.y-P.y,pt.x-P.x);
   // nearest first, but never something warded while anything else is in reach, and with a ranged weapon the boss wins unless something small is close enough to bite
@@ -769,9 +774,9 @@ function channels(dt){
   if(P.fireT>0){P.fireT-=dt;if((P.fireK-=dt)<=0){P.fireK=.1;const a=aim(null,1200);P.swing=a;P.atk=.1;pshot(a+rand()*.1-.05,720,dmgMul(),3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow()}}
   if(P.renewT>0){P.renewT-=dt;if((P.renewK+=dt)>=1){P.renewK=0;if(P.hp<P.maxHp){healP(.04);puff(P,'#7fd66b',4,80)}}}
 }
-// slot i (0-3) carries skill S.load[i] once that skill is learned
+// slot i (0-5) carries skill S.load[i] once that skill is learned
 const slotSkill=i=>{const si=S.load[i];return cls()&&si<known()?si:-1};
-function syncSkills(){const c=cls();for(let i=0;i<4;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0]}
+function syncSkills(){const c=cls();for(let i=0;i<NSK;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0]}
 // the room against the player: pillars push back, a pit swallows you unless you are dashing across it, raised spikes and burning braziers hurt
 function roomP(){
   collide(P,14,false);
@@ -812,12 +817,145 @@ function playerStep(dt){
     haptic(10)}
   want.dash=false;
   if(want.skill)want.sk[0]=true;want.skill=false;
-  for(let i=0;i<4;i++){const si=slotSkill(i);if(want.sk[i]&&si>=0&&P.cdS[si]<=0&&P.dashT<=0&&!(P.cutN>0)&&!held)skill(si);want.sk[i]=false}
+  for(let i=0;i<NSK;i++){const si=slotSkill(i);if(want.sk[i]&&si>=0&&P.cdS[si]<=0&&P.dashT<=0&&!(P.cutN>0)&&!held)skill(si);want.sk[i]=false}
   if(c==='tank'&&S.adv!=='berserker'&&!P.shield&&(P.shT+=dt)>=(pw(1)?3.5:6)*Math.pow(.85,S.b.spec)*(S.adv==='paladin'?.6:1)/(1+eqv('sh')/100)){P.shield=true;P.shT=0;sfx(660,.08,'sine',.12)}
   if(c==='necro'&&S.mode==='play'&&(P.sumT+=dt)>=(pw(1)?4:6)){P.sumT=0;
     if(allies.filter(a=>a.kind==='thrall'&&!a.extra).length<2+(pw(1)?2:0)+S.b.spec+(S.adv==='lich'?3:0)){const t=ally('thrall');allies.push(t);puff(t,'#7fd66b',6);sfx(180,.2,'sawtooth',.12,90)}}
   if(has('skin')&&P.hp<P.maxHp&&(P.regen+=dt)>=(c==='healer'?(pw(1)?2.5:4)*Math.pow(.88,S.b.spec)/(1+eqv('mend')/100):c==='tank'&&pw(3)?3.5:c==='fighter'?5:7)){P.regen=0;healP(.06)}
   syncSkills();
+}
+
+/* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
+// PETS.roster holds up to three: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active is the one that walks with you, or -1.
+// In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
+const PETS={roster:[],active:-1,down:false,dmg:0},PETMAX=3,PLVMAX=25,PETD=1,PETHP=1.5;
+const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
+const petOn=()=>petOwner()?PETS.roster[PETS.active]||null:null;
+const petTag=e=>e.name+(e.plv?' +'+e.plv:'');
+const PERK={swift:'moves and acts faster',shielded:'takes less damage',burning:'hits harder',vampiric:'heals itself when it hits',thorned:'hurts whatever touches it',splitting:'gets up once after it falls'};
+const PETDO={crawler:'It lunges at its prey.',hound:'It charges through its prey.',witch:'It throws bolts from a distance.',fist:'It leaps and slams the ground.',mother:'It hatches mites that fight for you.',burrower:'It digs under its prey and erupts.',bomber:'It lobs bombs.',summoner:'It raises husks that fight for you.',beamer:'It sweeps a beam across the room.',mimic:'It circles its prey and throws bolts.',hollow:'It throws rings of bolts.',mite:'It bites.'};
+// tougher kinds make tougher pets
+const petTough=k=>Math.sqrt((GENHP[k]||560)/560);
+const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col,crown:e.crown?1:0,r:Math.round(Math.max(16,Math.min(30,e.r*.8)))});
+// A pet is rescaled every time it enters a fight: its health follows yours and its blows follow your damage, so an old pet keeps pace and a new one is no stronger.
+const petHp=e=>Math.max(6,Math.round(P.maxHp*PETHP*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
+const petPow=a=>PETD*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
+function makePet(e,frac=1,owner=petOwner()){
+  const s=petSpec(e),g=rand()*TAU,hp=petHp(e);
+  const a={kind:'pet',pet:true,owner:owner||'necro',e,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*46,y:P.y+Math.sin(g)*46,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
+    st:'idle',t:1.2,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:0,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
+  clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);return a;
+}
+// what a mother or a caller pet raises: small, short-lived, cannot be hurt
+function petMinion(a,kind,dmg,life){
+  const g=rand()*TAU,s={...SPEC[kind],ai:'mite',col:a.s.col},m={kind:'pet',pet:true,minion:true,par:a,owner:a.owner,s,ai:'mite',name:s.name,plv:0,x:a.x+Math.cos(g)*(a.r+16),y:a.y+Math.sin(g)*(a.r+16),r:s.r,hp:1,maxHp:1,
+    st:'idle',t:0,n:0,ang:g,face:g,flash:0,hidden:false,lift:0,seed:rand()*9,life,cd:.3,walk:0,flip:false,inv:0,side:1,mods:[],ward:0,beam:null,boss:false,moving:false,dk:dmg};
+  clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);allies.push(m);puff(m,a.owner==='necro'?'#7fd66b':'#8fd3ff',6);return m;
+}
+const minions=a=>{let n=0;for(const x of allies)if(x.par===a&&x.life>0)n++;return n};
+let byPet=null;
+// every blow a pet lands goes through here, so it can be counted and so perks can react
+function petHit(m,d,a){if(!mons.includes(m))return;byPet=a||true;hurtM(m,d,true);byPet=null;leech()}
+function petShot(a,g,spd,dmg,r=4,pierce=0){pshots.push({x:a.x+Math.cos(g)*a.r*.8,y:a.y+Math.sin(g)*a.r*.8,vx:Math.cos(g)*spd,vy:Math.sin(g)*spd,r,dmg,kind:a.owner==='necro'?'skull':'bolt',pierce,hit:new Set(),sx:a.x,sy:a.y,pet:a})}
+function petBlast(a,at,r,dur,dmg){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,pet:a};clamp(z,10);zones.push(z);return z}
+function hurtPet(a,d){
+  if(a.minion||a.inv>0||a.hidden||a.st==='leap'||a.hp<=0||S.mode!=='play')return;
+  if(a.perk==='shielded')d=Math.max(1,Math.round(d*.7));
+  a.hp-=d;a.inv=1;a.flash=.15;puff(a,col(a.s.col),5,120);floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+d,life:.6,c:'#ffb3bf'});
+  if(a.hp>0)return;
+  if(a.up){a.up=false;a.hp=Math.ceil(a.maxHp/2);a.inv=1.5;puff(a,'#d6a544',14,180);floats.push({x:a.x,y:a.y-a.r-20,txt:'Gets up',life:1.2,c:'#d6a544'});return}
+  a.hp=0;a.life=0;a.beam=null;PETS.down=true;puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
+}
+// who a pet goes for: the nearest monster above ground, but the boss unless something small is close, and nothing warded while there is a choice
+function petTarget(a){let t=null,bd=1e9;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,a)-m.r-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}return t}
+// pets walk like monsters do: they steer round pillars and pits, and a charge (raw) reports what it ran into
+function petMove(a,g,sp,dt,raw,dgoal=1e9){
+  const room=obstacles.length&&!a.hidden,ox=a.x,oy=a.y;
+  if(room&&!raw)g=steer(a,g,dgoal);
+  a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;a.moving=true;
+  let hit=false;if(room&&collide(a,a.r,true)&&raw)hit=(a.x-ox)*Math.cos(g)+(a.y-oy)*Math.sin(g)<sp*dt*.35;
+  return clamp(a,a.r)||hit;
+}
+// hold a distance: close in when far, back off at a slant when crowded, otherwise circle
+function petKeep(a,dt,t,g,d,lo,hi,sp){
+  const e=d-t.r;
+  if(e>hi)petMove(a,g,sp*1.7,dt,false,d);
+  else if(petMove(a,g+(e<lo?Math.PI*.72:Math.PI/2)*a.side,sp,dt,false))a.side*=-1;
+}
+const PETAI={
+  mite(a,dt,t,g,d){if(d>t.r+a.r)petMove(a,g+Math.sin(S.t*3+a.seed)*.4,190,dt,false,d);else if(a.cd<=0){a.cd=.7;petHit(t,a.dk||petPow(a),a.par||a)}},
+  crawler(a,dt,t,g,d,D){
+    if(a.st==='idle'){const reach=t.r+a.r+56;if(d>reach)petMove(a,g,165,dt,false,d);if((a.t-=dt)<=0&&d<reach+40){a.st='wind';a.t=.3;a.ang=g}}
+    else if(a.st==='wind'){if(t)a.ang=g;if((a.t-=dt)<=0){a.st='lunge';a.t=.3;a.struck=false}}
+    else{petMove(a,a.ang,420,dt,true);if(!a.struck&&t&&d<t.r+a.r+8){a.struck=true;petHit(t,4.6*D,a)}if((a.t-=dt)<=0){a.st='idle';a.t=1.2}}
+  },
+  hound(a,dt,t,g,d,D){
+    if(a.st==='idle'){const e=d-t.r;if(e>230)petMove(a,g,180,dt,false,d);else if(petMove(a,g+(e<110?2.2:1.3)*a.side,120,dt,false))a.side*=-1;if((a.t-=dt)<=0&&e<300){a.st='wind';a.t=.45;a.ang=g}}
+    else if(a.st==='wind'){if(t)a.ang=g;if((a.t-=dt)<=0){a.st='charge';a.t=.7;a.hitS=new Set()}}
+    else if(a.st==='charge'){const hit=petMove(a,a.ang,520,dt,true);
+      for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!a.hitS.has(m)&&dist(m,a)<m.r+a.r+6){a.hitS.add(m);petHit(m,(m.boss?6.4:3)*D,a)}
+      if(hit||(a.t-=dt)<=0){a.st='dazed';a.t=hit?.7:.4}}
+    else if((a.t-=dt)<=0){a.st='idle';a.t=1.1}
+  },
+  witch(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,130,260,80);if((a.t-=dt)<=0){a.t=1.2;for(const k of[-.16,0,.16])petShot(a,g+k,380,1.1*D);sfx(520,.1,'sine',.08,260)}},
+  fist(a,dt,t,g,d,D){
+    if(a.st==='leap'){a.t-=dt;const p=Math.min(1,1-a.t/a.dur);a.x=a.sx+(a.tx-a.sx)*p;a.y=a.sy+(a.ty-a.sy)*p;a.lift=Math.sin(p*Math.PI);a.moving=true;if(a.t<=0){a.lift=0;a.st='idle';a.t=1.7;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}return}
+    if(!t)return;
+    if(d>t.r+a.r+50)petMove(a,g,120,dt,false,d);
+    if((a.t-=dt)<=0&&d<340){const k=Math.max(0,d-t.r-a.r-6),to={x:a.x+Math.cos(g)*k,y:a.y+Math.sin(g)*k};clamp(to,a.r);if(obstacles.length)collide(to,a.r,true);
+      a.st='leap';a.t=a.dur=.7;a.sx=a.x;a.sy=a.y;a.tx=to.x;a.ty=to.y;petBlast(a,t,88,.7,6*D)}
+  },
+  mother(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,230,60);if((a.t-=dt)<=0){a.t=2.2;if(minions(a)<3){petMinion(a,'mite',.8*D,7);sfx(300,.12,'sine',.08,500)}}},
+  burrower(a,dt,t,g,d,D){
+    if(a.st==='idle'){a.st='under';a.t=1.5;a.hidden=true;puff(a,col(a.s.col),8)}
+    else if(a.st==='under'){const near=d<t.r+a.r+14;if(!near)petMove(a,g,200,dt,true,d);if(near||(a.t-=dt)<=0){a.st='rise';a.t=.5;if(obstacles.length){a.hidden=false;collide(a,a.r,true);a.hidden=true}petBlast(a,a,80,.5,5.4*D)}}
+    else if(a.st==='rise'){if((a.t-=dt)<=0){a.hidden=false;a.st='up';a.t=1.7;a.cd=.4;puff(a,col(a.s.col),12)}}
+    else{if(t&&a.cd<=0){a.cd=.55;petShot(a,g,380,1.3*D)}if((a.t-=dt)<=0){a.st='under';a.hidden=true;a.t=1.5}}
+  },
+  bomber(a,dt,t,g,d,D){
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=1.7;if(t){for(const k of[0,.6]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.85,2.7*D);z.sx=a.x;z.sy=a.y}sfx(240,.2,'triangle',.1,90)}}return}
+    petKeep(a,dt,t,g,d,160,290,70);if((a.t-=dt)<=0&&d<440){a.st='wind';a.t=.35}
+  },
+  summoner(a,dt,t,g,d,D){
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=3;for(let i=minions(a);i<2;i++)petMinion(a,'husk',.9*D,8);sfx(140,.4,'sawtooth',.1,70)}return}
+    petKeep(a,dt,t,g,d,160,290,65);if(a.cd<=0){a.cd=1.6;petShot(a,g,360,D)}
+    if((a.t-=dt)<=0){if(minions(a)<2){a.st='wind';a.t=.6}else a.t=1}
+  },
+  beamer(a,dt,t,g,d,D){
+    if(a.st==='idle'){a.beam=null;petKeep(a,dt,t,g,d,140,270,60);if(a.cd<=0){a.cd=1.3;petShot(a,g,360,.8*D)}if((a.t-=dt)<=0){a.st='wind';a.t=.6;a.ba=g}}
+    else if(a.st==='wind'){a.ba=g;if((a.t-=dt)<=0){a.st='beam';a.t=1.8;a.bk=0;sfx(110,.4,'sawtooth',.12,70)}}
+    else{a.ba+=Math.max(-1.1*dt,Math.min(1.1*dt,Math.atan2(Math.sin(g-a.ba),Math.cos(g-a.ba))));if((a.t-=dt)<=0){a.st='idle';a.t=2.2;a.beam=null;return}}
+    if(a.st==='idle')return;
+    const on=a.st==='beam';if(!a.beam)a.beam={on,w:10,rays:[{a:0,len:0}]};a.beam.on=on;const r=a.beam.rays[0];r.a=a.ba;r.len=rayLen(a.x,a.y,r.a);
+    if(on&&(a.bk-=dt)<=0){a.bk=.2;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r)petHit(m,1.15*D,a)}
+  },
+  mimic(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,120,240,95);if((a.t-=dt)<=0){a.t=.85;petShot(a,g,380,2*D,5)}},
+  hollow(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,220,70);if((a.t-=dt)<=0){a.t=2.1;a.n++;for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,300,.7*D);for(const k of[-.14,0,.14])petShot(a,g+k,380,1.3*D,5);sfx(200,.2,'sawtooth',.1,90)}},
+};
+function petStep(a,dt){
+  a.moving=false;if(a.flash>0)a.flash-=dt;if(a.inv>0)a.inv-=dt;if(a.avT>0)a.avT-=dt;
+  if(a.minion){a.life-=dt;if(a.par&&!(a.par.life>0))a.life=0;if(a.life<=0){puff(a,'#e7dfcd',5);return}}
+  if(a.perk==='swift')dt*=1.12;a.cd-=dt;
+  const t=petTarget(a),ox=a.x,oy=a.y;
+  if(t){const g=angTo(a,t);a.face=g;PETAI[a.ai](a,dt,t,g,dist(a,t),a.minion?0:petPow(a))}
+  else{
+    // nothing to fight: finish a move already begun, otherwise come back to its owner (or its parent)
+    if(a.st==='lunge'||a.st==='charge'||a.st==='dazed'||a.st==='leap'||a.st==='rise')PETAI[a.ai](a,dt,null,a.ang,1e9,petPow(a));
+    else{a.st='idle';a.hidden=false;a.beam=null;a.t=Math.min(a.t,.8);const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);if(d>to.r+a.r+44||!to.r&&d>70){const g=angTo(a,to);a.face=g;petMove(a,g,220,dt,false,d)}}
+  }
+  if(a.st==='charge'||a.st==='lunge')a.face=a.ang;
+  if(obstacles.length&&!a.hidden&&a.st!=='leap'&&a.moving){if(Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
+}
+// what a monster does to pets: its touch, its charge and its beam hurt them
+function monVsPets(m){
+  for(const a of allies){if(!a.pet||a.minion||a.hidden||a.st==='leap'||a.inv>0||a.life<=0)continue;
+    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,a)<m.r+a.r){hurtPet(a,blow(m.st==='charge'||m.st==='lunge'?1:-1));if(a.perk==='thorned')petHit(m,1.5*petPow(a),a)}
+    else if(m.beam&&m.beam.on&&!m.hidden)for(const r of m.beam.rays)if(segDist(a,m.x,m.y,r.a,r.len)<m.beam.w+a.r*.6){hurtPet(a,blow(0));break}}
+}
+// the active pet takes its place beside you at the start of a level, or when it is chosen from the pause screen
+function fieldPet(frac){
+  allies=allies.filter(a=>!a.pet);const e=petOn();if(!e||PETS.down||!P)return null;
+  const a=makePet(e,frac);allies.push(a);PETS.fielded=e;puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150);return a;
 }
 
 /* ---------- loop ---------- */
@@ -833,7 +971,7 @@ function step(dt){
     if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
-      p.hit.add(m);if(p.slow)m.slow=Math.max(m.slow||0,p.slow);if(p.stun)m.stun=m.boss?p.stun*.7:p.stun*2;hurtM(m,d);
+      p.hit.add(m);if(p.slow)m.slow=Math.max(m.slow||0,p.slow);if(p.stun)m.stun=m.boss?p.stun*.7:p.stun*2;byPet=p.pet||null;hurtM(m,d,!!p.pet);byPet=null;
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
       if(!m.boss&&!mons.includes(m))continue; // a shot that kills something small flies on, so a swarm cannot soak up every single bolt
@@ -841,7 +979,7 @@ function step(dt){
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
   if(S.mode!=='play'||S.banner>1.5)return;
-  for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
+  for(const a of allies){if(a.pet){petStep(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
     else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1),true);leech()}
@@ -876,13 +1014,15 @@ function step(dt){
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
     if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,P)<m.r+11)hurtP(blow(m.st==='charge'||m.st==='lunge'&&S.level>=3?1:-1),m.ai+':'+m.st); // brushing against a monster is light; its telegraphed attack is not
+    if(PETS.fielded&&S.mode==='play')monVsPets(m);
   }
   if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(blow(S.level<8?-1:0),'shot');s.dead=true}
+    else for(const a of allies)if(a.pet&&!(a.inv>0)&&dist(s,a)<s.r+a.r*.7)hurtPet(a,blow(0)); // a bolt hurts a pet in its path and flies on
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;hurtM(m,z.dmg)}}else if(dist(z,P)<z.r)hurtP(blow(1),'zone')}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;byPet=z.pet||null;hurtM(m,z.dmg,!!z.pet);byPet=null}}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24){f.dead=true;healP(.25,3);SND.pickup();haptic(15)}
   morsels=morsels.filter(f=>!f.dead);
@@ -891,8 +1031,8 @@ function step(dt){
 /* ---------- drawing ---------- */
 const circ=(x,y,r)=>{ctx.beginPath();ctx.arc(x,y,r,0,TAU)};
 const line=(a,b,c,d)=>{ctx.beginPath();ctx.moveTo(a,b);ctx.lineTo(c,d);ctx.stroke()};
-function drawMon(m){
-  if(m.hidden)return;const s=m.s,r=m.r,a=angTo(m,P);
+function drawMon(m,face,s=m.s,eye){
+  if(m.hidden)return;const r=m.r,a=face===undefined?angTo(m,P):face;
   ctx.save();
   ctx.fillStyle='rgba(0,0,0,.35)';ctx.beginPath();ctx.ellipse(m.x,m.y+r*.8,r*.9,r*.3,0,0,TAU);ctx.fill();
   ctx.translate(m.x+(m.st==='wind'?rand()*4-2:0),m.y-m.lift*46);
@@ -908,7 +1048,7 @@ function drawMon(m){
   if(s.void){circ(0,0,r*.55);ctx.fillStyle='#050408';ctx.fill();ctx.strokeStyle=col('#b8263d');ctx.lineWidth=2.5;ctx.stroke()}
   if(s.teeth){circ(0,0,r*.62);ctx.fillStyle='#120b08';ctx.fill();ctx.fillStyle=col('#e7dfcd');for(let i=0;i<9;i++){const b=i*TAU/9+S.t;ctx.beginPath();ctx.moveTo(Math.cos(b-.16)*r*.62,Math.sin(b-.16)*r*.62);ctx.lineTo(Math.cos(b)*r*.3,Math.sin(b)*r*.3);ctx.lineTo(Math.cos(b+.16)*r*.62,Math.sin(b+.16)*r*.62);ctx.fill()}}
   for(let i=0;i<s.eyes;i++){const b=a+(i-(s.eyes-1)/2)*(s.eyes>3?.42:.62),ex=Math.cos(b)*r*.5,ey=Math.sin(b)*r*.5,er=Math.max(2.5,r*.16);
-    circ(ex,ey,er);ctx.fillStyle=col(s.void?'#ff5b6e':'#ffd95e');ctx.fill();circ(ex+Math.cos(a)*er*.4,ey+Math.sin(a)*er*.4,er*.45);ctx.fillStyle='#0a0a0a';ctx.fill();circ(ex-er*.3,ey-er*.35,er*.22);ctx.fillStyle='rgba(255,255,255,.85)';ctx.fill()}
+    circ(ex,ey,er);ctx.fillStyle=col(eye||(s.void?'#ff5b6e':'#ffd95e'));ctx.fill();circ(ex+Math.cos(a)*er*.4,ey+Math.sin(a)*er*.4,er*.45);ctx.fillStyle='#0a0a0a';ctx.fill();circ(ex-er*.3,ey-er*.35,er*.22);ctx.fillStyle='rgba(255,255,255,.85)';ctx.fill()}
   if(m.mods.length){
     if(m.mods.includes('thorned')){ctx.fillStyle=col('#e7dfcd');for(let i=0;i<12;i++){const b=i*TAU/12+.2;ctx.beginPath();ctx.moveTo(Math.cos(b-.1)*r,Math.sin(b-.1)*r);ctx.lineTo(Math.cos(b)*r*1.28,Math.sin(b)*r*1.28);ctx.lineTo(Math.cos(b+.1)*r,Math.sin(b+.1)*r);ctx.fill()}}
     if(m.mods.includes('vampiric')){circ(0,0,r+5+Math.sin(S.t*4)*1.5);ctx.strokeStyle='rgba(184,38,61,.8)';ctx.lineWidth=3;ctx.stroke()}
@@ -936,6 +1076,10 @@ function drawRoom(){
       circ(x,y,r*.62);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke()}}
 }
 function drawBeams(){
+  for(const m of allies){const b=m.beam;if(!b||!m.pet||m.hidden)continue;ctx.lineCap='round';
+    for(const r of b.rays){const ex=m.x+Math.cos(r.a)*r.len,ey=m.y+Math.sin(r.a)*r.len;
+      if(b.on){ctx.strokeStyle='rgba(143,211,255,.3)';ctx.lineWidth=b.w*2+8;line(m.x,m.y,ex,ey);ctx.strokeStyle='#8fd3ff';ctx.lineWidth=b.w*1.4;line(m.x,m.y,ex,ey);ctx.strokeStyle='#fff';ctx.lineWidth=b.w*.5;line(m.x,m.y,ex,ey)}
+      else{ctx.setLineDash([10,8]);ctx.strokeStyle='rgba(143,211,255,.7)';ctx.lineWidth=2;line(m.x,m.y,ex,ey);ctx.setLineDash([])}}}
   for(const m of mons){const b=m.beam;if(!b||m.hidden)continue;ctx.lineCap='round';
     for(const r of b.rays){const ex=m.x+Math.cos(r.a)*r.len,ey=m.y+Math.sin(r.a)*r.len;
       if(b.on){ctx.strokeStyle='rgba(255,91,110,.35)';ctx.lineWidth=b.w*2+10;line(m.x,m.y,ex,ey);ctx.strokeStyle='#ff8a4c';ctx.lineWidth=b.w*2;line(m.x,m.y,ex,ey);ctx.strokeStyle='#fff';ctx.lineWidth=b.w*.7;line(m.x,m.y,ex,ey);circ(ex,ey,b.w+4+Math.sin(S.t*40)*3);ctx.fillStyle='#ffd95e';ctx.fill()}
@@ -983,6 +1127,16 @@ function skeleton(org,sw,t){
     }
   };
   pass(true);pass(false);
+}
+// a pet is its monster, marked as yours: a ring on the ground in its owner's colour (grave green or a pale blue), bound dead drawn dark with green eyes, a health pip above
+function drawPet(a){
+  if(a.hidden)return;const nec=a.owner==='necro',c=nec?'127,214,107':'143,211,255';
+  if(!a.s2){a.s2=a.s;if(nec){const[r,g,b]=rgb(a.s.col),l=.3*r+.59*g+.11*b,h=v=>('0'+Math.round((v*.35+l*.65)*.55).toString(16)).slice(-2);a.s2={...a.s,col:'#'+h(r)+h(g)+h(b)}}}
+  const g=ctx.createRadialGradient(a.x,a.y+a.r*.7,a.r*.4,a.x,a.y+a.r*.7,a.r*1.7);g.addColorStop(0,`rgba(${c},.4)`);g.addColorStop(1,`rgba(${c},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(a.x,a.y+a.r*.7,a.r*1.7,a.r*.75,0,0,TAU);ctx.fill();
+  ctx.strokeStyle=`rgba(${c},.9)`;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(a.x,a.y+a.r*.7,a.r*1.25,a.r*.5,0,0,TAU);ctx.stroke();
+  if(a.inv>0&&Math.floor(S.t*18)%2)ctx.globalAlpha=.55;
+  drawMon(a,a.face,a.s2,nec?'#7fd66b':'#bfe9ff');ctx.globalAlpha=1;
+  if(!a.minion){const w=Math.max(26,a.r*1.6),y=a.y-a.lift*46-a.r-12;ctx.fillStyle='rgba(13,12,17,.8)';ctx.fillRect(a.x-w/2-1,y-1,w+2,6);ctx.fillStyle=`rgb(${c})`;ctx.fillRect(a.x-w/2,y,w*Math.max(0,a.hp/a.maxHp),4)}
 }
 function drawAlly(a){
   ctx.save();ctx.translate(a.x,a.y);ctx.lineCap='round';
@@ -1128,7 +1282,7 @@ function draw(){
   for(const m of mons)drawMon(m);
   drawBeams();
   for(const s of shots){if(sight){circ(s.x,s.y,s.r+5);ctx.fillStyle='rgba(255,138,76,.28)';ctx.fill()}circ(s.x,s.y,s.r);ctx.fillStyle=col('#ff8a4c');ctx.fill();circ(s.x,s.y,s.r*.45);ctx.fillStyle='#fff';ctx.fill()}
-  for(const a of allies)drawAlly(a);
+  for(const a of allies)a.pet?drawPet(a):drawAlly(a);
   for(const p of pshots){
     if(p.kind==='skull'){circ(p.x,p.y,p.r+4);ctx.fillStyle='rgba(127,214,107,.35)';ctx.fill();circ(p.x,p.y,p.r);ctx.fillStyle='#e7dfcd';ctx.fill();ctx.fillStyle='#15121b';circ(p.x-1.7,p.y-.6,1.2);ctx.fill();circ(p.x+1.7,p.y-.6,1.2);ctx.fill()}
     else if(p.kind==='arrow'){const a=Math.atan2(p.vy,p.vx);ctx.strokeStyle='#e7dfcd';ctx.lineWidth=2;line(p.x-Math.cos(a)*15,p.y-Math.sin(a)*15,p.x,p.y);circ(p.x,p.y,2);ctx.fillStyle='#d5dce2';ctx.fill()}
@@ -1178,11 +1332,12 @@ function show(o,foreign){
 function hud(){
   const nb=Object.values(S.b).reduce((a,b)=>a+b,0),cn=()=>S.adv?CLASSES[S.cls].adv.find(a=>a[0]===S.adv)[1]:CLASSES[S.cls].name;
   S.rank=rank();tune();
-  const chips=act2()&&S.cls?[['Rank '+S.rank,true],[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
+  const chips=act2()&&S.cls?[['Rank '+S.rank,true],[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn()?[['Pet · '+petTag(petOn()),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
   $('ledger').textContent='';chips.forEach(([name,on])=>{const li=document.createElement('li');li.textContent=name;if(on)li.className='on';$('ledger').appendChild(li)});
   if(act2()&&S.cls&&S.eq)for(const sl of SLOTS){const it=S.eq[sl],li=document.createElement('li');li.textContent=itemName(it);li.title=it.rarity+' '+sl+': '+itemLine(it);li.style.cssText='opacity:1;color:'+RAR[it.r][1]+';border-color:'+RAR[it.r][1];$('ledger').appendChild(li)}
   const hp=$('hp');hp.textContent='';
   if(!P)return;
+  hp.className=P.maxHp>50?'many lots':P.maxHp>20?'many':''; // a long row of pips gets thinner pips, so it still fits a phone
   if(has('touch')){for(let i=0;i<P.maxHp;i++){const e=document.createElement('i');if(i>=P.hp)e.className='off';hp.appendChild(e)}hp.setAttribute('aria-label',P.hp+' of '+P.maxHp+' health')}
   else{const e=document.createElement('em');e.textContent='Numb. No nerves to feel wounds with. You rattle when you are close to breaking.';hp.appendChild(e)}
   $('bDash').disabled=!has('organs');$('bDash').textContent=cls()==='mage'?'Blink':'Dash';
@@ -1190,7 +1345,7 @@ function hud(){
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0);
-  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
+  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
 }
 // dev only: __mb.over = {kind, mods, waves, room} replaces parts of a generated level, for testing one thing at a time
 function devDef(L,n){
@@ -1216,6 +1371,7 @@ function startLevel(n){
   else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2}
   if(L.kind==='mimic')reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
+  PETS.down=false;PETS.fielded=null;PETS.dmg=0;fieldPet();
   if(!S.wave)$('bossName').textContent=L.spec.name;
   ST.levelTime=0;ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Level '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
@@ -1223,26 +1379,72 @@ function startLevel(n){
 }
 function reward(){
   haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n);allies=[];emit('reward',{level:n});
+  {const e=PETS.fielded;PETS.fielded=null;if(e&&PETS.roster.includes(e))e.plv=Math.min(PLVMAX,e.plv+1)} // the pet that was sent into this fight grows a little
   if(n===7)return chooseClass();
   P.inv=0;S.level++;S.mode='reward';hud();
   const up=S.rank&&S.rank!==r0,rk=up?'Rank up. You have climbed from rank '+r0+' to rank '+S.rank+'.':'';
   if(up){SND.rankUp();setTimeout(()=>haptic([30,50,30,50,30,50,200]),500)}
-  if(n>=8&&S.cls)return dropScreen(n,rk,()=>newSkill(n,()=>reward2(n)));
+  if(n>=8&&S.cls)return dropScreen(n,rk,()=>bindScreen(n,()=>newSkill(n,()=>reward2(n))));
   reward2(n);
 }
-// a level that teaches a skill says so; with more than four known you choose which four to carry
+// a level that teaches a skill says so; with more than six known you choose which six to carry
 function newSkill(n,next){
   const k=known(),si=k-1;if(k<=known(n)||n<10)return next(); // the skills of levels 10 and 11 are announced by the power-up screens
   const sk=CLASSES[S.cls].skills[si],free=S.load.findIndex(v=>v>=k-1&&v!==si); // a slot still holding a skill not learned yet
-  if(k<=4&&!S.load.includes(si)&&free>=0)S.load[free]=si;
-  show({soft:true,kick:'New skill · level '+sk.level,title:sk.name,body:sk.text,keys:k>4?'You know '+k+' skills and carry four. You can change them now, or later from the pause screen.':'',btns:k>4?[['Choose my four',()=>loadout(next,si)],['Keep my four',next]]:[['Go on',next]]});
+  if(k<=NSK&&!S.load.includes(si)&&free>=0)S.load[free]=si;
+  const slot=S.load.indexOf(si),touch=matchMedia('(pointer:coarse)').matches;
+  show({soft:true,kick:'New skill · level '+sk.level,title:sk.name,body:sk.text,keys:k>NSK?'You know '+k+' skills and carry six. You can change them now, or later from the pause screen.':slot>=0&&!touch?'It is on key '+(slot+1)+'.':'',btns:k>NSK?[['Choose my six',()=>loadout(next,si)],['Keep my six',next]]:[['Go on',next]]});
 }
 function loadout(done,fresh){
   const c=CLASSES[S.cls],k=known(),again=()=>{syncSkills();loadout(done,fresh)};
-  show({wide:true,kick:'Skills · '+c.name,title:'Choose your four',body:'You carry four skills, on keys 1 to 4. Pick a skill you are not carrying to swap it in.',
-    cards:c.skills.slice(0,k).map((sk,i)=>{const slot=S.load.indexOf(i);return{title:sk.name,sub:slot>=0?'Carried · key '+(slot+1):i===fresh?'New · not carried':'Not carried',col:slot>=0?'':'#958ea3',body:sk.text,
-      fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>({title:c.skills[v].name,sub:'Key '+(j+1),body:c.skills[v].text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}})),btns:[['Back',again]]})}}),
+  show({wide:true,kick:'Skills · '+c.name,title:'Choose your six',body:(matchMedia('(pointer:coarse)').matches?'You carry six skills, one on each skill button.':'You carry six skills, on keys 1 to 6.')+' Pick a skill you are not carrying to swap it in.',
+    cards:c.skills.slice(0,k).map((sk,i)=>{const slot=S.load.indexOf(i);return{title:sk.name,sub:slot>=0?'Carried · '+(slot+1):i===fresh?'New · not carried':'Not carried',col:slot>=0?'':'#958ea3',body:sk.text,
+      fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>({title:c.skills[v].name,sub:'Slot '+(j+1),body:c.skills[v].text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}})),btns:[['Back',again]]})}}),
     btns:[['Done',done]]});
+}
+// what a level's boss looks like on the roster: its name without its modifiers, at most one of them kept as a perk
+function petEntry(n,L){const s=L.spec,gen=n>=LEVELS.length,ty=!!s.crown;
+  return{kind:L.kind,ai:s.ai||L.kind,name:gen&&!ty?PRE[n%10]+' '+SPEC[L.kind].name.replace('The ',''):s.name,col:s.col,r:s.r,plv:0,perk:(L.mods||[])[0]||null,crown:ty?1:0}}
+const petLine=e=>PETDO[e.ai]+(e.perk?' It '+PERK[e.perk]+'.':'')+(e.plv?' It has grown '+e.plv+(e.plv>1?' times':' time')+', and is stronger for it.':'');
+// After the drop, a Necromancer may bind the boss and a Beastmaster may tame it. Always optional. Tyrants and the Flayed King can only rarely be taken.
+function bindScreen(n,next){
+  const own=petOwner(),L=S.L;if(!own||n<8||!L||L.kind==='mimic')return next();
+  const rare=!!L.spec.crown,dv=window.__mb?window.__mb.bind:undefined; // dev: __mb.bind = true or false decides instead of the dice
+  if(!(typeof dv==='boolean'?dv:!rare||rand()<.15))return next();
+  const e=petEntry(n,L),nec=own==='necro',R=PETS.roster,full=R.length>=PETMAX;
+  const take=out=>()=>{if(out>=0){R.splice(out,1);if(PETS.active===out)PETS.active=-1;else if(PETS.active>out)PETS.active--}R.push(e);
+    if(PETS.active<0){PETS.active=R.length-1;return next()} // an empty place at your side is filled at once
+    petPick(next,e)};
+  const leave={title:'Leave it',sub:'Walk on',col:'#958ea3',body:'Take nothing. You can '+(nec?'bind':'tame')+' another boss later.',fn:next};
+  show({wide:true,col:nec?'#7fd66b':'#8fd3ff',kick:rare?(nec?'A tyrant, yours to bind':'A tyrant, yours to tame'):nec?'The dead can be bound':'It can be tamed',title:e.name,
+    body:(nec?'Bind it and it rises to fight beside you. ':'Tame it and it fights beside you. ')+petLine(e)+' You can keep '+PETMAX+' pets, and one goes with you into each level.'+(full?' You already keep '+PETMAX+': to take this one, let one go.':''),
+    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release for '+e.name,col:'#ff8497',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
+      :[{title:nec?'Bind it':'Tame it',sub:R.length?'Pet '+(R.length+1)+' of '+PETMAX:'Your first pet',col:nec?'#7fd66b':'#8fd3ff',body:e.name+' joins you. It is as strong as the level you take it into, however old it is.',fn:take(-1)},leave]});
+}
+// which pet goes with you
+function petPick(next,fresh){
+  show({wide:true,kick:petOwner()==='necro'?'Bound':'Tamed',title:'Who goes with you?',body:'One pet fights beside you in each level. The others wait. You can change this from the pause screen.',
+    cards:PETS.roster.map((p,i)=>({title:petTag(p),sub:p===fresh?'New':i===PETS.active?'With you now':'Waiting',col:i===PETS.active?'':'#958ea3',body:petLine(p),fn:()=>{PETS.active=i;next()}}))});
+}
+function petChoose(i){
+  if(!PETS.roster[i]||i===PETS.active)return;PETS.active=i;
+  if(S.mode==='play'&&!PETS.down){const cur=allies.find(a=>a.pet&&!a.minion);fieldPet(cur?cur.hp/cur.maxHp:1)} // it steps in as hurt as the one it replaces
+  if(S.mode==='play'||S.mode==='clear')save(S.level);hud();
+}
+function petRelease(i){
+  const R=PETS.roster;if(!R[i])return;const act=i===PETS.active;R.splice(i,1);
+  if(act){PETS.active=R.length?0:-1;if(S.mode==='play'){allies=allies.filter(a=>!a.pet);if(R.length)PETS.down=true}} // the next one comes with the next level
+  else if(PETS.active>i)PETS.active--;
+  if(S.mode==='play'||S.mode==='clear')save(S.level);hud();
+}
+function petsScreen(back){
+  const R=PETS.roster,nec=petOwner()==='necro',again=()=>petsScreen(back);
+  show({wide:true,kick:'Pets · '+R.length+' of '+PETMAX,title:nec?'Your bound dead':'Your tamed beasts',
+    body:R.length?'Pick a pet to send it out or to release it.'+(PETS.down?' The one with you has fallen. A pet comes back with the next level.':''):'You keep none. Kill a boss, and you may '+(nec?'bind':'tame')+' it.',
+    cards:R.map((p,i)=>({title:petTag(p),sub:i===PETS.active?(PETS.down?'Fallen · back next level':'With you'):'Waiting',col:i===PETS.active?'':'#958ea3',body:petLine(p),fn:()=>{
+      const act=i===PETS.active;show({kick:act?'With you':'Waiting',title:petTag(p),body:petLine(p),btns:[...(act?[]:[['Send it out',()=>{petChoose(i);again()}]]),['Back',again],
+        ['Release',()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',again],['Release it',()=>{petRelease(PETS.roster.indexOf(p));again()}]]})]]})}})),
+    btns:[['Back',back]]});
 }
 // every boss from level 9 on drops one item for your class: melt it into what you carry, wear it instead, or break it for scrap
 function dropScreen(n,rk,next){
@@ -1258,7 +1460,7 @@ function reward2(n){
     return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>begin(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 4 (E, Q, R and F also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
+    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;begin(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
@@ -1267,12 +1469,13 @@ function reward2(n){
     cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;begin(S.level)}}})});
 }
 function chooseClass(){
-  S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
-  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown, and you carry four at a time. After level 50 the class can be upgraded.',
-    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=[0,1,2,3];emit('classpicked',{cls:id});begin(8)}}))});
+  S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
+  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown, and you carry six at a time. After level 50 the class can be upgraded.',
+    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))});
 }
 function pauseShow(){
-  const btns=[['Resume',()=>pause(false)]];if(known()>4)btns.push(['Skills',()=>loadout(pauseShow)]);
+  const btns=[['Resume',()=>pause(false)]];if(known()>NSK)btns.push(['Skills',()=>loadout(pauseShow)]);
+  if(petOwner()&&act2())btns.push(['Pets',()=>petsScreen(pauseShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',pauseShow)]);
   show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
 }
@@ -1283,23 +1486,36 @@ function pause(on){
   const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed',S.paused);emit('pause',{paused:S.paused});
 }
 // The run as a plain object: what is written to localStorage and what MB.api.getSave() hands out. level is where "Continue" resumes.
-let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:[0,1,2,3],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
+// pets in a save: only what cannot be worked out again
+const petsClear=()=>{PETS.roster.length=0;PETS.active=-1;PETS.down=false;PETS.fielded=null};
+const petOut=e=>({kind:e.kind,name:e.name,col:e.col,r:e.r,plv:e.plv,perk:e.perk||null,crown:e.crown?1:0});
+function petIn(p){
+  if(!p||typeof p!=='object'||typeof p.kind!=='string'||!own(SPEC,p.kind)||p.kind==='mite'||p.kind==='husk')return null;
+  if(typeof p.name!=='string'||!p.name.trim()||p.name.length>48||typeof p.col!=='string'||!/^#[0-9a-f]{6}$/i.test(p.col))return null;
+  if(typeof p.r!=='number'||!(p.r>=8&&p.r<=60)||!Number.isInteger(p.plv)||p.plv<0||p.plv>PLVMAX)return null;
+  if(p.perk!==null&&p.perk!==undefined&&!MODS.includes(p.perk))return null;
+  return{kind:p.kind,ai:SPEC[p.kind].ai||p.kind,name:p.name.trim(),col:p.col.toLowerCase(),r:p.r,plv:p.plv,perk:p.perk||null,crown:p.crown?1:0};
+}
+const canPet=(c,a)=>c==='necro'||c==='ranger'&&a==='beastmaster';
+let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:-1,stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
   const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};
-  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active,stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
-function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,st:SAVE.stats}))}
+function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 // read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
 function applyRun(r){
   try{r=r&&typeof r==='object'?r:{};
     S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
-    S.load=okLoad(r.load)?r.load.slice():[0,1,2,3]; // older saves carry the first four skills
+    S.load=fixLoad(r.load)||load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
+    // older saves have no pets; a broken entry is dropped, the rest are kept
+    petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETMAX)){const e=petIn(p);if(e)PETS.roster.push(e)}const i=Math.floor(+r.pet);PETS.active=PETS.roster.length?(i>=0&&i<PETS.roster.length?i:0):-1}
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
-  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];stReset()}
+  }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
   eqSync();
 }
 // MB.api.loadSave is strict where applyRun is forgiving: anything that is not exactly a save is refused and nothing changes
@@ -1312,10 +1528,12 @@ function checkSave(o){
   const b=noBoons();if(!o.b||typeof o.b!=='object')return null;
   for(const k in b){const v=o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
   let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400))return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up}}}
-  if(!int(o.scrap,0,999)||!okLoad(o.load))return null;
+  const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
+  let pets=[],pet=-1;if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETMAX||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
+    pet=o.pet===undefined?(pets.length?0:-1):o.pet;if(!int(pet,pets.length?0:-1,pets.length-1))return null}
   const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
   if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
-  return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load:o.load.slice(),st,level:o.level};
+  return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load,pets,pet,st,level:o.level};
 }
 function loadSave(o){
   const r=checkSave(o);if(!r)return false;
@@ -1323,7 +1541,7 @@ function loadSave(o){
   applyRun(r);save(r.level);title(r.level);return true;
 }
 function storedLevel(){try{return Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0))}catch(e){return SAVE.level}}
-function newRun(){S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];stReset()}
+function newRun(){S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
 // a hook set by extras.js; `back` puts the screen it was opened from back up
 function hook(name,back){try{MB[name](back)}catch(e){console.error('Marrowborn: '+name+' failed',e);back()}}
 let titleSaved=0;
@@ -1356,7 +1574,7 @@ const API={
   haptic:p=>haptic(p),
 };
 /* ---------- input ---------- */
-const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'sk0',l:'sk0','1':'sk0',q:'sk1','2':'sk1',r:'sk2','3':'sk2',f:'sk3','4':'sk3'};
+const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w:'up',ArrowDown:'down',s:'down',' ':'atk',j:'atk',Shift:'dash',k:'dash',e:'sk0',l:'sk0','1':'sk0',q:'sk1','2':'sk1',r:'sk2','3':'sk2',f:'sk3','4':'sk3',c:'sk4','5':'sk4',v:'sk5','6':'sk5'};
 addEventListener('keydown',e=>{
   const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];
   if((e.key==='Escape'||e.key==='p'||e.key==='P')&&!e.repeat&&(S.paused||S.mode==='play'||S.mode==='clear')){e.preventDefault();pause(!S.paused);return}
@@ -1377,37 +1595,32 @@ const padUp=()=>{joy.x=joy.y=0;knob.style.transform=''};pad.addEventListener('po
 $('bAtk').addEventListener('pointerdown',e=>{want.atk=true;keys.atk=true;e.preventDefault()});
 for(const ev of['pointerup','pointercancel','pointerleave'])$('bAtk').addEventListener(ev,()=>keys.atk=false);
 $('bDash').addEventListener('pointerdown',e=>{want.dash=true;e.preventDefault()});
-// Four skill buttons (touch) and a skill bar under the vitals (keyboard). Both show the skill's name and the seconds left; MB.skills carries the same data.
-// The touch cluster becomes a 3 x 2 grid: skills 1-4 in the left two columns, Dash above Strike on the right.
+// Six skill buttons (touch) and a skill bar under the vitals (keyboard). Both show the skill's name and the seconds left; MB.skills carries the same data.
+// The touch cluster is a 3 x 3 grid laid out in index.html: skills in two columns, first skills at the bottom, Dash above a tall Strike on the outside.
 const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
-{const acts=$('bSkill').parentNode;for(let i=1;i<4;i++){const b=document.createElement('button');b.type='button';b.id='bSkill'+(i+1);b.hidden=true;acts.appendChild(b);skB.push(b)}
+{const acts=$('bSkill').parentNode;for(let i=1;i<NSK;i++){const b=document.createElement('button');b.type='button';b.id='bSkill'+(i+1);b.hidden=true;acts.appendChild(b);skB.push(b)}
   skBar.id='skillBar';skBar.hidden=true;skBar.setAttribute('aria-label','Skills');
   skB.forEach((b,i)=>{b.classList.add('sk');b.textContent='';for(const k of['n','c']){const e=document.createElement('span');e.className=k;b.appendChild(e)}
     b.addEventListener('pointerdown',e=>{want.sk[i]=true;e.preventDefault()});
     const li=document.createElement('li'),kb=document.createElement('kbd');kb.textContent=i+1;li.appendChild(kb);for(const k of['n','c']){const e=document.createElement('span');e.className=k;li.appendChild(e)}skBar.appendChild(li);skL.push(li)});
   document.querySelector('.vitals').after(skBar);
-  const kh=document.querySelector('.kbd');if(kh)kh.innerHTML='<kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> for class skills · <kbd>Esc</kbd> to pause';
+  const kh=document.querySelector('.kbd');if(kh)kh.innerHTML='<kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> to <kbd>6</kbd> for class skills · <kbd>Esc</kbd> to pause';
   const st=document.createElement('style');st.id='mbSkillCss';st.textContent=`
-.touch .acts{display:grid;grid-template-columns:64px 64px 84px;grid-template-rows:64px 84px;gap:10px;max-width:none}
-.touch .acts button{width:auto;height:auto;min-width:0;padding:2px}
-#bSkill{grid-area:1/1}#bSkill2{grid-area:1/2}#bSkill3{grid-area:2/1}#bSkill4{grid-area:2/2}
-#bDash{grid-area:1/3;border-radius:32px}#bAtk{grid-area:2/3}
-.touch .acts button.sk{border-radius:14px;font-size:.66rem;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;align-self:center;height:64px;background:linear-gradient(to top,var(--stone-2) calc(var(--cd,0)*100%),var(--stone) 0)}
+.touch .acts button.sk{border-radius:14px;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;background:linear-gradient(to top,var(--stone-2) calc(var(--cd,0)*100%),var(--stone) 0)}
 .touch .acts button.sk:not(:disabled){border-color:var(--marrow)}
 .touch .acts button.sk:disabled{opacity:.75}
 .sk .c,#skillBar .c{color:var(--marrow);font-weight:600;font-variant-numeric:tabular-nums}
-.sk .c{font-size:.95rem}.sk .c:empty{display:none}
+.sk .c{font-size:1.45em}.sk .c:empty{display:none}
 #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
-#skillBar li{flex:1 1 150px;display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid var(--stone-2);font-size:.88rem;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
+#skillBar li{flex:1 1 140px;display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid var(--stone-2);font-size:.88rem;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
 #skillBar li.ready{border-color:var(--marrow);color:var(--bone)}#skillBar li.locked{opacity:.45}
 #skillBar .c{margin-left:auto}
-@media (pointer:coarse){#skillBar{display:none}}
-@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){.touch .acts{grid-template-columns:58px 58px 76px;grid-template-rows:58px 76px;gap:8px;max-width:none}.touch .acts button{width:auto;height:auto}.touch .acts button.sk{height:58px;font-size:.6rem}.sk .c{font-size:.85rem}}`;document.head.appendChild(st)}
-let skShown=null;const skKey=['','','',''],skF=[-1,-1,-1,-1];
+@media (pointer:coarse){#skillBar{display:none}}`;document.head.appendChild(st)}
+let skShown=null;const skKey=Array(NSK).fill(''),skF=Array(NSK).fill(-1);
 function skillUi(){
   const on=!!cls()&&S.mode!=='title';if(on!==skShown){skShown=on;skBar.hidden=!on;for(const b of skB)b.hidden=!on}
   if(!on)return;
-  for(let i=0;i<4;i++){const s=SK[i],txt=!s.unlocked?'Lv '+SKLV[S.load[i]]:s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',key=s.name+'|'+txt+'|'+s.unlocked;
+  for(let i=0;i<NSK;i++){const s=SK[i],txt=!s.unlocked?'Lv '+SKLV[S.load[i]]:s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',key=s.name+'|'+txt+'|'+s.unlocked;
     if(key!==skKey[i]){skKey[i]=key;const b=skB[i],li=skL[i];b.children[0].textContent=li.children[1].textContent=s.name;b.children[1].textContent=txt;li.children[2].textContent=txt||'ready';
       b.disabled=!s.ready;li.className=s.ready?'ready':s.unlocked?'':'locked';b.setAttribute('aria-label',s.name+(s.unlocked?s.cd>0?', '+txt+' seconds':', ready':', locked'))}
     const f=s.unlocked&&s.max?Math.ceil(s.cd/s.max*40)/40:0;if(f!==skF[i]){skF[i]=f;skB[i].style.setProperty('--cd',f);skL[i].style.setProperty('--cd',f)}}
@@ -1416,6 +1629,17 @@ $('snd').onclick=()=>{audio();const wasOn=!muted&&(SET.music>0||SET.sfx>0);muted
   if(!wasOn&&!(SET.music>0||SET.sfx>0)){SET.music=.6;SET.sfx=.8;pref('settings',JSON.stringify(SET))} // both volumes were at zero: the button brings the defaults back
   setApply();emit('settings',{key:'mute',value:muted});sfx(520,.08,'triangle',.2);$('snd').blur()};
 $('hap').onclick=()=>{setSetting('haptic',SET.haptic>0?0:hapLast);haptic(40);$('hap').blur()};
+// the active pet's name and health, beside your own
+const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;
+{const n=document.createElement('span');n.className='lab';n.id='petName';const b=document.createElement('span');b.id='petBar';const f=document.createElement('span');f.id='petFill';b.appendChild(f);petHud.append(n,b);$('hp').after(petHud)}
+let petKey='';
+function petUi(){
+  const e=S.mode!=='title'&&act2()?petOn():null,a=e&&allies.find(x=>x.pet&&!x.minion),own=petOwner(),k=e?petTag(e)+'|'+(PETS.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f')+'|'+own:'';
+  if(k===petKey)return;petKey=k;petHud.hidden=!e;if(!e)return;
+  const pct=PETS.down?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;
+  petHud.className=(own==='beast'?'beast':'')+(PETS.down?' down':'');$('petName').textContent=petTag(e)+(PETS.down?' · fallen':'');$('petFill').style.width=pct+'%';
+  petHud.setAttribute('aria-label','Pet: '+petTag(e)+(PETS.down?', fallen, back next level':', '+pct+'% health'));
+}
 // a pause button beside the toggles, for touch screens
 {const pb=document.createElement('button');pb.id='pauseB';pb.type='button';pb.className='tog';pb.textContent='Pause';pb.setAttribute('aria-pressed','false');pb.onclick=()=>{audio();pause(!S.paused);pb.blur()};$('hap').after(pb);
   const st=document.createElement('style');st.textContent='#pauseB[aria-pressed="false"]{opacity:1;text-decoration:none}';document.head.appendChild(st)}
@@ -1423,13 +1647,13 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){pause(true
 
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
-window.MB={settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,RAR,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
+window.MB={settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
   get P(){return P},get mons(){return mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return boss}};
 let last=0;
 let fast=1;
 function tick(dt){if(S.paused){S.t+=dt;return}if(S.mode==='play'){ST.time+=dt;ST.levelTime+=dt}if(S.stop>0)S.stop-=dt;else step(dt)}
-function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);skillUi();
+function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);skillUi();petUi();
   const R=MB.renderer;
   if(R&&R.ok){try{R.draw(dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
@@ -1442,10 +1666,15 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=okLoad(r.load)?r.load.slice():[0,1,2,3];
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
-    startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen};
+    startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen,
+  // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
+  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;if(PETS.roster.length>=PETMAX)PETS.roster.shift();
+    const e={kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,perk:MODS.includes(o.perk)?o.perk:null,crown:ty?1:0};
+    PETS.roster.push(e);PETS.active=PETS.roster.length-1;PETS.down=false;if(S.mode!=='play'||!P)return e;
+    if(petOwner())return fieldPet();allies=allies.filter(a=>!a.pet);const a=makePet(e,1,o.owner==='beast'?'beast':'necro');allies.push(a);PETS.fielded=e;return a},PETS};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();

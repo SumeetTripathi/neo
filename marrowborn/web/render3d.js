@@ -726,14 +726,14 @@ function startFade(rec,own){
   if(!own){ // the pet object stays in the list (dead for this level): fade a twin, keep the record
     try{g=M.create(rec.e,MB);g.position.copy(rec.g.position);g.position.y=0;const a=rec.g.userData.mb,b=g.userData.mb;if(a&&b){b.root.rotation.y=a.root.rotation.y;b.born=9;b.grown=false}ents.add(g)}catch(e){return}
   }
-  g.visible=true;dying.push({g,t:0,pet:true,real:true});
+  g.visible=true;dying.push({g,t0:MB.S.t,pet:true,real:true});
 }
 function syncDying(dt){
   if(MB.S.level!==dyingLevel||MB.S.mode==='title'){for(let i=0;i<dying.length;i++)dropEnt(dying[i]);dying.length=0;dyingLevel=MB.S.level;return}
   const M=modelOf('monster');
-  for(let i=dying.length-1;i>=0;i--){const d=dying[i];d.t+=dt;
-    if(d.t>=.8||!M){dropEnt(d);dying.splice(i,1);continue}
-    try{M.fade(d.g,d.t/.8)}catch(e){dropEnt(d);dying.splice(i,1)}}
+  for(let i=dying.length-1;i>=0;i--){const d=dying[i],q=(MB.S.t-d.t0)/.8;
+    if(q>=1||q<0||!M){dropEnt(d);dying.splice(i,1);continue}
+    try{M.fade(d.g,q)}catch(e){dropEnt(d);dying.splice(i,1)}}
 }
 
 /* ---------- camera ---------- */
@@ -840,7 +840,7 @@ function drawOverlay(sight){
   }
   // pets: a small health bar over the head, in the owner's colour (also one more thing no hostile monster has)
   {const al=R.testAllies||MB.allies||NONE,MM=modelOf('monster');
-    for(let i=0;i<al.length;i++){const a=al[i];if(!a||!a.pet||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))continue;
+    for(let i=0;i<al.length;i++){const a=al[i];if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))continue;
       let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
       toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)continue;
       const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=sp.x-bw/2,by=sp.y-8;
