@@ -511,7 +511,7 @@ function enterBoss(){
   floats.push({x:boss.x,y:boss.y-boss.r-20,txt:L.spec.name,life:1.8,c:'#ff5b6e'});$('bossName').textContent=L.spec.name;
 }
 // give a boss its modifiers
-function arm(m,L){m.mods=(L.mods||[]).slice();if(m.mods.includes('swift'))m.spdK=1.2;m.shT=5;m.burnT=2.5;m.tenth=9;m.splitN=2}
+function arm(m,L){m.mods=(L.mods||[]).slice();if(m.mods.includes('swift'))m.spdK=1.12;m.shT=5;m.burnT=2.5;m.fifth=4;m.thornT=0;m.splitN=2}
 function bossBar(){
   if(boss)$('bossFill').style.width=Math.max(0,boss.hp/boss.maxHp*100)+'%';
   else if(S.wave){let hp=0;for(const m of mons)hp+=Math.max(0,m.hp);$('bossFill').style.width=Math.min(100,hp/(S.wave.hp0||1)*100)+'%'}
@@ -653,7 +653,7 @@ function hurtM(m,d,quiet){
   if(m.boss&&m.hp>0){if(m.ai==='hollow'){const ph=m.hp<=m.maxHp/3?3:m.hp<=m.maxHp*2/3?2:1;if(ph>(m.phase||1)){m.phase=ph;phaseShift(m)}}else if(!m.rage&&m.hp<=m.maxHp*.4)enrage(m)}
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
   if(m.mods.length&&m.hp>0){
-    if(m.mods.includes('thorned')){const t=Math.floor(m.hp/m.maxHp*10);if(t<m.tenth){m.tenth=t;ringShot(m,8,150,rand()*TAU);puff(m,'#e7dfcd',8,200);sfx(700,.12,'square',.12,300)}}
+    if(m.mods.includes('thorned')){const t=Math.floor(m.hp/m.maxHp*5);if(t<m.fifth&&!(m.thornT>0)){m.fifth=t;m.thornT=.6;rings.push({x:m.x,y:m.y,life:.6,max:.6,r:m.r+60,fx:true});floats.push({x:m.x,y:m.y-m.r-18,txt:'Thorns',life:.9,c:'#d6a544'});sfx(700,.5,'square',.1,1400)}} // a fifth of its health gone: it bristles, and the thorns fly a moment later
     if(m.mods.includes('splitting')&&m.splitN>0&&m.hp<=m.maxHp*m.splitN/3){m.splitN--;const g=rand()*TAU,c=lesser(m.kind,m.x+Math.cos(g)*(m.r+30),m.y+Math.sin(g)*(m.r+30),m.maxHp*.07);c.s.col=m.s.col;
       rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+70,fx:true});floats.push({x:m.x,y:m.y-m.r-18,txt:'It splits',life:1.3,c:'#ff5b6e'});sfx(200,.3,'sawtooth',.2,400)}
   }
@@ -867,6 +867,7 @@ function step(dt){
     if(obstacles.length&&!m.hidden&&m.st!=='leap'){collide(m,m.r,true);
       // a walker that is trying to move and getting nowhere tries the other way round
       if(m.moving&&Math.hypot(m.x-ox,m.y-oy)<12*dt){if((m.stk=(m.stk||0)+dt)>.45){m.stk=0;m.avS=-(m.avS||1);m.avT=1.2;m.side*=-1}}else m.stk=0}
+    if(m.thornT>0&&(m.thornT-=dt)<=0&&!m.hidden){ringShot(m,7,150,rand()*TAU);puff(m,'#e7dfcd',10,200);sfx(500,.12,'square',.14,250)}
     if(m.mods.length&&!(m.stun>0)){
       if(m.mods.includes('shielded')&&(m.shT-=dt)<=0){m.shT=9;m.ward=2.5;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+50,fx:true});sfx(880,.3,'sine',.14,1320)}
       if(m.mods.includes('burning')){if(rand()<dt*10)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y+rand()*m.r-m.r/2,vx:rand()*30-15,vy:-60-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5});
