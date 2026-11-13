@@ -1018,6 +1018,8 @@ function save(n){const eq=S.eq&&{};if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl
 function title(saved){
   S.mode='title';S.level=0;freshBody();P.y=H/2+40;mons=[];allies=[];boss=null;hud();
   const btns=[['Rise',()=>{S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=[0,1,2,3];startLevel(0)}]];
+  // start as a whole person at the class choice; nothing is saved until a class is picked
+  btns.push(['Skip to class selection',()=>{chooseClass();freshBody();hud()}]);
   if(saved>0)btns.unshift(['Continue at level '+(saved+1),()=>saved>=8&&!CLASSES[S.cls]?chooseClass():startLevel(saved)]);
   show({kick:'Bones first. Legend later.',title:'You wake as bare bones',body:'Each monster you kill gives part of a body back: organs, then skin, then the five senses. Once you are whole you choose a class. Every level after that makes it stronger, and after level 50 it can be upgraded.',keys:matchMedia('(pointer:coarse)').matches?'Stick to move. Strike aims at the nearest monster.':'WASD or arrows to move. Space or click to strike. Esc or P to pause.',btns});
 }

@@ -444,9 +444,9 @@ function draw(dt){
   if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.06)'}
 
   // camera: leans toward the player, never far from the arena centre
-  const follow=sight?.22:.3,tx=P?W/2+(P.x-W/2)*follow:W/2,tz=(P?H/2+(P.y-H/2)*follow:H/2)-4,k=1-Math.exp(-dt*3.2);
+  const follow=sight?.55:.8,tx=P?W/2+(P.x-W/2)*follow:W/2,tz=(P?H/2+(P.y-H/2)*follow:H/2)-4,k=1-Math.exp(-dt*3.2);
   camTarget.x+=(tx-camTarget.x)*k;camTarget.z+=(tz-camTarget.z)*k;
-  const zt=sight?.93:.88;zoom+=(zt-zoom)*k;
+  const zt=sight?.72:.58;zoom+=(zt-zoom)*k;
   placeCamera(camTarget.x,camTarget.z,fitD*zoom);basePos.copy(camera.position);
   scene.fog.near=fitD*zoom*.95;scene.fog.far=fitD*zoom+(env.crypt?2600:1300);
 

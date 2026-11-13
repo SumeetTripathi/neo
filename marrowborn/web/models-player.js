@@ -351,7 +351,7 @@ const player={
       s.shieldGlow.visible=on;if(on){const f=1+.04*Math.sin(t*6);s.shieldGlow.scale.set(f,f,1)}
       s.shield.position.y=8.6+(on?0:-2.5)+sw*.4;s.shield.rotation.y=.75-(on?0:.35)}
     else ud.shieldOn=null;
-    s.ready.visible=!!(MB.pw(2)&&P.skCd<=0&&S.mode==='play');
+    s.ready.visible=!!(S.mode==='play'&&(MB.skills?MB.skills[0]&&MB.skills[0].unlocked&&MB.skills[0].ready:MB.pw(2)&&P.skCd<=0));
     // melee slash arc fades over the swing
     const sl=s.slash;sl.visible=atk&&mel;
     if(sl.visible){ud.slashMat.opacity=.75*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
