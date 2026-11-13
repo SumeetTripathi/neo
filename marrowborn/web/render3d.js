@@ -70,10 +70,10 @@ function floorTexture(theme,hue){
   const TW=2048,TH=1024,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue);
   g.scale(TW/W,TH/H);
   const crypt=theme==='crypt';
-  g.fillStyle=crypt?hsl(hue,14,5):hsl(hue,22,11);g.fillRect(0,0,W,H);
+  g.fillStyle=crypt?hsl(hue,14,5):hsl(hue,14,8);g.fillRect(0,0,W,H);
   if(!crypt){ // bare earth showing between the slabs
-    for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(hue+rnd()*30-15,26,16+rnd()*7,.2):'rgba(0,0,0,.16)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
-    for(let i=0;i<1500;i++){g.fillStyle=hsl(hue+rnd()*40-20,34,20+rnd()*16,.5);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
+    for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(hue+rnd()*30-15,16,13+rnd()*6,.22):'rgba(0,0,0,.16)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
+    for(let i=0;i<1500;i++){g.fillStyle=hsl(hue+rnd()*40-20,24,18+rnd()*14,.5);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
   }
   let y=0;
   while(y<H){
@@ -82,11 +82,11 @@ function floorTexture(theme,hue){
       const w=42+rnd()*44,v=rnd();
       if(crypt||rnd()<.74){
         const jx=crypt?0:rnd()*3-1.5,jy=crypt?0:rnd()*3-1.5,sx=x+1.3+jx,sy=y+1.3+jy,sw=w-2.6,sh=rh-2.6;
-        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,29+v*13):hsl(hue+v*24-12,10+v*9,25+v*13);g.fillRect(sx,sy,sw,sh);
+        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,29+v*13):hsl(hue+v*24-12,4+v*6,30+v*13);g.fillRect(sx,sy,sw,sh);
         for(let i=0;i<9;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,1+rnd()*5,0,TAU);g.fill()}
         g.fillStyle='rgba(255,255,255,.1)';g.fillRect(sx,sy,sw,1.4);g.fillRect(sx,sy,1.4,sh);
         g.fillStyle='rgba(0,0,0,.4)';g.fillRect(sx,sy+sh-2,sw,2);g.fillRect(sx+sw-2,sy,2,sh);
-        if(rnd()<.11){g.fillStyle=crypt?hsl(hue-95,30,34,.2):hsl(hue+10,40,30,.4);g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,6+rnd()*12,0,TAU);g.fill()}
+        if(rnd()<.11){g.fillStyle=crypt?hsl(hue-95,30,34,.2):hsl(hue+10,26,26,.4);g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,6+rnd()*12,0,TAU);g.fill()}
         if(rnd()<.16){g.strokeStyle='rgba(0,0,0,.62)';g.lineWidth=1.4;g.beginPath();const cx=sx+rnd()*sw,cy=sy+rnd()*sh;g.moveTo(cx,cy);g.lineTo(cx+rnd()*20-10,cy+rnd()*20-10);g.lineTo(cx+rnd()*32-16,cy+rnd()*32-16);g.stroke()}
       }
       x+=w;
@@ -154,7 +154,7 @@ function buildEnv(key){
   const ftex=floorTexture(crypt?'crypt':'out',hue);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:ftex,bumpMap:ftex,bumpScale:1.6,roughness:.86,metalness:.04}));
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
-  const btex=brickTexture(crypt?226:hue,crypt?9:12);
+  const btex=brickTexture(crypt?226:hue,crypt?9:6);
   const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x3c3c46,roughness:.95});
   const mats=[side,side,top,top,side,side];
   if(crypt){
@@ -169,7 +169,7 @@ function buildEnv(key){
   }else{
     // outdoors: a ruined boundary wall of loose blocks, open ground beyond, standing stones in the mist
     const bg=hslColor(hue,.3,.035);scene.background.copy(bg);
-    const ground=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(hue,.26,.1),{roughness:1}));
+    const ground=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(hue,.2,.045),{roughness:1}));
     ground.position.set(W/2,-.6,H/2);ground.receiveShadow=true;root.add(ground);
     const blocks=[];
     const run=(horizontal,fixed,from,to,hMin,hMax,out)=>{let a=from;while(a<to){const len=Math.min(to-a,34+rnd()*30),h=rnd()<.14?6+rnd()*6:hMin+rnd()*(hMax-hMin),th=30+rnd()*10;
@@ -180,8 +180,8 @@ function buildEnv(key){
     const d=new THREE.Object3D(),col=new THREE.Color();
     blocks.forEach((b,i)=>{d.position.set(b[0],0,b[1]);d.scale.set(b[2],b[3],b[4]);d.rotation.set(0,(rnd()-.5)*.05,0);d.updateMatrix();inst.setMatrixAt(i,d.matrix);inst.setColorAt(i,col.setScalar(.75+rnd()*.35))});
     inst.castShadow=inst.receiveShadow=true;root.add(inst);
-    const rockMat=std(hslColor(hue,.12,.22),{flatShading:true,roughness:1}),N=70;
-    const rocks=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),rockMat,N),spikes=new THREE.InstancedMesh(new THREE.CylinderGeometry(.08,1,1,5).translate(0,.5,0),std(hslColor(hue+20,.14,.13),{flatShading:true,roughness:1}),N);
+    const rockMat=std(hslColor(hue,.08,.16),{flatShading:true,roughness:1}),N=70;
+    const rocks=new THREE.InstancedMesh(new THREE.DodecahedronGeometry(1,0),rockMat,N),spikes=new THREE.InstancedMesh(new THREE.CylinderGeometry(.08,1,1,5).translate(0,.5,0),std(hslColor(hue+20,.1,.09),{flatShading:true,roughness:1}),N);
     for(let i=0;i<N;i++){
       let x,z;do{x=-620+rnd()*(W+1240);z=-560+rnd()*(H+700)}while(x>-60&&x<W+60&&z>-60&&z<H+60);
       const s=6+rnd()*16;d.position.set(x,s*.3,z);d.scale.set(s,s*(.6+rnd()*.8),s);d.rotation.set(rnd()*3,rnd()*3,rnd()*3);d.updateMatrix();rocks.setMatrixAt(i,d.matrix);
@@ -453,8 +453,8 @@ function draw(dt){
     hemi.color.setHex(0x9a9db0);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.42;
     sun.color.setHex(0xdfe4f5);sun.intensity=.62;
   }else{
-    hemi.color.setHSL(env.hue/360,.3,.62);hemi.groundColor.setHSL(env.hue/360,.25,.12);hemi.intensity=.62;
-    sun.color.setHSL(((env.hue+25)%360)/360,.28,.86);sun.intensity=.95;
+    hemi.color.setHSL(env.hue/360,.14,.6);hemi.groundColor.setHSL(env.hue/360,.15,.1);hemi.intensity=.46;
+    sun.color.setHSL(((env.hue+25)%360)/360,.14,.88);sun.intensity=.78;
   }
   for(let i=0;i<4;i++){
     const f=env.flames[i],lit=sight,fl=1+.13*Math.sin(t*9+f.ph)+.07*Math.sin(t*23.7+f.ph*2.3);
