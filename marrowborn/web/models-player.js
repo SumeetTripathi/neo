@@ -243,14 +243,15 @@ function buildHuman(b,s,ud,st,c,adv,tier){
   b.sp('head',F,0,HEADY,.1,4.7,.93,1,.98);b.co('head',F,0,1.9,.9,3.5,3.6,PI,0,0,6,.9);
   b.fine=true;
   if(hearing)for(const k of[-1,1]){b.sp('head',F,k*4.5,4.5,-.3,1.6,.45,1,.75);b.sp('head',Fd,k*4.85,4.5,0,.9,.35,1,.7)}
-  if(sight){const W=lit(0xffffff,.55),Pp=mat(0x17121c),Br=mat(taste?C.hairS:C.skinD);
-    for(const k of[-1,1]){b.sp('head',W,k*1.8,4.9,4.05,1.3,1.1,.74,.5,0,0,k*.2);b.sp('head',Pp,k*1.72,4.85,4.55,.74,1,1,.5);b.bx('head',Br,k*1.9,6.15,4.3,2.5,.42,.6,0,0,k*.26)}}
+  if(sight){const W=lit(0xffffff,.55),Pp=c&&(adv||tier>=4)?lit(acc,1.2):mat(0x17121c),Br=mat(0x241c2c);
+    for(const k of[-1,1]){b.sp('head',W,k*1.85,4.75,4.0,1.35,1.12,.56,.5,0,0,k*.24);b.sp('head',Pp,k*1.7,4.72,4.5,.66,1,.9,.5);b.bx('head',Br,k*1.95,5.5,4.42,2.7,.36,.7,0,0,k*.3)}}
   if(smell)b.co('head',Fd,0,3.75,4.9,.7,1.7,1.15,0,0,4);
   if(taste)b.bx('head',mat(0x6e2430),0,2.25,4.2,1.9,.42,.5);
   b.fine=false;
   if(o.hair)hair(b,acc,o.hair===2);
   // ----- no class yet: grave wrappings -----
   if(!c){const cl=mat(0x4a4458),cd=mat(0x34303f),bd=mat(0xd9cfb8);
+    for(const k of[-1,1]){b.bx('torso',F,k*2.75,13.9,3.35,4.6,3.6,1.1,-.12,k*.22,k*.06);b.sp('torso',F,k*3,15.2,-2.6,1,3,3.2,1.4)}b.fine=true;b.bx('torso',Fd,0,7,3.05,.4,5.4,.3);b.bx('torso',Fd,0,6.2,3.05,3.4,.35,.3);b.bx('torso',Fd,0,8.2,3.1,3.6,.35,.3);b.fine=false;
     b.cy('hips',cl,0,.1,0,5,5.4,4.6,0,0,0,.72,8);b.cy('hips',cd,0,2.1,0,5.2,5.2,1.2,0,0,0,.72,8);
     s.coatB.position.set(-.8,-1.4,-3.3);s.coatL.position.set(1.3,-1.4,3.5);panel(b,'coatB',cl,8,2.6,2,0,null,2.4);panel(b,'coatL',cl,9.5,2.3,1.6,0,null,2.6);
     b.fine=true;for(const y of[-2.5,-4.3,-6.1])b.cy('foreL',bd,0,y,0,1.9,1.8,1.1);for(const y of[-4,-6,-8])b.cy('shinR',bd,0,y,0,2.05,1.95,1.1);b.fine=false}
@@ -267,7 +268,7 @@ function buildHuman(b,s,ud,st,c,adv,tier){
     // open collar vest, wide sash with two long tails at the back of the left hip, wrapped forearms
     b.cy('hips',o.thigh,0,-.6,0,5.1,5.6,5,0,0,0,.72,8);b.cy('hips',sash,0,2,0,5.1,5.1,2.6,0,0,0,.74,8);b.sp('hips',sash,3.2,2,-3.4,1.5);
     s.coatB.position.set(3,1.6,-3.6);panel(b,'coatB',sash,17,1.7,2.2,0,null,3);b.cy('coatB',sash,-2.4,-6.5,-.5,1.4,1.9,13,0,0,-.12,.15,6);b.spike('coatB',sash,-3.2,-12.6,-.5,-.15,-1,0,2.6,1.7,.2);
-    b.fine=true;b.bx('torso',tr,0,11.5,4.25,.8,9,.5);b.bx('torso',F,0,15.4,4.1,3,3.6,.5);b.fine=false;
+    b.fine=true;b.bx('torso',tr,-1.6,12.4,4.2,.7,7.4,.5,0,0,-.2);b.bx('torso',tr,1.6,12.4,4.2,.7,7.4,.5,0,0,.2);b.bx('torso',F,0,15.6,4.05,2.4,3.4,.5);b.fine=false;
     b.cy('torso',o.torso,0,NECK-1.4,-.6,2.9,3.2,3,0,0,0,.9,6);
     b.fine=true;for(const y of[-3,-4.8,-6.6])for(const f of['foreL','foreR'])b.cy(f,wrap,0,y,0,1.85,1.7,1.2);b.fine=false;
     // one layered pauldron on the left shoulder; champions wear two
@@ -354,7 +355,7 @@ function buildHuman(b,s,ud,st,c,adv,tier){
     hood(b,N1,.2);
     for(let i=0;i<5;i++){const a=PI*.5+(i-2)*.62;b.spike('torso',Bn,Math.cos(a)*-5.4,17.4,Math.sin(a)*-3.4-.4,-Math.cos(a)*.9,.55,-Math.sin(a)*.9-.2,3.6,.75)}
     for(const k of[-1,1])b.spike('torso',Bn,k*7.6,17.6,0,k*.9,1,-.2,4.2,1.1);
-    b.fine=true;b.bx('torso',tr,0,10.4,4.25,.6,10.5,.5);b.bx('torso',tr,0,13.4,4.25,3.4,.6,.5);b.bx('hips',tr,0,-7,3.75,.6,12,.5,-.05);
+    b.fine=true;b.bx('torso',tr,0,10.4,4.25,.6,10.5,.5);for(let i=0;i<3;i++)for(const k of[-1,1])b.bx('torso',tr,k*(1.3+i*.3),13.8-i*2.2,4.2,2+i*.6,.5,.5,0,0,k*.35);b.bx('hips',tr,0,-7,3.75,.6,12,.5,-.05);
     b.sp('hips',Bn,-2.8,1.2,3.8,1.6,1,1,.8);b.sp('hips',mat(C.dark),-3.3,1.4,4.9,.45);b.sp('hips',mat(C.dark),-2.3,1.4,4.9,.45);b.fine=false;
     b.cy('hips',N1,0,-6,3.4,2.2,2.8,13,-.05,0,0,.15,6);b.spike('hips',N1,0,-12.4,3.1,0,-1,0,4,2.8,.18);
     for(const f of['foreL','foreR'])b.cy(f,N1,0,-6,0,1.8,3,5);
@@ -392,7 +393,7 @@ function buildWeapon(b,s,ud,skin,c,adv,tier){
     b.fine=true;b.sp('orb',g,-1.2,.5,2.7,1);b.sp('orb',g,1.2,.5,2.7,1);b.co('orb',mat(C.dark),0,-.9,3.1,.5,1.1,0,0,0,3,.5);b.fine=false;
     b.sp('orb',glow(acc,.2),0,0,0,5.6);
     if(adv==='reaper'){const bl=mat(0x3a3f52,{side:T.DoubleSide});b.to('wepR',bl,0,8.5,8.2,11.5,1.3,.4,1.25,0,-HP,.55);b.to('wepR',edge,0,8.5,8.2,10.4,.45,.5,1.25,0,-HP,.55);b.bx('wepR',mat(0x2a2226),0,19.6,1.3,1.3,1.3,4.4)}}
-  else if(c==='ranger'){ud.wtype='bow';const wood=mat(0x2c2a36),R=18,ha=.8,H=R*Math.sin(ha);ud.bowH=H;
+  else if(c==='ranger'){ud.wtype='bow';const wood=mat(0x6a5a52),R=18,ha=.8,H=R*Math.sin(ha);ud.bowH=H;
     // recurve bow in the left hand: arc bulging forward (+Z), tips flicking forward, a lit string whose halves stretch in update()
     b.to('wepL',wood,0,0,-R*Math.cos(ha),R,.85,1,ha*2,0,-HP,-ha);b.cy('wepL',lea,0,0,R-R*Math.cos(ha),1.2,1.2,5.4);
     const tip=adv==='sharpshooter'?gold:wood;b.spike('wepL',tip,0,H-.6,-.3,0,1,.9,4.2,1);b.spike('wepL',tip,0,-H+.6,-.3,0,-1,.9,4.2,1);
@@ -444,7 +445,7 @@ const player={
   },
   update(g,P,MB,dt){
     const ud=g.userData,s=ud.s,S=MB.S,t=S.t||0;dt=dt||0;
-    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+(typeof S.rank==='string'?S.rank.slice(0,2):'');
+    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+tierOf(S);
     if(key!==ud.key){ud.key=key;rebuildPlayer(g,MB)}
     const c=ud.cls,wt=ud.wtype,atk=P.atk>0,mel=wt!=='staff'&&wt!=='bow';
     // facing (and how fast it is turning, for the cloth)
@@ -467,8 +468,8 @@ const player={
     rig.rotation.x=mb*.1+dl*.5+(mel?0:ab*.08);rig.scale.set(1-dl*.06,1-dl*.1,1+dl*.2);
     // legs: a long stride, the back leg kicking out on a dash
     const LA=ud.robe?.6:.72;
-    s.legL.rotation.x=-sw*LA-dl*.85;s.legR.rotation.x=sw*LA+dl*.6;s.legL.rotation.z=.05;s.legR.rotation.z=-.05;
-    s.shinL.rotation.x=Math.max(0,cw)*LA*1.2+dl*.6+mb*.12;s.shinR.rotation.x=Math.max(0,-cw)*LA*1.2+dl*1+mb*.12;
+    s.legL.rotation.x=-sw*LA-dl*.9;s.legR.rotation.x=sw*LA+dl*.3;s.legL.rotation.z=.05;s.legR.rotation.z=-.05;
+    s.shinL.rotation.x=Math.max(0,cw)*LA*1.2+dl*.9+mb*.12;s.shinR.rotation.x=Math.max(0,-cw)*LA*1.2+dl*.5+mb*.12;
     s.hips.rotation.y=sw*.14;
     // rest pose per weapon type: [R arm x, R elbow, weapon tilt, L arm x, L elbow, R swing, L swing]
     let rx=-.25,re=-.6,tilt=.62,lx=0,le=-.18,fr=.5,fl=1,ltilt=1,rz=-.15,lz=.15;
@@ -505,10 +506,10 @@ const player={
     }
     // cloth: tails, hip panels, cape, scarf and headband trail behind movement, lag a turn and never quite hang still
     const fl1=Math.sin(t*2.7),fl2=Math.sin(t*3.3+1.3),fl3=Math.sin(t*7.1+.6);
-    s.coatB.rotation.set(.07+mb*.5+dl*.8+fl1*.04+Math.abs(sw)*.08,0,sw*.06-yv);
-    s.coatL.rotation.set(mb*.3+dl*.65-sw*LA*.5+fl2*.03,0,.1+mb*.14+dl*.2+fl1*.03-yv*.6);
-    s.coatR.rotation.set(mb*.3+dl*.65+sw*LA*.5+fl1*.03,0,-.1-mb*.14-dl*.2-fl2*.03-yv*.6);
-    s.cape.rotation.set(.1+mb*.4+dl*.7+fl1*.04+Math.sin((P.walk||0)*2)*.05*mb,-twist*.5,-yv);
+    s.coatB.rotation.set(.07+mb*.5+dl*.45+fl1*.04+Math.abs(sw)*.08,0,sw*.06-yv);
+    s.coatL.rotation.set(mb*.3+dl*.4-sw*LA*.5+fl2*.03,0,.1+mb*.14+dl*.2+fl1*.03-yv*.6);
+    s.coatR.rotation.set(mb*.3+dl*.4+sw*LA*.5+fl1*.03,0,-.1-mb*.14-dl*.2-fl2*.03-yv*.6);
+    s.cape.rotation.set(.1+mb*.4+dl*.4+fl1*.04+Math.sin((P.walk||0)*2)*.05*mb,-twist*.5,-yv);
     s.cape2.rotation.set(mb*.26+dl*.3+Math.sin(t*2.7-1)*.07*(.5+mb)+ab*.2,0,-yv*.8);
     s.scarf.rotation.set(.3+mb*.75+dl*.55+fl3*.09*(.4+mb),-twist*.4,.1-yv*1.4);
     s.scarf2.rotation.set(.1+mb*.3+dl*.2+Math.sin(t*7.1-.5)*.16*(.4+mb),0,-yv);
@@ -520,7 +521,7 @@ const player={
     if(c==='healer'){s.halo.position.y=ud.haloY+Math.sin(t*2)*.5;s.halo.rotation.set(HP-.35,0,t*.6)}
     if(ud.adv){s.aura.rotation.y=t*.6;const f=1+.05*Math.sin(t*3);s.aura.scale.set(f,1,f)}
     if(ud.nw){const W=ud.wisps,n=ud.nw;for(let i=0;i<n;i++){const w=W[i],q=(t*(.5+i*.03)+i*.37)%1,a=i*2.4+t*.5,r=9+2.5*Math.sin(i*1.7+t),f=Math.sin(q*PI);
-        w.visible=rig.visible;w.position.set(Math.cos(a)*r,3+q*(44+ud.tier*2),Math.sin(a)*r);w.scale.set(1.1*f,(4+ud.tier*.5)*(.5+q),1.1*f)}}
+        w.visible=rig.visible;w.position.set(Math.cos(a)*r,3+q*(44+ud.tier*2),Math.sin(a)*r);w.scale.set(1.5*f,(6+ud.tier*.6)*(.5+q),1.5*f)}}
     if(ud.shieldMeshes.length){const on=!!P.shield;
       if(on!==ud.shieldOn){ud.shieldOn=on;const a=ud.shieldMeshes;for(let i=0;i<a.length;i+=3){a[i].material=on?a[i+1]:a[i+2];const l=a[i].userData.mbLineMesh;if(l)l.visible=on}}
       s.shieldGlow.visible=on;if(on){const f=1+.04*Math.sin(t*6);s.shieldGlow.scale.set(f,f,1)}
@@ -583,7 +584,8 @@ const ally={
   create(a,MB){
     const g=new T.Group(),wolf=a&&a.kind==='wolf';g.name=wolf?'wolf':'thrall';
     const s=mkSlots(g,wolf?W_TREE:T_TREE);if(wolf)buildWolf(s);else buildThrall(s);
-    g.userData={s,wolf,lx:a?a.x:0,ly:a?a.y:0,rot:a&&a.flip?-HP:HP,mv:0,seed:Math.random()*TAU};g.rotation.y=g.userData.rot;
+    g.userData={s,wolf,puffs:wolf?null:[s.p0,s.p1,s.p2],lx:a?a.x:0,ly:a?a.y:0,rot:a&&a.flip?-HP:HP,mv:0,seed:Math.random()*TAU};g.rotation.y=g.userData.rot;
+    if(!wolf)g.scale.setScalar(1.18);
     ink(g,.8);
     return g;
   },
@@ -605,7 +607,7 @@ const ally={
       s.armL.rotation.x=-1.15+sw*.25+Math.sin(t*2)*.06;s.armR.rotation.x=-1.05-sw*.25+Math.sin(t*2+1)*.06;
       s.head.rotation.z=Math.sin(t*1.7)*.1-sw*.1;s.head.rotation.x=-.12;
       // smoke: three dark puffs that swell, drift up from the feet and thin away
-      for(let i=0;i<3;i++){const p=s['p'+i],q=(t*.6+i*.33)%1,a2=i*2.1+t*.7,f=Math.sin(q*PI);p.position.set(Math.cos(a2)*(3+q*2),1+q*9,Math.sin(a2)*(3+q*2)-1);p.scale.set(3.4*f+.01,2.6*f+.01,3.4*f+.01)}
+      for(let i=0;i<3;i++){const p=ud.puffs[i],q=(t*.6+i*.33)%1,a2=i*2.1+t*.7,f=Math.sin(q*PI);p.position.set(Math.cos(a2)*(3+q*2),1+q*9,Math.sin(a2)*(3+q*2)-1);p.scale.set(3.4*f+.01,2.6*f+.01,3.4*f+.01)}
     }
   }
 };

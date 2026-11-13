@@ -197,7 +197,8 @@ const POOL=['crawler','hound','witch','fist','beamer','burrower','bomber','summo
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
 const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
-const genMul=n=>{const k=Math.max(0,n-12);return 1+.062*k+.0055*k*k};
+// (the last factor came in with six carried skills: it climbs from level 15 to +18% at level 25 and stays there)
+const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))};
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
 const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
@@ -829,7 +830,7 @@ function playerStep(dt){
 // PETS.roster holds up to eight: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
 // up to three for a Necromancer, two (beside the wolf) for a Beastmaster. Several pets share the work: each has the health and the bite of PETK[how many are out - 1] of a lone pet.
 // In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
-const PETS={roster:[],active:[],down:false,dmg:0,fielded:[]},PETMAX=8,PLVMAX=25,PETD=1,PETHP=2.2,PETK=[1,.65,.5],MINIONS=4;
+const PETS={roster:[],active:[],down:false,dmg:0,fielded:[]},PETMAX=8,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PETK=[1,.65,.5],MINIONS=4;
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
 const petCap=()=>({necro:3,beast:2})[petOwner()]||0;
 // the roster entries that go with you, in order
@@ -842,7 +843,7 @@ const petTough=k=>Math.sqrt((GENHP[k]||560)/560);
 const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col,crown:e.crown?1:0,r:Math.round(Math.max(16,Math.min(30,e.r*.8)))});
 // A pet is rescaled every time it enters a fight: its health follows yours and its blows follow your damage, so an old pet keeps pace and a new one is no stronger.
 const petHp=(e,k=1)=>Math.max(6,Math.round(P.maxHp*PETHP*k*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
-const petPow=a=>PETD*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
+const petPow=a=>(PETD[a.owner]||1)*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
 function makePet(e,frac=1,owner=petOwner(),k=1,slot=0){
   const s=petSpec(e),g=rand()*TAU,hp=petHp(e,k);
   const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*46,y:P.y+Math.sin(g)*46,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
@@ -918,7 +919,7 @@ const PETAI={
     else{if(t&&a.cd<=0){a.cd=.55;petShot(a,g,380,1.3*D)}if((a.t-=dt)<=0){a.st='under';a.hidden=true;a.t=1.5}}
   },
   bomber(a,dt,t,g,d,D){
-    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=1.7;if(t){for(const k of[0,.6]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.85,2.7*D);z.sx=a.x;z.sy=a.y}sfx(240,.2,'triangle',.1,90)}}return}
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=1.7;if(t){for(const k of[0,.6]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.85,3.3*D);z.sx=a.x;z.sy=a.y}sfx(240,.2,'triangle',.1,90)}}return}
     petKeep(a,dt,t,g,d,160,290,70);if((a.t-=dt)<=0&&d<440){a.st='wind';a.t=.35}
   },
   summoner(a,dt,t,g,d,D){
@@ -932,7 +933,7 @@ const PETAI={
     else{a.ba+=Math.max(-1.1*dt,Math.min(1.1*dt,Math.atan2(Math.sin(g-a.ba),Math.cos(g-a.ba))));if((a.t-=dt)<=0){a.st='idle';a.t=2.2;a.beam=null;return}}
     if(a.st==='idle')return;
     const on=a.st==='beam';if(!a.beam)a.beam={on,w:10,rays:[{a:0,len:0}]};a.beam.on=on;const r=a.beam.rays[0];r.a=a.ba;r.len=rayLen(a.x,a.y,r.a);
-    if(on&&(a.bk-=dt)<=0){a.bk=.2;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r)petHit(m,1.15*D,a)}
+    if(on&&(a.bk-=dt)<=0){a.bk=.2;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r)petHit(m,D,a)}
   },
   mimic(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,120,240,95);if((a.t-=dt)<=0){a.t=.85;petShot(a,g,380,2*D,5)}},
   hollow(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,220,70);if((a.t-=dt)<=0){a.t=2.1;a.n++;for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,300,.7*D);for(const k of[-.14,0,.14])petShot(a,g+k,380,1.3*D,5);sfx(200,.2,'sawtooth',.1,90)}},
@@ -1639,7 +1640,7 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 .sk .c,#skillBar .c{color:var(--marrow);font-weight:600;font-variant-numeric:tabular-nums}
 .sk .c{font-size:1.45em}.sk .c:empty{display:none}
 #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
-#skillBar li{flex:1 1 118px;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--stone-2);font-size:.88rem;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
+#skillBar li{flex:1 1 118px;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--stone-2);font-size:.82rem;line-height:1.15;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
 #skillBar li.ready{border-color:var(--marrow);color:var(--bone)}#skillBar li.locked{opacity:.45}
 #skillBar .c{margin-left:auto}
 @media (pointer:coarse){#skillBar{display:none}}`;document.head.appendChild(st)}
@@ -1658,7 +1659,7 @@ $('snd').onclick=()=>{audio();const wasOn=!muted&&(SET.music>0||SET.sfx>0);muted
 $('hap').onclick=()=>{setSetting('haptic',SET.haptic>0?0:hapLast);haptic(40);$('hap').blur()};
 // the active pets' names and health, beside your own: up to three rows
 const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;const petRows=[];
-for(let i=0;i<3;i++){const row=document.createElement('span'),n=document.createElement('span'),b=document.createElement('span'),f=document.createElement('span');row.className='petRow';n.className='lab petName';b.className='petBar';f.className='petFill';b.appendChild(f);row.append(n,b);petHud.appendChild(row);petRows.push({row,n,f,key:''})}
+for(let i=0;i<3;i++){const row=document.createElement('span'),n=document.createElement('span'),b=document.createElement('span'),f=document.createElement('span');row.className='petRow';row.hidden=true;n.className='lab petName';b.className='petBar';f.className='petFill';b.appendChild(f);row.append(n,b);petHud.appendChild(row);petRows.push({row,n,f,key:''})}
 $('hp').after(petHud);
 function petUi(){
   const on=S.mode!=='title'&&act2()?petOn():[],own=petOwner();

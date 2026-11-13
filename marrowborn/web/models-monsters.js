@@ -131,15 +131,29 @@ function eye(par,list,x,y,z,er,nx,ny,nz,red,lo){
 }
 // n eyes on a forward-facing face: two in a row, a third above, more in a wider upper row
 function eyesFace(par,list,n,cx,cy,cz,dx,er,red){
-  if(n===1){eye(par,list,cx,cy,cz,er*1.25,0,.1,1,red);return}
+  if(n===1){eye(par,list,cx,cy,cz,er*1.25,0,.1,1,red);eyeGlow(par,cx,cy,cz,dx,er*1.25,red,1);return}
   for(var i=0;i<n;i++){
     if(i<2)eye(par,list,cx+(i?dx:-dx),cy,cz,er,(i?.35:-.35),.1,1,red);
     else if(i===2)eye(par,list,cx,cy+dx*1.25,cz-dx*.25,er*.9,0,.3,1,red);
     else eye(par,list,cx+(i%2?1:-1)*dx*1.9,cy+dx*.9,cz-dx*.8,er*.75,(i%2?.7:-.7),.2,1,red);
   }
+  eyeGlow(par,cx,cy,cz,dx,er,red,n);
 }
 
-function claw3(){return merged('claw3',function(add){for(var k=-1;k<=1;k++)add(G.cone4,k*.5,-.3,.5,k*.35,-.5,1,.28,1.25,.28)})}
+// long hooked talons
+function claw3(){return merged('claw3',function(add){for(var k=-1;k<=1;k++){add(G.cone4,k*.5,-.3,.5,k*.35,-.5,1,.24,1.7,.2);add(G.cone4,k*.5,-.3,.5,k*.3,.9,-.4,.16,.5,.16)}})}
+// a soft glow across the eyes and streaks of light trailing off the outer ones (unregistered: no flash, no outline, no shadow)
+var CUR=null;
+function eyeGlow(par,cx,cy,cz,dx,er,red,n){
+  var p=CUR;if(!p)return;
+  var col=PV==='necro'?pal('necro',0x7dff8c):PV==='beast'?pal('beast',0xcfeaff):red==='g'?0x7fe85a:pal('foe',0xff2d55),k,t;
+  p.glows.push(fxMesh(G.sphLo,glowM(col,.3),par,cx,cy,cz-er*.4,(n>1?dx:0)+er*2.2,er*2,er*1.5));
+  for(k=-1;k<=1;k+=2){
+    if(n===1&&k>0)break;
+    t=fxMesh(G.cone4,glowM(col,.6),par,cx+(n>1?k*(dx+er*.5):0),cy+er*.3,cz-er*.3);orient(t,n>1?k*.6:0,.8,-1);t.scale.set(er*.6,er*4,er*.25);
+    p.glows.push(t);p.trails.push({o:t,l:er*4.2});
+  }
+}
 
 /* ---------- the nine bodies ---------- */
 var BUILD={},ANIM={};
@@ -151,19 +165,21 @@ var CFG={
   burrower:{bob:0,spd:2,y0:0,br:.02,top:2.2},mimic:{bob:.05,spd:3,y0:0,br:.03,top:2},hollow:{bob:.07,spd:1.7,y0:.22,br:.02,top:2.95,k:.86}
 };
 
+// Gravecrawler: low and wide on eight bladed legs, a ridge of fins down its back, a hooked stinger and scythe jaws
 BUILD.crawler=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.3),n=max(4,s.legs||8),half=n>>1,i;
   mk(G.sph,c,b,0,.64,-.6,.8,.56,.86);mk(G.sph,dk,b,0,.52,.22,.6,.4,.56);
-  mk(merged('crawlPlates',function(add){for(var k=0;k<4;k++)add(G.cone4,0,1.0-k*.05,-.15-k*.32,0,.8,-.6,.2-k*.02,.42,.2-k*.02)}),dk,b);
+  mk(merged('crawlFins',function(add){for(var k=0;k<5;k++)add(G.cone4,0,1.0-k*.05,.12-k*.32,0,.8,-.8,.06,.66-k*.05,.2);add(G.cone4,0,.72,-1.3,0,.8,-1,.1,.85,.1);add(G.cone4,0,1.24,-1.86,0,-.5,-1,.07,.4,.07)}),dk,b);
   p.head=grp(b,0,.5,.72);
-  mk(G.sphLo,lt,p.head,0,0,.12,.44,.36,.42);
-  p.mand=[spike(dk,grp(p.head,-.2,-.08,.4),0,0,0,.25,-.1,1,.5,.1).parent,spike(dk,grp(p.head,.2,-.08,.4),0,0,0,-.25,-.1,1,.5,.1).parent];
+  mk(merged('crawlHead',function(add){add(G.sphLo,0,0,.12,0,1,0,.44,.36,.42);for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.3,.16,.02,sd*.7,.8,-.6,.08,.5,.08)}),lt,p.head);
+  var mand=function(sd){var g=grp(p.head,sd*.2,-.08,.4);spike(dk,g,0,0,0,-sd*.22,-.1,1,.78,.13).scale.z=.05;return g};
+  p.mand=[mand(-1),mand(1)];
   eyesFace(p.head,p.eyes,s.eyes||2,0,.2,.42,.2,.13);
   p.legs=[];
+  var legG=function(side){return merged('crawlLeg'+side,function(add){add(G.cyl,0,0,0,side*.55,.5,0,.085,.75,.085);add(G.cone4,side*.55,.5,0,side*.6,-1,0,.07,1.2,.13);add(G.cone4,side*.5,.46,0,side*.5,1,0,.07,.36,.07)})};
   for(i=0;i<n;i++){
     var side=i%2?1:-1,k=i>>1,f=half>1?1-2*k/(half-1):0,o=grp(b,side*.42,.5,.12+f*.5),base=-side*f*.75;
-    seg(G.cyl,dk,o,0,0,0,side*.55,.5,0,.085);seg(G.cone,dk,o,side*.55,.5,0,side*1.08,-.5,0,.1);
-    mk(G.sphLo,dk,o,side*.55,.5,0,.12,.12,.12);
+    mk(legG(side),dk,o);
     o.rotation.y=base;p.legs.push({o:o,side:side,base:base,ph:(k+(side>0?0:1))*PI});
   }
 };
@@ -179,22 +195,26 @@ ANIM.crawler=function(p,m,t,tt,st,look){
   p.head.rotation.y=look*.5;p.head.rotation.x=wind?-.25:lunge?.1:0;
 };
 
+// Bonehound: a rangy skull-headed runner. Forward horns, sabre fangs, fins along the spine, blades on the shoulders, clawed feet
 BUILD.hound=function(b,m,p){
-  var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.3),n=s.spikes||6,i,x;
-  mk(G.sph,c,b,0,1.02,.25,.6,.62,.75);mk(G.sph,c,b,0,1.0,-.58,.42,.44,.56);
+  var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.3),n=s.spikes||6,i;
+  mk(G.sph,c,b,0,1.02,.25,.6,.62,.75);mk(G.sph,c,b,0,1.0,-.58,.4,.42,.56);
   mk(merged('houndRibs',function(add){for(var k=0;k<3;k++)for(var sd=-1;sd<=1;sd+=2)add(G.box,sd*.55,1.0,.55-k*.26,sd*.3,1,0,.09,.66,.08)}),lt,b);
-  mk(merged('houndSpine'+n,function(add){for(var k=0;k<n;k++){var f=k/(n-1),z=.72-f*1.65,h=.5-abs(f-.35)*.3;add(G.cone4,0,1.46-f*.14-(f<.15?.1:0),z,0,1,-.45,.14,h+.08,.14)}}),dk,b);
-  p.tail=grp(b,0,1.05,-1.02);seg(G.cone,dk,p.tail,0,0,0,0,.3,-.75,.1);
+  mk(merged('houndFins'+n,function(add){for(var k=0;k<n;k++){var f=k/(n-1),z=.72-f*1.65,h=.5-abs(f-.35)*.3;add(G.cone4,0,1.46-f*.14-(f<.15?.1:0),z,0,1,-.55,.05,h+.3,.2)}
+    for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.44,1.3,.42,sd*.7,.8,-1,.06,.85,.14);add(G.cone4,sd*.3,1.2,-.5,sd*.5,.7,-1,.05,.5,.1)}}),dk,b);
+  p.tail=grp(b,0,1.05,-1.02);seg(G.cone,dk,p.tail,0,0,0,0,.36,-.95,.1);mk(G.cone4,lt,p.tail,0,.3,-.8,.03,.4,.16).rotation.x=-1.9;
   p.head=grp(b,0,1.25,.9);
   mk(G.ico1,c,p.head,0,.04,.25,.48,.42,.52);mk(G.box,c,p.head,0,-.1,.72,.34,.26,.5);
   p.jaw=grp(p.head,0,-.22,.3);mk(G.box,c,p.jaw,0,-.06,.34,.3,.09,.56);
-  mk(merged('houndFangs',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.13,-.22,.9,0,-1,0,.055,.2,.055);add(G.cone4,sd*.13,-.22,.7,0,-1,0,.045,.15,.045)}}),M(BONE),p.head);
-  for(x=-1;x<=1;x+=2){seg(G.cyl,dk,p.head,x*.3,.28,.1,x*.64,.6,.3,.12);seg(G.cone,dk,p.head,x*.64,.6,.3,x*.6,.74,1.1,.125);mk(G.sphLo,dk,p.head,x*.64,.6,.3,.125,.125,.125)}
+  mk(merged('houndFangs',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.14,-.2,.9,sd*.05,-1,.1,.06,.4,.06);add(G.cone4,sd*.14,-.2,.7,0,-1,0,.045,.2,.045);add(G.cone4,sd*.12,-.2,.52,0,-1,0,.04,.15,.04)}}),M(BONE),p.head);
+  mk(merged('houndHorns',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cyl,sd*.3,.28,.1,sd*.34,.32,.2,.12,.5,.12);add(G.cone4,sd*.64,.6,.3,-sd*.06,.22,1,.13,1.15,.13);add(G.sphLo,sd*.64,.6,.3,0,1,0,.125,.125,.125);add(G.cone4,sd*.22,.36,.5,sd*.3,1,-.2,.06,.34,.06)}}),dk,p.head);
   eyesFace(p.head,p.eyes,s.eyes||2,0,.12,.62,.27,.12);
   p.legs=[];
+  var up=function(h){return merged('houndUp'+h,function(add){add(G.cyl,0,0,0,0,-h*.5,-.14,.15,Math.sqrt(h*h*.25+.0196),.15);add(G.sphLo,0,-h*.5,-.14,0,1,0,.17,.17,.17)})},
+    lo=function(h){return merged('houndLo'+h,function(add){add(G.cone4,0,-h*.5,-.14,0,-h*.5,.2,.15,h*.56,.15);add(G.cone4,0,-h*.5,-.14,0,.4,-1,.06,.34,.06);for(var k=-1;k<=1;k++)add(G.cone4,k*.09,-h+.07,.03,k*.3,-.25,1,.045,.3,.045)})};
   for(i=0;i<4;i++){
     var sd=i%2?1:-1,front=i<2,o=grp(b,sd*(front?.46:.36),front?.92:.88,front?.45:-.7),h=front?.92:.88;
-    seg(G.cyl,c,o,0,0,0,0,-h*.5,-.14,.15);seg(G.cone,dk,o,0,-h*.5,-.14,0,-h,.06,.16);mk(G.sphLo,c,o,0,-h*.5,-.14,.17,.17,.17);
+    mk(up(h),c,o);mk(lo(h),dk,o);
     p.legs.push({o:o,front:front,ph:(i===0||i===3)?0:PI});
   }
 };
@@ -214,21 +234,23 @@ ANIM.hound=function(p,m,t,tt,st,look){
   p.tail.rotation.y=ch?0:.4*sin(tt*(wind?16:5));p.tail.rotation.x=ch?.5:dz?.9:0;
 };
 
+// Tallow Witch: a floating robe with a ragged hem, a tall hood bent back between two horns, spiked shoulders and long talons
 BUILD.witch=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.35),x;
   p.robe=grp(b,0,0,0);
-  mk(G.robe,c,p.robe);mk(ringGeo('hem8',8,.74,.02,-2.6,.34,.24),c,p.robe);
+  mk(G.robe,c,p.robe);mk(ringGeo('hem8r',8,.74,.06,-2.1,.52,.2),c,p.robe);
   mk(G.cone,dk,b,0,1.28,0,.68,.5,.6);
+  mk(merged('witchBarbs',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.42,1.42,0,sd*1,.55,-.2,.1,.66,.07);add(G.cone4,sd*.26,1.52,-.2,sd*.5,1,-.6,.07,.42,.06)}}),dk,b);
   p.head=grp(b,0,1.86,0);
   mk(G.sph,dk,p.head,0,0,-.03,.5,.5,.52);
-  spike(dk,p.head,0,.2,-.1,0,1,-.55,.95,.36);
+  mk(merged('witchHood',function(add){add(G.cone,0,.2,-.1,0,1,-.4,.36,.72,.36);add(G.cone,0,.8,-.36,0,.45,-1,.2,.66,.2);for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.36,.16,-.1,sd*.85,.9,-.45,.09,.74,.07)}),dk,p.head);
   mk(G.sph,FX.voidM,p.head,0,-.04,.3,.36,.36,.26,true);
   eyesFace(p.head,p.eyes,s.eyes||2,0,-.02,.52,.15,.085);
   p.hands=[];
   for(x=-1;x<=1;x+=2){
     var h=grp(b,x*.98,1.12,.5);
     mk(G.ico,lt,h,0,0,0,.17,.17,.17);
-    mk(claw3(),lt,h,0,0,0,.2,.2,.2);
+    mk(claw3(),lt,h,0,0,0,.22,.22,.22);
     mk(G.oct,FX.eye,h,0,.36,0,.09,.13,.09,true);
     p.hands.push({o:h,x:x});
   }
@@ -245,21 +267,25 @@ ANIM.witch=function(p,m,t,tt,st,look){
   p.head.rotation.y=look*.6;p.head.rotation.x=.1+pre*-.25+cast*.25;
 };
 
+// Gravel Fist: a slab of rock on two fists. Burning fault lines in its chest, tusks, shards on its back, spiked knuckles
 BUILD.fist=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.45),lt=M(s.col,.22),n=s.spikes||4,x,i;
   mk(G.dod,c,b,0,1.08,0,.86,.78,.7).rotation.y=.3;
   mk(G.dod,dk,b,0,.55,-.02,.6,.4,.5);
   for(x=-1;x<=1;x+=2)mk(G.box,dk,b,x*.36,.2,.02,.36,.4,.46);
+  mk(merged('fistFaults',function(add){add(G.box,.02,1.0,.69,.1,1,.1,.06,.62,.04);add(G.box,-.22,1.26,.64,-.8,1,0,.05,.42,.04);add(G.box,.24,.9,.66,.9,.5,0,.05,.4,.04);add(G.box,-.16,.74,.62,-.7,-.6,0,.045,.3,.04)}),FX.crack,b,0,0,0,1,1,1,true);
+  mk(merged('fistShards',function(add){add(G.cone4,0,1.4,-.5,0,.8,-1,.2,.9,.14);add(G.cone4,-.4,1.2,-.5,-.5,.6,-1,.15,.66,.1);add(G.cone4,.42,1.1,-.5,.6,.5,-1,.15,.6,.1)}),dk,b);
   p.head=grp(b,0,1.74,.22);
   mk(G.dod,lt,p.head,0,0,0,.34,.3,.32);mk(G.box,dk,p.head,0,.17,.2,.5,.1,.2);
+  mk(merged('fistTusks',function(add){for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.18,-.24,.2,sd*.12,1,.25,.06,.32,.06)}),M(BONE),p.head);
   eyesFace(p.head,p.eyes,s.eyes||1,0,.0,.27,.13,.115);
-  for(i=0;i<n;i++){var sd=i%2?1:-1,back=i>>1;spike(dk,b,sd*(.62-back*.3),1.55+back*.1,-.05-back*.4,sd*(.7-back*.3),1,-.15-back*.6,.62-back*.1,.22)}
+  for(i=0;i<n;i++){var sd=i%2?1:-1,back=i>>1;spike(dk,b,sd*(.62-back*.3),1.55+back*.1,-.05-back*.4,sd*(.7-back*.3),1,-.15-back*.6,.8-back*.1,.2).scale.z=.12}
   p.arms=[];
   for(x=-1;x<=1;x+=2){
     var a=grp(b,x*.84,1.4,.02);
     mk(G.dod,c,a,0,0,0,.3,.3,.3);seg(G.cyl,dk,a,0,0,0,x*.24,-.6,.22,.19);
     var f=mk(G.dod,lt,a,x*.3,-.9,.32,.52,.5,.52);f.rotation.set(.4,x*.5,0);
-    mk(merged('knuckles',function(add){for(var k=-1;k<=1;k++)add(G.box,k*.3,0,0,0,1,0,.24,.22,.3)}),c,a,x*.3,-.98,.72,.9,.9,.9);
+    mk(merged('knuckleSpikes',function(add){for(var k=-1;k<=1;k++){add(G.box,k*.3,0,0,0,1,0,.24,.22,.3);add(G.cone4,k*.3,.02,.1,0,-.15,1,.1,.42,.1)}}),c,a,x*.3,-.98,.72,.9,.9,.9);
     p.arms.push({o:a,x:x});
   }
 };
@@ -276,15 +302,17 @@ ANIM.fist=function(p,m,t,tt,st,look,u){
   p.head.rotation.y=look*.6;
 };
 
+// Brood Mother: a swollen sac ringed with claws, a crown of spines, a fanged mouth and too many eyes
 BUILD.mother=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.45),lt=M(s.col,.38),i;
   mk(G.sph,c,b,0,.86,0,1.04,.82,1.04);mk(G.sph,dk,b,0,.36,-.06,1.14,.36,1.14);mk(G.sph,c,b,0,1.4,-.16,.68,.5,.68);
-  mk(ringGeo('stubs7',7,.92,.22,-.55,.42,.2,.45),dk,b);
+  mk(ringGeo('claws7',7,.92,.26,-.42,.66,.16,.45),dk,b);
+  mk(merged('motherCrown',function(add){for(var i=0;i<7;i++){var a=i*TAU/7+.22,f=(1-sin(a))*.5;add(G.cone4,cos(a)*.5,1.66,sin(a)*.5-.16,cos(a)*.7,1.1,sin(a)*.7-.25,.09,.36+f*.4,.09)}}),dk,b);
   var spots=[[.72,1.25,.2,.2],[-.8,.95,.1,.24],[.5,1.05,-.72,.22],[-.42,1.5,-.55,.19],[.1,1.82,-.22,.2],[-.6,1.55,.25,.15],[.88,.7,-.35,.2],[0,.75,-1.0,.24],[-.75,.6,-.6,.17]];
   p.pust=[];
-  for(i=0;i<spots.length;i++)p.pust.push({o:mk(G.sphLo,lt,b,spots[i][0],spots[i][1],spots[i][2],spots[i][3]),r:spots[i][3]});
-  mk(G.sph,FX.voidM,b,0,.52,.98,.26,.2,.14,true);
-  mk(ringGeo('motherFangs',6,.2,0,2.4,.2,.07),M(BONE),b,0,.52,1.05).rotation.x=PI/2;
+  for(i=0;i<spots.length;i++)p.pust.push({o:mk(G.sphLo,lt,b,spots[i][0],spots[i][1],spots[i][2],spots[i][3],spots[i][3],spots[i][3],true),r:spots[i][3]});
+  mk(G.sph,FX.voidM,b,0,.52,.98,.3,.22,.14,true);
+  mk(ringGeo('motherFangs2',6,.23,0,2.1,.36,.075),M(BONE),b,0,.52,1.05).rotation.x=PI/2;
   var n=s.eyes||5,E=[[0,1.3,.84,.18],[-.34,1.02,.94,.14],[.34,1.02,.94,.14],[-.5,1.5,.5,.115],[.5,1.5,.5,.115],[0,1.72,.36,.1],[-.72,1.2,.62,.09],[.72,1.2,.62,.09]];
   for(i=0;i<n&&i<E.length;i++)eye(b,p.eyes,E[i][0],E[i][1],E[i][2],E[i][3],E[i][0]*.6,(E[i][1]-1)*.6,1);
 };
@@ -311,19 +339,21 @@ ANIM.mite=function(p,m,t,tt){
 
 BUILD.burrower=function(b,m,p,root){
   var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.3),earth=M(s.col,-.72),n=s.spikes||0;
-  p.mound=mk(merged('mound',function(add){for(var i=0;i<9;i++){var a=i*TAU/9,q=.2+((i*7)%3)*.07;add(G.dod,cos(a)*1.02,.08,sin(a)*1.02,sin(a*3)*.3,1,cos(a*2)*.3,q+.12,q,q+.1)}}),earth,root);
+  p.mound=mk(merged('moundSharp',function(add){for(var i=0;i<9;i++){var a=i*TAU/9,q=.2+((i*7)%3)*.07;add(G.dod,cos(a)*1.02,.08,sin(a)*1.02,sin(a*3)*.3,1,cos(a*2)*.3,q+.12,q,q+.1);
+    if(i%2)add(G.cone4,cos(a+.3)*1.08,.05,sin(a+.3)*1.08,cos(a)*.7,1,sin(a)*.7,.13,.5+q,.13)}}),earth,root);
   mk(G.disc,FX.voidM,root,0,.03,0,.95,1,.95,true);
   p.worm=grp(b,0,0,0);
   mk(G.sph,c,p.worm,0,.3,0,.84,.5,.84);mk(G.sph,dk,p.worm,0,.62,.05,.7,.14,.7);
   mk(G.sph,c,p.worm,0,.9,.14,.78,.46,.78);mk(G.sph,dk,p.worm,0,1.2,.26,.66,.13,.66);
   mk(G.sph,lt,p.worm,0,.8,.58,.46,.6,.4);
-  if(n)mk(ringGeo('wyrmSpk'+n,n,.62,.88,.5,.6,.17,.3),dk,p.worm,0,0,.08);
+  mk(ringGeo('wyrmCollar',8,.72,.6,.3,.42,.1,.2),dk,p.worm,0,0,.05);
+  if(n)mk(ringGeo('wyrmSpk2'+n,n,.62,.88,.5,.78,.15,.3),dk,p.worm,0,0,.08);
   p.maw=grp(p.worm,0,1.52,.4);p.maw.rotation.x=.6;
   mk(G.sph,c,p.maw,0,-.14,0,.86,.32,.86);
   mk(G.torus,lt,p.maw,0,.2,0,.74,.9,.74);
   mk(G.disc,FX.voidM,p.maw,0,.2,0,.72,1,.72,true);
-  p.teeth=mk(merged('teeth9',function(add){for(var i=0;i<9;i++){var a=i*TAU/9;add(G.cone4,cos(a)*.7,.22,sin(a)*.7,-cos(a)*.75,.55,-sin(a)*.75,.13,.46,.13)}}),M(BONE),p.maw);
-  p.fangs=mk(ringGeo('fangs5',5,.86,.12,1.4,.5,.13,.3),M(BONE),p.maw);
+  p.teeth=mk(merged('teeth9b',function(add){for(var i=0;i<9;i++){var a=i*TAU/9;add(G.cone4,cos(a)*.7,.22,sin(a)*.7,-cos(a)*.75,.55,-sin(a)*.75,.12,.56,.12)}}),M(BONE),p.maw);
+  p.fangs=mk(ringGeo('fangs5b',5,.86,.12,1.5,.78,.13,.3),M(BONE),p.maw);
 };
 ANIM.burrower=function(p,m,t,tt,st){
   var mt=typeof m.t==='number'?m.t:1,e=1;
@@ -341,15 +371,17 @@ ANIM.burrower=function(p,m,t,tt,st){
 BUILD.mimic=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.5),bone=M(BONE),x;
   mk(G.sph,c,b,0,.82,0,.86,.78,.8);mk(G.sph,dk,b,0,.3,0,1.0,.3,1.0);mk(G.sph,c,b,0,1.3,-.16,.62,.5,.6);
-  mk(ringGeo('mimicFeet',6,.8,.16,-.35,.5,.2,.2),dk,b);
+  mk(ringGeo('mimicClaws',6,.8,.2,-.4,.68,.17,.2),dk,b);
+  mk(merged('mimicSpines',function(add){for(var k=0;k<4;k++)add(G.cone4,0,1.62-k*.3,-.5-k*.14+k*k*.02,0,.7,-1,.06,.56-k*.06,.16)}),dk,b);
   p.mask=grp(b,0,1.2,.6);p.mask.rotation.x=-.16;
-  mk(G.sph,bone,p.mask,0,0,0,.6,.7,.2);spike(bone,p.mask,0,-.42,.02,0,-1,.1,.42,.3).scale.z=.1;
+  // the mask: a long bone face with a blade of a chin and two short horns
+  mk(merged('mimicMask',function(add){add(G.sph,0,0,0,0,1,0,.6,.7,.2);add(G.cone,0,-.4,.02,0,-1,.1,.3,.62,.1);for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.34,.5,0,sd*.5,1,-.15,.09,.5,.06)}),bone,p.mask);
   mk(G.box,M(BONE,-.45),p.mask,0,-.3,.17,.22,.035,.06,true);
   eyesFace(p.mask,p.eyes,s.eyes||3,0,.02,.22,.23,.125);
   p.tend=[];
   for(x=-1;x<=1;x+=2){
     var t0=grp(b,x*.36,1.55,-.2);seg(G.cyl,dk,t0,0,0,0,x*.34,.42,-.05,.11);
-    var t1=grp(t0,x*.34,.42,-.05);seg(G.cone,dk,t1,0,0,0,x*.3,.3,.3,.11);mk(G.sphLo,c,t1,x*.3,.3,.3,.11,.11,.11);
+    var t1=grp(t0,x*.34,.42,-.05);seg(G.cone4,dk,t1,0,0,0,x*.38,.34,.36,.11);mk(G.sphLo,c,t1,0,0,0,.12,.12,.12);
     p.tend.push({a:t0,b:t1,x:x});
   }
 };
@@ -360,27 +392,30 @@ ANIM.mimic=function(p,m,t,tt,st,look){
   p.body.rotation.z+=sin(tt*2)*.05;
 };
 
+// The Hollow: a void in a cage of ribs under a horned skull, ringed in red light, a wheel of blades turning at its waist
 BUILD.hollow=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.5),lt=M(s.col,.28),horn=M(BONE,-.18),n=s.spikes||9,x;
-  mk(G.skirt,c,b);mk(ringGeo('hem8',8,.74,.02,-2.6,.34,.24),c,b,0,.02,0,1.06,1,1.06);
-  mk(merged('hollowRibs',function(add){for(var i=0;i<6;i++){var a=i*TAU/6;add(G.cone4,cos(a)*.46,.82,sin(a)*.46,cos(a)*.7,1,sin(a)*.7,.12,.7,.12)}}),dk,b);
+  mk(G.skirt,c,b);mk(ringGeo('hem8r',8,.74,.06,-2.1,.52,.2),c,b,0,.02,0,1.06,1,1.06);
+  mk(merged('hollowRibs2',function(add){for(var i=0;i<6;i++){var a=i*TAU/6;add(G.cone4,cos(a)*.46,.82,sin(a)*.46,cos(a)*.7,1,sin(a)*.7,.12,.86,.1)}}),dk,b);
   mk(G.sph,FX.voidM,b,0,1.3,.04,.58,.58,.58);
   p.ring=mk(G.torus,FX.ring,b,0,1.3,.04,.76,.7,.76,true);p.ring.rotation.x=.35;
   p.ring2=mk(G.torus,FX.ring,b,0,1.3,.04,.66,.4,.66,true);
-  p.spin=mk(ringGeo('hollowSpk'+n,n,.84,0,.12,.72,.2),M(s.col,.16),b,0,.84,0);
+  p.spin=mk(merged('hollowBlades'+n,function(add){for(var i=0;i<n;i++){var a=i*TAU/n;add(G.cone4,cos(a)*.84,0,sin(a)*.84,cos(a),.12,sin(a),.2,.86,.07)}}),M(s.col,.16),b,0,.84,0);
   seg(G.cyl,dk,b,0,.8,-.5,0,1.95,-.55,.13);mk(G.ico,c,b,0,2.0,-.38,.4,.2,.34);
-  mk(merged('hollowSpine',function(add){for(var k=0;k<4;k++)add(G.cone4,0,1.0+k*.27,-.6,0,.5,-1,.11,.4,.11)}),dk,b);
+  mk(merged('hollowSpine2',function(add){for(var k=0;k<4;k++)add(G.cone4,0,1.0+k*.27,-.6,0,.5,-1,.07,.56,.14)}),dk,b);
   p.head=grp(b,0,2.22,-.12);
-  mk(G.sphLo,dk,p.head,0,0,0,.3,.33,.32);spike(dk,p.head,0,-.12,.2,0,-1,.15,.34,.16);
-  for(x=-1;x<=1;x+=2){seg(G.cyl,horn,p.head,x*.18,.16,-.02,x*.62,.42,-.1,.11);seg(G.cone,horn,p.head,x*.62,.42,-.1,x*.72,1.0,.22,.115);mk(G.sphLo,horn,p.head,x*.62,.42,-.1,.115,.115,.115)}
+  mk(G.sphLo,dk,p.head,0,0,0,.3,.33,.32);spike(dk,p.head,0,-.12,.2,0,-1,.15,.4,.16);
+  // great horns sweeping out and forward, a second pair raked back behind them
+  mk(merged('hollowHorns',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cyl,sd*.18,.16,-.02,sd*.44,.26,-.08,.11,.52,.11);add(G.cone4,sd*.62,.42,-.1,sd*.14,.62,.34,.125,1.05,.125);add(G.sphLo,sd*.62,.42,-.1,0,1,0,.115,.115,.115);
+    add(G.cone4,sd*.2,.2,-.18,sd*.5,.8,-.7,.08,.7,.08)}}),horn,p.head);
   eyesFace(p.head,p.eyes,s.eyes||2,0,.04,.27,.13,.075,true);
   p.arms=[];
   for(x=-1;x<=1;x+=2){
     var a=grp(b,x*.98,1.86,-.1);
-    mk(G.ico,c,a,0,0,0,.27,.22,.27);spike(dk,a,0,.05,0,x*.8,1,-.2,.6,.19);
+    mk(G.ico,c,a,0,0,0,.27,.22,.27);spike(dk,a,0,.05,0,x*.8,1,-.2,.9,.17).scale.z=.09;spike(dk,a,x*.1,0,-.1,x*.9,.4,-.5,.5,.1);
     seg(G.cyl,dk,a,0,0,0,x*.3,-.62,.2,.11);
     var h=grp(a,x*.3,-.62,.2);mk(G.ico,c,h,0,0,0,.17,.17,.17);
-    mk(claw3(),lt,h,0,0,0,.24,.24,.24);
+    mk(claw3(),lt,h,0,0,0,.25,.25,.25);
     p.arms.push({o:a,x:x});
   }
 };
@@ -405,17 +440,20 @@ BUILD.bomber=function(b,m,p){
   p.head=grp(b,0,.92,.62);
   mk(G.sph,c,p.head,0,0,0,.74,.4,.56);
   mk(G.box,FX.voidM,p.head,0,-.1,.4,1.0,.05,.3,true);
+  // horned brows and a row of chin barbs
+  mk(merged('toadBarbs',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.5,.44,.02,sd*.6,1,-.5,.09,.46,.09);add(G.cone4,sd*.66,.2,-.1,sd*1,.5,-.5,.07,.3,.07);add(G.cone4,sd*.2,-.22,.42,0,-1,.3,.05,.2,.05);add(G.cone4,sd*.48,-.2,.3,0,-1,.2,.05,.17,.05)}}),dk,p.head);
   for(x=-1;x<=1;x+=2){mk(G.sphLo,c,p.head,x*.42,.3,.08,.24,.24,.24);eye(p.head,p.eyes,x*.44,.36,.2,.17,x*.3,.3,1)}
-  // the crater and its coals
-  mk(ringGeo('toadRim',7,.34,0,2.2,.3,.15),dk,b,0,1.16,-.3);
+  // the crater, its jagged rim and its coals
+  mk(ringGeo('toadRim2',7,.34,0,1.7,.5,.14),dk,b,0,1.14,-.3);
+  mk(merged('toadSpines',function(add){for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.8,.9,-.5,sd*.8,.9,-.6,.1,.5,.1);add(G.cone4,sd*.4,.9,-.9,sd*.3,.8,-1,.1,.5,.1)}add(G.cone4,0,.8,-1,0,.6,-1,.1,.56,.1)}),dk,b);
   p.coal=mk(G.sphLo,FX.ember,b,0,1.2,-.3,.3,.16,.3,true);
   var spots=[[.72,.98,-.1,.15],[-.7,.95,-.25,.17],[.45,1.02,-.72,.14],[-.4,1.05,-.75,.13],[.85,.7,-.5,.13],[-.88,.68,.1,.12]];
   p.pust=[];for(i=0;i<spots.length;i++)p.pust.push({o:mk(G.sphLo,FX.ember,b,spots[i][0],spots[i][1],spots[i][2],spots[i][3],spots[i][3],spots[i][3],true),r:spots[i][3]});
   p.legs=[];
   for(i=0;i<4;i++){
     var sd=i%2?1:-1,front=i<2,o=grp(b,sd*(front?.72:.82),front?.42:.5,front?.5:-.5);
-    if(front){seg(G.cyl,dk,o,0,0,0,sd*.2,-.4,.25,.13);mk(G.sph,dk,o,sd*.24,-.4,.36,.2,.08,.26)}
-    else{mk(G.sph,c,o,sd*.08,.06,0,.36,.4,.52);seg(G.cyl,dk,o,sd*.1,-.1,.3,sd*.3,-.46,-.1,.13);mk(G.sph,dk,o,sd*.36,-.48,.14,.22,.08,.4)}
+    if(front){seg(G.cyl,dk,o,0,0,0,sd*.2,-.4,.25,.13);mk(merged('toadFootF',function(add){add(G.sph,0,0,0,0,1,0,.2,.08,.26);for(var k=-1;k<=1;k++)add(G.cone4,k*.12,0,.16,k*.4,-.1,1,.05,.26,.05)}),dk,o,sd*.24,-.4,.36)}
+    else{mk(G.sph,c,o,sd*.08,.06,0,.36,.4,.52);seg(G.cyl,dk,o,sd*.1,-.1,.3,sd*.3,-.46,-.1,.13);mk(merged('toadFootB',function(add){add(G.sph,0,0,0,0,1,0,.22,.08,.4);for(var k=-1;k<=1;k++)add(G.cone4,k*.13,0,.28,k*.4,-.1,1,.05,.28,.05)}),dk,o,sd*.36,-.48,.14)}
     p.legs.push({o:o,front:front,sd:sd});
   }
 };
@@ -433,20 +471,22 @@ ANIM.bomber=function(p,m,t,tt,st){
 BUILD.summoner=function(b,m,p){
   var s=m.s,c=M(s.col),dk=M(s.col,-.55),lt=M(s.col,.3),bone=M(BONE),x;
   p.robe=grp(b,0,0,0);
-  mk(G.robe,c,p.robe,0,0,0,.82,1.22,.82);mk(ringGeo('hem8',8,.74,.02,-2.6,.34,.24),dk,p.robe,0,0,0,.84,1,.84);
+  mk(G.robe,c,p.robe,0,0,0,.82,1.22,.82);mk(ringGeo('hem8r',8,.74,.06,-2.1,.52,.2),dk,p.robe,0,0,0,.84,1,.84);
   mk(merged('callerStrips',function(add){for(var i=0;i<5;i++){var a=i*TAU/5+.3;add(G.box,cos(a)*.5,.7,sin(a)*.5,cos(a)*.25,-1,sin(a)*.25,.16,1.1,.03)}}),dk,p.robe);
-  mk(ringGeo('callerRibs',8,.36,0,.25,.62,.09,.2),bone,b,0,1.72,0);
+  mk(ringGeo('callerRibs2',8,.36,0,.3,.84,.085,.2),bone,b,0,1.72,0);
   mk(G.cone,dk,b,0,1.5,0,.5,.5,.46);
   p.head=grp(b,0,2.2,.02);
-  mk(G.sph,dk,p.head,0,0,-.04,.42,.48,.46);spike(dk,p.head,0,.3,-.12,0,1,-.25,.8,.3);
+  mk(G.sph,dk,p.head,0,0,-.04,.42,.48,.46);
+  mk(merged('callerHood',function(add){add(G.cone,0,.3,-.12,0,1,-.25,.3,.7,.3);add(G.cone,0,.9,-.28,0,.7,-1,.15,.5,.15);for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.3,.22,-.1,sd*.7,1,-.3,.07,.6,.06)}),dk,p.head);
   mk(G.sph,FX.voidM,p.head,0,-.05,.24,.31,.34,.24,true);
   eyesFace(p.head,p.eyes,s.eyes||3,0,-.06,.44,.12,.07,'g');
   p.arms=[];
   for(x=-1;x<=1;x+=2){
     var a=grp(b,x*.44,1.72,.05);
-    seg(G.cyl,dk,a,0,0,0,x*.3,-.5,.3,.09);var h=grp(a,x*.3,-.5,.3);mk(G.ico,bone,h,0,0,0,.13,.13,.13);mk(claw3(),bone,h,0,0,0,.18,.18,.18);
+    seg(G.cyl,dk,a,0,0,0,x*.3,-.5,.3,.09);var h=grp(a,x*.3,-.5,.3);mk(G.ico,bone,h,0,0,0,.13,.13,.13);mk(claw3(),bone,h,0,0,0,.2,.2,.2);
     if(x>0){p.staff=grp(h,0,0,0);seg(G.cyl,M('#3a2c20'),p.staff,0,-1.25,0,0,1.25,0,.05);
-      mk(G.torus,bone,p.staff,0,1.42,0,.22,.4,.22).rotation.x=PI/2;p.orb=mk(G.sphLo,FX.eyeGreen,p.staff,0,1.42,0,.13,.13,.13,true)}
+      mk(merged('callerBell',function(add){add(G.torus,0,1.42,0,0,0,1,.22,.4,.22);for(var sd=-1;sd<=1;sd+=2)add(G.cone4,sd*.2,1.5,0,sd*.6,1,0,.05,.4,.05);add(G.cone4,0,-1.25,0,0,-1,0,.06,.3,.06)}),bone,p.staff);
+      p.orb=mk(G.sphLo,FX.eyeGreen,p.staff,0,1.42,0,.13,.13,.13,true)}
     p.arms.push({o:a,x:x});
   }
 };
@@ -465,12 +505,14 @@ BUILD.beamer=function(b,m,p){
   p.ball=grp(b,0,1.3,0);
   mk(G.sph,sclera,p.ball,0,0,.06,.9,.9,.9);
   mk(G.sph,c,p.ball,0,.02,-.16,.98,.98,.9);
-  mk(ringGeo('eyeLash'+n,n,.74,0,.5,.62,.17,.3),dk,p.ball,0,0,-.05).rotation.x=-PI/2;
+  mk(ringGeo('eyeLash2'+n,n,.74,0,.5,.92,.15,.3),dk,p.ball,0,0,-.05).rotation.x=-PI/2;
+  // a crest of horns over the back of the shell and two hooks under it
+  mk(merged('eyeCrest',function(add){add(G.cone4,0,.8,-.4,0,1,-.9,.14,.95,.1);for(var sd=-1;sd<=1;sd+=2){add(G.cone4,sd*.6,.6,-.4,sd*.8,.8,-.9,.12,.7,.09);add(G.cone4,sd*.5,-.7,-.2,sd*.5,-1,.5,.1,.5,.08)}}),dk,p.ball);
   mk(merged('eyeVeins',function(add){for(var i=0;i<7;i++){var a=i*TAU/7+.2;add(G.box,cos(a)*.6,sin(a)*.6,.68,cos(a),sin(a),-.75,.035,.36,.02)}}),M('#b8263d'),p.ball,0,0,0,1,1,1,true);
   p.iris=mk(G.sph,FX.iris,p.ball,0,0,.6,.5,.5,.4,true);
   p.pupil=mk(G.sph,FX.pupil,p.ball,0,0,.86,.22,.3,.18,true);
   p.nerves=[];
-  for(i=0;i<4;i++){var a=i*TAU/4+.6,o=grp(b,cos(a)*.34,.52,sin(a)*.34-.1);seg(G.cyl,dk,o,0,0,0,0,-.3,0,.085);var o2=grp(o,0,-.3,0);seg(G.cone,dk,o2,0,0,0,0,-.42,0,.085);mk(G.sphLo,dk,o2,0,0,0,.085,.085,.085);p.nerves.push({a:o,b:o2,ph:i*1.7})}
+  for(i=0;i<4;i++){var a=i*TAU/4+.6,o=grp(b,cos(a)*.34,.52,sin(a)*.34-.1);seg(G.cyl,dk,o,0,0,0,0,-.3,0,.085);var o2=grp(o,0,-.3,0);seg(G.cone4,dk,o2,0,0,0,0,-.52,0,.085);p.nerves.push({a:o,b:o2,ph:i*1.7})}
 };
 ANIM.beamer=function(p,m,t,tt,st,look,u){
   var wind=st==='wind',beam=st==='beam',i,q,k;
@@ -628,9 +670,9 @@ function create(m,MB){
   geos();fx();fxm();
   var s=m.s||{},ai=pickAi(m),pv=petKind(m,MB);
   if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st};
-  var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
-  REG=[];PV=pv;
-  try{BUILD[ai](body,m,p,root)}finally{PV=0}
+  var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[],glows:[],trails:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
+  REG=[];PV=pv;CUR=p;
+  try{BUILD[ai](body,m,p,root)}finally{PV=0;CUR=null}
   var meshes=REG,mats=[],i,o;REG=null;
   if(pv){ // the few glowing parts that are not tinted through M(): no hostile reds or ambers left on a pet
     for(i=0;i<meshes.length;i++){o=meshes[i].material;
@@ -642,13 +684,20 @@ function create(m,MB){
   root.scale.setScalar(r*(cfg.k||1));
   var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,mode:0,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,aura:null,r:r,
     fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x||0,pz:m.y||0,mv:0,ma:0,auraCol:m.s.col,rageMats:null,
-    pv:pv,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0};
+    pv:pv,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0,rl:0,crown:null,lw:r<14?.7:m.boss&&!pv&&ai!=='mimic'?1.25:1};
   u.fx.scale.setScalar(r);
   if(pv){u.own=[];petDress(u,g,m,pv)}
   else if(m.boss&&ai!=='mimic'){
-    var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;g.add(au);u.aura=au;
+    var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;au.userData.noOutline=true;g.add(au);u.aura=au;
+    // the level's master wears a slow halo of dark shards with burning slivers between them
+    var cr=grp(root,0,cfg.top*.72,0),dkm=M(m.s.col,-.6);u.crown=cr;
+    o=mk0(merged('bossShards',function(add){for(var i=0;i<5;i++){var a=i*TAU/5,h=(i%2)*.16;add(G.cone4,cos(a)*1.5,h,sin(a)*1.5,cos(a)*.25,1,sin(a)*.25,.09,.5,.05);add(G.cone4,cos(a)*1.5,h,sin(a)*1.5,-cos(a)*.1,-1,-sin(a)*.1,.09,.24,.05)}}),dkm,cr,0,0,0,1,1,1);
+    meshes.push(o);mats.push(dkm);
+    o=mk0(merged('bossSlivers',function(add){for(var i=0;i<5;i++){var a=(i+.5)*TAU/5;add(G.cone4,cos(a)*1.42,.1,sin(a)*1.42,0,1,0,.05,.4,.05);add(G.cone4,cos(a)*1.42,.1,sin(a)*1.42,0,-1,0,.05,.2,.05)}}),FX.crack,cr,0,0,0,1,1,1);
+    o.castShadow=false;o.userData.noOutline=true;meshes.push(o);mats.push(FX.crack);
   }
   g.userData.mb=u;g.name=(pv?'pet:':'mon:')+ai;
+  ink(g,u.lw);
   return g;
 }
 // what a pet looks at: an explicit target if the game gives one, else the nearest monster that is not underground
@@ -748,6 +797,13 @@ function update(g,m,MB,dt){
   if(u.shake>.02)root.position.set(sin(t*91+seed)*.07*r*u.shake,0,cos(t*77+seed)*.05*r*u.shake);else root.position.set(0,0,0);
   ANIM[u.ai](p,m,t,tt,st,look,u,dt);
   if(u.pv)petUpdate(g,m,u,t,dt,r);
+  // how fast and which way it is moving (eye trails, swift streaks)
+  var vx=(m.x-u.px)/dt,vz=(m.y-u.pz)/dt,sp=Math.sqrt(vx*vx+vz*vz);u.px=m.x;u.pz=m.y;
+  if(sp>12&&sp<1500)u.ma=Math.atan2(vz,vx);u.mv+=((sp>12&&sp<1500?min(1,sp/120):0)-u.mv)*min(1,dt*8);
+  // light streams off the eyes: longer when it moves, winds up or rages
+  var TR=p.trails;
+  if(TR.length){k=(.5+u.mv*1.1+(rage?.55:0)+(st==='wind'||fast?.8:0))*(1+.16*sin(t*23+seed));for(i=0;i<TR.length;i++)TR[i].o.scale.y=TR[i].l*k*(1+.14*sin(t*31+i*2.3))}
+  if(u.crown){o=u.crown;o.rotation.y=-tt*(rage?1.5:.5);o.position.y=cfg.top*.72+.06*sin(tt*1.9);if(u.ai==='burrower')o.visible=p.worm.visible}
   // eyes follow the player
   var E=p.eyes;for(i=0;i<E.length;i++)E[i].pu.position.x=E[i].x+look*E[i].er*.38;
   // dazed or stunned: stars
@@ -788,9 +844,6 @@ function update(g,m,MB,dt){
   if(u.pv&&!nm&&typeof m.perk==='string'){if(!u.perk||u.perk[0]!==m.perk)u.perk=[m.perk];mods=u.perk;nm=1} // the one modifier a pet kept
   if(nm||u.nm){
     u.nm=nm;
-    // how fast and which way it is moving, for the streaks
-    var vx=(m.x-u.px)/dt,vz=(m.y-u.pz)/dt,sp=Math.sqrt(vx*vx+vz*vz);u.px=m.x;u.pz=m.y;
-    if(sp>12&&sp<1500)u.ma=Math.atan2(vz,vx);u.mv+=((sp>12?min(1,sp/120):0)-u.mv)*min(1,dt*8);
     for(i=0;i<MODS.length;i++){
       k=MODS[i];on=nm>0&&mods.indexOf(k)>=0;
       if(!on&&!F[k])continue;

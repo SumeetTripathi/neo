@@ -619,7 +619,7 @@ function buildEnv(key,low){
   });
   // obstacles take the colour of the place
   OB.stone.color.copy(crypt?_col.setHex(0x4e4d58):area==='court'?hslColor(285,.14,.22):area==='peaks'?hslColor(216,.1,.3):hslColor(hue,.1,.24));OB.ghost.color.copy(OB.stone.color);
-  OB.stone.color.multiplyScalar(.74);OB.ghost.color.copy(OB.stone.color);
+  OB.stone.color.multiplyScalar(.46);OB.ghost.color.copy(OB.stone.color);
   // fill light: indigo from above, leaning a little toward the colour of the place
   E.sky=new THREE.Color(0x6f78e6).lerp(hslColor(crypt?236:hue,.5,.62),crypt?.1:.3);E.gnd=new THREE.Color(0x1c1436).lerp(hslColor(crypt?250:hue,.45,.14),.4);
   // a glowing seal over the circle painted on the floor (crypt, court)
@@ -1112,7 +1112,7 @@ function drawOverlay(sight){
     const g=ctx.createRadialGradient(fx0,fy0,H*.2,fx0,fy0,H*.95);g.addColorStop(0,'rgba(5,3,16,0)');g.addColorStop(1,'rgba(5,3,16,'+.72*e+')');ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
     if(!Q.low){ctx.fillStyle=sight?(death?'rgba(196,244,255,':'rgba(255,60,95,')+(.5*e)+')':'rgba(240,240,250,'+(.4*e)+')';ctx.beginPath();
       const fr=Math.floor(S.t*20);
-      for(let i=0;i<22;i++){const a=i/22*TAU+Math.sin(i*12.9+fr*1.7)*.12,r1=H*(.5+.22*Math.sin(i*7.3+fr)),r0=W*.75,w=.012+.01*Math.sin(i*3.1+fr*.7),ca=Math.cos(a),sa=Math.sin(a);
+      for(let i=0;i<22;i++){const a=i/22*TAU+Math.sin(i*12.9+fr*1.7)*.12,r1=H*(.5+.22*Math.sin(i*7.3+fr)),r0=W*.75,w=.007+.006*Math.sin(i*3.1+fr*.7),ca=Math.cos(a),sa=Math.sin(a);
         ctx.moveTo(fx0+Math.cos(a-w)*r0,fy0+Math.sin(a-w)*r0);ctx.lineTo(fx0+ca*r1,fy0+sa*r1);ctx.lineTo(fx0+Math.cos(a+w)*r0,fy0+Math.sin(a+w)*r0);ctx.closePath()}
       ctx.fill()}
     const bh=30*e;ctx.fillStyle='rgba(5,4,12,.96)';ctx.fillRect(0,0,W,bh);ctx.fillRect(0,H-bh,W,bh);
@@ -1218,10 +1218,10 @@ function syncFx(dt,sight){
     // afterimages: a trail of ghosts on a dash, a streak and ghosts along a blink
     const dx=P.x-FX.px,dy=P.y-FX.py,jump=dx*dx+dy*dy;
     if(!low&&sight){
-      if(P.dashT>0){FX.ghostT-=dt;if(FX.ghostT<=0){FX.ghostT=.034;const o=TF.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.5;o.material.color.setHex(PAL.power)}}
+      if(P.dashT>0){FX.ghostT-=dt;if(FX.ghostT<=0){FX.ghostT=.034;const o=TF.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.36;o.material.color.setHex(PAL.power)}}
       else{FX.ghostT=0;
         if(jump>80*80&&jump<260*260&&cls==='mage'){const len=Math.sqrt(jump),a=Math.atan2(dy,dx);
-          for(let i=0;i<4;i++){const o=TF.ghost.spawn(.3+i*.05),q=i/4;o.position.set(FX.px+dx*q,0,FX.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.3+.14*i;o.material.color.setHex(i%2?PAL.power2:PAL.power)}
+          for(let i=0;i<4;i++){const o=TF.ghost.spawn(.3+i*.05),q=i/4;o.position.set(FX.px+dx*q,0,FX.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.2+.1*i;o.material.color.setHex(i%2?PAL.power2:PAL.power)}
           const s=TF.streak.spawn(.3),u=s.userData;s.position.set(FX.px+dx/2,22,FX.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;upStreak(s,0);
           flashAt(P.x,34,P.y,24,96,PAL.power2,.2,.9)}}
     }
@@ -1251,7 +1251,7 @@ function syncFx(dt,sight){
   // power rising off the hero: more of it with every rank
   {let k=0;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=r&&r[0]==='S'?1:RANK_K[r]||.12}
     FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK;
-    const n=rk<.02?0:Math.round((low?3:8)+(low?9:40)*rk),pos=auraP.pos,col=auraP.col,size=auraP.size,c=FX.clock;
+    const n=rk<.02||!P?0:Math.round((low?3:8)+(low?9:40)*rk),pos=auraP.pos,col=auraP.col,size=auraP.size,c=FX.clock;
     for(let i=0;i<n;i++){const a=i*2.399+c*(.5+i%3*.22),rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk))%(54+34*rk),q=h/(54+34*rk);
       pos[i*3]=P.x+Math.cos(a)*rad;pos[i*3+1]=3+h;pos[i*3+2]=P.y+Math.sin(a)*rad*.8;
       const hot=i%4===0;col[i*4]=hot?.77:.55;col[i*4+1]=hot?.96:.3;col[i*4+2]=1;col[i*4+3]=Math.sin(q*Math.PI)*(.5+.4*rk);size[i]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}
