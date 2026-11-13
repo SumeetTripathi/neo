@@ -246,7 +246,7 @@ class Pool{constructor(make){this.make=make;this.items=[];this.n=0}
   begin(){this.n=0}
   get(){let o=this.items[this.n];if(!o){o=this.make();fx.add(o);this.items.push(o)}this.n++;o.visible=true;return o}
   end(){for(let i=this.n;i<this.items.length;i++)this.items[i].visible=false}}
-const mCore={e:basic(0xfff0d8),bolt:basic(0xe8f6ff),orb:basic(0xfff6cf),bone:basic(0xe7dfcd),dark:basic(0x15121b),steel:basic(0xd5dce2),
+const mCore={e:basic(0xfff0d8),bolt:basic(0xe8f6ff),orb:basic(0xfff6cf),bone:basic(0xcfc7b4),dark:basic(0x15121b),steel:basic(0xd5dce2),
   morsel:new THREE.MeshStandardMaterial({color:0xd1213f,roughness:.35,emissive:0x5a0714}),pink:basic(0xffb3bf)};
 function orbMaker(coreMat,glowHex,glowK){return()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.sphere,coreMat),halo=new THREE.Sprite(glowMat(glowHex,.9)),pool=new THREE.Mesh(G.quad,flatGlowMat(glowHex,.4));
   halo.scale.setScalar(glowK);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(glowK*1.5);g.add(core,halo,pool);g.userData.core=core;return g}}
@@ -257,7 +257,7 @@ const pools={
   skull:new Pool(()=>{const g=new THREE.Group(),h=new THREE.Mesh(G.sphere,mCore.bone),jaw=new THREE.Mesh(G.box,mCore.bone),halo=new THREE.Sprite(glowMat(0x58e04a,.85)),pool=new THREE.Mesh(G.quad,flatGlowMat(0x58e04a,.38));
     jaw.scale.set(1.1,.6,.9);jaw.position.set(0,-.75,.35);g.add(h,jaw);
     for(const s of[-1,1]){const e=new THREE.Mesh(G.sphere,mCore.dark);e.scale.setScalar(.27);e.position.set(s*.38,.12,.82);g.add(e)}
-    const sc=new THREE.Group();sc.add(g);halo.scale.setScalar(6);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(8);sc.add(halo,pool);sc.userData.core=g;return sc}),
+    const sc=new THREE.Group();sc.add(g);halo.scale.setScalar(4.2);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(6);sc.add(halo,pool);sc.userData.core=g;return sc}),
   arrow:new Pool(()=>{const g=new THREE.Group(),s=new THREE.Mesh(G.shaft,mCore.bone),t=new THREE.Mesh(G.tip,mCore.steel),halo=new THREE.Sprite(glowMat(0xcfd8e6,.28));halo.scale.setScalar(16);s.castShadow=true;g.add(s,t,halo);return g}),
   morsel:new Pool(()=>{const g=new THREE.Group(),m=new THREE.Mesh(new THREE.IcosahedronGeometry(7.5,1),mCore.morsel),hi=new THREE.Mesh(G.sphere,mCore.pink),pool=new THREE.Mesh(G.quad,flatGlowMat(0xff2a4c,.34));
     hi.scale.setScalar(2.3);hi.position.set(-2.4,4.2,3.6);m.castShadow=true;const b=new THREE.Group();b.add(m,hi);pool.scale.setScalar(46);pool.position.y=.5;g.add(b,pool);g.userData.bob=b;return g}),

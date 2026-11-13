@@ -35,7 +35,7 @@ const CLASSES={
   ['Whirlwind','A new skill. Spin and hit everything around you hard.'],
   ['Bloodrush','Hit 25% harder and swing 15% faster.']]},
  assassin:{name:'Assassin',gear:'Twin daggers, mask',hp:0,text:'The fastest strikes and the shortest dash cooldown. Your first strike after a dash hits triple. 10 health.',pows:[
-  ['Twin Fangs','Every strike lands twice.'],
+  ['Twin Fangs','Every strike lands twice. The second cut does 60% of the first.'],
   ['Shadowstep','A new skill. Appear behind the nearest monster and stab it for heavy damage.'],
   ['Vanish','Your dash recharges almost twice as fast.']]},
  healer:{name:'Healer',gear:'Sun staff, white robe',hp:2,text:'Orbs of light at range, and you mend 1 health every 4 seconds. 12 health.',pows:[
@@ -45,7 +45,7 @@ const CLASSES={
  tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds. Slowest on foot.',pows:[
   ['Bulwark','Your shield recharges in 3.5 seconds, and a blocked hit throws a shockwave that hurts everything near you.'],
   ['Earthsplitter','A new skill. Slam the ground to hit everything around you hard and wipe out nearby bolts.'],
-  ['Iron Heart','4 more health, and your wounds close twice as fast.']]},
+  ['Iron Heart','4 more health, your wounds close twice as fast, and you hit 25% harder.']]},
  mage:{name:'Mage',gear:'Staff, robe, hat',hp:0,text:'Arcane bolts that strike from across the room. Your dash becomes a blink that jumps you through danger. 10 health.',pows:[
   ['Forked Bolt','Every cast throws three bolts in a spread.'],
   ['Nova','A new skill. A ring of bolts bursts out of you and erases enemy bolts nearby.'],
@@ -168,18 +168,18 @@ const BOONS=[
  {id:'spec'},
 ];
 const SPEC={
- crawler:{name:'Gravecrawler',r:24,hp:9,col:'#7c9a52',eyes:2,legs:8},
- hound:{name:'Bonehound',r:22,hp:12,col:'#c9c1a8',eyes:2,spikes:6},
- witch:{name:'Tallow Witch',r:20,hp:13,col:'#8566b8',eyes:2,hood:1},
- fist:{name:'Gravel Fist',r:32,hp:18,col:'#8f8474',eyes:1,spikes:4},
- mother:{name:'Brood Mother',r:34,hp:15,col:'#b3557a',eyes:5,pust:1},
- burrower:{name:'The Burrower',r:26,hp:15,col:'#c0823c',eyes:0,teeth:1},
- mimic:{name:'The Mimic',r:22,hp:12,col:'#3fa596',eyes:3,mask:1},
- hollow:{name:'The Hollow',r:38,hp:40,col:'#4a3a66',eyes:2,void:1,spikes:9},
- knight:{name:'Carrion Knight',ai:'hound',r:26,hp:32,col:'#7d8a99',eyes:2,spikes:8},
- lich:{name:'Bog Lich',ai:'witch',r:22,hp:28,col:'#5f9a6a',eyes:3,hood:1},
- wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:30,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
- king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:70,col:'#8c2f39',eyes:3,void:1,spikes:11},
+ crawler:{name:'Gravecrawler',r:24,hp:44,col:'#7c9a52',eyes:2,legs:8},
+ hound:{name:'Bonehound',r:22,hp:56,col:'#c9c1a8',eyes:2,spikes:6},
+ witch:{name:'Tallow Witch',r:20,hp:26,col:'#8566b8',eyes:2,hood:1},
+ fist:{name:'Gravel Fist',r:32,hp:112,col:'#8f8474',eyes:1,spikes:4},
+ mother:{name:'Brood Mother',r:34,hp:33,col:'#b3557a',eyes:5,pust:1},
+ burrower:{name:'The Burrower',r:26,hp:30,col:'#c0823c',eyes:0,teeth:1},
+ mimic:{name:'The Mimic',r:22,hp:39,col:'#3fa596',eyes:3,mask:1},
+ hollow:{name:'The Hollow',r:38,hp:206,col:'#4a3a66',eyes:2,void:1,spikes:9},
+ knight:{name:'Carrion Knight',ai:'hound',r:26,hp:215,col:'#7d8a99',eyes:2,spikes:8},
+ lich:{name:'Bog Lich',ai:'witch',r:22,hp:82,col:'#5f9a6a',eyes:3,hood:1},
+ wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:210,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
+ king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1000,col:'#8c2f39',eyes:3,void:1,spikes:11},
  mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
 };
 // levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
@@ -220,7 +220,7 @@ let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],f
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
 const adv=k=>(ADV[S.adv]||{})[k];
-const dmgMul=()=>(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1);
+const dmgMul=()=>(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
 const cdMul=()=>1/((P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1); // Phantom only speeds up Shadowstep
 const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1);
@@ -388,7 +388,7 @@ function chargeStates(m,dt,a,next,E){
   if(m.st==='wind'){m.ang=a;if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
   else if(m.st==='charge'){const hit=move(m,m.ang,540,dt);if(hit||(m.t-=dt)<=0){
     if(hit){S.shake=.25;sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
-    if(E&&!m.again&&S.level>=8){m.again=1;m.st='wind';m.t=.42} // enraged: a second charge straight away
+    if(E&&!m.again&&S.level>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
     else{m.again=0;m.st='dazed';m.t=hit?(E?1:1.5):.6}}}
   else if((m.t-=dt)<=0){m.st='idle';m.t=next}
 }
@@ -492,9 +492,10 @@ function hurtP(d,src){
 
 /* ---------- player ---------- */
 const keys={},want={atk:false,dash:false,skill:false,sk:[false,false,false,false],pt:null},joy={x:0,y:0};
-function aim(pt,range){
+function aim(pt,range,spd){
   if(pt)return Math.atan2(pt.y-P.y,pt.x-P.x);
   let best=null,bd=range;for(const m of mons){if(m.hidden)continue;const d=dist(m,P)-m.r;if(d<bd&&(has('sight')||d<FOG)){bd=d;best=m}}
+  if(best&&spd&&best.vx!==undefined&&best.st!=='charge'&&best.st!=='lunge'){const k=Math.min(.6,dist(best,P)/spd);return Math.atan2(best.y+best.vy*k-P.y,best.x+best.vx*k-P.x)} // auto-aim leads a moving target
   return best?angTo(P,best):P.face;
 }
 function pshot(a,spd,dmg,r,kind,pierce){pshots.push({x:P.x+Math.cos(a)*16,y:P.y-4+Math.sin(a)*16,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r,dmg,kind,pierce:pierce===true?99:pierce||0,hit:new Set(),sx:P.x,sy:P.y})}
@@ -506,20 +507,20 @@ function shock(r,d){
 function ally(kind,life){const a=rand()*TAU;return{kind,x:P.x+Math.cos(a)*30,y:P.y+Math.sin(a)*30,r:kind==='wolf'?12:9,life:life||(kind==='wolf'||S.adv==='lich'?1e9:14),cd:0,walk:rand()*6}}
 function leech(){if(cls()==='necro'&&pw(3)&&++P.lc%10===0&&P.hp<P.maxHp){P.hp++;hud();puff(P,'#7fd66b',6)}}
 function strike(pt){
-  const c=cls(),a=aim(pt,melee(c)?170:1200),D=dmgMul(),H=cdMul();P.swing=a;
+  const c=cls(),a=aim(pt,melee(c)?170:1200,{mage:430,ranger:720,necro:400,healer:560}[c]),D=dmgMul(),H=cdMul();P.swing=a;
   if(c==='mage'){P.atk=.14;P.cd=.45*H;const n=1+(pw(1)?2:0)+S.b.spec+(S.adv==='archmage'?2:0);
     for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}SND.bolt();return}
   if(c==='ranger'){P.atk=.1;P.cd=(pw(1)?.17:.28)*H;pshot(a,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow();return}
-  if(c==='necro'){P.atk=.14;P.cd=.5*H;pshot(a,400,1.5*D,5,'skull',S.adv==='reaper');SND.skull();return}
-  if(c==='healer'){P.atk=.14;P.cd=.4*H;pshot(a,460,1.5*D,5,'orb',S.adv==='inquisitor');SND.orb();return}
-  const M={tank:[2,.42,78,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.5,.2,60,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
+  if(c==='necro'){P.atk=.14;P.cd=.48*H;pshot(a,400,1.8*D,5,'skull',S.adv==='reaper');SND.skull();return}
+  if(c==='healer'){P.atk=.14;P.cd=.38*H;pshot(a,560,2*D,6,'orb',S.adv==='inquisitor');SND.orb();return}
+  const M={tank:[2.2,.4,78,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.25,.22,60,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
   let dmg=M[0]*D;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0}
   const twice=c==='assassin'&&pw(1);
   P.atk=.16;P.cd=M[1]*H;SND.swing(c);
   for(const m of[...mons]){
     if(m.hidden||!mons.includes(m))continue;const d=dist(m,P);
     if(d<M[2]+m.r){const da=Math.atan2(Math.sin(angTo(P,m)-a),Math.cos(angTo(P,m)-a));
-      if(Math.abs(da)<M[3]||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy){m.x+=Math.cos(a)*26;m.y+=Math.sin(a)*26;clamp(m,m.r)}hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg);if(decoy)break}}
+      if(Math.abs(da)<M[3]||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy){m.x+=Math.cos(a)*26;m.y+=Math.sin(a)*26;clamp(m,m.r)}hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg*.6);if(decoy)break}}
   }
 }
 function field(kind,x,y,r,dur,every,dmg,slow){const f={kind,x,y,r,t:0,dur,every,tick:0,dmg,slow};clamp(f,10);fields.push(f)}
@@ -630,9 +631,9 @@ function step(dt){
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
   if(S.mode!=='play'||S.banner>1.5)return;
-  for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a);if(d<bd){bd=d;t=m}}
+  for(const a of allies){a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
-    if(d>stop){const g=angTo(a,to),sp=a.kind==='wolf'?250:175;a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r)}
+    if(d>stop){const g=angTo(a,to),sp=a.kind==='wolf'?250:200;a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r)}
     else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1),true);leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
@@ -645,14 +646,15 @@ function step(dt){
   if(act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
   for(const m of[...mons]){
     if(S.mode!=='play')break;if(!mons.includes(m))continue; // the boss or the player died earlier in this loop
-    m.moving=false;if(m.flash>0)m.flash-=dt;if(m.ward>0)m.ward-=dt;
+    m.moving=false;if(m.flash>0)m.flash-=dt;if(m.ward>0)m.ward-=dt;const ox=m.x,oy=m.y;
     if(m.markT>0)m.markT-=dt;
     if(m.dotT>0){m.dotT-=dt;if((m.dotK-=dt)<=0){m.dotK=.5;hurtM(m,m.dotD,true);if(!mons.includes(m))continue}}
     let k=aiK(m);if(m.slow>0){m.slow-=dt;k*=.5}
     if(m.stun>0)m.stun-=dt;else AI[m.ai](m,dt*k,angTo(m,P),dist(m,P));
+    m.vx=(m.x-ox)/dt;m.vy=(m.y-oy)/dt;
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
-    if(!m.hidden&&m.st!=='leap'&&dist(m,P)<m.r+11)hurtP((m.st==='charge'?2:1)+tier(),m.ai+':'+m.st);
+    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,P)<m.r+11)hurtP((m.st==='charge'?2:1)+tier(),m.ai+':'+m.st);
   }
   if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(1+tier(),'shot');s.dead=true}
