@@ -30,7 +30,7 @@ const LEVELS=[
  {title:'The Throne',boss:'king',hint:'Everything you are, against everything it kept.'},
 ];
 const CLASSES={
- fighter:{name:'Fighter',gear:'Greatsword, headband',hp:3,text:'A fast, heavy blade and no defence but your feet. 13 health.',pows:[
+ fighter:{name:'Fighter',gear:'Greatsword, headband',hp:5,text:'A fast, heavy blade, no defence but your feet, and wounds that close a little faster than most. 15 health.',pows:[
   ['Cleave','Your swing becomes a full circle with a longer reach.'],
   ['Whirlwind','A new skill. Spin and hit everything around you hard.'],
   ['Bloodrush','Hit 25% harder and swing 15% faster.']]},
@@ -38,8 +38,8 @@ const CLASSES={
   ['Twin Fangs','Every strike lands twice. The second cut does 60% of the first.'],
   ['Shadowstep','A new skill. Appear behind the nearest monster and stab it for heavy damage.'],
   ['Vanish','Your dash recharges almost twice as fast.']]},
- healer:{name:'Healer',gear:'Sun staff, white robe',hp:2,text:'Orbs of light at range, and you mend 1 health every 4 seconds. 12 health.',pows:[
-  ['Sanctuary','You mend 1 health every 2.5 seconds.'],
+ healer:{name:'Healer',gear:'Sun staff, white robe',hp:2,text:'Orbs of light at range, and your wounds close every 4 seconds instead of every 7. 12 health.',pows:[
+  ['Sanctuary','Your wounds close every 2.5 seconds.'],
   ['Mend','A new skill. Heal 5 health at once and throw back everything near you.'],
   ['Smite','Your orbs hit 60% harder.']]},
  tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds. Slowest on foot.',pows:[
@@ -57,14 +57,14 @@ const CLASSES={
  necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. 11 health.',pows:[
   ['Grave Call','Thralls rise every 4 seconds, and you can hold four.'],
   ['Army of Bones','A new skill. Four extra thralls claw out of the ground at once.'],
-  ['Soul Leech','Every tenth hit by you or your thralls heals 1 health.']]},
+  ['Soul Leech','Every tenth hit by you or your thralls heals you a little.']]},
 };
 // per class: a stacking boon [name, text, cap] and the two upgrades offered after level 50
 const EXTRA={
  fighter:{boon:['Fury','Swing 8% faster.',5],adv:[['champion','Champion','Raw power','Hit 50% harder and gain 6 health.'],['duelist','Duelist','Footwork','Swing 50% faster and move 15% faster.']]},
  assassin:{boon:['Ambush','Your strike after a dash hits even harder.',5],adv:[['nightblade','Nightblade','Sharper','Every strike hits 60% harder.'],['phantom','Phantom','Unseen','Shadowstep recharges more than twice as fast, and you move 10% faster.']]},
  healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
- tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals 2 health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
+ tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
  mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, and your skill recharges twice as fast.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
  ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires.']]},
  necro:{boon:['Legion','One more thrall at your side.',5],adv:[['lich','Lich','Undeath','Three more thralls, and your thralls no longer crumble with time.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard.']]},
@@ -79,7 +79,7 @@ const SKILLS={
   ['lunge','Lunge',7,'Drive straight through your target and hit everything in the way. Nothing can hurt you while you move.',[['rush',4,0]]],
   ['warcry','War Cry',14,'For 5 seconds you hit 40% harder and swing 25% faster.',[['buff','rageT',5],['ring',90]]],
   ['rend','Rend',10,'One huge blow on the nearest monster in reach. It is slowed for 3 seconds.',[['hit',7,{slow:3}]],'near'],
-  ['secondwind','Second Wind',22,'Heal 4 health and shrug off everything for a second.',[['heal',4],['buff','inv',1]]],
+  ['secondwind','Second Wind',22,'Heal a quarter of your health and shrug off everything for a second.',[['heal',.25],['buff','inv',1]]],
   ['bladestorm','Bladestorm',45,'Ultimate. For 4 seconds you are a storm of steel, hitting everything around you again and again while you move freely.',[['buff','stormT',4]]],
   ['breaker','Ground Breaker',11,'Crack the ground under your target. It bursts a moment later and hits very hard.',[['blast','at',100,.5,8]]],
   ['ironskin','Iron Skin',18,'For 5 seconds every hit on you does half damage.',[['buff','stoneT',5],['ring',60]]],
@@ -90,7 +90,7 @@ const SKILLS={
   ['charge','Shield Charge',8,'Rush forward behind your shield, hitting and stunning whatever is in the way.',[['rush',3,1]]],
   ['bastion','Bastion',14,'For 3 seconds every hit is blocked and thrown back as a shockwave.',[['buff','guardT',3],['shield'],['ring',60]]],
   ['throw','Hammer Throw',7,'Hurl a hammer that passes through everything, hits hard and stuns.',[['fan',1,0,560,4,8,'bolt',99,{stun:1}]]],
-  ['rally','Rally',22,'Heal 5 health and raise your shield at once.',[['heal',5],['shield']]],
+  ['rally','Rally',22,'Heal a third of your health and raise your shield at once.',[['heal',.34],['shield']]],
   ['cataclysm','Cataclysm',50,'Ultimate. Three shockwaves roll out of you, each wider than the last.',[['shock',130,4],['seq','quake']]],
   ['stoneskin','Stone Skin',18,'For 6 seconds every hit on you does half damage.',[['buff','stoneT',6],['ring',60]]],
   ['tremor','Tremor',10,'Send a tremor toward your target: three bursts in a line, each hitting hard.',[['line',3,90,70,5]]],
@@ -131,18 +131,18 @@ const SKILLS={
   ['fleet','Fleet Foot',16,'Move 40% faster for 6 seconds.',[['buff','fleetT',6],['ring',50]]]],
  healer:[
   ['lance','Sun Lance',7,'A spear of light that passes through everything and hits hard.',[['fan',1,0,560,5,9,'orb',99]]],
-  ['mend','Mend',10,'Heal 5 health at once and throw a shockwave at everything near you.',[['heal',5],['shock',100,2]]],
+  ['mend','Mend',10,'Heal a third of your health at once and throw a shockwave at everything near you.',[['heal',.34],['shock',100,2]]],
   ['flash','Blinding Light',12,'Stun every monster near you and burn away nearby bolts.',[['near',220,{stun:1.2}],['clear',220],['ring',220]]],
   ['halo','Hallowed Ground',15,'Bless the ground around you for 5 seconds. It mends you and burns monsters that stand on it.',[['field','halo','self',120,5,.5,1,false]]],
-  ['renew','Renewal',24,'Mend 1 health every second for 8 seconds.',[['buff','renewT',8]]],
-  ['wrath','Wrath of the Sun',55,'Ultimate. Heal to full and scorch everything in a huge ring around you.',[['heal','full'],['shock',260,10]]],
+  ['renew','Renewal',24,'Mend a little health every second for 8 seconds, about a third of your health in all.',[['buff','renewT',8]]],
+  ['wrath','Wrath of the Sun',55,'Ultimate. Heal to full and scorch everything in a huge ring around you.',[['heal',1],['shock',260,10]]],
   ['aegis','Aegis',20,'Nothing can hurt you for 2.5 seconds.',[['buff','inv',2.5],['ring',50]]],
   ['radiance','Radiance',9,'Ten orbs of light burst out of you in a ring.',[['ringp',10,420,2,5,'orb',0]]],
   ['judgement','Judgement',14,'A pillar of light falls on your target after a moment and hits very hard.',[['blast','at',90,.7,9]]],
-  ['purify','Purify',12,'Erase every enemy bolt in the room and heal 2 health.',[['clear',9999],['heal',2],['ring',300]]]],
+  ['purify','Purify',12,'Erase every enemy bolt in the room and heal a tenth of your health.',[['clear',9999],['heal',.1],['ring',300]]]],
  necro:[
   ['army','Army of Bones',9,'Four extra thralls claw out of the ground at once and fight for 9 seconds.',[['army']]],
-  ['drain','Soul Drain',8,'Tear life out of the nearest monster at any range. It is hurt and you heal 2 health.',[['beam'],['heal',2],['hit',3,{}]],'t'],
+  ['drain','Soul Drain',8,'Tear life out of the nearest monster at any range. It is hurt and you heal a tenth of your health.',[['beam'],['heal',.1],['hit',3,{}]],'t'],
   ['grasp','Grave Grasp',9,'Dead hands seize your target. It takes heavy damage and cannot act for a moment.',[['hit',3,{stun:1.2}],['ringT',30]],'t'],
   ['burst','Bone Burst',10,'Your thralls explode and hurt everything near them. New ones rise in time.',[['burst']],'thrall'],
   ['plague','Plague',16,'Every monster near you sickens and keeps taking damage for 6 seconds.',[['near',260,{dot:.6}],['ring',260]]],
@@ -150,7 +150,7 @@ const SKILLS={
   ['spears','Bone Volley',7,'Five bone spears in a fan. Each passes through everything.',[['fan',5,.14,420,2,5,'skull',99]]],
   ['shroud','Death Shroud',20,'For 6 seconds every hit on you does half damage.',[['buff','stoneT',6],['ring',60]]],
   ['pit','Grave Pit',12,'Open a pit under your target for 4 seconds. Monsters in it are slowed and hurt.',[['field','frost','at',100,4,.5,1,true]]],
-  ['pact','Dark Pact',25,'Unmake your thralls. Each one heals you 2 health, up to 8.',[['pact']],'thrall']],
+  ['pact','Dark Pact',25,'Unmake your thralls. Each one heals a tenth of your health, up to half.',[['pact']],'thrall']],
 };
 const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
 const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds.';
@@ -170,16 +170,16 @@ const BOONS=[
 const SPEC={
  crawler:{name:'Gravecrawler',r:24,hp:44,col:'#7c9a52',eyes:2,legs:8},
  hound:{name:'Bonehound',r:22,hp:56,col:'#c9c1a8',eyes:2,spikes:6},
- witch:{name:'Tallow Witch',r:20,hp:26,col:'#8566b8',eyes:2,hood:1},
+ witch:{name:'Tallow Witch',r:20,hp:42,col:'#8566b8',eyes:2,hood:1},
  fist:{name:'Gravel Fist',r:32,hp:112,col:'#8f8474',eyes:1,spikes:4},
- mother:{name:'Brood Mother',r:34,hp:33,col:'#b3557a',eyes:5,pust:1},
- burrower:{name:'The Burrower',r:26,hp:30,col:'#c0823c',eyes:0,teeth:1},
+ mother:{name:'Brood Mother',r:34,hp:60,col:'#b3557a',eyes:5,pust:1},
+ burrower:{name:'The Burrower',r:26,hp:38,col:'#c0823c',eyes:0,teeth:1},
  mimic:{name:'The Mimic',r:22,hp:39,col:'#3fa596',eyes:3,mask:1},
- hollow:{name:'The Hollow',r:38,hp:206,col:'#4a3a66',eyes:2,void:1,spikes:9},
- knight:{name:'Carrion Knight',ai:'hound',r:26,hp:215,col:'#7d8a99',eyes:2,spikes:8},
- lich:{name:'Bog Lich',ai:'witch',r:22,hp:82,col:'#5f9a6a',eyes:3,hood:1},
- wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:210,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
- king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1000,col:'#8c2f39',eyes:3,void:1,spikes:11},
+ hollow:{name:'The Hollow',r:38,hp:200,col:'#4a3a66',eyes:2,void:1,spikes:9},
+ knight:{name:'Carrion Knight',ai:'hound',r:26,hp:235,col:'#7d8a99',eyes:2,spikes:8},
+ lich:{name:'Bog Lich',ai:'witch',r:22,hp:225,col:'#5f9a6a',eyes:3,hood:1},
+ wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:245,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
+ king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1100,col:'#8c2f39',eyes:3,void:1,spikes:11},
  mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
 };
 // levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
@@ -187,10 +187,13 @@ const AREAS=[['The Ash Road',28],['The Drowned Fen',165],['The Bone Peaks',215],
 const PRE=['Ashen','Dread','Rotting','Gilded','Howling','Pale','Iron','Blighted','Starved','Elder'];
 const POOL=['crawler','hound','witch','fist','mother','burrower'];
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
+// health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
+const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1350};
+const genMul=n=>{const k=Math.max(0,n-12);return 1+.062*k+.0055*k*k};
 function levelDef(n){
   if(n<LEVELS.length){const L=LEVELS[n];return{title:L.title,hint:L.hint,kind:L.boss,spec:SPEC[L.boss],hue:100}}
-  const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],mult=1.6+(n-12)*.14;
-  const spec={...base,ai:kind,crown:tyrant?1:0,name:tyrant?'Tyrant of '+area[0].replace('The ',''):PRE[n%10]+' '+base.name.replace('The ',''),hp:Math.round(base.hp*mult*(tyrant?1.3:1)),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
+  const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],mult=genMul(n);
+  const spec={...base,ai:kind,crown:tyrant?1:0,name:tyrant?'Tyrant of '+area[0].replace('The ',''):PRE[n%10]+' '+base.name.replace('The ',''),hp:Math.round(GENHP[kind]*mult),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
   return{title:area[0],hint:tyrant?'A tyrant holds this ground.':N===50?'':'Stronger than the last. So are you.',kind,spec,hue:area[1]};
 }
 
@@ -226,7 +229,10 @@ const skMul=i=>Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv===
 const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1);
 const melee=c=>!c||c==='tank'||c==='fighter'||c==='assassin';
 const mspd=()=>S.level<8?1:Math.min(1.7,1.25+Math.max(0,S.level-12)*.01);
-const tier=()=>S.level<12?0:Math.floor((S.level-12)/15);
+// what a blow costs: a touch is 1 while you are learning and 2 from level 4, then climbs with your health. Charges, lunges and ground blasts (heavy=1) hit half again as hard; brushing against a monster (heavy=-1) is lighter, and so are bolts before level 9.
+const blow=heavy=>{const n=S.level,b=n<3?1:n<12?2:Math.round(2+(n-11)*.13);return heavy>0?Math.round(b*1.5+.01):heavy<0?Math.max(1,Math.round(b*.6)):b};
+// healing scales with your health: f is a share of maximum health, never less than lo
+const healP=(f,lo=1)=>{P.hp=Math.min(P.maxHp,P.hp+Math.max(lo,Math.round(f*P.maxHp)));hud()};
 // rank climbs with the levels once you have a trade: E at level 9, S by level 50, then S+1, S+2... every ten levels
 const RANKS=[[50,'S'],[41,'A'],[32,'B'],[23,'C'],[15,'D'],[9,'E']];
 function rank(n=S.level){if(!S.cls||n<8)return'';const N=n+1;if(N>=60)return'S+'+Math.floor((N-50)/10);for(const[a,r]of RANKS)if(N>=a)return r;return''}
@@ -375,7 +381,7 @@ function shoot(x,y,a,spd,r=6){shots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*
 function ringShot(m,n,spd,off=0){for(let i=0;i<n;i++)shoot(m.x,m.y,off+i*TAU/n,spd)}
 function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z)}
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
-function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=12)hp=Math.round(2*(1+(S.level-12)*.1));if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0};clamp(m,m.r);mons.push(m);return m}
+function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=S.level<12?4:Math.round(4*Math.pow(genMul(S.level),.8));if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0};clamp(m,m.r);mons.push(m);return m}
 function reshuffle(){
   mons=mons.filter(m=>!m.decoy);
   const spot=()=>{let p;do{p={x:WALL+60+rand()*(W-2*WALL-120),y:WALL+60+rand()*(H-2*WALL-120)}}while(dist(p,P)<210);return p};
@@ -385,7 +391,8 @@ function reshuffle(){
 
 /* ---------- monsters ---------- */
 function chargeStates(m,dt,a,next,E){
-  if(m.st==='wind'){m.ang=a;if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
+  if(m.st==='wind'){if(m.t>.22)m.ang=a; // the line of the charge locks just before it goes, so a sidestep at the last moment works
+    if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
   else if(m.st==='charge'){const hit=move(m,m.ang,540,dt);if(hit||(m.t-=dt)<=0){
     if(hit){S.shake=.25;sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
     if(E&&!m.again&&S.level>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
@@ -402,13 +409,13 @@ const AI={
   },
   hound(m,dt,a){
     const E=m.rage;
-    if(m.st==='idle'){if(move(m,a+1.1*m.side,E?130:110,dt))m.side*=-1;if((m.t-=dt)<=0){m.st='wind';m.t=E?.5:.68}}
+    if(m.st==='idle'){if(move(m,a+1.1*m.side,E?130:110,dt))m.side*=-1;if((m.t-=dt)<=0){m.st='wind';m.t=E?.52:.75}}
     else chargeStates(m,dt,a,E?.8:1.15,E);
   },
   witch(m,dt,a,d){
     const E=m.rage;if(m.slide>0)m.slide-=dt;
     const dir=m.slide>0?a+Math.PI/2*m.side:d<200?a+Math.PI:d>330?a:a+Math.PI/2*m.side;
-    if(move(m,dir,d<200?(S.level<8?78:112):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind
+    if(move(m,dir,d<200?(S.level<8?78:98):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind
     if((m.t-=dt)<=0){m.n++;if(m.n%(E?2:3)===0)ringShot(m,E?12:10,150,a);else for(const k of E?[-.5,-.25,0,.25,.5]:[-.25,0,.25])shoot(m.x,m.y,a+k,200);
       if(E&&S.level>=3&&m.n%2)zone(P.x,P.y,70,1,m);m.t=1.25;sfx(520,.12,'sine',.2,260)}
   },
@@ -482,7 +489,7 @@ function hurtP(d,src){
   if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
   if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);shock(115,2);return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
-  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){P.hp=Math.min(P.maxHp,P.hp+2);hud()}if(pw(1))shock(115,2);return}
+  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   if(P.stoneT>0)d=Math.ceil(d/2);
   P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
@@ -505,15 +512,15 @@ function shock(r,d){
   shots=shots.filter(s=>dist(s,P)>r+10);S.shake=.3;noise(.25,.4);sfx(70,.3,'square',.35,35);haptic(50);
 }
 function ally(kind,life){const a=rand()*TAU;return{kind,x:P.x+Math.cos(a)*30,y:P.y+Math.sin(a)*30,r:kind==='wolf'?12:9,life:life||(kind==='wolf'||S.adv==='lich'?1e9:14),cd:0,walk:rand()*6}}
-function leech(){if(cls()==='necro'&&pw(3)&&++P.lc%10===0&&P.hp<P.maxHp){P.hp++;hud();puff(P,'#7fd66b',6)}}
+function leech(){if(cls()==='necro'&&pw(3)&&++P.lc%10===0&&P.hp<P.maxHp){healP(.05);puff(P,'#7fd66b',6)}}
 function strike(pt){
   const c=cls(),a=aim(pt,melee(c)?170:1200,{mage:430,ranger:720,necro:400,healer:560}[c]),D=dmgMul(),H=cdMul();P.swing=a;
   if(c==='mage'){P.atk=.14;P.cd=.45*H;const n=1+(pw(1)?2:0)+S.b.spec+(S.adv==='archmage'?2:0);
     for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}SND.bolt();return}
   if(c==='ranger'){P.atk=.1;P.cd=(pw(1)?.17:.28)*H;pshot(a,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow();return}
   if(c==='necro'){P.atk=.14;P.cd=.48*H;pshot(a,400,1.8*D,5,'skull',S.adv==='reaper');SND.skull();return}
-  if(c==='healer'){P.atk=.14;P.cd=.38*H;pshot(a,560,2*D,6,'orb',S.adv==='inquisitor');SND.orb();return}
-  const M={tank:[2.2,.4,78,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.25,.22,60,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
+  if(c==='healer'){P.atk=.14;P.cd=.38*H;pshot(a,560,2.2*D,6,'orb',S.adv==='inquisitor');SND.orb();return}
+  const M={tank:[2.2,.4,80,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.15,.22,68,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
   let dmg=M[0]*D;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0}
   const twice=c==='assassin'&&pw(1);
   P.atk=.16;P.cd=M[1]*H;SND.swing(c);
@@ -535,7 +542,7 @@ function cast(op,x){
   case'rush':rush(ta,a*D,b);break;                                // damage, stun: dash through the target
   case'back':rush(ta+Math.PI,0,0);break;                          // untouchable roll away from the target
   case'buff':P[a]=Math.max(P[a]||0,b);puff(P,'#d6a544',14,180);break; // timer name, seconds
-  case'heal':P.hp=a==='full'?P.maxHp:Math.min(P.maxHp,P.hp+a);hud();puff(P,'#7fd66b',18,200);break;
+  case'heal':healP(a);puff(P,'#7fd66b',18,200);break;
   case'shield':if(S.adv!=='berserker'){P.shield=true;P.shT=0}break;
   case'fan':for(let k=0;k<a;k++){pshot(ta+(k-(a-1)/2)*b,c,d*D,e,f,pierceOf(g));if(h){const p=pshots[pshots.length-1];if(h.boom)p.boom=h.boom*D;if(h.slow)p.slow=h.slow;if(h.stun)p.stun=h.stun}}break; // count, spread, speed, damage, radius, kind, pierce, extras
   case'ringp':for(let k=0;k<a;k++)pshot(k*TAU/a,b,c*D,d,e,pierceOf(f));break; // count, speed, damage, radius, kind, pierce
@@ -557,7 +564,7 @@ function cast(op,x){
     for(let k=0;k<4;k++){const al=ally('thrall',9);al.extra=1;allies.push(al);puff(al,'#7fd66b',6)}break;
   case'burst':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);S.shake=.25;noise(.25,.35,900,150);
     for(const al of th){ring(al,70);puff(al,'#7fd66b',10,220);for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,al)<70+m.r)hurtM(m,2*D,true)}break}
-  case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);P.hp=Math.min(P.maxHp,P.hp+Math.min(8,2*th.length));hud();break}
+  case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);healP(Math.min(.5,.1*th.length));break}
   }
 }
 function skill(si){
@@ -578,7 +585,7 @@ function channels(dt){
   if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');hurtM(m,3*dmgMul())}}
   if(P.starN>0&&(P.starT-=dt)<=0){P.starT=.35;P.starN--;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160};meteor({x:at.x+rand()*60-30,y:at.y+rand()*60-30},80,.6,6*dmgMul())}
   if(P.fireT>0){P.fireT-=dt;if((P.fireK-=dt)<=0){P.fireK=.1;const a=aim(null,1200);P.swing=a;P.atk=.1;pshot(a+rand()*.1-.05,720,dmgMul(),3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow()}}
-  if(P.renewT>0){P.renewT-=dt;if((P.renewK+=dt)>=1){P.renewK=0;if(P.hp<P.maxHp){P.hp++;hud();puff(P,'#7fd66b',4,80)}}}
+  if(P.renewT>0){P.renewT-=dt;if((P.renewK+=dt)>=1){P.renewK=0;if(P.hp<P.maxHp){healP(.04);puff(P,'#7fd66b',4,80)}}}
 }
 // slot i (0-3) carries skill S.load[i] once that skill is learned
 const slotSkill=i=>{const si=S.load[i];return cls()&&si<known()?si:-1};
@@ -596,7 +603,8 @@ function playerStep(dt){
   for(const k of['inv','atk','cd','dashCd','amb','rageT','guardT','legT','fleetT','stoneT'])if(P[k]>0)P[k]-=dt;
   for(let i=0;i<10;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
   if(S.mode==='play')channels(dt);
-  if((want.atk||keys.atk)&&P.cd<=0)strike(want.pt);
+  const held=S.banner>1.5; // the monster stands frozen while the level banner is up, so you cannot hit it either
+  if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
   if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){
     if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink()}
@@ -604,11 +612,11 @@ function playerStep(dt){
     haptic(10)}
   want.dash=false;
   if(want.skill)want.sk[0]=true;want.skill=false;
-  for(let i=0;i<4;i++){const si=slotSkill(i);if(want.sk[i]&&si>=0&&P.cdS[si]<=0&&P.dashT<=0&&!(P.cutN>0))skill(si);want.sk[i]=false}
+  for(let i=0;i<4;i++){const si=slotSkill(i);if(want.sk[i]&&si>=0&&P.cdS[si]<=0&&P.dashT<=0&&!(P.cutN>0)&&!held)skill(si);want.sk[i]=false}
   if(c==='tank'&&S.adv!=='berserker'&&!P.shield&&(P.shT+=dt)>=(pw(1)?3.5:6)*Math.pow(.85,S.b.spec)*(S.adv==='paladin'?.6:1)/(1+eqv('sh')/100)){P.shield=true;P.shT=0;sfx(660,.08,'sine',.12)}
   if(c==='necro'&&S.mode==='play'&&(P.sumT+=dt)>=(pw(1)?4:6)){P.sumT=0;
     if(allies.filter(a=>a.kind==='thrall'&&!a.extra).length<2+(pw(1)?2:0)+S.b.spec+(S.adv==='lich'?3:0)){const t=ally('thrall');allies.push(t);puff(t,'#7fd66b',6);sfx(180,.2,'sawtooth',.12,90)}}
-  if(has('skin')&&P.hp<P.maxHp&&(P.regen+=dt)>=(c==='healer'?(pw(1)?2.5:4)*Math.pow(.88,S.b.spec)/(1+eqv('mend')/100):c==='tank'&&pw(3)?3.5:7)){P.regen=0;P.hp++;hud()}
+  if(has('skin')&&P.hp<P.maxHp&&(P.regen+=dt)>=(c==='healer'?(pw(1)?2.5:4)*Math.pow(.88,S.b.spec)/(1+eqv('mend')/100):c==='tank'&&pw(3)?3.5:c==='fighter'?5:7)){P.regen=0;healP(.06)}
   syncSkills();
 }
 
@@ -640,7 +648,7 @@ function step(dt){
   for(const f of fields){f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
     const fc=f.kind==='frost'?'#8fd3ff':f.kind==='halo'?'#ffe08a':'#e7dfcd';for(let i=0;i<5;i++){const a=rand()*TAU,d=rand()*f.r;bits.push({x:f.x+Math.cos(a)*d,y:f.y+Math.sin(a)*d,vx:0,vy:f.kind==='rain'?60:-30,life:.5,max:.5,c:fc,r:2.5})}
     for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.slow)m.slow=Math.max(m.slow||0,.8);hurtM(m,f.dmg,true)}
-    if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp){P.hp++;hud()}}}
+    if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp)healP(.04)}}
   fields=fields.filter(f=>f.t<f.dur);
   if(S.mode!=='play')return;
   if(act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
@@ -654,16 +662,16 @@ function step(dt){
     m.vx=(m.x-ox)/dt;m.vy=(m.y-oy)/dt;
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
-    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,P)<m.r+11)hurtP((m.st==='charge'?2:1)+tier(),m.ai+':'+m.st);
+    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,P)<m.r+11)hurtP(blow(m.st==='charge'||m.st==='lunge'&&S.level>=3?1:-1),m.ai+':'+m.st); // brushing against a monster is light; its telegraphed attack is not
   }
   if(S.mode!=='play')return;
-  for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(1+tier(),'shot');s.dead=true}
+  for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(blow(S.level<8?-1:0),'shot');s.dead=true}
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL)s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;hurtM(m,z.dmg)}}else if(dist(z,P)<z.r)hurtP(2+tier(),'zone')}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)m.stun=m.boss?z.stun:z.stun*2;hurtM(m,z.dmg)}}else if(dist(z,P)<z.r)hurtP(blow(1),'zone')}}
   zones=zones.filter(z=>!z.dead);
-  for(const f of morsels)if(dist(f,P)<24){f.dead=true;P.hp=Math.min(P.maxHp,P.hp+3);hud();SND.pickup();haptic(15)}
+  for(const f of morsels)if(dist(f,P)<24){f.dead=true;healP(.25,3);SND.pickup();haptic(15)}
   morsels=morsels.filter(f=>!f.dead);
 }
 
@@ -1045,6 +1053,7 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
     b.addEventListener('pointerdown',e=>{want.sk[i]=true;e.preventDefault()});
     const li=document.createElement('li'),kb=document.createElement('kbd');kb.textContent=i+1;li.appendChild(kb);for(const k of['n','c']){const e=document.createElement('span');e.className=k;li.appendChild(e)}skBar.appendChild(li);skL.push(li)});
   document.querySelector('.vitals').after(skBar);
+  const kh=document.querySelector('.kbd');if(kh)kh.innerHTML='<kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd> <kbd>4</kbd> for class skills · <kbd>Esc</kbd> to pause';
   const st=document.createElement('style');st.id='mbSkillCss';st.textContent=`
 .touch .acts{display:grid;grid-template-columns:64px 64px 84px;grid-template-rows:64px 84px;gap:10px;max-width:none}
 .touch .acts button{width:auto;height:auto;min-width:0;padding:2px}
@@ -1052,6 +1061,7 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 #bDash{grid-area:1/3;border-radius:32px}#bAtk{grid-area:2/3}
 .touch .acts button.sk{border-radius:14px;font-size:.66rem;line-height:1.05;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;overflow:hidden;align-self:center;height:64px;background:linear-gradient(to top,var(--stone-2) calc(var(--cd,0)*100%),var(--stone) 0)}
 .touch .acts button.sk:not(:disabled){border-color:var(--marrow)}
+.touch .acts button.sk:disabled{opacity:.75}
 .sk .c,#skillBar .c{color:var(--marrow);font-weight:600;font-variant-numeric:tabular-nums}
 .sk .c{font-size:.95rem}.sk .c:empty{display:none}
 #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
