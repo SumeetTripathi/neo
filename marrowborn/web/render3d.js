@@ -18,7 +18,7 @@ try{
 }catch(e){console.warn('Marrowborn: WebGL unavailable, staying 2D');return}
 
 const calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-const TILT=56*Math.PI/180,LIFT=46,SHOT_Y=17;
+const TILT=52*Math.PI/180,LIFT=46,SHOT_Y=17;
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
@@ -32,7 +32,7 @@ const camera=new THREE.PerspectiveCamera(30,W/H,50,6000);
 /* ---------- lights: a constant set (hemisphere, one shadow sun, four points) so shaders never recompile ---------- */
 const hemi=new THREE.HemisphereLight(0x8a94b8,0x1a1410,.5);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,.8);
-sun.position.set(W/2-280,640,H/2+230);sun.target.position.set(W/2,0,H/2);
+sun.position.set(W/2-190,700,H/2+250);sun.target.position.set(W/2,0,H/2);
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
 {const c=sun.shadow.camera;c.left=-600;c.right=600;c.top=470;c.bottom=-470;c.near=100;c.far=1500;c.updateProjectionMatrix()}
 sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;sun.shadow.radius=2;
@@ -82,7 +82,7 @@ function floorTexture(theme,hue){
       const w=42+rnd()*44,v=rnd();
       if(crypt||rnd()<.74){
         const jx=crypt?0:rnd()*3-1.5,jy=crypt?0:rnd()*3-1.5,sx=x+1.3+jx,sy=y+1.3+jy,sw=w-2.6,sh=rh-2.6;
-        g.fillStyle=crypt?hsl(hue+v*26-10,9+v*9,24+v*13):hsl(hue+v*24-12,10+v*9,25+v*13);g.fillRect(sx,sy,sw,sh);
+        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,29+v*13):hsl(hue+v*24-12,10+v*9,25+v*13);g.fillRect(sx,sy,sw,sh);
         for(let i=0;i<9;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,1+rnd()*5,0,TAU);g.fill()}
         g.fillStyle='rgba(255,255,255,.1)';g.fillRect(sx,sy,sw,1.4);g.fillRect(sx,sy,1.4,sh);
         g.fillStyle='rgba(0,0,0,.4)';g.fillRect(sx,sy+sh-2,sw,2);g.fillRect(sx+sw-2,sy,2,sh);
@@ -119,7 +119,7 @@ function brickTexture(hue,sat){
   g.fillStyle=hsl(hue,sat,7);g.fillRect(0,0,256,256);
   for(let r=0;r<4;r++)for(let i=-1;i<2;i++){
     const x=i*128+(r%2?64:0),y=r*64,v=rnd();
-    g.fillStyle=hsl(hue+v*18-9,sat+v*6,22+v*12);g.fillRect(x+3,y+3,122,58);
+    g.fillStyle=hsl(hue+v*18-9,sat+v*6,30+v*13);g.fillRect(x+3,y+3,122,58);
     for(let k=0;k<14;k++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.05)':'rgba(0,0,0,.12)';g.beginPath();g.arc(x+3+rnd()*122,y+3+rnd()*58,2+rnd()*9,0,TAU);g.fill()}
     g.fillStyle='rgba(255,255,255,.1)';g.fillRect(x+3,y+3,122,3);g.fillStyle='rgba(0,0,0,.42)';g.fillRect(x+3,y+56,122,5);
     if(rnd()<.4){g.strokeStyle='rgba(0,0,0,.5)';g.lineWidth=2;g.beginPath();const cx=x+20+rnd()*90;g.moveTo(cx,y+4);g.lineTo(cx+rnd()*20-10,y+30);g.lineTo(cx+rnd()*30-15,y+60);g.stroke()}
@@ -148,14 +148,14 @@ function slab(x0,x1,y0,y1,z0,z1,mats){
   const m=new THREE.Mesh(geo,mats);m.castShadow=true;m.receiveShadow=true;return m;
 }
 function buildEnv(key){
-  const crypt=key==='crypt',hue=crypt?218:+key.slice(1)||0;
+  const crypt=key==='crypt',hue=crypt?208:+key.slice(1)||0;
   const root=new THREE.Group(),E={key,crypt,hue,root,flames:[],lit:[],tick:null};
   const rnd=rng(77+hue);
   const ftex=floorTexture(crypt?'crypt':'out',hue);
   const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:ftex,bumpMap:ftex,bumpScale:1.6,roughness:.86,metalness:.04}));
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
   const btex=brickTexture(crypt?226:hue,crypt?9:12);
-  const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x6f6f7c,roughness:.95});
+  const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x3c3c46,roughness:.95});
   const mats=[side,side,top,top,side,side];
   if(crypt){
     const T=260,hN=92,hS=14;
@@ -398,8 +398,8 @@ function drawOverlay(sight){
     // no eyes: everything past arm's reach is black
     const e=groundEllipse(P.x,P.y,FOG*1.04),k=e.ry/e.rx;
     ctx.save();ctx.translate(e.cx,e.cy-10);ctx.scale(1,k);
-    const g=ctx.createRadialGradient(0,0,e.rx*.28,0,0,e.rx);
-    g.addColorStop(0,'rgba(5,4,8,0)');g.addColorStop(.35,'rgba(5,4,8,.3)');g.addColorStop(.7,'rgba(5,4,8,.82)');g.addColorStop(1,'rgba(5,4,8,.985)');
+    const g=ctx.createRadialGradient(0,0,e.rx*.36,0,0,e.rx);
+    g.addColorStop(0,'rgba(5,4,8,0)');g.addColorStop(.3,'rgba(5,4,8,.12)');g.addColorStop(.62,'rgba(5,4,8,.55)');g.addColorStop(.85,'rgba(5,4,8,.9)');g.addColorStop(1,'rgba(5,4,8,.985)');
     ctx.fillStyle=g;ctx.fillRect(-W*2,-H*2/k,W*4,H*4/k);ctx.restore();
     // ...but footsteps still come up through the floor
     const rings=MB.rings;
@@ -441,17 +441,17 @@ function draw(dt){
   camTarget.x+=(tx-camTarget.x)*k;camTarget.z+=(tz-camTarget.z)*k;
   const zt=sight?.93:.88;zoom+=(zt-zoom)*k;
   placeCamera(camTarget.x,camTarget.z,fitD*zoom);basePos.copy(camera.position);
-  scene.fog.near=fitD*zoom*.95;scene.fog.far=fitD*zoom+(env.crypt?1500:1150);
+  scene.fog.near=fitD*zoom*.95;scene.fog.far=fitD*zoom+(env.crypt?2600:1300);
 
   // lights
   if(!sight){
-    hemi.color.setHex(0x9aa0b0);hemi.groundColor.setHex(0x15151a);hemi.intensity=.34;
-    sun.color.setHex(0xffffff);sun.intensity=.62;
-    points[0].color.setHex(0xffffff);points[0].intensity=.85;points[0].distance=FOG*1.9;points[0].position.set(P?P.x:W/2,95,(P?P.y:H/2)+26);
+    hemi.color.setHex(0xaab0c0);hemi.groundColor.setHex(0x1c1c22);hemi.intensity=.5;
+    sun.color.setHex(0xffffff);sun.intensity=.85;
+    points[0].color.setHex(0xffffff);points[0].intensity=1.5;points[0].distance=FOG*2.2;points[0].position.set(P?P.x:W/2,120,(P?P.y:H/2)+30);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else if(env.crypt){
-    hemi.color.setHex(0x7f8fc4);hemi.groundColor.setHex(0x21160f);hemi.intensity=.5;
-    sun.color.setHex(0xb4c4ff);sun.intensity=.62;
+    hemi.color.setHex(0x9a9db0);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.42;
+    sun.color.setHex(0xdfe4f5);sun.intensity=.62;
   }else{
     hemi.color.setHSL(env.hue/360,.3,.62);hemi.groundColor.setHSL(env.hue/360,.25,.12);hemi.intensity=.62;
     sun.color.setHSL(((env.hue+25)%360)/360,.28,.86);sun.intensity=.95;
@@ -460,7 +460,7 @@ function draw(dt){
     const f=env.flames[i],lit=sight,fl=1+.13*Math.sin(t*9+f.ph)+.07*Math.sin(t*23.7+f.ph*2.3);
     f.fl.visible=lit;
     if(lit){
-      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?1.55:.9)*fl;l.distance=env.crypt?560:400;l.position.set(CORNERS[i][0],f.y+10,CORNERS[i][1]);
+      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?3.4:1.5)*fl;l.distance=env.crypt?720:460;l.position.set(CORNERS[i][0]+(i%2?-30:30),f.y+70,CORNERS[i][1]+(i<2?30:-30));
       if(env.crypt){f.f1.scale.set(22*fl,34*fl+3*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+7+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(11,16*fl,1);f.halo.material.opacity=.2*fl}
       else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.16*fl;env.crystals[i].rotation.y=t*.6+i}
     }
@@ -528,7 +528,7 @@ function screenToGame(cx,cy){
 }
 function dispose(){
   if(!alive)return;alive=false;R.ok=false;
-  glc.hidden=true;glc.style.filter='';
+  glc.hidden=true;glc.style.filter='';cv.style.zIndex='';
   glc.removeEventListener('webglcontextlost',onLost);
   try{ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.clearRect(0,0,cv.width,cv.height)}catch(e){}
   try{if(env)disposeEnv(env);renderer.dispose()}catch(e){}
@@ -536,6 +536,8 @@ function dispose(){
 function onLost(e){e.preventDefault();console.warn('Marrowborn: WebGL context lost, falling back to 2D');dispose()}
 glc.addEventListener('webglcontextlost',onLost);
 
+// a CSS filter lifts #gl into its own stacking layer; give the overlay canvas a z-index so it stays on top (below #ov, which has z-index 1)
+cv.style.zIndex='0';
 glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
