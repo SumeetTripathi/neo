@@ -13,6 +13,7 @@
   color-scheme:dark;
   --ink:#0d0c11; --stone:#1a1822; --stone-2:#2a2636;
   --bone:#e7dfcd; --ash:#958ea3; --blood:#b8263d; --marrow:#d6a544; --flesh:#c68863;
+  --pet-necro:#7fd66b; --pet-beast:#8fd3ff; --warn:#ff8497;
   --display:"Pirata One","Luminari","Palatino Linotype",Georgia,serif;
   --body:"Spectral",Georgia,"Times New Roman",serif;
 }
@@ -74,10 +75,10 @@ button:disabled{opacity:.35;cursor:default}
 #bDash{grid-area:dash;border-radius:calc(30px*var(--mb-btn,1))}#bAtk{grid-area:atk;border-radius:calc(40px*var(--mb-btn,1))}
 @media (max-width:420px){.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
 #petHud{display:flex;align-items:center;gap:8px;min-width:0}
-#petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:#7fd66b}
+#petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:var(--pet-necro)}
 #petBar{display:block;width:56px;height:6px;background:var(--stone-2);flex:none}
-#petFill{display:block;height:100%;width:100%;background:#7fd66b}
-#petHud.beast #petName{color:#8fd3ff}#petHud.beast #petFill{background:#8fd3ff}
+#petFill{display:block;height:100%;width:100%;background:var(--pet-necro)}
+#petHud.beast #petName{color:var(--pet-beast)}#petHud.beast #petFill{background:var(--pet-beast)}
 #petHud.down #petName{color:var(--ash)}
 .kbd{color:var(--ash);font-size:.9rem;margin:0}
 kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(--bone)}
@@ -94,9 +95,18 @@ kbd{font-family:inherit;border:1px solid var(--stone-2);padding:0 6px;color:var(
   .panel{padding:12px 18px;gap:6px;max-width:600px}.panel h2{font-size:1.9rem}.panel p{font-size:.92rem;line-height:1.35}
   .vitals{position:fixed;z-index:2;top:max(6px,env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));pointer-events:none;font-size:.8rem;text-shadow:0 1px 2px #000}
   .vitals button{pointer-events:auto}#hp em{max-width:38vw;font-size:.72rem;line-height:1.2}#bossBar{width:22vw}
-  .touch{position:fixed;z-index:2;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(18px,env(safe-area-inset-left,0px));right:max(18px,env(safe-area-inset-right,0px));pointer-events:none}
-  #pad,.touch .acts{pointer-events:auto;opacity:.62}
-  .touch{align-items:flex-end;flex-wrap:nowrap}.touch .acts{--s:calc(56px*var(--mb-btn,1));--a:calc(76px*var(--mb-btn,1));--g:calc(7px*var(--mb-btn,1))}.touch .acts button.sk{font-size:calc(.6rem*var(--mb-btn,1))}
+  .touch{position:fixed;z-index:2;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));pointer-events:none}
+  #pad,.touch .acts{pointer-events:auto}#pad{opacity:.62}
+  /* the buttons float over the edge of the arena: see-through until pressed, so what stands under them still shows */
+  .touch .acts button{opacity:.5;text-shadow:0 1px 2px #000;transition:opacity .08s}
+  .touch .acts button.dn,.touch .acts button:active{opacity:1}
+  /* sideways the grid is two columns hugging the screen edge, on the black bar beside the arena: three rows of skills over Dash and Strike. Rows stop growing when four of them fill the screen height. */
+  .touch{align-items:flex-end;flex-wrap:nowrap}
+  .touch .acts{--s:calc(56px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1));--h:min(var(--s),calc((100vh - 76px)/4.5));
+    grid-template-columns:var(--s) var(--s);grid-template-rows:var(--h) var(--h) var(--h) calc(var(--h)*1.3);grid-template-areas:"s5 s6" "s3 s4" "s1 s2" "dash atk"}
+  .touch .acts button.sk{font-size:calc(.6rem*var(--mb-btn,1))}
+  .mb-left .wrap .touch .acts{grid-template-columns:var(--s) var(--s);grid-template-areas:"s6 s5" "s4 s3" "s2 s1" "atk dash"}
+  #bDash,#bAtk{border-radius:calc(22px*var(--mb-btn,1))}
   #petName{max-width:120px}#petBar{width:40px}
   .cards button{padding:7px 10px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.35rem}
 }

@@ -1415,16 +1415,16 @@ function bindScreen(n,next){
   const take=out=>()=>{if(out>=0){R.splice(out,1);if(PETS.active===out)PETS.active=-1;else if(PETS.active>out)PETS.active--}R.push(e);
     if(PETS.active<0){PETS.active=R.length-1;return next()} // an empty place at your side is filled at once
     petPick(next,e)};
-  const leave={title:'Leave it',sub:'Walk on',col:'#958ea3',body:'Take nothing. You can '+(nec?'bind':'tame')+' another boss later.',fn:next};
-  show({wide:true,col:nec?'#7fd66b':'#8fd3ff',kick:rare?(nec?'A tyrant, yours to bind':'A tyrant, yours to tame'):nec?'The dead can be bound':'It can be tamed',title:e.name,
+  const leave={title:'Leave it',sub:'Walk on',col:'var(--ash)',body:'Take nothing. You can '+(nec?'bind':'tame')+' another boss later.',fn:next};
+  show({wide:true,col:nec?'var(--pet-necro)':'var(--pet-beast)',kick:rare?(nec?'A tyrant, yours to bind':'A tyrant, yours to tame'):nec?'The dead can be bound':'It can be tamed',title:e.name,
     body:(nec?'Bind it and it rises to fight beside you. ':'Tame it and it fights beside you. ')+petLine(e)+' You can keep '+PETMAX+' pets, and one goes with you into each level.'+(full?' You already keep '+PETMAX+': to take this one, let one go.':''),
-    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release for '+e.name,col:'#ff8497',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
-      :[{title:nec?'Bind it':'Tame it',sub:R.length?'Pet '+(R.length+1)+' of '+PETMAX:'Your first pet',col:nec?'#7fd66b':'#8fd3ff',body:e.name+' joins you. It is as strong as the level you take it into, however old it is.',fn:take(-1)},leave]});
+    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release for '+e.name,col:'var(--warn)',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
+      :[{title:nec?'Bind it':'Tame it',sub:R.length?'Pet '+(R.length+1)+' of '+PETMAX:'Your first pet',col:nec?'var(--pet-necro)':'var(--pet-beast)',body:e.name+' joins you. It is as strong as the level you take it into, however old it is.',fn:take(-1)},leave]});
 }
 // which pet goes with you
 function petPick(next,fresh){
   show({wide:true,kick:petOwner()==='necro'?'Bound':'Tamed',title:'Who goes with you?',body:'One pet fights beside you in each level. The others wait. You can change this from the pause screen.',
-    cards:PETS.roster.map((p,i)=>({title:petTag(p),sub:p===fresh?'New':i===PETS.active?'With you now':'Waiting',col:i===PETS.active?'':'#958ea3',body:petLine(p),fn:()=>{PETS.active=i;next()}}))});
+    cards:PETS.roster.map((p,i)=>({title:petTag(p),sub:p===fresh?'New':i===PETS.active?'With you now':'Waiting',col:i===PETS.active?'':'var(--ash)',body:petLine(p),fn:()=>{PETS.active=i;next()}}))});
 }
 function petChoose(i){
   if(!PETS.roster[i]||i===PETS.active)return;PETS.active=i;
@@ -1441,7 +1441,7 @@ function petsScreen(back){
   const R=PETS.roster,nec=petOwner()==='necro',again=()=>petsScreen(back);
   show({wide:true,kick:'Pets · '+R.length+' of '+PETMAX,title:nec?'Your bound dead':'Your tamed beasts',
     body:R.length?'Pick a pet to send it out or to release it.'+(PETS.down?' The one with you has fallen. A pet comes back with the next level.':''):'You keep none. Kill a boss, and you may '+(nec?'bind':'tame')+' it.',
-    cards:R.map((p,i)=>({title:petTag(p),sub:i===PETS.active?(PETS.down?'Fallen · back next level':'With you'):'Waiting',col:i===PETS.active?'':'#958ea3',body:petLine(p),fn:()=>{
+    cards:R.map((p,i)=>({title:petTag(p),sub:i===PETS.active?(PETS.down?'Fallen · back next level':'With you'):'Waiting',col:i===PETS.active?'':'var(--ash)',body:petLine(p),fn:()=>{
       const act=i===PETS.active;show({kick:act?'With you':'Waiting',title:petTag(p),body:petLine(p),btns:[...(act?[]:[['Send it out',()=>{petChoose(i);again()}]]),['Back',again],
         ['Release',()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',again],['Release it',()=>{petRelease(PETS.roster.indexOf(p));again()}]]})]]})}})),
     btns:[['Back',back]]});
@@ -1595,13 +1595,16 @@ const padUp=()=>{joy.x=joy.y=0;knob.style.transform=''};pad.addEventListener('po
 $('bAtk').addEventListener('pointerdown',e=>{want.atk=true;keys.atk=true;e.preventDefault()});
 for(const ev of['pointerup','pointercancel','pointerleave'])$('bAtk').addEventListener(ev,()=>keys.atk=false);
 $('bDash').addEventListener('pointerdown',e=>{want.dash=true;e.preventDefault()});
+// a pressed touch button carries the class dn while the finger is on it (the page makes idle buttons see-through)
+function pressFx(b){b.addEventListener('pointerdown',()=>b.classList.add('dn'));for(const ev of['pointerup','pointercancel','pointerleave'])b.addEventListener(ev,()=>b.classList.remove('dn'))}
+pressFx($('bAtk'));pressFx($('bDash'));
 // Six skill buttons (touch) and a skill bar under the vitals (keyboard). Both show the skill's name and the seconds left; MB.skills carries the same data.
 // The touch cluster is a 3 x 3 grid laid out in index.html: skills in two columns, first skills at the bottom, Dash above a tall Strike on the outside.
 const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 {const acts=$('bSkill').parentNode;for(let i=1;i<NSK;i++){const b=document.createElement('button');b.type='button';b.id='bSkill'+(i+1);b.hidden=true;acts.appendChild(b);skB.push(b)}
   skBar.id='skillBar';skBar.hidden=true;skBar.setAttribute('aria-label','Skills');
   skB.forEach((b,i)=>{b.classList.add('sk');b.textContent='';for(const k of['n','c']){const e=document.createElement('span');e.className=k;b.appendChild(e)}
-    b.addEventListener('pointerdown',e=>{want.sk[i]=true;e.preventDefault()});
+    b.addEventListener('pointerdown',e=>{want.sk[i]=true;e.preventDefault()});pressFx(b);
     const li=document.createElement('li'),kb=document.createElement('kbd');kb.textContent=i+1;li.appendChild(kb);for(const k of['n','c']){const e=document.createElement('span');e.className=k;li.appendChild(e)}skBar.appendChild(li);skL.push(li)});
   document.querySelector('.vitals').after(skBar);
   const kh=document.querySelector('.kbd');if(kh)kh.innerHTML='<kbd>WASD</kbd> or arrows to move · <kbd>Space</kbd> or click to strike · <kbd>Shift</kbd> to dash, once you have lungs · <kbd>1</kbd> to <kbd>6</kbd> for class skills · <kbd>Esc</kbd> to pause';
@@ -1612,7 +1615,7 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 .sk .c,#skillBar .c{color:var(--marrow);font-weight:600;font-variant-numeric:tabular-nums}
 .sk .c{font-size:1.45em}.sk .c:empty{display:none}
 #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
-#skillBar li{flex:1 1 140px;display:flex;align-items:center;gap:8px;padding:4px 10px;border:1px solid var(--stone-2);font-size:.88rem;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
+#skillBar li{flex:1 1 118px;min-width:0;display:flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid var(--stone-2);font-size:.88rem;color:var(--ash);background:linear-gradient(to right,var(--stone-2) calc(var(--cd,0)*100%),transparent 0)}
 #skillBar li.ready{border-color:var(--marrow);color:var(--bone)}#skillBar li.locked{opacity:.45}
 #skillBar .c{margin-left:auto}
 @media (pointer:coarse){#skillBar{display:none}}`;document.head.appendChild(st)}
@@ -1674,7 +1677,7 @@ if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(
   pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;if(PETS.roster.length>=PETMAX)PETS.roster.shift();
     const e={kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,perk:MODS.includes(o.perk)?o.perk:null,crown:ty?1:0};
     PETS.roster.push(e);PETS.active=PETS.roster.length-1;PETS.down=false;if(S.mode!=='play'||!P)return e;
-    if(petOwner())return fieldPet();allies=allies.filter(a=>!a.pet);const a=makePet(e,1,o.owner==='beast'?'beast':'necro');allies.push(a);PETS.fielded=e;return a},PETS};
+    if(petOwner()){const a=fieldPet();save(S.level);hud();return a}allies=allies.filter(a=>!a.pet);const a=makePet(e,1,o.owner==='beast'?'beast':'necro');allies.push(a);PETS.fielded=e;return a},PETS};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
 window.claude?.hot?.ready?window.claude.hot.ready(start):start(window.claude?.hot?.data??{});
 })();

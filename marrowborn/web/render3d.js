@@ -1,3 +1,185 @@
+/* ==========================================================================================================
+   window.MBStyle: the shared cel-shading kit. Defined at script load (needs only THREE), used by the models and the renderer.
+     toon(hex, opts)    -> CACHED MeshToonMaterial (never mutate it; ask for another variant).
+                           opts: emissive, emissiveIntensity, steps 2|3|4 (default 3), transparent, opacity, side, rim (default true),
+                                 also passed through: flatShading, depthWrite, alphaTest, map, fog.
+                           Stepped light from one shared ramp texture per step count; lights, fog and received shadows all work.
+                           rim = a stepped back-light on edges facing up and away from the camera (one extra term in the fragment shader).
+     toonRaw(hex, opts) -> the same material but NOT cached: the caller owns and may mutate/dispose it.
+     glow(hex, opts)    -> CACHED unlit additive MeshBasicMaterial (depthWrite off). opts: opacity, side, map, depthTest.
+     outline(obj, opts) -> ink outlines for every Mesh under obj (skips userData.noOutline, additive/see-through/sprite things):
+                           a child mesh that shares the geometry and draws its back faces pushed out along smoothed normals in the
+                           vertex shader. opts.thickness in world units (default 1.1), opts.color (default palette.ink). Never casts
+                           shadows, one shared material per thickness+colour. Safe to call again (also after swapping a mesh's geometry).
+                           In low graphics nothing is created; the request is remembered on obj.userData.mbOutline and
+                           MBStyle.refresh(root) builds or strips outlines when the quality changes (the renderer calls it).
+     COLOUR: hex values are what you see. toon() and glow() take ordinary sRGB hex (or '#rrggbb' / THREE.Color) and convert it, so a
+                           surface in full light shows the hex you asked for (the old std materials showed it paler). Shadow bands are deep.
+     palette            -> hex numbers. quality -> 'high'|'low' (live mirror of MB.settings.gfx). outlinesOn -> bool (live).
+   ========================================================================================================== */
+(function(){
+'use strict';
+const THREE=window.THREE;if(!THREE||window.MBStyle)return;
+const palette={
+  ink:0x0b0a16,shadow:0x1d1a3c,night:0x12102a,bone:0xece4d2,blood:0xc2203f,gold:0xf0b848,steel:0xc9d2e4,iron:0x2b2a3a,leather:0x3a2a2c,cloth:0x1c1b2c,
+  white:0xffffff,power:0x8b4dff,power2:0xc4f4ff,powerDeep:0x3d1c9c,foe:0xff2d55,foe2:0xffb0a0,friend:0x6fe07a,necro:0x7dff8c,beast:0xcfeaff,
+  fire:0xff8a3a,frost:0x8fd3ff,holy:0xffd66e,rim:0x93a0ff};
+const low=()=>{try{const M=window.MB;return !!(M&&M.settings&&M.settings.gfx==='low')}catch(e){return false}};
+const hexOf=c=>typeof c==='number'?c:new THREE.Color(c).getHex();
+const lin=m=>{m.color.convertSRGBToLinear();if(m.emissive)m.emissive.convertSRGBToLinear();return m};
+
+// light ramps: 32 texels across N.L = -1..1; hard steps, deep shadow band (the hemisphere light fills it with indigo)
+const BANDS={2:[[-1,.16],[.04,1]],3:[[-1,.12],[-.04,.56],[.46,1]],4:[[-1,.1],[-.22,.36],[.12,.7],[.56,1]]};
+const ramps={};
+function ramp(steps){
+  steps=BANDS[steps]?steps:3;if(ramps[steps])return ramps[steps];
+  const n=32,d=new Uint8Array(n*4),b=BANDS[steps];
+  for(let i=0;i<n;i++){const ndl=(i+.5)/n*2-1;let v=b[0][1];for(let j=1;j<b.length;j++)if(ndl>=b[j][0])v=b[j][1];const q=Math.round(v*255);d[i*4]=d[i*4+1]=d[i*4+2]=q;d[i*4+3]=255}
+  const t=new THREE.DataTexture(d,n,1,THREE.RGBAFormat);t.minFilter=t.magFilter=THREE.NearestFilter;t.generateMipmaps=false;t.needsUpdate=true;
+  return ramps[steps]=t;
+}
+// rim light: shared uniform (rgb = colour x strength) so the renderer can retune it per place; view-space direction is fixed because the camera tilt is
+const uRim={value:new THREE.Color(palette.rim).multiplyScalar(.55)};
+function rimCompile(sh){
+  sh.uniforms.mbRim=uRim;
+  sh.fragmentShader=sh.fragmentShader.replace('#include <common>','#include <common>\nuniform vec3 mbRim;')
+    .replace('#include <output_fragment>','{float mbF=1.0-saturate(dot(normal,normalize(vViewPosition)));float mbD=smoothstep(0.0,0.35,normal.y*0.8+normal.x*0.35+0.12);outgoingLight+=mbRim*(smoothstep(0.6,0.68,mbF)*mbD)*(0.3+0.7*diffuseColor.rgb);}\n#include <output_fragment>');
+}
+function toonRaw(hex,o){
+  o=o||{};
+  const p={color:hexOf(hex),gradientMap:ramp(o.steps||3)};
+  if(o.emissive!==undefined){p.emissive=hexOf(o.emissive);p.emissiveIntensity=o.emissiveIntensity===undefined?1:o.emissiveIntensity}
+  if(o.transparent){p.transparent=true}
+  if(o.opacity!==undefined)p.opacity=o.opacity;
+  if(o.side!==undefined)p.side=o.side;
+  if(o.depthWrite!==undefined)p.depthWrite=o.depthWrite;
+  if(o.alphaTest)p.alphaTest=o.alphaTest;
+  if(o.map)p.map=o.map;
+  if(o.fog===false)p.fog=false;
+  const m=new THREE.MeshToonMaterial(p);
+  if(o.flatShading){m.flatShading=true}
+  if(o.rim!==false)m.onBeforeCompile=rimCompile;
+  lin(m);
+  m.userData.mbToon=true;
+  return m;
+}
+const toonCache=new Map(),glowCache=new Map(),lineCache=new Map();
+const idOf=x=>x&&x.uuid?x.uuid:'';
+function toon(hex,o){
+  o=o||{};const h=hexOf(hex);
+  const k=h+'|'+(o.emissive===undefined?'':hexOf(o.emissive))+'|'+(o.emissiveIntensity===undefined?'':o.emissiveIntensity)+'|'+(o.steps||3)+'|'+(o.transparent?1:0)+'|'+(o.opacity===undefined?'':o.opacity)+'|'+(o.side===undefined?'':o.side)+'|'+(o.rim===false?0:1)+'|'+(o.flatShading?1:0)+'|'+(o.depthWrite===undefined?'':+o.depthWrite)+'|'+(o.alphaTest||'')+'|'+idOf(o.map)+'|'+(o.fog===false?0:1);
+  let m=toonCache.get(k);if(!m){m=toonRaw(h,o);toonCache.set(k,m)}return m;
+}
+function glow(hex,o){
+  o=o||{};const h=hexOf(hex),op=o.opacity===undefined?1:o.opacity;
+  const k=h+'|'+op+'|'+(o.side===undefined?'':o.side)+'|'+idOf(o.map)+'|'+(o.depthTest===false?0:1);
+  let m=glowCache.get(k);
+  if(!m){m=new THREE.MeshBasicMaterial({color:h,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:op,toneMapped:false,fog:false});
+    if(o.side!==undefined)m.side=o.side;if(o.map)m.map=o.map;if(o.depthTest===false)m.depthTest=false;lin(m);m.userData.mbGlow=true;glowCache.set(k,m)}
+  return m;
+}
+
+/* ---- ink outlines (inverted hull) ---- */
+// uMin = the smallest useful thickness in world units for the current view (about a pixel and a bit); the renderer keeps it current
+const uMin={value:0};
+const LINE_VS=[
+  'attribute vec3 mbN;uniform float uT;uniform float uMin;',
+  '#include <common>',
+  '#include <fog_pars_vertex>',
+  'void main(){',
+  ' vec3 n=mbN;float l=length(n);vec4 p=vec4(position,1.0);',
+  ' #ifdef USE_INSTANCING',
+  '  mat3 im=mat3(instanceMatrix);n/=vec3(dot(im[0],im[0]),dot(im[1],im[1]),dot(im[2],im[2]));n=im*n;p=instanceMatrix*p;',
+  ' #endif',
+  ' vec3 vn=normalMatrix*n;float vl=length(vn);vn=vl>1e-6?vn/vl*l:vec3(0.0);',
+  ' vec4 mvPosition=modelViewMatrix*p;mvPosition.xyz+=vn*max(uT,uMin);',
+  ' gl_Position=projectionMatrix*mvPosition;',
+  ' #include <fog_vertex>',
+  '}'].join('\n');
+const LINE_FS='uniform vec3 uC;\n#include <common>\n#include <fog_pars_fragment>\nvoid main(){gl_FragColor=vec4(uC,1.0);\n#include <fog_fragment>\n}';
+function lineMat(th,col){
+  const k=th+'|'+col;let m=lineCache.get(k);
+  if(!m){m=new THREE.ShaderMaterial({uniforms:THREE.UniformsUtils.merge([THREE.UniformsLib.fog,{uT:{value:th},uC:{value:new THREE.Color(col)}}]),vertexShader:LINE_VS,fragmentShader:LINE_FS,side:THREE.BackSide,fog:true});
+    m.uniforms.uMin=uMin;m.userData.mbLine=true;m.visible=!low();lineCache.set(k,m)}
+  return m;
+}
+// one extra attribute per geometry, computed once: normals averaged over vertices that share a position (so hard-edged and flat-shaded
+// shapes get a closed hull), lengthened at corners so the line keeps its width on every face
+function hullNormals(geo){
+  if(geo.attributes.mbN)return true;
+  const P=geo.attributes.position,N=geo.attributes.normal;if(!P||!N)return false;
+  const n=P.count,out=new Float32Array(n*3);
+  if(n>24000){for(let i=0;i<n;i++){out[i*3]=N.getX(i);out[i*3+1]=N.getY(i);out[i*3+2]=N.getZ(i)}}
+  else{
+    if(!geo.boundingSphere)geo.computeBoundingSphere();
+    const q=4096/Math.max(1e-6,geo.boundingSphere?geo.boundingSphere.radius:1),groups=new Map(),gid=new Int32Array(n),acc=[];
+    for(let i=0;i<n;i++){
+      const key=Math.round(P.getX(i)*q)+'_'+Math.round(P.getY(i)*q)+'_'+Math.round(P.getZ(i)*q);
+      let g=groups.get(key);if(g===undefined){g=acc.length;groups.set(key,g);acc.push([])}
+      gid[i]=g;const a=acc[g],x=N.getX(i),y=N.getY(i),z=N.getZ(i);let dup=false;
+      for(let j=0;j<a.length;j+=3)if(a[j]*x+a[j+1]*y+a[j+2]*z>.995){dup=true;break}
+      if(!dup&&a.length<36)a.push(x,y,z);
+    }
+    const res=new Float32Array(acc.length*3),ok=new Uint8Array(acc.length);
+    for(let g=0;g<acc.length;g++){const a=acc[g];let x=0,y=0,z=0;for(let j=0;j<a.length;j+=3){x+=a[j];y+=a[j+1];z+=a[j+2]}
+      const l=Math.hypot(x,y,z);if(l<1e-4)continue;x/=l;y/=l;z/=l;
+      let d=0;for(let j=0;j<a.length;j+=3)d+=a[j]*x+a[j+1]*y+a[j+2]*z;d/=a.length/3;
+      const s=1/Math.max(.55,Math.min(1,d));res[g*3]=x*s;res[g*3+1]=y*s;res[g*3+2]=z*s;ok[g]=1}
+    for(let i=0;i<n;i++){const g=gid[i];if(ok[g]){out[i*3]=res[g*3];out[i*3+1]=res[g*3+1];out[i*3+2]=res[g*3+2]}else{out[i*3]=N.getX(i);out[i*3+1]=N.getY(i);out[i*3+2]=N.getZ(i)}}
+  }
+  geo.setAttribute('mbN',new THREE.BufferAttribute(out,3));
+  return true;
+}
+function wantsLine(o){
+  if(!o.isMesh||o.userData.mbLine||o.userData.noOutline||!o.geometry||!o.geometry.attributes||o.isSkinnedMesh)return false;
+  const m=Array.isArray(o.material)?o.material[0]:o.material;if(!m)return false;
+  if(m.blending===THREE.AdditiveBlending||m.depthWrite===false||(m.transparent&&m.opacity<.9)||m.visible===false)return false;
+  return true;
+}
+function lock(o,name,val){try{Object.defineProperty(o,name,{get(){return val},set(){},configurable:true,enumerable:true})}catch(e){}}
+const _todo=[];
+function outline(root,opts){
+  if(!root||!root.traverse)return root;
+  const th=opts&&opts.thickness>0?+opts.thickness:1.1,col=opts&&opts.color!==undefined?hexOf(opts.color):palette.ink;
+  root.userData.mbOutline={thickness:th,color:col};
+  if(low())return root;
+  const mat=lineMat(th,col);
+  _todo.length=0;
+  root.traverse(o=>{if(wantsLine(o))_todo.push(o)});
+  for(let i=0;i<_todo.length;i++){
+    const o=_todo[i];let c=o.userData.mbLineMesh;
+    if(c&&c.parent===o){if(c.geometry!==o.geometry&&hullNormals(o.geometry))c.geometry=o.geometry;if(o.isInstancedMesh){c.count=o.count;c.instanceMatrix=o.instanceMatrix}continue}
+    if(!hullNormals(o.geometry))continue;
+    if(o.isInstancedMesh){c=new THREE.InstancedMesh(o.geometry,mat,0);c.instanceMatrix=o.instanceMatrix;c.count=o.count;c.frustumCulled=false}
+    else c=new THREE.Mesh(o.geometry,mat);
+    c.userData.mbLine=true;c.userData.noOutline=true;c.name='mbLine';c.matrixAutoUpdate=false;c.receiveShadow=false;c.renderOrder=o.renderOrder;
+    // model code that walks a group to set shadows or swap materials (hit flash) must not disturb the line
+    lock(c,'castShadow',false);lock(c,'material',mat);
+    o.userData.mbLineMesh=c;o.add(c);
+  }
+  _todo.length=0;
+  return root;
+}
+function strip(root){
+  _todo.length=0;root.traverse(o=>{if(o.userData&&o.userData.mbLine)_todo.push(o)});
+  for(let i=0;i<_todo.length;i++){const c=_todo[i],p=c.parent;if(p){p.remove(c);if(p.userData.mbLineMesh===c)p.userData.mbLineMesh=null}}
+  _todo.length=0;
+}
+const _roots=[];
+function refresh(root){
+  const on=!low();
+  lineCache.forEach(m=>{m.visible=on});
+  if(!root)return;
+  if(!on){strip(root);return}
+  _roots.length=0;root.traverse(o=>{if(o.userData&&o.userData.mbOutline)_roots.push(o)});
+  for(let i=0;i<_roots.length;i++)outline(_roots[i],_roots[i].userData.mbOutline);
+  _roots.length=0;
+}
+window.MBStyle={toon,toonRaw,glow,outline,strip,refresh,palette,ramp,uRim,uMin,
+  get quality(){return low()?'low':'high'},
+  get outlinesOn(){return !low()}};
+})();
+
 // 3D renderer. Registers MB.renderer = { ok, draw(dt), screenToGame(clientX, clientY), dispose() }.
 // World units = game pixels: X = game x, Z = game y, Y up. WebGL goes to #gl, text and the blind-fog go to the 2D overlay #cv.
 (function(){
@@ -9,6 +191,7 @@ const linearPick=(cx,cy)=>{const r=cv.getBoundingClientRect();return{x:(cx-r.lef
 const R={ok:false,draw(){},screenToGame:linearPick,dispose(){}};
 MB.renderer=R;
 const THREE=window.THREE;if(!THREE||!glc)return;
+const ST=window.MBStyle,PAL=ST.palette;
 
 let renderer;
 try{
@@ -20,13 +203,17 @@ try{
 const calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TILT=52*Math.PI/180,LIFT=46,SHOT_Y=17;
 // Colour: plain linear tone mapping (ACES bleached the class and monster colours toward white) and moderate lights; the floor textures are lifted instead.
-const EXPOSURE=1.0,FLOOR_GAIN=1.6,SUN_K=.6,HEMI_K=.8,PT_K=.7;
+// Cel look: one strong key light with crisp shadows, a cool indigo fill, torches as accents. Characters use MBStyle.toon (sRGB-true colours);
+// the place uses the same toon ramp but paler, darker colours (ENV_K) so heroes, monsters and glows stand out against it.
+const EXPOSURE=1.0,FLOOR_GAIN=.8,SUN_K=1.65,HEMI_K=1.25,PT_K=.5,ENV_K=.52;
+// overlay text: one family constant (the page may bundle a font later)
+const FONT='"Rajdhani","Oswald","Barlow Condensed","Roboto Condensed","Arial Narrow","sans-serif-condensed","Helvetica Neue",Arial,sans-serif';
 // graphics quality: MB.settings.gfx 'low' = no shadow maps, pixel ratio 1, no bump maps, two point lights, few particles, blob shadows
 const Q={low:false};
 const isLow=()=>!!(MB.settings&&MB.settings.gfx==='low');
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.LinearToneMapping;renderer.toneMappingExposure=EXPOSURE;
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
 const maxAniso=Math.min(4,renderer.capabilities.getMaxAnisotropy());
 
 const scene=new THREE.Scene();
@@ -35,12 +222,12 @@ scene.fog=new THREE.Fog(0x050408,900,2600);
 const camera=new THREE.PerspectiveCamera(30,W/H,50,6000);
 
 /* ---------- lights: a constant set (hemisphere, one shadow sun, four points) so shaders never recompile ---------- */
-const hemi=new THREE.HemisphereLight(0x8a94b8,0x1a1410,.5);scene.add(hemi);
+const hemi=new THREE.HemisphereLight(0x7078e0,0x1c1436,.5);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,.8);
 sun.position.set(W/2-300,620,H/2+300);sun.target.position.set(W/2,0,H/2);
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
 {const c=sun.shadow.camera;c.left=-560;c.right=560;c.top=420;c.bottom=-420;c.near=100;c.far=1500;c.updateProjectionMatrix()}
-sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;sun.shadow.radius=2;
+sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;sun.shadow.radius=1;
 scene.add(sun,sun.target);
 const CORNERS=[[WALL+9,WALL+9],[W-WALL-9,WALL+9],[WALL+9,H-WALL-9],[W-WALL-9,H-WALL-9]];
 const points=CORNERS.map(()=>{const l=new THREE.PointLight(0xff9a48,0,520,1.5);scene.add(l);return l});
@@ -60,7 +247,14 @@ const glowTex=(()=>{const c=mkCanvas(64,64),g=c.getContext('2d'),gr=g.createRadi
 const glowMat=(hex,op)=>new THREE.SpriteMaterial({map:glowTex,color:hex,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:op===undefined?1:op,fog:false,toneMapped:false});
 const flatGlowMat=(hex,op)=>new THREE.MeshBasicMaterial({map:glowTex,color:hex,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,opacity:op,fog:false,toneMapped:false});
 const basic=(hex,o)=>new THREE.MeshBasicMaterial(Object.assign({color:hex,toneMapped:false},o||{}));
-const std=(hex,o)=>new THREE.MeshStandardMaterial(Object.assign({color:hex,roughness:.85,metalness:0},o||{}));
+// scenery material: toon ramp, colour kept as authored for the old lighting and scaled down (not cached: places dispose what they build)
+const _c0=new THREE.Color();
+function std(hex,o){o=o||{};const q={flatShading:!!o.flatShading,steps:o.steps||3};
+  if(o.transparent){q.transparent=true;q.opacity=o.opacity}if(o.depthWrite===false)q.depthWrite=false;if(o.side!==undefined)q.side=o.side;if(o.map)q.map=o.map;if(o.alphaTest)q.alphaTest=o.alphaTest;if(o.rim===false)q.rim=false;
+  const m=ST.toonRaw(0xffffff,q);m.color.copy(_c0.set(hex)).multiplyScalar(o.k===undefined?ENV_K:o.k);
+  if(o.emissive!==undefined){m.emissive.copy(_c0.set(o.emissive));m.emissiveIntensity=o.emissiveIntensity===undefined?1:o.emissiveIntensity}
+  return m}
+const noLine=o=>{o.userData.noOutline=true;return o};
 const G={
   sphere:new THREE.SphereGeometry(1,14,10),
   disc:new THREE.CircleGeometry(1,48).rotateX(-Math.PI/2),
@@ -85,7 +279,7 @@ function floorTexture(theme,hue,area,low){
     for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(eh+rnd()*30-15,22,A[0][2]+4+rnd()*7,.25):'rgba(0,0,0,.14)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
     for(let i=0;i<1500;i++){g.fillStyle=hsl(eh+rnd()*40-20,28,A[0][2]+9+rnd()*14,.55);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
   }
-  const slabCol=v=>crypt?hsl(hue+v*24-12,3+v*7,25+v*10):area==='ash'?hsl(24,3+v*4,17+v*9):area==='fen'?hsl(135+v*30,9+v*9,20+v*9):area==='peaks'?hsl(215,8+v*6,27+v*10):area==='dark'?hsl(340,9+v*9,13+v*7):hsl(v<.5?hue:35,2+v*5,24+v*10);
+  const slabCol=v=>crypt?hsl(232+v*16-8,9+v*5,21+v*9):area==='ash'?hsl(24,3+v*4,17+v*9):area==='fen'?hsl(135+v*30,9+v*9,20+v*9):area==='peaks'?hsl(215,8+v*6,27+v*10):area==='dark'?hsl(340,9+v*9,13+v*7):hsl(v<.5?hue:35,2+v*5,24+v*10);
   if(court){
     // polished chequer, a gold inlay and a runner up the middle
     const T=60;
@@ -104,15 +298,16 @@ function floorTexture(theme,hue,area,low){
     while(y<H){
       const rh=40+rnd()*16;let x=-rnd()*40;
       while(x<W){
-        const w=42+rnd()*44,v=rnd();
+        const w=42+rnd()*44,v=Math.floor(rnd()*3)/2;
         if(crypt||rnd()<A[1]){
           const jx=crypt?0:rnd()*3-1.5,jy=crypt?0:rnd()*3-1.5,sx=x+1.3+jx,sy=y+1.3+jy,sw=w-2.6,sh=rh-2.6;
           g.fillStyle=slabCol(v);g.fillRect(sx,sy,sw,sh);
-          for(let i=0;i<9;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,1+rnd()*5,0,TAU);g.fill()}
-          g.fillStyle='rgba(255,255,255,.1)';g.fillRect(sx,sy,sw,1.4);g.fillRect(sx,sy,1.4,sh);
-          g.fillStyle='rgba(0,0,0,.4)';g.fillRect(sx,sy+sh-2,sw,2);g.fillRect(sx+sw-2,sy,2,sh);
+          for(let i=0;i<3;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.04)':'rgba(0,0,0,.1)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,2+rnd()*6,0,TAU);g.fill()}
+          g.fillStyle='rgba(255,255,255,.15)';g.fillRect(sx,sy,sw,1.5);g.fillRect(sx,sy,1.5,sh);
+          g.fillStyle='rgba(4,3,12,.55)';g.fillRect(sx,sy+sh-2.6,sw,2.6);g.fillRect(sx+sw-2.6,sy,2.6,sh);
+          g.strokeStyle='rgba(5,4,13,.95)';g.lineWidth=1.5;g.strokeRect(sx,sy,sw,sh);
           if(rnd()<.11){g.fillStyle=crypt?hsl(hue-95,30,34,.2):hsl(eh+10,26,26,.4);g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,6+rnd()*12,0,TAU);g.fill()}
-          if(rnd()<.16){g.strokeStyle='rgba(0,0,0,.62)';g.lineWidth=1.4;g.beginPath();const cx=sx+rnd()*sw,cy=sy+rnd()*sh;g.moveTo(cx,cy);g.lineTo(cx+rnd()*20-10,cy+rnd()*20-10);g.lineTo(cx+rnd()*32-16,cy+rnd()*32-16);g.stroke()}
+          if(rnd()<.16){g.strokeStyle='rgba(4,3,12,.85)';g.lineWidth=1.6;g.beginPath();const cx=sx+rnd()*sw,cy=sy+rnd()*sh;g.moveTo(cx,cy);g.lineTo(cx+rnd()*20-10,cy+rnd()*20-10);g.lineTo(cx+rnd()*32-16,cy+rnd()*32-16);g.stroke()}
         }
         x+=w;
       }
@@ -162,12 +357,13 @@ function floorTexture(theme,hue,area,low){
 }
 function brickTexture(hue,sat){
   const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(5+hue);
-  g.fillStyle=hsl(hue,sat,7);g.fillRect(0,0,256,256);
+  g.fillStyle=hsl(240,20,3);g.fillRect(0,0,256,256);
   for(let r=0;r<4;r++)for(let i=-1;i<2;i++){
     const x=i*128+(r%2?64:0),y=r*64,v=rnd();
-    g.fillStyle=hsl(hue+v*18-9,sat+v*6,30+v*13);g.fillRect(x+3,y+3,122,58);
-    for(let k=0;k<14;k++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.05)':'rgba(0,0,0,.12)';g.beginPath();g.arc(x+3+rnd()*122,y+3+rnd()*58,2+rnd()*9,0,TAU);g.fill()}
-    g.fillStyle='rgba(255,255,255,.1)';g.fillRect(x+3,y+3,122,3);g.fillStyle='rgba(0,0,0,.42)';g.fillRect(x+3,y+56,122,5);
+    g.fillStyle=hsl(hue+v*18-9,sat+v*6,27+Math.floor(v*3)*5.5);g.fillRect(x+3,y+3,122,58);
+    g.strokeStyle='rgba(5,4,13,.95)';g.lineWidth=3;g.strokeRect(x+3,y+3,122,58);
+    for(let k=0;k<4;k++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.05)':'rgba(0,0,0,.12)';g.beginPath();g.arc(x+3+rnd()*122,y+3+rnd()*58,2+rnd()*9,0,TAU);g.fill()}
+    g.fillStyle='rgba(255,255,255,.14)';g.fillRect(x+4,y+4,120,3);g.fillStyle='rgba(4,3,12,.5)';g.fillRect(x+4,y+54,120,6);
     if(rnd()<.4){g.strokeStyle='rgba(0,0,0,.5)';g.lineWidth=2;g.beginPath();const cx=x+20+rnd()*90;g.moveTo(cx,y+4);g.lineTo(cx+rnd()*20-10,y+30);g.lineTo(cx+rnd()*30-15,y+60);g.stroke()}
   }
   return canvasTex(c,true);
@@ -207,18 +403,27 @@ function bannerTexture(){
   g.fillStyle='#d6a544';g.beginPath();g.arc(32,46,5,0,TAU);g.fill();g.restore();
   return canvasTex(c,false);
 }
+function runeTexture(R0){ // [colour, half-size in world units, [[radius,width]...], star points, star radius, ticks]
+  const c=mkCanvas(256,256),g=c.getContext('2d'),k=128/R0[1];g.translate(128,128);g.scale(k,k);g.strokeStyle='#fff';g.lineCap='round';
+  g.shadowColor='#fff';g.shadowBlur=5*k;
+  for(const[r,lw]of R0[2]){g.lineWidth=lw+.6;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke()}
+  g.lineWidth=1.8;
+  if(R0[5])for(let i=0;i<24;i++){const a=i/24*TAU,r0=119,r1=i%2?126:131;g.beginPath();g.moveTo(Math.cos(a)*r0,Math.sin(a)*r0);g.lineTo(Math.cos(a)*r1,Math.sin(a)*r1);g.stroke()}
+  const n=R0[3],rr=R0[4];g.beginPath();for(let i=0;i<=n;i++){const a=i*3/n*TAU-Math.PI/2;g[i?'lineTo':'moveTo'](Math.cos(a)*rr,Math.sin(a)*rr)}g.stroke();
+  return new THREE.CanvasTexture(c);
+}
 function buildEnv(key,low){
   const crypt=key==='crypt',hue=crypt?208:+key.slice(1)||0,area=crypt?'crypt':AREA_BY_HUE[hue]||'pass';
-  const root=new THREE.Group(),E={key,low,crypt,area,hue,root,flames:[],lit:[],ticks:[],crystals:[],fire:crypt,
+  const root=new THREE.Group(),E={key,low,crypt,area,hue,root,flames:[],lit:[],ticks:[],crystals:[],glowOnly:[],rune:null,runeM:null,fire:crypt,
     sun:new THREE.Color(0xe6e9f2),sunI:.66,hemiI:.36,lightI:1.6,lightD:400,fogFar:1300,mote:[1,.9,.68],moteMode:'drift',moteN:low?0:40};
   const rnd=rng(77+hue),dn=n=>low?Math.ceil(n*.5):n;
   const ftex=floorTexture(crypt?'crypt':'out',hue,area,low);
-  const floor=new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({map:ftex,bumpMap:low?null:ftex,bumpScale:1.6,roughness:area==='court'?.5:.86,metalness:area==='court'?.12:.04}));
-  floor.material.color.setScalar(crypt?1.3:area==='peaks'?1.1:FLOOR_GAIN);
+  const floor=noLine(new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),ST.toonRaw(0xffffff,{map:ftex,rim:false})));
+  floor.material.color.setScalar(crypt?FLOOR_GAIN*.9:area==='peaks'?FLOOR_GAIN*.72:area==='court'?FLOOR_GAIN*1.15:FLOOR_GAIN);
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
   const btex=brickTexture(crypt?226:hue,crypt?9:4);
-  const side=new THREE.MeshStandardMaterial({map:btex,bumpMap:low?null:btex,bumpScale:1.4,roughness:.9}),top=new THREE.MeshStandardMaterial({map:btex,color:0x2c2c35,roughness:.95});
-  side.color.setScalar(FLOOR_GAIN);
+  const side=ST.toonRaw(0xffffff,{map:btex}),top=ST.toonRaw(0xffffff,{map:btex,rim:false});
+  side.color.setScalar(FLOOR_GAIN*1.1);top.color.setHex(0x2c2c35).multiplyScalar(.6);
   const mats=[side,side,top,top,side,side];
   // ruined boundary of loose blocks; gap = chance that a stretch has fallen
   const blockWall=(tint,gap,hN,hE,hS)=>{
@@ -226,7 +431,7 @@ function buildEnv(key,low){
     const run=(horizontal,fixed,from,to,hh,out)=>{let a=from;while(a<to){const len=Math.min(to-a,34+rnd()*30),h=rnd()<.14?6+rnd()*6:hh[0]+rnd()*(hh[1]-hh[0]),th=30+rnd()*10;
       const mid=fixed+out*th/2;if(rnd()>=gap)blocks.push(horizontal?[a+len/2,mid,len-1.5,h,th]:[mid,a+len/2,th,h,len-1.5]);a+=len}};
     run(true,WALL,-8,W+8,hN,-1);run(true,H-WALL,-8,W+8,hS,1);run(false,WALL,WALL,H-WALL,hE,-1);run(false,W-WALL,WALL,H-WALL,hE,1);
-    const wallMat=new THREE.MeshStandardMaterial({color:tint,map:btex,bumpMap:low?null:btex,bumpScale:1.2,roughness:.92});
+    const wallMat=ST.toonRaw(0xffffff,{map:btex});wallMat.color.setHex(tint).multiplyScalar(.7);
     const im=inst(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),wallMat,blocks.length);
     blocks.forEach((b,i)=>{put(im,i,b[0],0,b[1],b[2],b[3],b[4],0,(rnd()-.5)*.05,0);im.setColorAt(i,_col.setScalar(.75+rnd()*.35))});
     root.add(im);
@@ -238,7 +443,7 @@ function buildEnv(key,low){
     if(stepS)for(let x=6;x<W;x+=stepS*(.7+rnd()*.6))fn(i++,x,H-WALL+8+rnd()*8,1);
     return i};
   const count=(a,b,c)=>{const keep=rnd.s;const n=along(a,b,c,()=>{});rnd.s=keep;return n};
-  const ground=(col,o)=>{const g=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(col,Object.assign({roughness:1},o||{})));g.position.set(W/2,-.6,H/2);g.receiveShadow=true;root.add(g);return g};
+  const ground=(col,o)=>{const g=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(col,{rim:false,k:.8})));g.position.set(W/2,-.6,H/2);g.receiveShadow=true;root.add(g);return g};
   const rocks=(n,col)=>{const im=inst(new THREE.DodecahedronGeometry(1,0),std(col,{flatShading:true,roughness:1}),n);
     for(let i=0;i<n;i++){const p=outside(rnd,60,true),s=6+rnd()*16;put(im,i,p.x,s*.3,p.z,s,s*(.6+rnd()*.8),s,rnd()*3,rnd()*3,rnd()*3)}root.add(im)};
   if(crypt){
@@ -247,9 +452,15 @@ function buildEnv(key,low){
     // buttresses break up the long walls and catch the torchlight
     for(const x of[150,330,630,810])root.add(slab(x-15,x+15,0,hN+8,WALL-2,WALL+9,mats));
     for(const z of[170,320,470]){root.add(slab(WALL-2,WALL+9,0,hN+8,z-15,z+15,mats),slab(W-WALL-9,W-WALL+2,0,hN+8,z-15,z+15,mats))}
-    const gate=new THREE.Mesh(new THREE.PlaneGeometry(84,78),new THREE.MeshStandardMaterial({map:gateTexture(),transparent:true,alphaTest:.5,roughness:.7,metalness:.3}));
+    const gate=noLine(new THREE.Mesh(new THREE.PlaneGeometry(84,78),ST.toonRaw(0xffffff,{map:gateTexture(),transparent:true,alphaTest:.5,rim:false})));
     gate.position.set(W/2,39,WALL+.4);root.add(gate);
-    scene.background.setHex(0x040306);E.sun.setHex(0xcfd8f6);E.sunI=.62;E.hemiI=.3;E.lightI=4.2;E.lightD=500;E.fogFar=2600;
+    // rune slits cut into the buttresses: the crypt's own cold light
+    {const pts=[];for(const x of[150,330,630,810])pts.push([x,WALL+9.3,0]);for(const z of[170,320,470]){pts.push([WALL+9.3,z,1],[W-WALL-9.3,z,1])}
+      const slitM=basic(0x8f7bff),sl=noLine(inst(G.box,slitM,pts.length,true)),hz=noLine(inst(G.quad,flatGlowMat(0x7a5cff,.3),pts.length,true));
+      pts.forEach((q,i)=>{const a=q[2];put(sl,i,a?q[0]:q[0],52,a?q[1]:q[1],a?1.2:3,30,a?3:1.2);put(hz,i,a?q[0]+(q[0]<W/2?14:-14):q[0],.7,a?q[1]:q[1]+16,a?70:46,1,a?46:70)});
+      root.add(sl,hz);E.glowOnly.push(sl,hz);
+      E.ticks.push(t=>{const k=.62+.3*Math.sin(t*1.7);slitM.color.setRGB(.5*k,.42*k,1.0*k)})}
+    scene.background.setHex(0x040306);E.sun.setHex(0xdfe4ff);E.sunI=.6;E.hemiI=.3;E.lightI=4.2;E.lightD=500;E.fogFar=2600;E.rune=[0x7a5cff,136,[[132,3],[118,1.5],[62,1.5]],7,62,true];
   }else if(area==='ash'){
     // the ash road: a burnt palisade, dead trees, embers still alive in the ground, the road running on east and west
     scene.background.setHSL(16/360,.5,.03);ground(hslColor(20,.16,.04));
@@ -274,7 +485,7 @@ function buildEnv(key,low){
     // the drowned fen: the arena is a mud bank in still black water, reeds and rotten posts around it
     scene.background.setHSL(172/360,.4,.028);
     E.sun.setHex(0xcfeadb);E.sunI=.6;E.hemiI=.34;E.lightI=2.1;E.lightD=430;E.fogFar=820;E.mote=[.72,1,.45];E.moteN=low?10:44;
-    const water=new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),new THREE.MeshStandardMaterial({color:hslColor(172,.5,.07),roughness:.16,metalness:.55}));
+    const water=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(172,.5,.07),{rim:false,k:.9})));
     water.position.set(W/2,-4,H/2);water.receiveShadow=true;root.add(water);
     const mud=std(hslColor(120,.18,.07),{roughness:1}),bank=slab(-30,W+30,-9,-.25,-30,H+30,mud);bank.castShadow=false;root.add(bank);
     blockWall(0x7d9b88,.62,[8,24],[8,20],[5,9]);
@@ -292,7 +503,7 @@ function buildEnv(key,low){
     const nL=dn(40),pads=inst(new THREE.CircleGeometry(1,7).rotateX(-Math.PI/2),std(hslColor(128,.42,.17),{roughness:.7}),nL,true);
     for(let i=0;i<nL;i++){const p=outside(rnd,36,true),s=5+rnd()*8;put(pads,i,p.x,-3.7,p.z,s,1,s*(.7+rnd()*.3),0,rnd()*6,0)}root.add(pads);
     // shallow standing water on the bank itself
-    const sheen=new THREE.MeshStandardMaterial({color:0x04100e,roughness:.05,metalness:.3,transparent:true,opacity:.42,depthWrite:false}),nW=9,pud=inst(G.disc,sheen,nW,true);
+    const sheen=new THREE.MeshBasicMaterial({color:0x020a0a,transparent:true,opacity:.46,depthWrite:false}),nW=9,pud=inst(G.disc,sheen,nW,true);
     for(let i=0;i<nW;i++)put(pud,i,WALL+60+rnd()*(W-2*WALL-120),.3,WALL+50+rnd()*(H-2*WALL-100),30+rnd()*46,1,18+rnd()*26,0,rnd()*3,0);
     pud.receiveShadow=true;pud.renderOrder=0;root.add(pud);
     if(!low){const mist=flatGlowMat(0xa8d8c8,.07),nM=10,mm=inst(G.quad,mist,nM,true);for(let i=0;i<nM;i++){const s=360+rnd()*320;put(mm,i,rnd()*W,6+i*.4,rnd()*H,s,1,s*.5)}mm.renderOrder=3;root.add(mm);
@@ -323,7 +534,7 @@ function buildEnv(key,low){
     // the black court: a finished hall open to the dark, colonnade and banners on the north side
     scene.background.setHSL(285/360,.4,.02);ground(hslColor(285,.3,.035),{roughness:.35,metalness:.3});
     E.sun.setHex(0xddd0f4);E.sunI=.56;E.hemiI=.3;E.lightI=3.6;E.lightD=520;E.fire=true;E.mote=[.85,.7,1];E.moteN=low?0:30;E.fogFar=1900;
-    side.color.setHSL(285/360,.22,.5);top.color.setHSL(285/360,.2,.12);
+    side.color.setHSL(285/360,.22,.5).multiplyScalar(.62);top.color.setHSL(285/360,.2,.12).multiplyScalar(.7);E.rune=[0xf0b848,88,[[84,3],[70,1.6]],8,70,false];
     root.add(slab(-60,W+60,0,46,-60,WALL-2,mats),slab(-60,WALL-2,0,34,WALL-2,H+40,mats),slab(W-WALL+2,W+60,0,34,WALL-2,H+40,mats),slab(WALL-2,W-WALL+2,0,9,H-WALL+2,H+40,mats));
     const marble=std(hslColor(285,.14,.26),{roughness:.45,metalness:.1,flatShading:true}),gold=std(0xb88a2e,{roughness:.35,metalness:.7});
     const cols=[];for(let i=0;i<7;i++)cols.push([96+i*128,13,156]);for(const z of[150,300,450]){cols.push([13,z,112],[W-13,z,112])}
@@ -331,8 +542,8 @@ function buildEnv(key,low){
     cols.forEach((c,i)=>{put(shaft,i,c[0],6,c[1],10.5,c[2]-12,10.5);put(caps,i*2,c[0],0,c[1],28,7,28);put(caps,i*2+1,c[0],c[2]-7,c[1],28,7,28);put(rings,i,c[0],c[2]-11,c[1],11,3,11)});
     root.add(shaft,caps,rings);
     root.add(slab(60,W-60,156,170,2,24,[marble,marble,marble,marble,marble,marble]));
-    const btexB=bannerTexture(),cloth=new THREE.MeshStandardMaterial({map:btexB,alphaTest:.5,side:THREE.DoubleSide,roughness:.9}),bg=new THREE.PlaneGeometry(50,100).translate(0,-50,0),banners=[];
-    for(let i=0;i<6;i++){const b=new THREE.Mesh(bg,cloth);b.position.set(160+i*128,152,25.5);b.castShadow=true;root.add(b);banners.push(b)}
+    const btexB=bannerTexture(),cloth=ST.toonRaw(0xffffff,{map:btexB,alphaTest:.5,side:THREE.DoubleSide,rim:false}),bg=new THREE.PlaneGeometry(50,100).translate(0,-50,0),banners=[];
+    for(let i=0;i<6;i++){const b=noLine(new THREE.Mesh(bg,cloth));b.position.set(160+i*128,152,25.5);b.castShadow=true;root.add(b);banners.push(b)}
     E.ticks.push(t=>{for(let i=0;i<banners.length;i++)banners[i].rotation.x=.04+Math.sin(t*1.1+i*1.9)*.05});
     const nB=30,bal=inst(new THREE.CylinderGeometry(.6,1,1,6).translate(0,.5,0),marble,nB);for(let i=0;i<nB;i++)put(bal,i,20+i*(W-40)/(nB-1),9,H-WALL+10,3.4,8,3.4);root.add(bal);
     root.add(slab(8,W-8,17,20,H-WALL+5,H-WALL+15,[marble,marble,marble,marble,marble,marble]));
@@ -345,7 +556,7 @@ function buildEnv(key,low){
     const nJ=dn(40),jag=inst(new THREE.ConeGeometry(1,1,5).translate(0,.5,0),rockM,nJ,true);
     for(let i=0;i<nJ;i++){const s=i<nJ*.6,x=s?rnd()*W:(rnd()<.5?-10:W+10),z=s?H+6+rnd()*10:rnd()*H,w=14+rnd()*22;put(jag,i,x,-64,z,w,40+rnd()*110,w,Math.PI,rnd()*3,0)}root.add(jag);
     blockWall(0x8a7480,.68,[10,34],[8,26],[5,9]);
-    const shardM=new THREE.MeshStandardMaterial({color:0x2a1a24,emissive:hslColor(340,.9,.1),roughness:.3,metalness:.5,flatShading:true}),hotM=basic(hslColor(345,.95,.6)),oct=new THREE.OctahedronGeometry(1,0);
+    const shardM=std(0x2a1a24,{emissive:hslColor(340,.9,.1),flatShading:true,k:.8}),hotM=basic(hslColor(345,.95,.6)),oct=new THREE.OctahedronGeometry(1,0);
     const sets=[];
     for(let g=0;g<3;g++){const n=dn(22),im=inst(oct,shardM,n,true),hot=inst(oct,hotM,dn(8),true),grp=new THREE.Group();
       for(let i=0;i<n;i++){const p=outside(rnd,70,true),s=8+rnd()*rnd()*46,south=p.z>H-40;put(im,i,p.x,south?-150+rnd()*110:-70+rnd()*290,p.z,s*.55,s*1.7,s*.55,rnd()*3,rnd()*3,rnd()*3)}
@@ -399,15 +610,23 @@ function buildEnv(key,low){
       const cry=new THREE.Mesh(new THREE.OctahedronGeometry(6,0),basic(coreCol));cry.position.y=62;cry.scale.y=1.5;
       g.add(men,cry);E.crystals.push(cry);topY=62;
     }
-    const f1=new THREE.Sprite(glowMat(flameCol,.95)),f2=new THREE.Sprite(glowMat(coreCol,.9)),halo=new THREE.Sprite(glowMat(flameCol,.22));
-    f1.position.y=topY+3;f2.position.y=topY;halo.position.y=topY;halo.scale.setScalar(150);
-    const fl=new THREE.Group();fl.add(halo,f1,f2);g.add(fl);
+    const f1=new THREE.Sprite(glowMat(flameCol,.95)),f2=new THREE.Sprite(glowMat(coreCol,.9)),halo=new THREE.Sprite(glowMat(flameCol,.22)),spill=new THREE.Mesh(G.quad,flatGlowMat(flameCol,.2));
+    f1.position.y=topY+3;f2.position.y=topY;halo.position.y=topY;halo.scale.setScalar(190);
+    spill.position.set(x<W/2?40:-40,.8,z<H/2?34:-34);spill.scale.set(330,1,250);spill.renderOrder=1; // the light it throws on the floor, as a flat pool
+    const fl=new THREE.Group();fl.add(halo,f1,f2,spill);g.add(fl);
     E.flames.push({fl,f1,f2,halo,ph:i*1.7,y:topY});
     root.add(g);
   });
   // obstacles take the colour of the place
   OB.stone.color.copy(crypt?_col.setHex(0x4e4d58):area==='court'?hslColor(285,.14,.22):area==='peaks'?hslColor(216,.1,.3):hslColor(hue,.1,.24));OB.ghost.color.copy(OB.stone.color);
+  OB.stone.color.multiplyScalar(.74);OB.ghost.color.copy(OB.stone.color);
+  // fill light: indigo from above, leaning a little toward the colour of the place
+  E.sky=new THREE.Color(0x6f78e6).lerp(hslColor(crypt?236:hue,.5,.62),crypt?.1:.3);E.gnd=new THREE.Color(0x1c1436).lerp(hslColor(crypt?250:hue,.45,.14),.4);
+  // a glowing seal over the circle painted on the floor (crypt, court)
+  if(E.rune){const R0=E.rune,m=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:runeTexture(R0),color:R0[0],transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));
+    m.position.set(W/2,.5,H/2);m.scale.setScalar(R0[1]*2);m.renderOrder=1;root.add(m);E.runeM=m;E.glowOnly.push(m)}
   scene.fog.color.copy(scene.background);
+  if(!low)ST.outline(root,{thickness:1.25});
   scene.add(root);
   return E;
 }
@@ -468,7 +687,7 @@ class Pool{constructor(make){this.make=make;this.items=[];this.n=0}
   get(){let o=this.items[this.n];if(!o){o=this.make();fx.add(o);this.items.push(o)}this.n++;o.visible=true;return o}
   end(){for(let i=this.n;i<this.items.length;i++)this.items[i].visible=false}}
 const mCore={e:basic(0xfff0d8),bolt:basic(0xe8f6ff),orb:basic(0xfff6cf),bone:basic(0xcfc7b4),dark:basic(0x15121b),steel:basic(0xd5dce2),
-  morsel:new THREE.MeshStandardMaterial({color:0xd1213f,roughness:.35,emissive:0x5a0714}),pink:basic(0xffb3bf)};
+  morsel:ST.toon(0xe0244a,{emissive:0x7a0a1c,steps:2}),pink:basic(0xffb3bf)};
 function orbMaker(coreMat,glowHex,glowK){return()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.sphere,coreMat),halo=new THREE.Sprite(glowMat(glowHex,.9)),pool=new THREE.Mesh(G.quad,flatGlowMat(glowHex,.4));
   halo.scale.setScalar(glowK);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(glowK*1.5);g.add(core,halo,pool);g.userData.core=core;return g}}
 const pools={
@@ -577,12 +796,12 @@ function makeObstacle(o){
   const g=new THREE.Group(),r=o.r||20,k=o.kind,u={kind:k,up:o.on?1:0,r};
   if(k==='pit'){
     if(!OB.pitMat)OB.pitMat=new THREE.MeshBasicMaterial({map:pitTexture(),transparent:true,alphaTest:.5});
-    const d=new THREE.Mesh(G.disc,OB.pitMat);d.scale.setScalar(r);d.position.y=.32;
+    const d=noLine(new THREE.Mesh(G.disc,OB.pitMat));d.scale.setScalar(r);d.position.y=.32;
     const rim=new THREE.Mesh(OB.rimGeo,OB.rimMat);rim.scale.set(r*1.03,Math.min(2.2,34/r)*r*.5,r*1.03);rim.position.y=.4;rim.rotation.y=hash2(o.x,o.y)*6;rim.receiveShadow=true;
     g.add(d,rim);
   }else if(k==='spikes'){
-    if(!OB.plateMat)OB.plateMat=new THREE.MeshStandardMaterial({map:plateTexture(),roughness:.55,metalness:.45,transparent:true,alphaTest:.5});
-    const d=new THREE.Mesh(G.disc,OB.plateMat);d.scale.setScalar(r);d.position.y=.36;d.receiveShadow=true;
+    if(!OB.plateMat){OB.plateMat=ST.toonRaw(0xffffff,{map:plateTexture(),transparent:true,alphaTest:.5,rim:false});OB.plateMat.color.setScalar(.8)}
+    const d=noLine(new THREE.Mesh(G.disc,OB.plateMat));d.scale.setScalar(r);d.position.y=.36;d.receiveShadow=true;
     const sp=new THREE.Mesh(OB.spikes,OB.steel);sp.castShadow=true;
     const ring=new THREE.Mesh(G.rim,OB.warn);ring.scale.setScalar(r*1.04);ring.position.y=.62;ring.renderOrder=2;
     g.add(d,sp,ring);u.sp=sp;u.ring=ring;
@@ -599,7 +818,7 @@ function makeObstacle(o){
     const hh=hash2(o.x,o.y),broken=hh>.78,h=broken?40+hh*20:66+hh*90%22;
     const p=new THREE.Mesh(broken?OB.stump:OB.pillar,OB.stone);p.scale.set(r,h,r);p.rotation.y=hh*6;p.castShadow=true;p.receiveShadow=true;g.add(p);u.p=p;u.h=h;u.kind='pillar';
   }
-  g.position.set(o.x,0,o.y);obsRoot.add(g);
+  g.position.set(o.x,0,o.y);ST.outline(g,{thickness:1.3});obsRoot.add(g);
   return{g,u,stamp:0};
 }
 let xlN=0;
@@ -615,7 +834,7 @@ function syncObstacles(dt,sight){
     if(u.kind==='pillar'){
       // a pillar standing between the camera and the player turns to glass
       let hide=false;if(P){const dx=Math.abs(P.x-o.x),dz=o.y-P.y;hide=dx<u.r+12&&dz>2&&dz<u.h*.8+12}
-      u.p.material=hide?OB.ghost:OB.stone;u.p.castShadow=!hide||!low;
+      u.p.material=hide?OB.ghost:OB.stone;u.p.castShadow=!hide||!low;{const lm=u.p.userData.mbLineMesh;if(lm)lm.visible=!hide}
       if(low){const b=pools.blob.get();b.position.set(o.x+u.r*.3,.5,o.y-u.r*.25);b.scale.set(u.r*6,1,u.r*5.2)}
     }else if(u.kind==='spikes'){
       const e=.1+.9*u.up+(o.warn&&!o.on?.06*Math.sin(t*46+o.x):0);u.sp.scale.set(u.r,28*e,u.r);u.sp.position.y=-1.5;
@@ -867,6 +1086,7 @@ function applyQuality(){
   if(low&&sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}
   points[2].visible=points[3].visible=!low;XL[0].visible=XL[1].visible=!low;
   viewPR=0; // resize() picks the new pixel ratio; syncEnv() rebuilds the place without bump maps and with fewer props
+  ST.refresh(scene); // ink outlines: stripped in low, rebuilt from the remembered requests in high
 }
 if(typeof MB.on==='function')try{MB.on('settings',()=>{if(alive&&isLow()!==Q.low)applyQuality()})}catch(e){}
 
@@ -877,7 +1097,10 @@ function draw(dt){
   const S=MB.S,P=MB.P,sight=MB.has('sight'),t=S.t;
   if(isLow()!==Q.low)applyQuality();
   resize();syncEnv();
-  if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.06)'}
+  if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.22) brightness(1.06)';
+    ST.uRim.value.setHex(sight?PAL.rim:0xffffff).multiplyScalar(sight?.55:.8)}
+  for(let i=0;i<env.glowOnly.length;i++)env.glowOnly[i].visible=sight;
+  if(env.runeM)env.runeM.material.opacity=.3+.14*Math.sin(t*1.3);
 
   // camera: leans toward the player, never far from the arena centre
   frameWant(sight);
@@ -886,17 +1109,17 @@ function draw(dt){
   zoom+=(want.zoom-zoom)*(want.zoom>zoom?1-Math.exp(-dt*4.5):1-Math.exp(-dt*1.3));
   placeCamera(camTarget.x,camTarget.z,fitD*zoom);basePos.copy(camera.position);
   scene.fog.near=fitD*zoom*.95;scene.fog.far=fitD*zoom+env.fogFar;
+  ST.uMin.value=viewH?2*fitD*zoom*Math.tan(camera.fov*Math.PI/360)/viewH*.95:0; // ink lines never thinner than about a pixel
 
   // lights
   const low=Q.low,nL=low?2:4;
   if(!sight){
-    hemi.color.setHex(0xaab0c0);hemi.groundColor.setHex(0x1c1c22);hemi.intensity=.36;
-    sun.color.setHex(0xffffff);sun.intensity=.42;
-    points[0].color.setHex(0xffffff);points[0].intensity=.75;points[0].distance=FOG*2.4;points[0].position.set(P?P.x:W/2,140,(P?P.y:H/2)+34);
+    hemi.color.setHex(0xaab0c0);hemi.groundColor.setHex(0x1c1c22);hemi.intensity=.3;
+    sun.color.setHex(0xffffff);sun.intensity=.62;
+    points[0].color.setHex(0xffffff);points[0].intensity=1.1;points[0].distance=FOG*2.4;points[0].position.set(P?P.x:W/2,140,(P?P.y:H/2)+34);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else{
-    if(env.crypt){hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14)}
-    else{hemi.color.setHSL(env.hue/360,.1,.62);hemi.groundColor.setHSL(env.hue/360,.14,.1)}
+    hemi.color.copy(env.sky);hemi.groundColor.copy(env.gnd);
     hemi.intensity=env.hemiI*HEMI_K;sun.color.copy(env.sun);sun.intensity=env.sunI*SUN_K;
   }
   for(let i=0;i<4;i++){
@@ -906,8 +1129,8 @@ function draw(dt){
       if(i<nL){const l=points[i];l.color.copy(env.lightColor);
         if(low){l.intensity=env.lightI*1.1*PT_K;l.distance=env.lightD*1.7;l.position.set(i?W*.76:W*.24,170,H*.45)}
         else{l.intensity=env.lightI*fl*PT_K;l.distance=env.lightD;l.position.set(CORNERS[i][0]+(i%2?-46:46),f.y+78,CORNERS[i][1]+(i<2?46:-46))}}
-      if(env.fire){f.f1.scale.set(30*fl,48*fl+4*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+10+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(15,24*fl,1);f.halo.material.opacity=.3*fl}
-      else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.16*fl;const c=env.crystals[i];if(c){c.rotation.y=t*.6+i;c.position.y=f.y+Math.sin(t*1.4+i*1.9)*2.5}}
+      if(env.fire){f.f1.scale.set(30*fl,48*fl+4*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+10+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(15,24*fl,1);f.halo.material.opacity=.36*fl}
+      else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.24*fl;const c=env.crystals[i];if(c){c.rotation.y=t*.6+i;c.position.y=f.y+Math.sin(t*1.4+i*1.9)*2.5}}
     }
   }
   for(let i=0;i<env.lit.length;i++)env.lit[i].m.color.setHex(sight?env.lit[i].on:env.lit[i].off);
@@ -1013,5 +1236,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.scene=scene;R.camera=camera;R.ok=true;
 })();
