@@ -20,7 +20,7 @@ try{
 const calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TILT=52*Math.PI/180,LIFT=46,SHOT_Y=17;
 renderer.outputEncoding=THREE.sRGBEncoding;
-renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.2;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 const maxAniso=Math.min(4,renderer.capabilities.getMaxAnisotropy());
 
@@ -32,7 +32,7 @@ const camera=new THREE.PerspectiveCamera(30,W/H,50,6000);
 /* ---------- lights: a constant set (hemisphere, one shadow sun, four points) so shaders never recompile ---------- */
 const hemi=new THREE.HemisphereLight(0x8a94b8,0x1a1410,.5);scene.add(hemi);
 const sun=new THREE.DirectionalLight(0xffffff,.8);
-sun.position.set(W/2-190,700,H/2+250);sun.target.position.set(W/2,0,H/2);
+sun.position.set(W/2-300,620,H/2+300);sun.target.position.set(W/2,0,H/2);
 sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
 {const c=sun.shadow.camera;c.left=-600;c.right=600;c.top=470;c.bottom=-470;c.near=100;c.far=1500;c.updateProjectionMatrix()}
 sun.shadow.bias=-.0006;sun.shadow.normalBias=.8;sun.shadow.radius=2;
@@ -70,10 +70,10 @@ function floorTexture(theme,hue){
   const TW=2048,TH=1024,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue);
   g.scale(TW/W,TH/H);
   const crypt=theme==='crypt';
-  g.fillStyle=crypt?hsl(hue,14,5):hsl(hue,14,8);g.fillRect(0,0,W,H);
+  g.fillStyle=crypt?hsl(hue,14,5):hsl(hue,20,13);g.fillRect(0,0,W,H);
   if(!crypt){ // bare earth showing between the slabs
-    for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(hue+rnd()*30-15,16,13+rnd()*6,.22):'rgba(0,0,0,.16)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
-    for(let i=0;i<1500;i++){g.fillStyle=hsl(hue+rnd()*40-20,24,18+rnd()*14,.5);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
+    for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(hue+rnd()*30-15,22,17+rnd()*7,.25):'rgba(0,0,0,.14)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
+    for(let i=0;i<1500;i++){g.fillStyle=hsl(hue+rnd()*40-20,28,22+rnd()*14,.55);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
   }
   let y=0;
   while(y<H){
@@ -82,7 +82,7 @@ function floorTexture(theme,hue){
       const w=42+rnd()*44,v=rnd();
       if(crypt||rnd()<.74){
         const jx=crypt?0:rnd()*3-1.5,jy=crypt?0:rnd()*3-1.5,sx=x+1.3+jx,sy=y+1.3+jy,sw=w-2.6,sh=rh-2.6;
-        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,29+v*13):hsl(hue+v*24-12,4+v*6,30+v*13);g.fillRect(sx,sy,sw,sh);
+        g.fillStyle=crypt?hsl(hue+v*24-12,3+v*7,25+v*10):hsl(hue+v*24-12,4+v*6,23+v*10);g.fillRect(sx,sy,sw,sh);
         for(let i=0;i<9;i++){g.fillStyle=rnd()<.5?'rgba(255,255,255,.045)':'rgba(0,0,0,.09)';g.beginPath();g.arc(sx+rnd()*sw,sy+rnd()*sh,1+rnd()*5,0,TAU);g.fill()}
         g.fillStyle='rgba(255,255,255,.1)';g.fillRect(sx,sy,sw,1.4);g.fillRect(sx,sy,1.4,sh);
         g.fillStyle='rgba(0,0,0,.4)';g.fillRect(sx,sy+sh-2,sw,2);g.fillRect(sx+sw-2,sy,2,sh);
@@ -175,7 +175,7 @@ function buildEnv(key){
     const run=(horizontal,fixed,from,to,hMin,hMax,out)=>{let a=from;while(a<to){const len=Math.min(to-a,34+rnd()*30),h=rnd()<.14?6+rnd()*6:hMin+rnd()*(hMax-hMin),th=30+rnd()*10;
       const mid=fixed+out*th/2;blocks.push(horizontal?[a+len/2,mid,len-1.5,h,th]:[mid,a+len/2,th,h,len-1.5]);a+=len}};
     run(true,WALL,-8,W+8,26,62,-1);run(true,H-WALL,-8,W+8,8,15,1);run(false,WALL,WALL,H-WALL,24,58,-1);run(false,W-WALL,WALL,H-WALL,24,58,1);
-    const wallMat=new THREE.MeshStandardMaterial({map:btex,bumpMap:btex,bumpScale:1.2,roughness:.92});
+    const wallMat=new THREE.MeshStandardMaterial({color:0xa8a8a8,map:btex,bumpMap:btex,bumpScale:1.2,roughness:.92});
     const inst=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),wallMat,blocks.length);
     const d=new THREE.Object3D(),col=new THREE.Color();
     blocks.forEach((b,i)=>{d.position.set(b[0],0,b[1]);d.scale.set(b[2],b[3],b[4]);d.rotation.set(0,(rnd()-.5)*.05,0);d.updateMatrix();inst.setMatrixAt(i,d.matrix);inst.setColorAt(i,col.setScalar(.75+rnd()*.35))});
@@ -198,7 +198,7 @@ function buildEnv(key){
   // corner lights: iron braziers in the crypt, crystal-topped menhirs outside
   const iron=std(0x24222a,{roughness:.6,metalness:.5}),stone=std(crypt?0x55545f:hslColor(hue,.1,.3),{flatShading:true,roughness:1});
   const flameCol=crypt?0xff8a3a:hslColor(hue,.85,.6).getHex(),coreCol=crypt?0xffe2a0:hslColor(hue,.7,.82).getHex();
-  E.lightColor=crypt?new THREE.Color(0xff9448):hslColor(hue,.75,.62);
+  E.lightColor=crypt?new THREE.Color(0xff9448):hslColor(hue,.4,.7);
   CORNERS.forEach(([x,z],i)=>{
     const g=new THREE.Group();g.position.set(x,0,z);
     let topY;
@@ -390,6 +390,8 @@ function groundEllipse(x,z,r){ // screen-space ellipse of a circle lying on the 
   toScreen(x,0,z);const cx=sp.x,cy=sp.y;toScreen(x+r,0,z);const rx=Math.abs(sp.x-cx);toScreen(x,0,z+r);const a=Math.abs(sp.y-cy);toScreen(x,0,z-r);const b=Math.abs(sp.y-cy);
   return{cx,cy:cy+(a-b)/2,rx,ry:(a+b)/2};
 }
+let vig=null;
+function vignette(){if(!vig){vig=ctx.createRadialGradient(W/2,H/2,H*.42,W/2,H/2,H*.98);vig.addColorStop(0,'rgba(4,3,8,0)');vig.addColorStop(1,'rgba(4,3,8,.62)')}return vig}
 function drawOverlay(sight){
   const S=MB.S,P=MB.P;
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,cv.width,cv.height);
@@ -409,6 +411,7 @@ function drawOverlay(sight){
       ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx,el.ry,0,0,TAU);ctx.stroke()}
     ctx.globalAlpha=1;
   }
+  else if(sight){ctx.fillStyle=vignette();ctx.fillRect(0,0,W,H)}
   const floats=MB.floats;
   if(floats.length){ctx.font='22px "Pirata One",Georgia,serif';ctx.textAlign='center';
     for(let i=0;i<floats.length;i++){const f=floats[i];toScreen(f.x,26,f.y);if(!sp.ok)continue;ctx.globalAlpha=Math.max(0,Math.min(1,f.life*2.5));ctx.fillStyle='#0d0c11';ctx.fillText(f.txt,sp.x+1.5,sp.y+1.5);ctx.fillStyle=f.c;ctx.fillText(f.txt,sp.x,sp.y)}
@@ -450,17 +453,17 @@ function draw(dt){
     points[0].color.setHex(0xffffff);points[0].intensity=1.5;points[0].distance=FOG*2.2;points[0].position.set(P?P.x:W/2,120,(P?P.y:H/2)+30);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else if(env.crypt){
-    hemi.color.setHex(0x9a9db0);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.42;
-    sun.color.setHex(0xdfe4f5);sun.intensity=.62;
+    hemi.color.setHex(0x8f93ac);hemi.groundColor.setHex(0x2a1e14);hemi.intensity=.26;
+    sun.color.setHex(0xcfd8f6);sun.intensity=.85;
   }else{
-    hemi.color.setHSL(env.hue/360,.14,.6);hemi.groundColor.setHSL(env.hue/360,.15,.1);hemi.intensity=.46;
-    sun.color.setHSL(((env.hue+25)%360)/360,.14,.88);sun.intensity=.78;
+    hemi.color.setHSL(env.hue/360,.1,.62);hemi.groundColor.setHSL(env.hue/360,.12,.1);hemi.intensity=.3;
+    sun.color.setHex(0xe6e9f2);sun.intensity=1.0;
   }
   for(let i=0;i<4;i++){
     const f=env.flames[i],lit=sight,fl=1+.13*Math.sin(t*9+f.ph)+.07*Math.sin(t*23.7+f.ph*2.3);
     f.fl.visible=lit;
     if(lit){
-      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?3.4:1.5)*fl;l.distance=env.crypt?720:460;l.position.set(CORNERS[i][0]+(i%2?-30:30),f.y+70,CORNERS[i][1]+(i<2?30:-30));
+      const l=points[i];l.color.copy(env.lightColor);l.intensity=(env.crypt?2.9:1.15)*fl;l.distance=env.crypt?720:460;l.position.set(CORNERS[i][0]+(i%2?-30:30),f.y+70,CORNERS[i][1]+(i<2?30:-30));
       if(env.crypt){f.f1.scale.set(22*fl,34*fl+3*Math.sin(t*17+f.ph),1);f.f1.position.y=f.y+7+Math.sin(t*13+f.ph)*1.2;f.f2.scale.set(11,16*fl,1);f.halo.material.opacity=.2*fl}
       else{f.f1.scale.setScalar(40*fl);f.f2.scale.setScalar(16);f.halo.material.opacity=.16*fl;env.crystals[i].rotation.y=t*.6+i}
     }
