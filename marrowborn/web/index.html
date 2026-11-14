@@ -20,6 +20,7 @@
   --bone:#eeecfb; --ash:#989bbd; --blood:#f0355a; --marrow:#f0b848; --flesh:#c68863;
   --pet-necro:#7fd66b; --pet-beast:#8fd3ff; --warn:#ff8497;
   --power:#8b4dff; --power-hi:#b89cff; --power2:#c4f4ff; --foe:#ff2d55; --gold:#f0b848;
+  --mana:#5cd9ff; --mana2:#8f6bff;
   --text:#d3d6ea; --line:#313a63; --plate:rgba(16,20,42,.92); --panel:rgba(9,11,24,.94);
   --r-common:#b9b2c6; --r-rare:#6ea3e0; --r-epic:#b88cff; --r-legendary:#f0b848;
   --display:"Rajdhani","Oswald","Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
@@ -116,6 +117,11 @@ button:disabled{opacity:.35;cursor:default}
 .cards small::after{content:"";position:absolute;inset:0;background:linear-gradient(125deg,currentColor,transparent 46%);opacity:.11;pointer-events:none}
 .cards span{font-size:.88rem;line-height:1.36;color:var(--text)}
 .cards button:hover small::after,.cards button:focus-visible small::after{opacity:.22}
+/* a long list (the pets screen, .cards.list set by game.js): compact rows in columns that scroll inside the panel; the body text is cut to one line */
+.cards.list{grid-template-columns:repeat(auto-fill,minmax(232px,1fr));gap:6px;max-height:min(44vh,400px);overflow:hidden auto;padding:2px 6px 2px 0;align-content:start;overscroll-behavior:contain}
+.cards.list button{--c:8px;padding:7px 10px 8px 15px;gap:2px;min-height:48px}
+.cards.list b{font-size:1.04rem}.cards.list small{font-size:.72rem;letter-spacing:.09em}
+.cards.list span{font-size:.78rem;line-height:1.25;color:var(--ash);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 
 /* ---- vitals row: health pips, pets, boss bar, toggles ---- */
 .vitals{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;justify-content:space-between}
@@ -136,8 +142,31 @@ button:disabled{opacity:.35;cursor:default}
 #pauseB[aria-pressed="true"]{--e:var(--power2);color:var(--power2)}
 @media (pointer:coarse){.tog{min-height:44px;min-width:44px}}
 
-/* the active pets or trophies beside your health: #petHud holds up to three .petRow (name + bar); .beast = tamed, .tro = a trophy (bar = charge, colour set inline),
-   .n1/.n2/.n3 = how many are out, .down = fallen this level, .ready = trophy charged */
+/* ---- mana: a slanted bar under the health pips. #manaFill = what you have (violet to cyan), #manaRes = the part held by pets or familiars (hatched, from the right),
+   #manaNum = "84 / 120", #manaHeld = "32 held", #manaTag = "Drawing" while standing still pulls mana in. game.js sets .draw .full .low .held .deny on #mana. ---- */
+.vitals>div:first-child{flex:1 1 300px}
+.vbrk{flex:0 0 100%;height:0;margin:0}
+#mana{display:flex;align-items:center;gap:4px 9px;min-width:0;flex-wrap:wrap}
+#mana .manaLab{color:var(--mana)}
+#manaBar{position:relative;display:block;width:min(210px,40vw);height:9px;flex:none;background:var(--stone-2);clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%)}
+#manaFill,#manaRes{position:absolute;top:0;bottom:0;display:block}
+#manaFill{left:0;width:0;background:linear-gradient(90deg,var(--mana2),var(--mana) 85%,var(--power2))}
+#manaRes{right:0;width:0;background:repeating-linear-gradient(-60deg,rgba(143,107,255,.6) 0 3px,rgba(12,15,32,.95) 3px 6px)}
+#manaNum{color:var(--mana);letter-spacing:.08em;white-space:nowrap}
+#manaHeld{color:var(--power-hi);font-size:.74rem;letter-spacing:.1em;white-space:nowrap}#manaHeld:empty{display:none}
+#manaTag{color:var(--power2);font-size:.72rem;letter-spacing:.18em;white-space:nowrap}#manaTag:empty{display:none}
+#mana.draw #manaFill{animation:mbDraw .9s ease-in-out infinite}
+#mana.draw #manaTag::before{content:"";display:inline-block;width:7px;height:7px;margin-right:6px;background:var(--mana);transform:rotate(45deg);animation:mbDraw .9s ease-in-out infinite}
+#mana.low #manaNum{color:var(--warn)}
+#mana.deny,.sk.deny,#skillBar li.deny{animation:mbDeny .32s linear}
+#mana.deny #manaBar{background:rgba(255,132,151,.5)}
+@keyframes mbDraw{50%{filter:brightness(1.55)}}
+@keyframes mbDeny{15%{transform:translateX(-4px)}35%{transform:translateX(4px)}55%{transform:translateX(-3px)}75%{transform:translateX(2px)}}
+@media (prefers-reduced-motion:reduce){#mana.draw #manaFill,#mana.draw #manaTag::before,#mana.deny,.sk.deny,#skillBar li.deny{animation:none}}
+
+/* the active pets or trophies beside your health. Up to three: #petHud holds a .petRow each (name + bar). More than three (#petHud.many): .petCount ("5/7 pets"), then .petPips with one .pip each
+   (its inner b is the health, or a familiar's charge; .pip.down = fallen, data-t = seconds until it rises) and .petMore ("+N") past twelve.
+   .beast = tamed, .tro = a trophy (bar = charge, colour set inline), .n1-.n4 = how many are out (n4 = four or more), .down = fallen, .ready = trophy charged */
 #petHud{display:flex;flex-wrap:wrap;align-items:center;gap:4px 14px;min-width:0}
 .petRow{display:flex;align-items:center;gap:7px;min-width:0}
 .petName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;color:var(--pet-necro);letter-spacing:.1em}
@@ -147,6 +176,14 @@ button:disabled{opacity:.35;cursor:default}
 #petHud.beast .petName{color:var(--pet-beast)}#petHud.beast .petFill{background:var(--pet-beast)}
 .petRow.down .petName{color:var(--ash)}
 .petRow.ready .petBar{box-shadow:0 0 0 1px rgba(255,255,255,.55),0 0 9px rgba(196,244,255,.7)}
+.petCount{color:var(--pet-necro);letter-spacing:.1em;white-space:nowrap}#petHud.beast .petCount{color:var(--pet-beast)}#petHud.tro .petCount{color:var(--power-hi)}
+.petPips{display:flex;flex-wrap:wrap;gap:3px 4px;align-items:center;padding:0 3px}
+.pip{position:relative;display:block;width:9px;height:15px;flex:none;background:var(--stone-2);transform:skewX(-14deg);font-style:normal}
+.pip b{position:absolute;left:0;right:0;bottom:0;height:100%;display:block;background:var(--pet-necro)}#petHud.beast .pip b{background:var(--pet-beast)}
+.pip.down{background:rgba(255,132,151,.16);box-shadow:inset 0 0 0 1px var(--warn)}
+.pip.down::after{content:attr(data-t);position:absolute;inset:0;display:grid;place-items:center;transform:skewX(14deg);font:700 10px/1 var(--display);color:var(--warn);font-variant-numeric:tabular-nums}
+.pip.ready{box-shadow:0 0 0 1px rgba(255,255,255,.55),0 0 7px rgba(196,244,255,.7)}
+.petMore{color:var(--ash);letter-spacing:.08em}
 
 /* ---- keyboard skill bar (game.js builds it and injects base rules; these outrank them) ---- */
 .wrap #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
@@ -157,6 +194,10 @@ button:disabled{opacity:.35;cursor:default}
     linear-gradient(to right,rgba(139,77,255,.34) calc(var(--cd,0)*100%),transparent 0),var(--f)}
 .wrap #skillBar li.ready{--e:var(--power);color:var(--bone)}
 .wrap #skillBar li.locked{opacity:.45}
+/* not enough mana (game.js sets .nomp): dimmer than ready, with the cost in the mana colour; distinct from cooling down, which shows seconds and a sweep */
+.wrap #skillBar li.nomp{--e:#2a6588;color:var(--ash);--f:rgba(10,18,32,.85)}
+.wrap #skillBar li.nomp .n{opacity:.6}
+.wrap #skillBar li.nomp .c,.wrap #skillBar li.ready .c{color:var(--mana)}
 .wrap #skillBar .c,.wrap .sk .c{color:var(--power2);font-weight:700;font-variant-numeric:tabular-nums}
 .wrap #skillBar kbd{grid-row:1/3}
 .wrap #skillBar .n{grid-column:2;min-width:0;overflow-wrap:anywhere}
@@ -190,6 +231,12 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
     conic-gradient(rgba(139,77,255,.3) calc(var(--cd,0)*1turn),transparent 0),var(--f)}
 .wrap .touch .acts button.sk:not(:disabled){--e:var(--power);--f:linear-gradient(160deg,rgba(60,32,130,.94),rgba(18,20,46,.94));color:#fff}
 .wrap .touch .acts button.sk:disabled{opacity:.8}
+/* the cost of a skill sits in the uncut top right corner of its button (data-cost); without the mana for it the button dims (.nomp) and the cost takes the middle */
+.wrap .touch .acts button.sk{position:relative}
+.wrap .touch .acts button.sk[data-cost]::after{content:attr(data-cost);position:absolute;top:1px;right:4px;font-family:var(--display);font-weight:700;font-size:.82em;line-height:1.1;color:var(--mana);font-variant-numeric:tabular-nums}
+.wrap .touch .acts button.sk.nomp::after{display:none}
+.wrap .touch .acts button.sk.nomp{--e:#2a6588;--f:rgba(8,16,30,.94);color:#7d86a8}
+.wrap .sk.nomp .c{color:var(--mana);font-size:1.25em}.wrap .sk.nomp .c::after{content:" mp";font-size:.6em;letter-spacing:.08em}
 .wrap .sk .c{font-size:1.4em;line-height:1;letter-spacing:.02em}.sk .c:empty{display:none}
 @media (max-width:420px){.wrap .touch .acts button.sk{font-size:calc(.68rem*var(--mb-btn,1))}.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
 
@@ -230,6 +277,9 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   #bAtk,#bDash{font-size:calc(.95rem*var(--mb-btn,1));--c:calc(11px*var(--mb-btn,1))}
   .mb-left .wrap .touch .acts{grid-template-columns:var(--s) var(--s);grid-template-areas:"s6 s5" "s4 s3" "s2 s1" "atk dash"}
   #petHud{gap:2px 10px}.petName,#petHud.n3 .petName{max-width:96px}#petHud.n2 .petName{max-width:76px}#petHud.n3 .petName{max-width:54px}.petBar{width:32px}
+  .vbrk,#mana .manaLab,#manaHeld{display:none}#manaBar{width:84px;height:8px}#manaNum{font-size:.74rem}#manaTag{font-size:.66rem;letter-spacing:.12em}
+  .pip{width:7px;height:13px}.petPips{gap:2px 3px}.petCount,.petMore{font-size:.72rem}
+  .cards.list{max-height:none;overflow:visible;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
   .cards button{padding:8px 10px 9px 15px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.25rem}.cards small{font-size:.72rem}
 }
 /* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them ---- */
@@ -345,7 +395,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
     </div></div>
   </div>
   <div class="vitals">
-    <div><span class="lab">You</span><span id="hp"></span></div>
+    <div><span class="lab">You</span><span id="hp"></span><i class="vbrk"></i><span id="mana" hidden><span class="lab manaLab">Mana</span><span id="manaBar"><i id="manaFill"></i><i id="manaRes"></i></span><span class="lab" id="manaNum"></span><span class="lab" id="manaHeld"></span><span class="lab" id="manaTag"></span></span></div>
     <div><span class="lab" id="bossName">—</span><div id="bossBar"><div id="bossFill"></div></div>
       <span class="togs"><button id="snd" class="tog" type="button" aria-pressed="true">Sound</button><button id="hap" class="tog" type="button" aria-pressed="true">Haptics</button></span></div>
   </div>

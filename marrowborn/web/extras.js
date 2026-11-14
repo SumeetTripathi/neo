@@ -440,7 +440,9 @@ guard('hints',function(){
     {id:'skills',t:.5,when:function(){return !!S().cls&&S().level>=8},until:function(){var sk=MB.skills;return !!(sk&&sk[0]&&sk[0].cd>0)},
       touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 to 6 use your skills as you unlock them. The bar under the arena counts the seconds until each is ready again.'},
     {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active&&p.active.length&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
-      touch:'A pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause to choose which pets go with you.',keys:'A pet fights on its own and cannot hurt you. If it falls, it is back next level. Pause (Esc) to choose which pets go with you.'}
+      touch:'A pet fights on its own and cannot hurt you. Each one that is out holds part of your mana. If it falls, it rises again after a moment, paid for with mana. Pause to choose how many go with you.',keys:'A pet fights on its own and cannot hurt you. Each one that is out holds part of your mana. If it falls, it rises again after a moment, paid for with mana. Pause (Esc) to choose how many go with you.'},
+    {id:'mana',t:2,when:function(){var m=MB.mana;return !!S().cls&&S().level>=8&&!!m&&m.max>0&&m.cur<(m.max-m.reserved)*.7},
+      touch:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.',keys:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.'}
   ];
   function mark(id){if(seen.indexOf(id)<0){seen.push(id);store.set('hints',seen)}}
   function hide(){box.classList.remove('on');cur=null}

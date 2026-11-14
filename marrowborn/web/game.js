@@ -169,8 +169,14 @@ const MCOST={
 // MREGEN: the share of your free mana that comes back each second, whatever you do. Standing still draws it in from the room: after STILL0 seconds without a step the flow starts to rise,
 // and STILL1 seconds later it is MDRAW times the base. A step or a dash resets it. MKILL: the share of the pool a lesser kill gives back. MBLOCK: what a tank's blocked hit gives back.
 const MREGEN=.05,MDRAW=2,STILL0=.3,STILL1=.7,MKILL=.03,MBLOCK=.08;
-// Pets and familiars are held with mana: each one in the field keeps a share of the pool locked away for as long as it is out. All of them together may hold RESVCAP of the pool at most.
-const RESV={pet:.14,familiar:.12},RESVCAP=.9;
+// The pool has no ceiling: MWELL more for every Wellspring boon (it can be taken any number of times) and MLEVEL more for every level cleared since you took a class, and a trinket's mana line multiplies all of it.
+const MWELL=20,MLEVEL=2,MWELLR=.03,MWELLRMAX=.6;
+// Skills cost a little more as the levels climb, so a deep pool does not make them free: MRISE of the listed cost per level past the ninth.
+const MRISE=0;
+// Pets and familiars are held with mana: each one in the field keeps PCOST of the pool locked away for as long as it is out (PCROWN for a crowned one). Held mana cannot be spent and does not refill.
+// There is no other limit on how many go with you. A pet that falls rises again REVT seconds later beside you at REVHP of its health, paid from the free pool:
+// REVIVE (REVCROWN for a crowned one), and REVUP times more each time the same pet has to be raised again in one level.
+const PCOST={pet:16,familiar:14},PCROWN={pet:28,familiar:24},REVIVE=20,REVCROWN=32,REVT=4,REVHP=.5,REVUP=1.5;
 const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+d[6]+'.';
 for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
 const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1,cost:0,affordable:false}));
@@ -188,7 +194,7 @@ const BOONS=[
  {id:'vigor',name:'Vigor',text:'+3 maximum health.'},
  {id:'focus',name:'Focus',text:'Your skill recharges 12% faster.',cap:5},
  {id:'fleet',name:'Fleet',text:'Move 6% faster.',cap:5},
- {id:'well',name:'Wellspring',text:'+15% maximum mana, and mana comes back 10% faster.',cap:5},
+ {id:'well',name:'Wellspring',text:'+20 maximum mana, and mana comes back 3% faster (up to 60% faster). You can take this as often as it is offered.',cap:1e9},
  {id:'spec'},
 ];
 const SPEC={
@@ -306,10 +312,12 @@ const dmgMul=()=>(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:
 const cdMul=()=>1/((P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1); // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
-const manaMax=()=>{const c=cls();return c?Math.round(MANA0[c]*(1+.15*S.b.well)*(1+eqv('mana')/100)):0};
-const skCost=si=>{const c=cls(),d=c&&SKILLS[c][si];return d?Math.max(1,Math.round(d[6]*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1))):0};
+const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8))*(1+eqv('mana')/100)):0};
+const skRise=()=>1+MRISE*Math.max(0,S.level-8);
+const skCost=si=>{const c=cls(),d=c&&SKILLS[c][si];return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1))):0};
+const num=v=>Math.round(v).toLocaleString('en-US');
 const manaRoom=()=>P?Math.max(0,P.maxMana-P.resv):0;
-const manaRate=()=>manaRoom()*MREGEN*(1+.1*S.b.well)*(S.adv==='saint'?1.25:1);
+const manaRate=()=>manaRoom()*MREGEN*(1+Math.min(MWELLRMAX,MWELLR*S.b.well))*(S.adv==='saint'?1.25:1);
 function manaGive(v){if(!P||!P.maxMana)return;P.mana=Math.min(manaRoom(),P.mana+v)}
 function manaSync(){if(!P)return;MANA.cur=Math.floor(P.mana+1e-6);MANA.max=P.maxMana;MANA.reserved=P.resv;MANA.drawing=P.drawK>0&&P.mana<manaRoom()-.01;MANA.regen=P.maxMana&&P.mana<manaRoom()-.01?Math.round(manaRate()*(1+(MDRAW-1)*P.drawK)*10)/10:0}
 // a skill that was asked for and cannot be paid: a soft sound and a flag for the HUD (which button, when), and nothing else
@@ -878,21 +886,38 @@ function playerStep(dt){
 }
 
 /* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
-// PETS.roster holds up to eight: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
-// as many as your mana can hold (see RESV: each one out keeps a share of the pool locked; the wolf and the thralls cost nothing). Several pets share the work: each has the health and the bite of PETK[how many are out - 1] of a lone pet,
-// so a full field is stronger than a small one, but each one added brings less than the one before (1, 1.3, 1.5, 1.68, 1.8, 1.92, 2.03 and 2.16 lone pets' worth for one to eight).
+// PETS.roster holds as many as you have taken: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
+// as many as your mana can hold (see PCOST: each one out keeps that much of the pool locked; the wolf and the thralls cost nothing). There is no limit on the roster and none on the field but the pool.
+// Several pets share the work: each has the bite of petK(n) = n^-PEXP of a lone pet when n are out, so the whole field hits like n^(1-PEXP) lone pets (1, 1.3, 1.52, 1.69, 1.84 ... 2.4 for ten, 3.1 for twenty),
+// and the health of petKh(n) = n^-PHEXP of a lone pet (a big field is made of smaller bodies, but not as small as their bite).
 // In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
-const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],get form(){return form()||'pet'}},PETMAX=8,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PETK=[1,.65,.5,.42,.36,.32,.29,.27],MINIONS=4;
+// PETS.auto: fallen pets are raised again from the free pool (the toggle on the pets screen). PETS.fallen: the entries that are down, in the order they fell. PETS.fieldCount: how many pets or familiars stand in the arena now (information only).
+const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],fallen:[],auto:true,get form(){return form()||'pet'},get fieldCount(){let n=0;for(const a of allies)if((a.pet||a.trophy)&&!a.minion)n++;return n}},
+  PETSANE=2000,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PEXP=.62,PHEXP=.4,MINIONS=4;
+const petK=n=>Math.pow(Math.max(1,n),-PEXP),petKh=n=>Math.pow(Math.max(1,n),-PHEXP);
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
-// the share of the pool one of them holds while it is out: pets and familiars only; the other trophies cost nothing and go one at a time
-const resvOf=()=>{const f=form();return f==='pet'?(S.adv==='lich'?.11:RESV.pet):f==='familiar'?(S.adv==='archmage'?.1:RESV.familiar):0};
-// how many can be out at once: what RESVCAP of the pool can hold, the roster at most
-const petCap=()=>{const f=form(),r=f?resvOf():0;return!f?0:r?Math.min(PETMAX,Math.floor(RESVCAP/r+1e-9)):1};
-const resvMana=n=>Math.round(manaMax()*n*resvOf());
+// the forms that are held with mana: pets and familiars. The other trophies cost nothing and go one at a time.
+const resvForm=()=>{const f=form();return f==='pet'||f==='familiar'?f:null};
+// what one of them holds while it is out, and what it costs to raise it again after it fell (dearer each time within a level)
+const petCost=e=>{const f=resvForm();return f?Math.max(1,Math.round((e.crown?PCROWN:PCOST)[f]*(f==='pet'&&S.adv==='lich'||f==='familiar'&&S.adv==='archmage'?.8:1))):0};
+const reviveCost=e=>Math.round((e.crown?REVCROWN:REVIVE)*Math.pow(REVUP,e.revN||0));
+const petCap=()=>resvForm()?1e9:form()?1:0;
+// how strong a roster entry is, for sorting and for "fill from the strongest down"
+const petRank=e=>(e.crown?1e4:0)+e.plv*10+(e.perk?5:0)+e.r/100;
+// the roster entries that go with you, in order: everything on the active list that the pool can hold
+const petOn=()=>{const out=[],f=form();if(!f)return out;const rs=resvForm(),M=rs?manaMax():0;let sum=0;
+  for(const i of PETS.active){const e=PETS.roster[i];if(!e)continue;if(rs){const c=petCost(e);if(sum+c>M)continue;sum+=c}else if(out.length)break;out.push(e)}return out};
+const petHeld=(on=petOn())=>{let s=0;for(const e of on)s+=petCost(e);return s};
+// can this entry be sent out as things stand: is there unheld mana for it
+const petFits=e=>!resvForm()?petOn().length<1:petHeld()+petCost(e)<=manaMax();
 // the reserve follows who is in the field: called whenever that changes
-function resvSync(){if(!P)return;P.resv=P.maxMana?Math.min(P.maxMana,Math.round(P.maxMana*petOn().length*resvOf())):0;if(P.mana>manaRoom())P.mana=manaRoom();manaSync()}
-// the roster entries that go with you, in order
-const petOn=()=>{const n=petCap(),out=[];for(const i of PETS.active){const e=PETS.roster[i];if(e&&out.length<n&&!out.includes(e))out.push(e)}return out};
+function resvSync(){if(!P)return;P.resv=P.maxMana?Math.min(P.maxMana,petHeld()):0;if(P.mana>manaRoom())P.mana=manaRoom();manaSync()}
+// at the start of a level: if the pool can no longer hold everyone on the active list, the weakest wait, and you are told
+function petTrim(){
+  if(!resvForm())return[];const R=PETS.roster,M=manaMax(),out=[];let A=PETS.active.filter(i=>R[i]),sum=0;for(const i of A)sum+=petCost(R[i]);
+  while(sum>M&&A.length){let w=0;for(let j=1;j<A.length;j++)if(petRank(R[A[j]])<petRank(R[A[w]]))w=j;sum-=petCost(R[A[w]]);out.push(R[A[w]]);A.splice(w,1)}
+  PETS.active=A;return out;
+}
 const petTag=e=>e.name+(e.plv?' +'+e.plv:'');
 const PERK={swift:'moves and acts faster',shielded:'takes less damage',burning:'hits harder',vampiric:'heals itself when it hits',thorned:'hurts whatever touches it',splitting:'gets up once after it falls'};
 const PETDO={crawler:'It lunges at its prey.',hound:'It charges through its prey.',witch:'It throws bolts from a distance.',fist:'It leaps and slams the ground.',mother:'It hatches mites that fight for you.',burrower:'It digs under its prey and erupts.',bomber:'It lobs bombs.',summoner:'It raises husks that fight for you.',beamer:'It sweeps a beam across the room.',mimic:'It circles its prey and throws bolts.',hollow:'It throws rings of bolts.',mite:'It bites.'};
@@ -903,7 +928,7 @@ const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col
 const petHp=(e,k=1)=>Math.max(6,Math.round(P.maxHp*PETHP*k*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
 const petPow=a=>(PETD[a.owner]||1)*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
 function makePet(e,frac=1,owner=petOwner(),k=1,slot=0,n=1){
-  const s=petSpec(e),g=n>1?slot/n*TAU+rand()*.5:rand()*TAU,hp=petHp(e,k),far=n>4?62:46,lag=Math.min(.45,1.5/n);
+  const s=petSpec(e),g=n>1?slot/n*TAU+rand()*.5:rand()*TAU,hp=petHp(e,petKh(n)),far=n>12?46+rand()*70:n>4?62:46,lag=Math.min(.45,1.5/n);
   const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*far,y:P.y+Math.sin(g)*far,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
     st:'idle',t:1.2+slot*lag,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:slot*lag*.66,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);return a;
@@ -918,6 +943,9 @@ const minions=a=>{let n=0;for(const x of allies)if(x.par===a&&x.life>0)n++;retur
 // a pet may raise one more while it has fewer than `per` of its own and all pets together have fewer than MINIONS
 const minionRoom=(a,per)=>{let all=0;for(const x of allies)if(x.minion&&x.life>0)all++;return all<MINIONS&&minions(a)<per};
 let byPet=null;
+// a coarse grid of the pets that stand in the arena, rebuilt once a step: neighbours are found through it instead of by looking at every other pet
+const PG=new Map(),PGC=80;
+function petGrid(){PG.clear();for(const a of allies){if(!a.pet||a.minion||a.life<=0)continue;const k=Math.floor(a.x/PGC)+Math.floor(a.y/PGC)*64;let c=PG.get(k);if(!c)PG.set(k,c=[]);c.push(a)}}
 // every blow a pet lands goes through here, so it can be counted and so perks can react
 function petHit(m,d,a){if(!mons.includes(m))return;byPet=a||true;hurtM(m,d,true);byPet=null;leech()}
 function petShot(a,g,spd,dmg,r=4,pierce=0){pshots.push({x:a.x+Math.cos(g)*a.r*.8,y:a.y+Math.sin(g)*a.r*.8,vx:Math.cos(g)*spd,vy:Math.sin(g)*spd,r,dmg,kind:a.owner==='necro'?'skull':'bolt',pierce,hit:new Set(),sx:a.x,sy:a.y,pet:a})}
@@ -928,7 +956,7 @@ function hurtPet(a,d){
   a.hp-=d;a.inv=1.4;a.flash=.15;puff(a,col(a.s.col),5,120);floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+d,life:.6,c:'#ffb3bf'});
   if(a.hp>0)return;
   if(a.up){a.up=false;a.hp=Math.ceil(a.maxHp/2);a.inv=1.5;puff(a,'#d6a544',14,180);floats.push({x:a.x,y:a.y-a.r-20,txt:'Gets up',life:1.2,c:'#d6a544'});return}
-  a.hp=0;a.life=0;a.beam=null;a.e.down=true;a.e.frac=0;PETS.down=petOn().every(e=>e.down);puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
+  a.hp=0;a.life=0;a.beam=null;a.e.down=true;a.e.frac=0;a.e.revT=REVT;if(!PETS.fallen.includes(a.e))PETS.fallen.push(a.e);PETS.down=petOn().every(e=>e.down);puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
 }
 // who a pet goes for: the nearest monster above ground, but the boss unless something small is close, and nothing warded while there is a choice
 function petTarget(a){let t=null,bd=1e9;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,a)-m.r-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}return t}
@@ -1009,8 +1037,13 @@ function petStep(a,dt){
   }
   if(a.st==='charge'||a.st==='lunge')a.face=a.ang;
   // pets keep a little room between them, so two never stand on one spot
-  else if(!a.minion&&!a.hidden&&a.st!=='leap'&&a.st!=='dazed')for(const b of allies){if(b===a||!b.pet||b.minion||b.hidden||b.st==='leap')continue;const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy),min=a.r+b.r+14;
-    if(d<min){const g=d>1?Math.atan2(dy,dx):a.slot*2.1+1,p=Math.min(min-d,90*dt);a.x+=Math.cos(g)*p;a.y+=Math.sin(g)*p;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}}
+  else if(!a.minion&&!a.hidden&&a.st!=='leap'&&a.st!=='dazed'){
+    // only the pets in this cell of the grid and the eight around it are looked at (see petGrid), so a big field costs no more per pet than a small one; one push per step at most
+    const cx=Math.floor(a.x/PGC),cy=Math.floor(a.y/PGC);let px=0,py=0,hit=0;
+    for(let gy=cy-1;gy<=cy+1;gy++)for(let gx=cx-1;gx<=cx+1;gx++){const cell=PG.get(gx+gy*64);if(!cell)continue;
+      for(const b of cell){if(b===a||b.hidden||b.st==='leap'||b.life<=0)continue;const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy),min=a.r+b.r+14;
+        if(d<min){const g=d>1?Math.atan2(dy,dx):a.slot*2.1+1,p=min-d;px+=Math.cos(g)*p;py+=Math.sin(g)*p;hit++}}}
+    if(hit){const l=Math.hypot(px,py),p=Math.min(l,90*dt);if(l>.01){a.x+=px/l*p;a.y+=py/l*p;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}}}
   if(obstacles.length&&!a.hidden&&a.st!=='leap'&&a.moving){if(Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
 }
 // what a monster does to pets: its touch, its charge and its beam hurt them
@@ -1022,15 +1055,30 @@ function monVsPets(m){
 // The active pets take their places beside you at the start of a level (mid false), or when the choice changes from the pause screen (mid true).
 // Mid-fight nothing is healed by the change: a pet keeps the share of health it had, and one that steps in fresh takes the lowest share on the field.
 function fieldPets(mid){
-  if(form()!=='pet')return fieldTrophies();
+  if(form()!=='pet')return fieldTrophies(mid);
   const old=allies.filter(a=>a.pet&&!a.minion);for(const a of old)a.e.frac=a.hp/a.maxHp;
   allies=allies.filter(a=>!a.pet&&!a.trophy);TSRC=[];if(!P)return[];
-  if(!mid)for(const e of PETS.roster){e.down=false;e.frac=undefined}
+  if(!mid){for(const e of PETS.roster){e.down=false;e.frac=undefined;e.revN=0;e.revT=0}PETS.fallen=[];
+    const w=petTrim();if(w.length)S.note=(w.length>1?w.length+' pets wait':w[0].name+' waits')+': not enough mana to hold '+(w.length>1?'them':'it')}
   resvSync();
-  const on=petOn(),out=on.filter(e=>!e.down),k=PETK[Math.min(PETK.length,on.length)-1]||1,low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
+  const on=petOn(),out=on.filter(e=>!e.down),k=petK(on.length),low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
+  PETS.fallen=PETS.fallen.filter(e=>e.down&&on.includes(e));for(const e of PETS.roster)if(e.down&&!on.includes(e))e.down=false; // one that was called back while it was down is simply waiting
   out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),k,i,out.length);if(was){a.x=was.x;a.y=was.y}
     allies.push(a);made.push(a);if(!PETS.fielded.includes(e))PETS.fielded.push(e);if(!was)puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150)});
   PETS.down=on.length>0&&on.every(e=>e.down);return made;
+}
+// Fallen pets rise again, one at a time and in the order they fell: REVT seconds after the fall, as soon as the free pool can pay. The mana a fallen pet holds stays held.
+function reviveStep(dt){
+  const F=PETS.fallen;if(!F.length)return;
+  for(const e of F)if(e.revT>0)e.revT-=dt;
+  if(!PETS.auto||!P||S.mode!=='play')return;
+  const e=F[0];if(!e.down){F.shift();return}
+  const c=reviveCost(e);if(e.revT>0||P.mana<c)return;
+  const on=petOn(),i=on.indexOf(e);F.shift();if(i<0){e.down=false;return}
+  P.mana-=c;e.down=false;e.revN=(e.revN||0)+1;e.frac=REVHP;PETS.down=false;
+  const g=rand()*TAU,a=makePet(e,REVHP,petOwner(),petK(on.length),i,on.length);a.x=P.x+Math.cos(g)*(a.r+18);a.y=P.y+Math.sin(g)*(a.r+18);a.t=.8;a.inv=1.2;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);
+  allies.push(a);const cc=a.owner==='necro'?'#7fd66b':'#8fd3ff';puff(a,cc,18,170);rings.push({x:a.x,y:a.y,life:.5,max:.5,r:a.r+34,fx:true});
+  floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' rises · -'+c+' mana',life:1.5,c:cc});sfx(196,.3,'triangle',.16,392);sfx(392,.25,'sine',.1,784,.12);haptic([20,30,40]);
 }
 
 /* ---------- trophies: what the other classes take from a boss they have killed ---------- */
@@ -1084,10 +1132,11 @@ function makeTrophy(e,f,k,slot,n=1){
   return a;
 }
 // the active trophies take their places: at the start of a level, and again when the choice changes from the pause screen
-function fieldTrophies(){
+function fieldTrophies(mid){
   const old=allies.filter(a=>a.trophy&&a.ent);allies=allies.filter(a=>!a.pet&&!a.trophy);TSRC=[];PETS.down=false;if(!P)return[];
   resvSync();
-  const f=form(),on=f?petOn():[],k=PETK[Math.min(PETK.length,on.length)-1]||1,made=[];
+  if(!mid){const w=petTrim();if(w.length)S.note=(w.length>1?w.length+' familiars wait':w[0].name+' waits')+': not enough mana to hold '+(w.length>1?'them':'it')}
+  const f=form(),on=f?petOn():[],k=petK(on.length),made=[];
   on.forEach((e,i)=>{const a=makeTrophy(e,f,k,i,on.length),was=old.find(o=>o.e===e);if(!PETS.fielded.includes(e))PETS.fielded.push(e);
     if(!a.ent){TSRC.push(a);return}
     if(was){a.x=was.x;a.y=was.y;a.t=Math.min(a.tm,Math.max(was.t,.5));a.shield=was.shield;a.shT=was.shT}else puff(a,TCOL[S.cls],12,140);
@@ -1138,13 +1187,14 @@ function step(dt){
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
   if(S.mode!=='play'||S.banner>1.5)return;
-  trophyTick(dt);
+  trophyTick(dt);if(PETS.fielded.length)petGrid();
   for(const a of allies){if(a.pet){petStep(a,dt);continue}if(a.trophy){trophyStep(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
     else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1),true);leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
+  if(PETS.fallen.length)reviveStep(dt);
   for(const f of fields){f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
     const fc=f.kind==='frost'?'#8fd3ff':f.kind==='halo'?'#ffe08a':'#e7dfcd';for(let i=0;i<5;i++){const a=rand()*TAU,d=rand()*f.r;bits.push({x:f.x+Math.cos(a)*d,y:f.y+Math.sin(a)*d,vx:0,vy:f.kind==='rain'?60:-30,life:.5,max:.5,c:fc,r:2.5})}
     for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.slow)m.slow=Math.max(m.slow||0,.8);hurtM(m,f.dmg,true)}
@@ -1467,6 +1517,7 @@ function draw(){
     if(p.kind==='skull'){circ(p.x,p.y,p.r+4);ctx.fillStyle='rgba(127,214,107,.35)';ctx.fill();circ(p.x,p.y,p.r);ctx.fillStyle='#e7dfcd';ctx.fill();ctx.fillStyle='#15121b';circ(p.x-1.7,p.y-.6,1.2);ctx.fill();circ(p.x+1.7,p.y-.6,1.2);ctx.fill()}
     else if(p.kind==='arrow'){const a=Math.atan2(p.vy,p.vx);ctx.strokeStyle='#e7dfcd';ctx.lineWidth=2;line(p.x-Math.cos(a)*15,p.y-Math.sin(a)*15,p.x,p.y);circ(p.x,p.y,2);ctx.fillStyle='#d5dce2';ctx.fill()}
     else{const o=p.kind==='orb';circ(p.x,p.y,p.r+3);ctx.fillStyle=o?'rgba(255,224,138,.4)':'rgba(143,211,255,.35)';ctx.fill();circ(p.x,p.y,p.r);ctx.fillStyle=o?'#ffe08a':'#8fd3ff';ctx.fill();circ(p.x,p.y,p.r*.45);ctx.fillStyle='#fff';ctx.fill()}}
+  if(P&&MANA.drawing&&S.mode==='play'){ctx.globalAlpha=.3+.2*Math.sin(S.t*6);ctx.strokeStyle='#6fe3ff';ctx.lineWidth=1.5;circ(P.x,P.y+4,26+3*Math.sin(S.t*3));ctx.stroke();ctx.globalAlpha=1} // drawing mana in from the room
   if(P)drawPlayer();
   for(const b of bits){ctx.globalAlpha=Math.max(0,b.life/b.max);circ(b.x,b.y,b.r);ctx.fillStyle=b.c;ctx.fill()}
   ctx.font='22px "Pirata One",Georgia,serif';ctx.textAlign='center';for(const f of floats){ctx.globalAlpha=Math.min(1,f.life*2.5);ctx.fillStyle='#0d0c11';ctx.fillText(f.txt,f.x+1.5,f.y+1.5);ctx.fillStyle=f.c;ctx.fillText(f.txt,f.x,f.y)}ctx.globalAlpha=1;
@@ -1499,7 +1550,7 @@ let lastScreen=null; // the last screen the game itself put up, so MB.api.hide()
 function show(o,foreign){
   if(!foreign)lastScreen=o;
   $('ovKick').textContent=o.kick||'';$('ovTitle').textContent=o.title||'';$('ovTitle').style.color=o.col||'';$('ovBody').textContent=o.body||'';$('ovBody').hidden=!o.body;$('ovKeys').textContent=o.keys||'';$('ovKeys').hidden=!o.keys;
-  const cd=$('ovCards');cd.textContent='';cd.hidden=!o.cards;
+  const cd=$('ovCards'),keep=o.list&&cd.classList.contains('list')?[cd.scrollTop,$('ovPanel').scrollTop]:null;cd.textContent='';cd.hidden=!o.cards;cd.className='cards'+(o.list?' list':''); // list: many compact rows that scroll (the pets screen); it keeps its place when it is drawn again
   (o.cards||[]).forEach(c=>{const e=document.createElement('button');e.type='button';
     for(const[tag,txt]of[['b',c.title],['small',c.sub],['span',c.body]]){const x=document.createElement(tag);x.textContent=txt;e.appendChild(x)}
     if(c.col)e.children[1].style.color=c.col;
@@ -1507,7 +1558,7 @@ function show(o,foreign){
   const b=$('ovBtns');b.textContent='';b.hidden=!o.btns;
   (o.btns||[]).forEach(([label,fn],i)=>{const e=document.createElement('button');e.type='button';e.textContent=label;if(!i)e.className='primary';e.onclick=()=>{audio();sfx(440,.06,'triangle',.18,660);haptic(10);fn()};b.appendChild(e)});
   $('ovPanel').className='panel'+(o.wide?' wide':'');
-  $('ov').className=o.soft?'soft':'';$('ov').hidden=false;
+  $('ov').className=o.soft?'soft':'';$('ov').hidden=false;if(keep){cd.scrollTop=keep[0];$('ovPanel').scrollTop=keep[1]}
 }
 function hud(){
   const nb=Object.values(S.b).reduce((a,b)=>a+b,0),cn=()=>S.adv?CLASSES[S.cls].adv.find(a=>a[0]===S.adv)[1]:CLASSES[S.cls].name;
@@ -1552,7 +1603,8 @@ function startLevel(n){
   else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2}
   if(L.kind==='mimic')reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
-  PETS.down=false;PETS.fielded=[];PETS.dmg=0;fieldPets();
+  PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
+  if(S.note){floats.push({x:P.x,y:P.y-70,txt:S.note,life:4.5,c:'#6fe3ff'});S.note=''}
   if(!S.wave)$('bossName').textContent=L.spec.name;
   ST.levelTime=0;ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Level '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
@@ -1605,54 +1657,88 @@ function tw(){
 }
 // short names for the small labels beside the health bar
 const SHORT={crawler:'Crawler',hound:'Hound',witch:'Witch',fist:'Fist',mother:'Brood',burrower:'Borer',mimic:'Mimic',hollow:'Hollow',knight:'Knight',lich:'Lich',wyrm:'Wyrm',king:'King',bomber:'Toad',summoner:'Caller',beamer:'Eye'};
-// with three rows there is room for about seven letters, so the level is left to the pause screen
+// with three rows there is room for about seven letters, so the level is left to the pause screen (more than three are shown as pips, without names)
 const petShort=(e,n)=>{const s=e.crown&&e.kind==='hollow'?'Tyrant':SHORT[e.kind]||e.name;return n>2||!e.plv?s:s+(s.length+(''+e.plv).length>7?'+':' +')+e.plv};
 // when the class changes what it does with its roster (a ranger taking Beastmaster): fill the places at your side
 function petFit(){const cap=Math.min(2,petCap()),R=PETS.roster;PETS.active=PETS.active.filter((v,i,l)=>v<R.length&&l.indexOf(v)===i).slice(0,cap);for(let i=R.length-1;i>=0&&PETS.active.length<cap;i--)if(!PETS.active.includes(i))PETS.active.push(i)}
 // PETS.active holds roster indices; these keep it right when the roster changes
-const petActive=e=>PETS.active.includes(PETS.roster.indexOf(e));
 function petDrop(i){PETS.roster.splice(i,1);PETS.active=PETS.active.filter(v=>v!==i).map(v=>v>i?v-1:v)}
-const petWord=n=>n===1?'one goes':n===2?'two go':'three go';
+// the words for how much mana is held and how much is left: used by every screen that deals with pets or familiars
+const heldLine=(on=petOn())=>{const M=manaMax(),h=petHeld(on);return'Deployed '+on.length+' · reserving '+num(h)+' of '+num(M)+' mana · '+num(M-h)+' left for skills'};
 // After the drop the boss itself can be taken: bound or tamed as a pet, or as the class's own kind of trophy. Always optional. Tyrants and the Flayed King can only rarely be taken.
 function bindScreen(n,next){
   const f=form(),L=S.L;if(!f||n<8||!L||L.kind==='mimic')return next();
   const rare=!!L.spec.crown,dv=window.__mb?window.__mb.bind:undefined; // dev: __mb.bind = true or false decides instead of the dice
   if(!(typeof dv==='boolean'?dv:!rare||rand()<.15))return next();
-  const e=petEntry(n,L),w=tw(),R=PETS.roster,full=R.length>=PETMAX,cap=petCap();
-  const take=out=>()=>{if(out>=0)petDrop(out);R.push(e);
-    if(petOn().length<cap){PETS.active.push(R.length-1);return next()} // a free place is filled at once
+  const e=petEntry(n,L),w=tw(),R=PETS.roster,rs=resvForm();
+  const take=()=>{R.push(e);
+    if(rs)return petPick(next,e); // held with mana: you decide whether it goes out
+    if(!petOn().length){PETS.active=[R.length-1];return next()} // a free place is filled at once
     petPick(next,e)};
   const leave={title:'Leave it',sub:'Walk on',col:'var(--ash)',body:'Take nothing. '+w.later,fn:next};
   show({wide:true,col:w.col,kick:rare?w.rare:w.kick,title:e.name,
-    body:w.how+' '+petLine(e)+(w.pet?' You can keep '+PETMAX+' pets, and up to '+petWord(cap)+' with you into each level.':' You can keep '+PETMAX+' '+w.pl+'. '+(cap>1?'Two are in use at a time.':'One is in use at a time.'))+(full?' You already keep '+PETMAX+': to take this one, let one go.':''),
-    cards:full?[...R.map((p,i)=>({title:petTag(p),sub:'Release'+(petActive(p)?' · '+w.on.toLowerCase():''),col:'var(--warn)',body:petLine(p)+' It is gone for good.',fn:take(i)})),leave]
-      :[{title:w.take,sub:R.length?cap1(w.n)+' '+(R.length+1)+' of '+PETMAX:'Your first '+w.n,col:w.col,body:(w.pet?e.name+' joins you. ':'')+'It is as strong as the level you take it into, however old it is.',fn:take(-1)},leave]});
+    body:w.how+' '+petLine(e)+(rs?' You can keep as many '+w.pl+' as you like. Each one you send out holds some of your mana for as long as it is out ('+petCost(e)+' for this one, of your '+num(manaMax())+'), so the more that fight, the less is left for skills.':' You can keep as many '+w.pl+' as you like. One is in use at a time.'),
+    cards:[{title:w.take,sub:R.length?cap1(w.n)+' '+(R.length+1):'Your first '+w.n,col:w.col,body:(w.pet?e.name+' joins you. ':'')+'It is as strong as the level you take it into, however old it is.',fn:take},leave]});
 }
-// every place is taken and a new one has joined: the new one is used unless you say otherwise, and one has to wait
+// a new one has joined. Held with mana (pets, familiars): send it out if the pool can hold it, let it wait, or open the list. Otherwise one is in use at a time: pick which.
 function petPick(next,fresh){
-  const on=petOn(),R=PETS.roster,w=tw(),cap=petCap();
-  show({wide:true,kick:w.done,title:w.pet?'Who waits behind?':'Which one is set aside?',body:w.pet?'Only '+(cap===2?'two pets':'three pets')+' can go with you. Pick the one that waits this time. You can change this from the pause screen.':'Only '+(cap>1?'two '+w.pl+' are':'one '+w.n+' is')+' in use at a time. Pick the one to set aside. You can change this from the pause screen.',
-    cards:[...on,fresh].map(p=>({title:petTag(p),sub:p===fresh?'New':w.on+' now',col:p===fresh?'var(--ash)':'',body:petLine(p),fn:()=>{if(p!==fresh)PETS.active[PETS.active.indexOf(R.indexOf(p))]=R.indexOf(fresh);next()}}))});
+  const on=petOn(),R=PETS.roster,w=tw(),i=R.indexOf(fresh);
+  if(resvForm()){const c=petCost(fresh),M=manaMax(),h=petHeld(on),can=h+c<=M;
+    return show({wide:true,kick:w.done+' · '+heldLine(on),title:can?'Send it out?':'No mana to hold it',
+      body:can?petTag(fresh)+' would hold '+c+' of your mana while it is out, and leave '+num(M-h-c)+' for skills. You can change who goes with you at any time from the pause screen.'
+        :petTag(fresh)+' needs '+c+' mana to hold, and only '+num(M-h)+' of your '+num(M)+' is not held already. It waits until you withdraw another or your pool grows.',
+      cards:[...(can?[{title:w.send,sub:'Holds '+c+' mana',col:w.col,body:'It goes with you into the next level. '+petLine(fresh),fn:()=>{PETS.active.push(i);next()}}]:[]),
+        {title:'Let it wait',sub:w.off,col:'var(--ash)',body:'It holds no mana until you send it out.',fn:next},
+        {title:'Choose who goes',sub:cap1(w.pl)+' · '+R.length+' kept',col:'var(--mana)',body:'Open the list: deploy, withdraw, or set how many go with you.',fn:()=>petsScreen(next)}]})}
+  show({wide:true,kick:w.done,title:'Which one is set aside?',body:'Only one '+w.n+' is in use at a time. Pick the one to set aside. You can change this from the pause screen.',
+    cards:[...on,fresh].map(p=>({title:petTag(p),sub:p===fresh?'New':w.on+' now',col:p===fresh?'var(--ash)':'',body:petLine(p),fn:()=>{if(p!==fresh)PETS.active=[i];next()}}))});
 }
-const petSaved=()=>{if(S.mode==='play'||S.mode==='clear')save(S.level);hud()};
-// send a pet out (in place of `out`, a roster index, when every place is taken), call one back, or put one first
+const petSaved=()=>{if(S.mode==='play')fieldPets(true);if(S.mode==='play'||S.mode==='clear')save(S.level);hud()};
+// send one out (in place of `out`, a roster index, for the forms that go one at a time), call one back, or release one. petSend answers false when the pool cannot hold it.
 function petSend(i,out){
-  const A=PETS.active;if(!PETS.roster[i]||A.includes(i))return;
-  if(out>=0&&A.includes(out))A[A.indexOf(out)]=i;else if(petOn().length<petCap())A.push(i);else return;
-  if(S.mode==='play')fieldPets(true);petSaved();
+  const A=PETS.active,e=PETS.roster[i];if(!e||A.includes(i))return false;
+  if(!resvForm()){PETS.active=[i];petSaved();return true}
+  if(!petFits(e))return false;
+  A.push(i);petSaved();return true;
 }
-function petBack(i){if(!PETS.active.includes(i))return;PETS.active=PETS.active.filter(v=>v!==i);if(S.mode==='play')fieldPets(true);petSaved()}
-function petFirst(i){if(!PETS.active.includes(i))return;PETS.active=[i,...PETS.active.filter(v=>v!==i)];if(S.mode==='play')fieldPets(true);petSaved()}
-function petRelease(i){if(!PETS.roster[i])return;petDrop(i);if(S.mode==='play')fieldPets(true);petSaved()}
-function petsScreen(back){
-  const R=PETS.roster,w=tw(),again=()=>petsScreen(back),cap=petCap(),on=petOn();
-  show({wide:true,kick:cap1(w.pl)+' · '+R.length+' of '+PETMAX+' kept · '+on.length+' of '+cap+' '+w.on.toLowerCase(),title:w.mine,
-    body:R.length?(w.pet?'Pick a pet to send it out, call it back or release it. The more that fight at once, the weaker each one is.'+(on.some(e=>e.down)?' A pet that has fallen comes back with the next level.':''):'Pick one to use it, set it aside or release it.'+(cap>1?' Two at once share the work: each is weaker than one alone.':'')):'You keep none. Kill a boss, and you may '+(w.pet?(petOwner()==='necro'?'bind':'tame')+' it.':'take one.'),
-    cards:R.map((p,i)=>{const act=on.includes(p),nth=on.indexOf(p)+1;return{title:petTag(p),sub:act?(p.down?'Fallen · back next level':w.on+(cap>1?' · '+nth:'')):w.off,col:act?'':'var(--ash)',body:petLine(p),fn:()=>{
-      const send=()=>on.length<cap?(petSend(i,-1),again()):show({wide:true,kick:(w.pet?'Send out ':'Use ')+p.name,title:'In place of which?',cards:on.map(q=>({title:petTag(q),sub:q.down?'Fallen':w.on,body:petLine(q),fn:()=>{petSend(i,R.indexOf(q));again()}})),btns:[['Back',again]]});
-      show({kick:act?w.on:w.off,title:petTag(p),body:petLine(p),btns:[['Back',again],...(act?[[w.back,()=>{petBack(i);again()}],...(w.pet&&nth>1?[['Put it first',()=>{petFirst(i);again()}]]:[])]:[[w.send,send]]),
-        ['Release',()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',again],['Release it',()=>{petRelease(R.indexOf(p));again()}]]})]]})}}}),
-    btns:[['Back',back]]});
+function petBack(i){if(!PETS.active.includes(i))return;PETS.active=PETS.active.filter(v=>v!==i);petSaved()}
+function petRelease(i){if(!PETS.roster[i])return;petDrop(i);petSaved()}
+// set how many go with you: withdraw the weakest, or send out the strongest that the pool can still hold, until n are out (or nothing more fits)
+function petCount(n){
+  const R=PETS.roster;let A=PETS.active.filter(i=>R[i]);n=Math.max(0,Math.min(R.length,n|0));
+  while(A.length>n){let w=0;for(let j=1;j<A.length;j++)if(petRank(R[A[j]])<petRank(R[A[w]]))w=j;A.splice(w,1)}
+  if(A.length<n){const M=manaMax();let sum=0;for(const i of A)sum+=petCost(R[i]);
+    const rest=R.map((e,i)=>i).filter(i=>!A.includes(i)).sort((a,b)=>petRank(R[b])-petRank(R[a]));
+    for(const i of rest){if(A.length>=n)break;const c=petCost(R[i]);if(sum+c<=M){A.push(i);sum+=c}}}
+  PETS.active=A;petSaved();
+}
+// The pets screen (pause, and the reward flow): the whole roster as a list, deployed first and then the strongest. A row sends its pet out or calls it back; the buttons set how many go.
+// For the forms that go one at a time (technique, ward, venom, arrowhead, guardian) a row puts that one in use.
+let petMode='deploy';
+function petsScreen(back,note){
+  const R=PETS.roster,w=tw(),rs=resvForm(),on=petOn(),M=manaMax(),h=petHeld(on),rel=petMode==='release',again=n=>petsScreen(back,n),
+    order=R.map((e,i)=>i).sort((a,b)=>(on.includes(R[b])-on.includes(R[a]))||petRank(R[b])-petRank(R[a]));
+  const btns=[['Back',()=>{petMode='deploy';back()}]];
+  if(rel)btns.push(['Done releasing',()=>{petMode='deploy';again()}]);
+  else{
+    if(rs&&R.length){btns.push(['One fewer',()=>{if(!on.length)return again('None are out.');petCount(on.length-1);again()}],['One more',()=>{const n=on.length;petCount(n+1);again(petOn().length>n?'':R.length>n?'No mana to hold another: '+num(M-h)+' is free, and the cheapest that waits needs '+Math.min(...R.filter(e=>!on.includes(e)).map(petCost))+'.':'Every one you keep is out already.')}],
+      ['Deploy all I can afford',()=>{const n=on.length;petCount(R.length);const m=petOn().length;again(m>n?'':m<R.length?'No mana to hold more.':'Every one you keep is out already.')}],['Withdraw all',()=>{petCount(0);again()}]);
+      if(w.pet)btns.push(['Revive fallen pets automatically: '+(PETS.auto?'on':'off'),()=>{PETS.auto=!PETS.auto;petSaved();again()}])}
+    if(R.length)btns.push(['Release…',()=>{petMode='release';again()}]);
+  }
+  show({wide:true,list:R.length>3,kick:rel?'Release · pick one to let go':rs?heldLine(on):cap1(w.pl)+' · '+R.length+' kept',title:w.mine,
+    body:!R.length?'You keep none. Kill a boss, and you may '+(w.pet?(petOwner()==='necro'?'bind':'tame')+' it.':'take one.')
+      :rel?'Pick the one to release. It is gone for good.'
+      :rs?'Pick one to send it out or call it back. Each one that is out holds part of your mana for as long as it is out: held mana cannot be spent on skills and does not refill. The more that fight at once, the weaker each one is.'+(w.pet?' One that falls rises again after '+REVT+' seconds for '+REVIVE+' mana from what is left ('+REVCROWN+' for a crowned one), and half as much again each further time in a level'+(PETS.auto?'.':'; that is switched off now, so the fallen stay down until the next level.'):'')
+      :'Pick one to use it. One is in use at a time.',
+    keys:note||'',
+    cards:order.map(i=>{const p=R[i],act=on.includes(p),c=petCost(p);return{title:petTag(p),
+      sub:rel?'Release'+(act?' · '+w.on.toLowerCase():''):act?(p.down?(PETS.auto?'Fallen · rises for '+reviveCost(p)+' mana':'Fallen · back next level'):w.on)+(rs?' · holds '+c:''):w.off+(rs?' · needs '+c+(h+c>M?' · no mana':''):''),
+      col:rel?'var(--warn)':act?(rs?w.col:''):'var(--ash)',body:petLine(p),
+      fn:rel?()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',()=>again()],['Release it',()=>{petRelease(R.indexOf(p));again()}]]})
+        :act?()=>{if(rs)petBack(i);again()}
+        :()=>{if(!petSend(i,-1))return again('Not enough mana to hold '+petTag(p)+': it needs '+c+', and '+num(M-h)+' of your '+num(M)+' is free. Withdraw another first.');again()}}}),
+    btns});
 }
 // every boss from level 9 on drops one item for your class: melt it into what you carry, wear it instead, or break it for scrap
 function dropScreen(n,rk,next){
@@ -1668,7 +1754,7 @@ function reward2(n){
     return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>begin(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
+    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges. Every skill costs mana, the bar under your health: it seeps back on its own, and twice as fast while you stand still.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges, and what each costs in mana. Mana seeps back on its own, and twice as fast while you stand still.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;if(id==='beastmaster')petFit();begin(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
@@ -1678,14 +1764,14 @@ function reward2(n){
 }
 function chooseClass(){
   S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
-  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown, and you carry six at a time. After level 50 the class can be upgraded.',
-    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))});
+  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown and its cost in mana, and you carry six at a time. Mana comes back on its own, faster while you stand still, and your pool grows with every level. After level 50 the class can be upgraded.',
+    cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' '+c.mana+' mana. First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))});
 }
 function pauseShow(){
   const btns=[['Resume',()=>pause(false)]];if(known()>NSK)btns.push(['Skills',()=>loadout(pauseShow)]);
   if(form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(pauseShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',pauseShow)]);
-  show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
+  show({kick:'Paused · level '+(S.level+1)+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:S.L.spec.name+' is waiting.'+(P&&P.maxMana?' Mana '+num(MANA.cur)+' of '+num(P.maxMana-P.resv)+(P.resv?' ('+num(P.resv)+' more is held by your '+tw().pl+')':'')+'.':'')+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
 }
 function pause(on){
   if(on){if(S.paused||S.mode!=='play'&&S.mode!=='clear')return;S.paused=true;for(const k in keys)keys[k]=false;joy.x=joy.y=0;SND.pause(true);pauseShow()}
@@ -1695,14 +1781,19 @@ function pause(on){
 }
 // The run as a plain object: what is written to localStorage and what MB.api.getSave() hands out. level is where "Continue" resumes.
 // pets in a save: only what cannot be worked out again
-const petsClear=()=>{PETS.roster.length=0;PETS.active=[];PETS.down=false;PETS.fielded=[]};
+const petsClear=()=>{PETS.roster.length=0;PETS.active=[];PETS.down=false;PETS.fielded=[];PETS.fallen=[];PETS.auto=true};
 // the active list out of a save: a list of roster indices, or the single index older saves carry. null when it makes no sense.
 function actIn(v,len,cap){if(v===undefined||v===null)v=len?[len-1]:[];if(Number.isInteger(v))v=v<0?[]:[v];
   return Array.isArray(v)&&v.length<=cap&&v.every((x,i)=>Number.isInteger(x)&&x>=0&&x<len&&v.indexOf(x)===i)?v.slice():null}
 // how many can be active in a save: what the mana of that class can hold (see petCap), so an older save keeps the pets it had out
-const capOf=(c,a)=>c==='necro'||c==='ranger'&&a==='beastmaster'?(a==='lich'?8:6):c==='mage'?(a==='archmage'?8:7):c?1:0;
-const petOut=e=>({kind:e.kind,name:e.name,col:e.col,r:e.r,plv:e.plv,perk:e.perk||null,crown:e.crown?1:0});
+// A pet in a save is a short list, so a long roster stays a short code: [kind, name, colour, r, plv, perk, crown], where a generated name is the index of its prefix (PRE), a stock colour its index (TINT),
+// the perk its place in MODS plus one, and zeros at the end are left out. Saves from before this carry objects ({kind,name,col,r,plv,perk,crown}); both are read.
+const petName=(kind,i)=>PRE[i]+' '+SPEC[kind].name.replace('The ','');
+function petOut(e){const pi=PRE.findIndex((x,i)=>petName(e.kind,i)===e.name),ci=TINT.indexOf(e.col),o=[e.kind,pi>=0?pi:e.name,ci>=0?ci:e.col,e.r,e.plv,e.perk?MODS.indexOf(e.perk)+1:0,e.crown?1:0];while(o.length>4&&!o[o.length-1])o.pop();return o}
 function petIn(p){
+  if(Array.isArray(p)){const[kind,nm,cl,r,plv,pk,crown]=p;if(typeof kind!=='string'||!own(SPEC,kind)||p.length<4||p.length>7)return null;
+    if(pk!==undefined&&!(Number.isInteger(pk)&&pk>=0&&pk<=MODS.length))return null;
+    p={kind,name:Number.isInteger(nm)&&nm>=0&&nm<PRE.length?petName(kind,nm):nm,col:Number.isInteger(cl)&&cl>=0&&cl<TINT.length?TINT[cl]:cl,r,plv:plv===undefined?0:plv,perk:pk?MODS[pk-1]:null,crown:crown?1:0}}
   if(!p||typeof p!=='object'||typeof p.kind!=='string'||!own(SPEC,p.kind)||p.kind==='mite'||p.kind==='husk')return null;
   if(typeof p.name!=='string'||!p.name.trim()||p.name.length>48||typeof p.col!=='string'||!/^#[0-9a-f]{6}$/i.test(p.col))return null;
   if(typeof p.r!=='number'||!(p.r>=8&&p.r<=60)||!Number.isInteger(p.plv)||p.plv<0||p.plv>PLVMAX)return null;
@@ -1713,21 +1804,22 @@ const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
   const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS){eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};if(S.eq[sl].m)eq[sl].m=1} // m: a trinket that carries mana
-  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
-function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,st:SAVE.stats}))}
+function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 // read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
 function applyRun(r){
   try{r=r&&typeof r==='object'?r:{};
     S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
-    const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
+    const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
     S.load=fixLoad(r.load)||load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
     // older saves have no pets; a broken entry is dropped, the rest are kept
-    petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETMAX)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length,cap=capOf(S.cls,S.adv);
-      PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i).slice(0,cap):r.pet,n,cap)||(n?[n-1]:[])}
+    petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETSANE)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length;
+      PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[])}
+    PETS.auto=!(r.rev===0||r.rev===false); // raising the fallen is on unless the save says otherwise
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
   }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
   eqSync();
@@ -1740,14 +1832,15 @@ function checkSave(o){
   const c=o.cls;if(!c&&(o.level>8||o.adv||o.eq))return null;
   if(o.adv!==null&&o.adv!==undefined&&!(c&&CLASSES[c].adv.some(a=>a[0]===o.adv)))return null;
   const b=noBoons();if(!o.b||typeof o.b!=='object')return null;
-  for(const k in b){const v=k==='well'&&o.b[k]===undefined?0:o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
+  for(const k in b){const v=k==='well'&&o.b[k]===undefined?0:o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
   let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400)||e.m!==undefined&&e.m!==0&&e.m!==1)return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up,m:e.m?1:0}}}
   const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
-  let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETMAX||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
-    pet=actIn(o.pet,pets.length,capOf(c,o.adv));if(!pet)return null}
+  let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETSANE||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
+    pet=actIn(o.pet,pets.length,pets.length);if(!pet)return null}
+  if(o.rev!==undefined&&o.rev!==0&&o.rev!==1)return null;
   const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
   if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
-  return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load,pets,pet,st,level:o.level};
+  return{cls:c,adv:o.adv||null,b,eq,scrap:o.scrap,load,pets,pet,rev:o.rev===0?0:1,st,level:o.level};
 }
 function loadSave(o){
   const r=checkSave(o);if(!r)return false;
@@ -1833,39 +1926,75 @@ const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
 #skillBar li.ready{border-color:var(--marrow);color:var(--bone)}#skillBar li.locked{opacity:.45}
 #skillBar .c{margin-left:auto}
 @media (pointer:coarse){#skillBar{display:none}}`;document.head.appendChild(st)}
-let skShown=null;const skKey=Array(NSK).fill(''),skF=Array(NSK).fill(-1);
+let skShown=null,skDeny=-1;const skKey=Array(NSK).fill(''),skF=Array(NSK).fill(-1);
 function skillUi(){
   const on=!!cls()&&S.mode!=='title';if(on!==skShown){skShown=on;skBar.hidden=!on;for(const b of skB)b.hidden=!on}
   if(!on)return;
-  for(let i=0;i<NSK;i++){const s=SK[i],txt=!s.unlocked?'Lv '+SKLV[S.load[i]]:s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',key=s.name+'|'+txt+'|'+s.unlocked;
-    if(key!==skKey[i]){skKey[i]=key;const b=skB[i],li=skL[i];b.children[0].textContent=li.children[1].textContent=s.name;b.children[1].textContent=txt;li.children[2].textContent=txt||'ready';
-      b.disabled=!s.ready;li.className=s.ready?'ready':s.unlocked?'':'locked';b.setAttribute('aria-label',s.name+(s.unlocked?s.cd>0?', '+txt+' seconds':', ready':', locked'))}
+  for(let i=0;i<NSK;i++){const s=SK[i],nomp=s.ready&&!s.affordable,secs=s.cd>0?(s.cd<10?s.cd.toFixed(1):''+Math.ceil(s.cd)):'',txt=!s.unlocked?'Lv '+SKLV[S.load[i]]:secs||(nomp?''+s.cost:''),key=s.name+'|'+txt+'|'+s.unlocked+'|'+nomp+'|'+s.cost;
+    // three states besides ready: locked, cooling down (the seconds, a sweep), and not enough mana (class nomp: dimmed, the cost in the mana colour). An unaffordable button stays live, so pressing it can say why nothing happens.
+    if(key!==skKey[i]){skKey[i]=key;const b=skB[i],li=skL[i];b.children[0].textContent=li.children[1].textContent=s.name;b.children[1].textContent=txt;li.children[2].textContent=!s.unlocked?txt:secs?secs+'s · '+s.cost+' mp':nomp?'needs '+s.cost+' mp':'ready · '+s.cost+' mp';
+      b.disabled=!s.ready;b.classList.toggle('nomp',nomp);li.className=(s.ready&&!nomp?'ready':s.unlocked?'':'locked')+(nomp?' nomp':'');if(s.unlocked)b.dataset.cost=s.cost;else delete b.dataset.cost;
+      b.setAttribute('aria-label',s.name+(s.unlocked?(s.cd>0?', '+txt+' seconds':nomp?', not enough mana':', ready')+', costs '+s.cost+' mana':', locked'))}
     const f=s.unlocked&&s.max?Math.ceil(s.cd/s.max*40)/40:0;if(f!==skF[i]){skF[i]=f;skB[i].style.setProperty('--cd',f);skL[i].style.setProperty('--cd',f)}}
+  // a skill that was asked for without the mana for it: its button and the mana bar shake for a moment
+  const dn=performance.now()-manaCue.at<340?manaCue.i:-1;
+  if(dn!==skDeny){if(skDeny>=0){skB[skDeny].classList.remove('deny');skL[skDeny].classList.remove('deny')}if(dn>=0){skB[dn].classList.add('deny');skL[dn].classList.add('deny')}skDeny=dn;manaEl.classList.toggle('deny',dn>=0)}
+}
+// The mana bar, under the health pips (index.html owns the markup and the look; it is built here when the page does not have it).
+// #mana carries: draw (the standing bonus is flowing), full, low (less than the cheapest skill you carry), held (part of the pool is reserved), deny (see above).
+let manaEl=$('mana');
+if(!manaEl){manaEl=document.createElement('span');manaEl.id='mana';manaEl.hidden=true;manaEl.innerHTML='<span class="lab manaLab">Mana</span><span id="manaBar"><i id="manaFill"></i><i id="manaRes"></i></span><span class="lab" id="manaNum"></span><span class="lab" id="manaHeld"></span><span class="lab" id="manaTag">Drawing</span>';$('hp').after(manaEl)}
+let manaKey='',manaCls='';
+function manaUi(){
+  const on=!!cls()&&S.mode!=='title'&&!!P&&P.maxMana>0;if(manaEl.hidden!==!on)manaEl.hidden=!on;if(!on)return;
+  const m=MANA,room=m.max-m.reserved,w=Math.round(P.mana/m.max*400)/4,rw=Math.round(m.reserved/m.max*400)/4,key=m.cur+'|'+w+'|'+m.reserved+'|'+m.max;
+  if(key!==manaKey){manaKey=key;$('manaFill').style.width=w+'%';$('manaRes').style.width=rw+'%';$('manaNum').textContent=num(m.cur)+' / '+num(room);$('manaHeld').textContent=m.reserved?num(m.reserved)+' held':'';
+    manaEl.setAttribute('aria-label','Mana: '+m.cur+' of '+room+(m.reserved?', '+m.reserved+' held by your '+tw().pl:''));manaEl.title=m.reserved?num(m.reserved)+' of '+num(m.max)+' mana is held by your '+tw().pl:''}
+  let low=1e9;for(const s of SK)if(s.unlocked&&s.cost<low)low=s.cost;
+  const c=(m.drawing?'draw ':'')+(m.cur>=room?'full ':'')+(m.cur<low?'low ':'')+(m.reserved?'held ':'');
+  if(c!==manaCls){manaCls=c;for(const k of['draw','full','low','held'])manaEl.classList.toggle(k,c.includes(k+' '));$('manaTag').textContent=m.drawing?'Drawing':'';manaEl.dataset.regen=m.regen}
 }
 $('snd').onclick=()=>{audio();const wasOn=!muted&&(SET.music>0||SET.sfx>0);muted=wasOn;pref('mute',muted?1:0);
   if(!wasOn&&!(SET.music>0||SET.sfx>0)){SET.music=.6;SET.sfx=.8;pref('settings',JSON.stringify(SET))} // both volumes were at zero: the button brings the defaults back
   setApply();emit('settings',{key:'mute',value:muted});sfx(520,.08,'triangle',.2);$('snd').blur()};
 $('hap').onclick=()=>{setSetting('haptic',SET.haptic>0?0:hapLast);haptic(40);$('hap').blur()};
-// the active pets' names and health, beside your own: up to three rows
-const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;const petRows=[];
+// The active pets (or trophies) beside your own health. Up to three: a row each, name and bar. More than three: a count, then one small pip each (its fill is the pet's health, or a familiar's charge;
+// a fallen pet's pip shows the seconds until it rises), PIPS of them at most, and "+N" for the rest. A fallen pet in a row shows the same countdown after its name.
+const petHud=document.createElement('span');petHud.id='petHud';petHud.hidden=true;const petRows=[],PIPS=12;
 for(let i=0;i<3;i++){const row=document.createElement('span'),n=document.createElement('span'),b=document.createElement('span'),f=document.createElement('span');row.className='petRow';row.hidden=true;n.className='lab petName';b.className='petBar';f.className='petFill';b.appendChild(f);row.append(n,b);petHud.appendChild(row);petRows.push({row,n,f,key:''})}
-$('hp').after(petHud);
+const petCnt=document.createElement('span'),petPips=document.createElement('span'),petMore=document.createElement('span'),pipEls=[];petCnt.className='lab petCount';petPips.className='petPips';petMore.className='lab petMore';petCnt.hidden=petPips.hidden=petMore.hidden=true;
+for(let i=0;i<PIPS;i++){const p=document.createElement('i'),f=document.createElement('b');p.className='pip';p.hidden=true;p.appendChild(f);petPips.appendChild(p);pipEls.push({p,f,key:''})}
+petHud.append(petCnt,petPips,petMore);
+($('mana')||$('hp')).after(petHud);
 // how far a trophy is from going off again, 0 to 1 (i: its place among the active ones)
-function troCharge(e,i){
-  const a=allies.find(x=>x.e===e&&x.ent);if(a)return 1-Math.max(0,a.t)/a.tm;const t=TSRC[i];if(!t||!P)return 0;
+function troCharge(e,i,a){
+  if(a===undefined)a=allies.find(x=>x.e===e&&x.ent);if(a)return 1-Math.max(0,a.t)/a.tm;const t=TSRC[i];if(!t||!P)return 0;
   return P.trQ?1:t.form==='technique'?P.trN/4:t.form==='arrowhead'?P.trN/6:1-Math.max(0,P.trCd)/(t.form==='ward'?2.5:1.5);
 }
+// what a fallen pet's entry says: the seconds until it may rise, then that it waits for mana; "fallen" when raising is switched off
+const downTxt=e=>e.revT>0&&PETS.auto?Math.ceil(e.revT)+'s':PETS.auto?'mana':'fallen';
+let petUiKey='';const petBy=new Map();
 function petUi(){
-  const on=S.mode!=='title'&&act2()?petOn():[],own=petOwner(),f=form(),tro=!!f&&f!=='pet';
+  const on=S.mode!=='title'&&act2()?petOn():[],own=petOwner(),f=form(),tro=!!f&&f!=='pet',many=on.length>3;
   if(petHud.hidden!==!on.length)petHud.hidden=!on.length;if(!on.length)return;
-  const cl=(own==='beast'?'beast':'')+(tro?'tro '+f:'')+' n'+on.length;if(petHud.className!==cl)petHud.className=cl;
+  const cl=(own==='beast'?'beast':'')+(tro?'tro '+f:'')+' n'+Math.min(on.length,4)+(many?' many':'');if(petHud.className!==cl)petHud.className=cl;
+  const w=tw();petBy.clear();for(const a of allies)if(a.e&&!a.minion&&(a.pet||a.ent))petBy.set(a.e,a);
+  if(petCnt.hidden===many){petCnt.hidden=petPips.hidden=!many;for(const r of petRows){r.row.hidden=true;r.key=''}for(const q of pipEls)q.key=''}
+  if(many){
+    let up=0;for(const e of on)if(!e.down)up++;const more=on.length-PIPS,head=(tro?on.length:up+'/'+on.length)+' '+w.pl+'|'+more;
+    if(head!==petUiKey){petUiKey=head;petCnt.textContent=(tro?on.length:up+'/'+on.length)+' '+w.pl;petMore.hidden=!(more>0);petMore.textContent=more>0?'+'+more:'';
+      petHud.setAttribute('aria-label',on.length+' '+w.pl+(tro?'':', '+up+' standing'))}
+    pipEls.forEach((q,i)=>{const e=on[i],a=e&&petBy.get(e),dn=!!e&&!!e.down&&!tro,pct=!e?0:tro?Math.round(troCharge(e,i,a||null)*10)*10:dn?0:a?Math.max(0,Math.ceil(a.hp/a.maxHp*10)*10):100,key=e?pct+'|'+(dn?downTxt(e):''):'';
+      if(key===q.key)return;q.key=key;q.p.hidden=!e;if(!e)return;q.p.className='pip'+(dn?' down':'')+(tro&&pct>=100?' ready':'');q.f.style.height=pct+'%';q.p.dataset.t=dn&&e.revT>0&&PETS.auto?Math.ceil(e.revT):'';q.p.title=petTag(e)+(dn?' · '+downTxt(e):'');
+      q.f.style.background=tro?TCOL[S.cls]:''});
+    return}
   // the full name only where there is room for it: one row on a wide screen
-  const tight=on.length>1||innerWidth<720||matchMedia('(pointer:coarse)').matches,w=tw();
-  petRows.forEach((r,i)=>{const e=on[i],a=e&&!tro&&allies.find(x=>x.e===e&&!x.minion),ch=e&&tro?Math.round(troCharge(e,i)*20)*5:0,lab=e?(tight?petShort(e,on.length):petTag(e)):'',key=e?lab+'|'+f+'|'+(tro?ch:e.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f'):'';
+  const tight=on.length>1||innerWidth<720||matchMedia('(pointer:coarse)').matches;
+  petRows.forEach((r,i)=>{const e=on[i],a=e&&!tro&&petBy.get(e),ch=e&&tro?Math.round(troCharge(e,i)*20)*5:0,lab=e?(tight?petShort(e,on.length):petTag(e)):'',dn=!!e&&!!e.down&&!tro,key=e?lab+'|'+f+'|'+(tro?ch:dn?'x'+downTxt(e):a?Math.ceil(a.hp/a.maxHp*25):'f'):'';
     if(key===r.key)return;r.key=key;r.row.hidden=!e;if(!e)return;
-    const pct=tro?ch:e.down?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;r.row.className='petRow'+(e.down&&!tro?' down':'')+(tro&&pct>=100?' ready':'');r.n.textContent=lab+(e.down&&!tro?' · fallen':'');r.n.title=petTag(e);r.f.style.width=pct+'%';
+    const pct=tro?ch:dn?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;r.row.className='petRow'+(dn?' down':'')+(tro&&pct>=100?' ready':'');r.n.textContent=lab+(dn?' · '+downTxt(e):'');r.n.title=petTag(e);r.f.style.width=pct+'%';
     r.n.style.color=tro?TCOL[S.cls]:'';r.f.style.background=tro?TCOL[S.cls]:'';
-    r.row.setAttribute('aria-label',cap1(w.n)+': '+petTag(e)+(tro?(pct>=100?', ready':''):e.down?', fallen, back next level':', '+pct+'% health'))});
+    r.row.setAttribute('aria-label',cap1(w.n)+': '+petTag(e)+(tro?(pct>=100?', ready':''):dn?', fallen'+(PETS.auto?', rises again for mana':', back next level'):', '+pct+'% health'))});
 }
 // a pause button beside the toggles, for touch screens
 {const pb=document.createElement('button');pb.id='pauseB';pb.type='button';pb.className='tog';pb.textContent='Pause';pb.setAttribute('aria-pressed','false');pb.onclick=()=>{audio();pause(!S.paused);pb.blur()};$('hap').after(pb);
@@ -1874,13 +2003,13 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){pause(true
 
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
-window.MB={settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
+window.MB={settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
   get P(){return P},get mons(){return mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get echoes(){return echoes},get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return boss}};
 let last=0;
 let fast=1;
 function tick(dt){if(S.paused){S.t+=dt;return}if(S.mode==='play'){ST.time+=dt;ST.levelTime+=dt}if(S.stop>0)S.stop-=dt;else step(dt)}
-function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);skillUi();petUi();
+function frame(ts){const dt=Math.min(.033,(ts-last)/1000||0);last=ts;for(let i=0;i<fast;i++)tick(dt);skillUi();manaUi();petUi();
   const R=MB.renderer;
   if(R&&R.ok){try{R.draw(dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
@@ -1898,11 +2027,13 @@ if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen,
   // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
-  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;if(PETS.roster.length>=PETMAX)petDrop(0);
+  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;
     const e={kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,perk:MODS.includes(o.perk)?o.perk:null,crown:ty?1:0};
-    const cap=petCap()||3;PETS.roster.push(e);PETS.active.push(PETS.roster.length-1);while(PETS.active.length>cap)PETS.active.shift();if(S.mode!=='play'||!P)return e;
+    const cap=petCap()||3;PETS.roster.push(e);PETS.active.push(PETS.roster.length-1);while(PETS.active.length>cap||form()&&PETS.active.length>1&&!petOn().includes(e))PETS.active.shift();if(S.mode!=='play'||!P)return e; // the oldest step back until the pool can hold the new one
     if(form()&&!(o.owner&&!petOwner())){const made=fieldPets(true);save(S.level);hud();return allies.find(a=>a.e===e)||TSRC.find(a=>a.e===e)||made[0]||e} // the class's own form: a pet, a familiar or guardian entity, or the stand-in of a technique, ward, venom or arrowhead
-    const k=PETK[PETS.active.length-1],a=makePet(e,1,o.owner==='beast'?'beast':'necro',k,PETS.active.length-1);allies.push(a);PETS.fielded.push(e);return a},PETS,
+    const k=petK(PETS.active.length),a=makePet(e,1,o.owner==='beast'?'beast':'necro',k,PETS.active.length-1,PETS.active.length);allies.push(a);PETS.fielded.push(e);return a},PETS,
+  // mana(v): set the free mana (v undefined: just read MB.mana). well(n): set the Wellspring count and rebuild the pool at once.
+  mana:v=>{if(P&&v!==undefined){P.mana=Math.max(0,Math.min(manaRoom(),+v||0));syncSkills()}return MANA},
   // fire(): make the active trophy go off now (when there is something to hit). Returns how many echoes are live afterwards.
   fire:()=>{if(S.mode!=='play'||!P)return 0;for(const a of allies)if(a.trophy&&a.ent)a.t=0;if(TSRC.length){P.trQ=1;P.trCd=0}const b=S.banner;S.banner=0;trophyTick(0);for(const a of[...allies])if(a.trophy&&a.ent)trophyStep(a,0);S.banner=b;return echoes.length},get TSRC(){return TSRC}};
 window.claude?.hot?.snapshot?.(()=>({level:S.mode==='title'?0:S.level}));
