@@ -217,7 +217,7 @@ function openRecords(){
   return openView('mbx-wide','Records',function(p){
     var hd=heading('Records',rec.best?'What the dark remembers':'Nothing to remember yet'),i;
     for(i=0;i<hd.length;i++)if(hd[i])p.appendChild(hd[i]);
-    if(!rec.best&&!rec.runs){p.appendChild(h('p',{class:'dim',style:'text-align:center',text:'Start a run. Your best level, your fastest kills and your deaths are kept here.'}))}
+    if(!rec.best&&!rec.runs){p.appendChild(h('p',{class:'dim mbx-center',text:'Start a run. Your best level, your fastest kills and your deaths are kept here.'}))}
     else{
       var tile=function(v,l){return h('div',null,h('b',{text:String(v)}),h('small',{text:l}))};
       p.appendChild(h('div',{class:'mbx-tiles'},tile(rec.best||'—','Best level'),tile(rec.runs,'Runs'),tile(rec.bosses,'Bosses killed'),tile(rec.deaths,'Deaths'),tile(clock(rec.time),'Time played')));
@@ -308,10 +308,10 @@ function exportView(back){
     var hd=heading('Save code','Export save');p.appendChild(hd[0]);p.appendChild(hd[1]);
     var msg=h('p',{class:'mbx-msg',role:'status'});
     if(!code){
-      p.appendChild(h('p',{class:'dim',style:'text-align:center',text:'There is no run to export yet.'}));
+      p.appendChild(h('p',{class:'dim mbx-center',text:'There is no run to export yet.'}));
       var b0=button('Back',goBack,true);p.appendChild(h('div',{class:'btns'},b0));return b0;
     }
-    p.appendChild(h('p',{class:'dim',style:'text-align:center',text:'This code holds your run ('+saveLine(save)+') and your records. Keep it somewhere safe, or paste it into Import save on another device.'}));
+    p.appendChild(h('p',{class:'dim mbx-center',text:'This code holds your run ('+saveLine(save)+') and your records. Keep it somewhere safe, or paste it into Import save on another device.'}));
     var ta=h('textarea',{readonly:true,rows:'4',spellcheck:'false','aria-label':'Save code',onclick:function(){ta.select()}});ta.value=code;
     p.appendChild(ta);p.appendChild(msg);
     var selectAll=function(){try{ta.focus();ta.select();ta.setSelectionRange(0,code.length)}catch(e){}};
@@ -333,7 +333,7 @@ function importView(back){
   var goBack=function(){back()};
   openView('','Import save',function(p){
     var hd=heading('Save code','Import save');p.appendChild(hd[0]);p.appendChild(hd[1]);
-    var info=h('p',{class:'dim',style:'text-align:center',text:'Paste a code made with Export save. It replaces the run on this device.'});
+    var info=h('p',{class:'dim mbx-center',text:'Paste a code made with Export save. It replaces the run on this device.'});
     var ta=h('textarea',{rows:'4',spellcheck:'false',autocomplete:'off',autocapitalize:'off','aria-label':'Save code',placeholder:'MB1.…'});
     var msg=h('p',{class:'mbx-msg',role:'alert'}),pending=null;
     var bad=function(t){msg.className='mbx-msg bad';msg.textContent=t};
@@ -469,6 +469,15 @@ guard('hints',function(){
       panelNote(isDrop,h('p',{class:'keys mbx-note'},h('b',{text:'Hint: '}),'Every boss drops one item. Upgrade is the steady choice. Replace is worth it when the drop is rarer than what you wear. Destroy only when neither helps.'))},0);
   });
   hintsApi={reset:function(){seen=[];store.set('hints',seen);moved=0;struck=0}};
+});
+
+/* ---------- reward accent (style only) ---------- */
+// the first screen after a kill gets a class for an accent sweep, a rank-up a gold one (CSS in index.html); the game resets the panel's classes with each screen
+guard('accent',function(){
+  listen('reward',function(){setTimeout(function(){
+    var ov=$('ov'),p=$('ovPanel'),k=$('ovKeys');if(!ov||ov.hidden||!p)return;
+    p.classList.add(k&&/^Rank up/.test(k.textContent)?'mbx-rankup':'mbx-clear');
+  },0)});
 });
 
 // the title screen was drawn before this file loaded: let it pick up the Settings and Records buttons
