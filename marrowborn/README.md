@@ -10,9 +10,9 @@ This folder is self-contained and is not part of the url-shortening Maven build.
 
 | Levels | What happens |
 |---|---|
-| 1 to 8 | One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. |
-| 9 to 12 | You choose a class and get its basic equipment and first two skills. Level 12 is the Flayed King. |
-| 13 onward | Generated levels across five areas: scaling monsters with modifiers, rooms with pillars, pits and traps, waves before some bosses, and a three-phase tyrant every tenth level. Each clear gives an equipment drop and a boon. |
+| 1 to 8 | One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. Level 8 is The Hollow. |
+| 9 to 12 | You choose a class and get its basic equipment and first two skills. Level 10 is the first boss, The Flayed King. |
+| 13 onward | Generated levels across five areas. Ordinary levels are short, sharp fights against a monster with modest health that hits hard, in rooms with pillars, pits and traps, sometimes after a wave. Every tenth level is a boss: a three-phase tyrant with high health and power. Each clear gives an equipment drop and a boon. |
 | After 50 | You choose one of two upgrades for your class. The levels continue without end. |
 
 The title screen also offers "Skip to class selection", which starts at level 9.
@@ -39,9 +39,10 @@ you stand still, and the pool has no upper limit: it grows with every level clea
 with the Wellspring boon and with equipment.
 
 Every class can also claim something from a boss it kills. The Necromancer binds the
-monster as a pet and the Ranger's Beastmaster upgrade tames it. There is no limit on
-pets held or deployed: each deployed pet holds back some mana, and a fallen pet
-revives by spending mana. The other classes take a trophy that replays the boss's
+monster as a pet and the Ranger's Beastmaster upgrade tames it. A bound pet fights as the
+monster it was: same attacks, enrage, modifiers and strength. There is no limit on
+pets held or deployed: each deployed pet holds back mana in proportion to its power,
+and a fallen pet revives by spending mana. The other classes take a trophy that replays the boss's
 attack: a technique (Fighter), ward (Tank), venom (Assassin), familiar (Mage),
 arrowhead (Ranger before the upgrade) or guardian (Healer).
 
@@ -56,7 +57,7 @@ Runs can be exported and imported as a text code.
   `game.js` (rules), `render3d.js` (3D scene), `models-player.js`, `models-monsters.js`,
   `extras.js` (settings, records, hints, story), plus bundled fonts and three.js.
 - `android/` is a thin WebView wrapper that packages `web/` as an app.
-- `dist/Marrowborn.apk` is a prebuilt, installable APK (Android 6.0+). `Marrowborn-3.1.apk`
+- `dist/Marrowborn.apk` is a prebuilt, installable APK (Android 6.0+). `Marrowborn-3.2.apk`
   is the previous release and `Marrowborn-2.0.apk` the last 2D-only build.
 
 ## Play in a browser

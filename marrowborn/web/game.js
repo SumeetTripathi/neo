@@ -25,10 +25,13 @@ const LEVELS=[
  {title:'Scent',boss:'mimic',hint:'Three are false. Follow the scent.'},
  {title:'Whole',boss:'hollow',hint:'It wants back everything you took.'},
  {title:'Daylight',boss:'knight',hint:'You have a trade now. Keys 1 and 2, or the skill buttons, use its skills.'},
- {title:'The Mire',boss:'lich',hint:'It calls mites while it casts.'},
+ {title:'The Throne',boss:'king',hint:'The first tyrant. Everything you are, against everything it kept.'},
  {title:'The Pass',boss:'wyrm',hint:'Faster than the last thing that dug.'},
- {title:'The Throne',boss:'king',hint:'Everything you are, against everything it kept.'},
+ {title:'The Mire',boss:'lich',hint:'It calls mites while it casts.'},
 ];
+// Every tenth level is a boss level: the Flayed King on level 10, a tyrant on 20, 30, 40... Only those have high health and fight in three phases (and the Hollow, the end of the crypt, in a small way).
+// Every other level is a short, sharp fight: modest health, heavy blows.
+const tenth=n=>(n+1)%10===0;
 const CLASSES={
  fighter:{name:'Fighter',gear:'Greatsword, headband',hp:5,text:'A fast, heavy blade, no defence but your feet, and wounds that close a little faster than most. 15 health. Bosses you kill teach you a technique.',pows:[
   ['Cleave','Your swing becomes a full circle with a longer reach.'],
@@ -173,10 +176,10 @@ const MREGEN=.05,MDRAW=2,STILL0=.3,STILL1=.7,MKILL=.03,MBLOCK=.08;
 const MWELL=20,MLEVEL=2,MWELLR=.03,MWELLRMAX=.6;
 // Skills cost a little more as the levels climb, so a deep pool does not make them free: MRISE of the listed cost per level past the ninth.
 const MRISE=.007;
-// Pets and familiars are held with mana: each one in the field keeps PCOST of the pool locked away for as long as it is out (PCROWN for a crowned one). Held mana cannot be spent and does not refill.
-// There is no other limit on how many go with you. A pet that falls rises again REVT seconds later beside you at REVHP of its health, paid from the free pool:
-// REVIVE (REVCROWN for a crowned one), and REVUP times more each time the same pet has to be raised again in one level.
-const PCOST={pet:16,familiar:18},PCROWN={pet:28,familiar:30},REVIVE=20,REVCROWN=32,REVT=4,REVHP=.5,REVUP=1.5;
+// Pets and familiars are held with mana: each one in the field keeps part of the pool locked away for as long as it is out. Held mana cannot be spent and does not refill.
+// A familiar holds PCOST.familiar (PCROWN for a crowned one). A pet holds mana in proportion to its power (see the pets section: petCost). There is no other limit on how many go with you.
+// A pet that falls rises again REVT seconds later beside you at REVHP of its health, paid from the free pool: a quarter more than it holds, and REVUP times more each time the same pet has to be raised again in one level.
+const PCOST={pet:16,familiar:18},PCROWN={pet:28,familiar:30},REVT=4,REVHP=.5,REVUP=1.5;
 // a skill's text says what it costs at the level you stand on (mana: the listed cost, before the rise)
 const skText=(d,k,i)=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+(S.cls===k&&S.level>=8?skCost(i):d[6])+'.';
 for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],get text(){return skText(d,k,i)},level:SKLV[i]}));
@@ -200,18 +203,18 @@ const BOONS=[
  {id:'spec'},
 ];
 const SPEC={
- crawler:{name:'Gravecrawler',r:24,hp:44,col:'#7c9a52',eyes:2,legs:8},
- hound:{name:'Bonehound',r:22,hp:56,col:'#c9c1a8',eyes:2,spikes:6},
- witch:{name:'Tallow Witch',r:20,hp:42,col:'#8566b8',eyes:2,hood:1},
- fist:{name:'Gravel Fist',r:32,hp:112,col:'#8f8474',eyes:1,spikes:4},
- mother:{name:'Brood Mother',r:34,hp:60,col:'#b3557a',eyes:5,pust:1},
- burrower:{name:'The Burrower',r:26,hp:38,col:'#c0823c',eyes:0,teeth:1},
- mimic:{name:'The Mimic',r:22,hp:39,col:'#3fa596',eyes:3,mask:1},
- hollow:{name:'The Hollow',r:38,hp:200,col:'#4a3a66',eyes:2,void:1,spikes:9},
- knight:{name:'Carrion Knight',ai:'hound',r:26,hp:235,col:'#7d8a99',eyes:2,spikes:8},
- lich:{name:'Bog Lich',ai:'witch',r:22,hp:225,col:'#5f9a6a',eyes:3,hood:1},
- wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:245,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
- king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1100,col:'#8c2f39',eyes:3,void:1,spikes:11},
+ crawler:{name:'Gravecrawler',r:24,hp:26,col:'#7c9a52',eyes:2,legs:8},
+ hound:{name:'Bonehound',r:22,hp:30,col:'#c9c1a8',eyes:2,spikes:6},
+ witch:{name:'Tallow Witch',r:20,hp:20,col:'#8566b8',eyes:2,hood:1},
+ fist:{name:'Gravel Fist',r:32,hp:52,col:'#8f8474',eyes:1,spikes:4},
+ mother:{name:'Brood Mother',r:34,hp:26,col:'#b3557a',eyes:5,pust:1},
+ burrower:{name:'The Burrower',r:26,hp:17,col:'#c0823c',eyes:0,teeth:1},
+ mimic:{name:'The Mimic',r:22,hp:17,col:'#3fa596',eyes:3,mask:1},
+ hollow:{name:'The Hollow',r:38,hp:110,col:'#4a3a66',eyes:2,void:1,spikes:9},
+ knight:{name:'Carrion Knight',ai:'hound',r:26,hp:115,col:'#7d8a99',eyes:2,spikes:8},
+ lich:{name:'Bog Lich',ai:'witch',r:22,hp:220,col:'#5f9a6a',eyes:3,hood:1},
+ wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:125,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
+ king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1000,col:'#8c2f39',eyes:3,void:1,spikes:11},
  mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
  // generated levels only: a toad that lobs bombs, a caller that hides behind its husks, an eye that sweeps a beam
  bomber:{name:'Cinder Toad',r:27,hp:240,col:'#c9642f',eyes:2,pust:1},
@@ -219,16 +222,18 @@ const SPEC={
  beamer:{name:'Lidless Eye',r:25,hp:230,col:'#c2a640',eyes:1,spikes:5},
  husk:{name:'Husk',ai:'mite',r:12,hp:6,col:'#a9b7a0',eyes:2,legs:4},
 };
-// levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
+// Health of the story monsters (levels 1-12) is set above, one by one. Levels 13 and up are generated: a scaled monster from the pool, a tyrant every tenth level
 const AREAS=[['The Ash Road',28],['The Drowned Fen',165],['The Bone Peaks',215],['The Black Court',285],['The Endless Dark',340]];
 const PRE=['Ashen','Dread','Rotting','Gilded','Howling','Pale','Iron','Blighted','Starved','Elder'];
 const POOL=['crawler','hound','witch','fist','beamer','burrower','bomber','summoner','mother'];
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
 const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
-// (a flat 18% more since every class takes a trophy from the bosses it kills. The 18% that came in with six carried skills, climbing from level 15 to 25, went out again with mana:
-// skills now have to be paid for, and that costs about as much as the two extra skills gave.)
-const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*1.18};
+// (CURVE: the old curve, 18% up since every class takes a trophy from the bosses it kills.) ORDHP: what an ordinary level's monster has of it, so that it dies in 15 to 35 seconds.
+// TYRHP: a tyrant has that many times the health its kind would have on an ordinary level (the Hollow's kind has the highest base as it is), so that it lasts 90 to 150 seconds.
+const ORDHP=.45,TYRHP=2.75,TYRLATE=1.15; // TYRLATE: the tyrants from level 60 on meet a class that has taken its upgrade
+const CURVE=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*1.18};
+const genMul=n=>CURVE(n)*ORDHP;
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
 const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
@@ -245,12 +250,12 @@ const wavesOf=n=>n<13?0:[1,0,2,0,0][(n-13)%5];
 const QA=[[250,190],[710,190],[250,410],[710,410]],QB=[[300,300],[660,300]],QC=[[480,300]],QD=[[165,300],[795,300]],QE=[[360,205],[600,205],[360,395],[600,395]];
 const ROOMS=[[],[['pillar',QB]],[['pillar',QA]],[['spikes',QE]],[['pillar',QC],['spikes',QE]],[['brazier',QB]],[['pit',QB]],[['spikes',QE],['spikes',QC]],[['brazier',QA]],[['pit',QD],['spikes',QB]],[['pillar',QA],['brazier',QC]],[['pit',QC],['pillar',QD]]];
 // levels 1-3 are bare; the crypt and the first trade levels bring in one thing at a time (pillars, spikes, braziers, pits); after that the room follows from the level number
-const roomOf=(n,tyrant)=>n<3?0:n<12?[1,2,3,4,2,5,6,7,8][n-3]:tyrant?8:(n*7+2)%12;
+const roomOf=(n,tyrant)=>n<3?0:n<12?[1,2,3,4,2,5,8,7,6][n-3]:tyrant?8:(n*7+2)%12;
 const cap1=x=>x[0].toUpperCase()+x.slice(1);
 function levelDef(n){
   if(n<LEVELS.length){const L=LEVELS[n];return{title:L.title,hint:L.hint,kind:L.boss,spec:SPEC[L.boss],hue:100,waves:0,mods:[],room:roomOf(n)}}
   const N=n+1,area=AREAS[N<=20?0:Math.min(4,Math.floor((N-11)/10))],tyrant=N%10===0,kind=tyrant?'hollow':POOL[(n*5+3)%POOL.length],base=SPEC[kind],waves=wavesOf(n),mods=modsOf(n,kind,tyrant);
-  let hp=GENHP[kind]*genMul(n)*[1,.8,.68][waves];for(const k of mods)hp*=MODHP[k]||1;
+  let hp=GENHP[kind]*genMul(n)*(tyrant?TYRHP*(n>=59?TYRLATE:1):1)*[1,.8,.68][waves];for(const k of mods)hp*=MODHP[k]||1;
   const name=tyrant?'Tyrant of '+area[0].replace('The ',''):(mods[0]?cap1(mods[0])+' ':'')+PRE[n%10]+' '+base.name.replace('The ','')+(mods[1]?', '+cap1(mods[1]):'');
   const spec={...base,ai:kind,crown:tyrant?1:0,name,hp:Math.round(hp),col:tyrant?'#8c2f39':TINT[(n*3)%10],r:base.r+(tyrant?6:2)};
   return{title:area[0],hint:tyrant?'A tyrant holds this ground.':N===50?'':waves>1?'Two packs come first. Then it does.':waves?'Its pack comes first. Then it does.':'Stronger than the last. So are you.',kind,spec,hue:area[1],waves,mods,room:roomOf(n,tyrant)};
@@ -286,7 +291,7 @@ let EQ={};
 function eqSync(){EQ={};if(S.eq)for(const sl of SLOTS){const it=S.eq[sl];if(it)for(const k of it.keys)EQ[k]=(EQ[k]||0)+statV(it,k)}}
 const eqv=k=>S.level>=8&&S.cls&&EQ[k]||0;
 function dropItem(n){
-  const N=n+1,big=N===12||N%10===0,pL=Math.min(.25,.01+(N-9)*.004)*(big?4:1),pE=Math.min(.35,.05+(N-9)*.008)*(big?2:1),x=rand();
+  const N=n+1,big=N%10===0,pL=Math.min(.25,.01+(N-9)*.004)*(big?4:1),pE=Math.min(.35,.05+(N-9)*.008)*(big?2:1),x=rand();
   const slot=SLOTS[Math.floor(rand()*3)],r=x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0;
   return item(S.cls,slot,r,0,0,slot==='trinket'&&r>0&&CASTER[S.cls]&&rand()<.4?1:0);
 }
@@ -337,8 +342,14 @@ function manaStep(dt){
 const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1)*(m.spdK||1);
 const melee=c=>!c||c==='tank'||c==='fighter'||c==='assassin';
 const mspd=()=>S.level<8?1:Math.min(1.7,1.25+Math.max(0,S.level-12)*.01);
-// what a blow costs: a touch is 1 while you are learning and 2 from level 4, then climbs with your health. Charges, lunges and ground blasts (heavy=1) hit half again as hard; brushing against a monster (heavy=-1) is lighter, and so are bolts before level 9.
-const blow=heavy=>{const n=S.level,b=n<3?1:n<12?2:Math.round(2+(n-11)*.13);return heavy>0?Math.round(b*1.5+.01):heavy<0?Math.max(1,Math.round(b*.6)):b};
+// What a blow costs. In the crypt (levels 1-8) a touch is 1 while you are learning and 2 from level 4; charges, lunges and ground blasts (heavy=1) hit half again as hard, a brush against a monster (heavy=-1) is lighter, and so are bolts.
+// From level 9 a blow is a share of PHP(n), the health a player typically has on that level (14 on levels 9-12, then 0.85 more per level): SHARE = a brush 10%, a bolt, a beam or a trap 19%, a telegraphed blow 31%.
+// So two or three telegraphed blows are most of a health bar, and extra health from Vigor or armour buys real room. On the boss levels (every tenth) every blow is BOSSDMG times that.
+const PHP=n=>n<1?4:n<2?7:n<8?10:14+.85*Math.max(0,n-11);
+const SHARE=[.1,.19,.31],BOSSDMG=1.1;
+const blowAt=(n,heavy)=>{if(n<8){const b=n<3?1:2;return heavy>0?Math.round(b*1.5+.01):heavy<0?Math.max(1,Math.round(b*.6)):b}
+  return Math.max(1,Math.round(PHP(n)*SHARE[heavy>0?2:heavy<0?0:1]*(tenth(n)?BOSSDMG:1)))};
+const blow=heavy=>blowAt(S.level,heavy);
 // healing scales with your health: f is a share of maximum health, never less than lo
 const healP=(f,lo=1)=>{P.hp=Math.min(P.maxHp,P.hp+Math.max(lo,Math.round(f*P.maxHp)));hud()};
 // rank climbs with the levels once you have a trade: E at level 9, S by level 50, then S+1, S+2... every ten levels
@@ -400,7 +411,7 @@ const live=()=>AC&&!muted&&!document.hidden;
 function audio(){if(AC)return;try{AC=new(window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.45;fx=AC.createGain();fx.gain.value=SET.sfx/.8;fx.connect(master);lp=AC.createBiquadFilter();lp.type='lowpass';master.connect(lp);lp.connect(AC.destination);tune();startBed()}catch(e){AC=null}}
 // one oscillator voice: f -> f2 over d seconds, starting `at` seconds from now
 function sfx(f,d=.1,type='square',v=.3,f2,at=0){
-  if(!live())return;try{
+  if(!live())return;if(SIDE)v*=.35;try{
   if(AC.state==='suspended')AC.resume();
   const o=AC.createOscillator(),g=AC.createGain(),t=AC.currentTime+at;o.type=type;
   o.frequency.setValueAtTime(f,t);if(f2)o.frequency.exponentialRampToValueAtTime(f2,t+d);
@@ -411,7 +422,7 @@ function sfx(f,d=.1,type='square',v=.3,f2,at=0){
 function tune(){if(!AC)return;const h=has('hearing'),t=AC.currentTime;lp.frequency.setTargetAtTime(h?18000:700,t,.05);master.gain.setTargetAtTime(h?.45:.7,t,.05)}
 // noise burst; with f it is band-passed and swept f -> f2 (whooshes, clangs, rattles)
 function noise(d=.12,v=.3,f,f2,at=0){
-  if(!live())return;try{
+  if(!live())return;if(SIDE)v*=.35;try{
   if(!nbuf){nbuf=AC.createBuffer(1,AC.sampleRate*.5,AC.sampleRate);const ch=nbuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1}
   const n=AC.createBufferSource(),g=AC.createGain(),t=AC.currentTime+at;n.buffer=nbuf;n.loop=true;g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);
   if(f){const q=AC.createBiquadFilter();q.type='bandpass';q.Q.value=1.4;q.frequency.setValueAtTime(f,t);if(f2)q.frequency.exponentialRampToValueAtTime(f2,t+d);n.connect(q);q.connect(g)}else n.connect(g);
@@ -517,7 +528,7 @@ function collide(e,r,pits){
   if(hit)clamp(e,r);return hit;
 }
 // Steering: when something solid lies in the way, head for its edge instead. The side is kept for a moment so a walker does not dither, and flipped by the caller if it stops making ground.
-function steer(m,a,dp=dist(m,P)){
+function steer(m,a,dp=dist(m,T||P)){
   const ux=Math.cos(a),uy=Math.sin(a);let best=null,bg=46,bR=0,bd=0;
   for(const o of obstacles){const R=o.kind==='pit'?o.r-8:solidR(o);if(!R)continue;
     const dx=o.x-m.x,dy=o.y-m.y,d=Math.hypot(dx,dy);if(dx*ux+dy*uy<=0||dp<d-R)continue; // behind us, or the player stands in front of it
@@ -546,20 +557,27 @@ function rayLen(x,y,a){
   return Math.max(0,t);
 }
 function segDist(p,x,y,a,len){const ux=Math.cos(a),uy=Math.sin(a),al=Math.max(0,Math.min(len,(p.x-x)*ux+(p.y-y)*uy));return Math.hypot(p.x-x-ux*al,p.y-y-uy*al)}
-function shoot(x,y,a,spd,r=6){shots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r})}
+// SIDE: the bound pet whose turn it is while the monster AI runs for it (null while a monster acts). T: what the acting creature fights: you for a monster, its prey for a pet.
+// The AI below is written once and used by both: it aims at T, and what it throws (shoot, zone, brood, the beam) lands on the other side.
+let SIDE=null,T=null;
+const LV=()=>SIDE?99:S.level; // the level a pattern asks about: a pet was a boss past the crypt, so it has them all
+const quake=v=>{if(!SIDE)S.shake=Math.max(S.shake,v)};
+function shoot(x,y,a,spd,r=6){
+  if(SIDE){const o=SIDE.par||SIDE;pshots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r:Math.min(r,6),dmg:SIDE.du[1],kind:o.owner==='necro'?'skull':'bolt',pierce:0,hit:new Set(),sx:x,sy:y,pet:o});return}
+  shots.push({x,y,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r})}
 function ringShot(m,n,spd,off=0){for(let i=0;i<n;i++)shoot(m.x,m.y,off+i*TAU/n,spd)}
-function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z={x,y,r,t:0,dur};clamp(z,10);zones.push(z);return z}
+function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z=SIDE?{x,y,r,t:0,dur,mine:true,dmg:SIDE.du[2],pet:SIDE.par||SIDE}:{x,y,r,t:0,dur};clamp(z,10);zones.push(z);return z}
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
-const miteHp=()=>S.level<8?2:S.level<12?4:Math.round(4*Math.pow(genMul(S.level),.8));
+const miteHp=()=>S.level<8?2:S.level<12?4:Math.round(4*Math.pow(CURVE(S.level),.8));
 function spawn(kind,x,y,isBoss,spec){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=miteHp();if(kind==='husk')hp=Math.round(miteHp()*1.5);if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);const m={kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,mods:[],ward:0,beam:null};clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);mons.push(m);return m}
 function lesser(kind,x,y,hp){const m=spawn(kind,x,y,false,lesserSpec(kind,S.level,hp));m.lesser=true;m.spdK=.8;m.t=1+rand()*.6;puff(m,col(m.s.col),10);return m}
 // a wave pack: one or two lesser monsters and a handful of mites, spread along the far side of the room from you
 const LESSER=['crawler','hound','witch','fist','bomber'];
 function spawnWave(){
-  const n=S.level,w=S.wave,big=w.n>1?2:1,far=P.y>H/2?150:H-150,base=GENHP,total=4+(n>=30?1:0)-(big>1?1:0);
+  const n=S.level,w=S.wave,big=w.n>1?2:1,far=P.y>H/2?150:H-150,base=GENHP,total=3+(n>=30?1:0)-(big>1?1:0); // small packs: one lesser monster and three mites, then two and two
   for(let j=0;j<big;j++){const kind=LESSER[(n+w.n*2+j*3)%LESSER.length];lesser(kind,W/2+(big>1?(j?170:-170):0),far,base[kind]*genMul(n)*.085)}
   for(let j=0;j<total;j++){const m=spawn('mite',W/2+(j-(total-1)/2)*70,far+(P.y>H/2?60:-60));m.t=1}
-  w.hp0=mons.reduce((a,m)=>a+m.maxHp,0);S.waveT=.9;
+  w.hp0=mons.reduce((a,m)=>a+m.maxHp,0);S.waveT=.6;
   $('bossName').textContent='Wave '+w.n+' of '+w.of;
   floats.push({x:W/2,y:far-50,txt:w.of>1?'Pack '+w.n+' of '+w.of:'The pack',life:1.6,c:'#d6a544'});sfx(150,.4,'sawtooth',.2,90);
 }
@@ -587,8 +605,8 @@ function chargeStates(m,dt,a,next,E){
   if(m.st==='wind'){if(m.t>.22)m.ang=a; // the line of the charge locks just before it goes, so a sidestep at the last moment works
     if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
   else if(m.st==='charge'){const hit=move(m,m.ang,540,dt,true);if(hit||(m.t-=dt)<=0){
-    if(hit){S.shake=.25;sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
-    if(E&&!m.again&&S.level>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
+    if(hit){quake(.25);sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
+    if(E&&!m.again&&LV()>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
     else{m.again=0;m.st='dazed';m.t=hit?(E?1:1.5):.6}}}
   else if((m.t-=dt)<=0){m.st='idle';m.t=next}
 }
@@ -596,9 +614,9 @@ function chargeStates(m,dt,a,next,E){
 const AI={
   crawler(m,dt,a,d){
     const E=m.rage;
-    if(m.st==='idle'){move(m,a,80,dt);m.t-=dt;if(m.t<=0&&d<170){m.st='wind';m.t=.52;m.ang=a;m.again=0;if(S.level>=12)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,190)}}
+    if(m.st==='idle'){move(m,a,80,dt);m.t-=dt;if(m.t<=0&&d<170){m.st='wind';m.t=.52;m.ang=a;m.again=0;if(LV()>=12)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,190)}}
     else if(m.st==='wind'){if((m.t-=dt)<=0){m.st='lunge';m.t=.28}}
-    else{move(m,m.ang,400,dt,true);if((m.t-=dt)<=0){if(E&&S.level>=3)ringShot(m,6,140,a);if(E&&!m.again){m.again=1;m.st='wind';m.t=.4;m.ang=a}else{m.st='idle';m.t=1.15}}}
+    else{move(m,m.ang,400,dt,true);if((m.t-=dt)<=0){if(E&&LV()>=3)ringShot(m,6,140,a);if(E&&!m.again){m.again=1;m.st='wind';m.t=.4;m.ang=a}else{m.st='idle';m.t=1.15}}}
   },
   hound(m,dt,a){
     const E=m.rage;
@@ -608,19 +626,19 @@ const AI={
   witch(m,dt,a,d){
     const E=m.rage;if(m.slide>0)m.slide-=dt;
     const dir=m.slide>0?a+Math.PI/2*m.side:d<200?a+Math.PI:d>330?a:a+Math.PI/2*m.side;
-    if(move(m,dir,d<200?(S.level<8?78:98/mspd()):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind; deeper down her clock quickens but her retreat does not, or nothing on foot could reach her
+    if(move(m,dir,d<200?(LV()<8?78:98/mspd()):90,dt)){m.side*=-1;m.slide=.7} // the first witch is slow enough to run down half-blind; deeper down her clock quickens but her retreat does not, or nothing on foot could reach her
     if((m.t-=dt)<=0){m.n++;if(m.n%(E?2:3)===0)ringShot(m,E?12:10,150,a);else for(const k of E?[-.5,-.25,0,.25,.5]:[-.25,0,.25])shoot(m.x,m.y,a+k,200);
-      if(E&&S.level>=3&&m.n%2)zone(P.x,P.y,70,1,m);m.t=1.25;sfx(520,.12,'sine',.2,260)}
+      if(E&&LV()>=3&&m.n%2)zone(T.x,T.y,70,1,m);m.t=1.25;sfx(520,.12,'sine',.2,260)}
   },
   fist(m,dt,a){
     const E=m.rage;
-    if(m.st==='idle'){move(m,a,60,dt);if((m.t-=dt)<=0){m.n++;m.st='leap';m.t=m.dur=.95;m.sx=m.x;m.sy=m.y;m.tx=P.x;m.ty=P.y;zone(P.x,P.y,85,.95,m);
-      if(E||m.n%3===0)for(let i=0;i<3;i++){const b=a+i*TAU/3;zone(P.x+Math.cos(b)*150,P.y+Math.sin(b)*150,70,1.3,m)}}}
+    if(m.st==='idle'){move(m,a,60,dt);if((m.t-=dt)<=0){m.n++;m.st='leap';m.t=m.dur=.95;m.sx=m.x;m.sy=m.y;m.tx=T.x;m.ty=T.y;zone(T.x,T.y,85,.95,m);
+      if(E||m.n%3===0)for(let i=0;i<3;i++){const b=a+i*TAU/3;zone(T.x+Math.cos(b)*150,T.y+Math.sin(b)*150,70,1.3,m)}}}
     else{m.t-=dt;const p=Math.min(1,1-m.t/m.dur);m.x=m.sx+(m.tx-m.sx)*p;m.y=m.sy+(m.ty-m.sy)*p;m.lift=Math.sin(p*Math.PI);clamp(m,m.r);if(m.t<=0){m.lift=0;m.st='idle';m.t=E?1:1.35;if(E)ringShot(m,8,150,rand()*TAU)}}
   },
   mother(m,dt,a){
     const E=m.rage;m.ang+=dt*.5;if(move(m,m.ang,E?46:30,dt))m.ang+=Math.PI;
-    if((m.t-=dt)<=0){m.n++;for(let i=0;i<(E?2:1);i++)if(mons.length<(E?9:7)){const b=rand()*TAU;spawn('mite',m.x+Math.cos(b)*44,m.y+Math.sin(b)*44)}
+    if((m.t-=dt)<=0){m.n++;for(let i=0;i<(E?2:1);i++)if(broodOk(m,E?9:7)){const b=rand()*TAU;brood(m,'mite',m.x+Math.cos(b)*44,m.y+Math.sin(b)*44)}
       if(E)for(const k of[-.3,0,.3])shoot(m.x,m.y,a+k,160,8);else if(m.n%2===0)shoot(m.x,m.y,a,150,8);m.t=1.4}
   },
   mite(m,dt,a){move(m,a+Math.sin(S.t*3+m.seed)*.6,125,dt)},
@@ -629,9 +647,9 @@ const AI={
     const E=m.rage;if(m.hopT>0)m.hopT-=dt;
     if(m.st==='leap'){m.t-=dt;const p=Math.min(1,1-m.t/m.dur);m.x=m.sx+(m.tx-m.sx)*p;m.y=m.sy+(m.ty-m.sy)*p;m.lift=Math.sin(p*Math.PI)*.6;clamp(m,m.r);if(m.t<=0){m.lift=0;m.st='idle';m.t=Math.max(m.t,.5)}return}
     if(m.st==='wind'){if((m.t-=dt)<=0){
-      const lob=(x,y,r,dur)=>{const z=zone(x,y,r,dur,m);z.sx=m.x;z.sy=m.y},lx=P.x+(P.vx||0)*.55,ly=P.y+(P.vy||0)*.55,b=rand()*TAU;
-      lob(P.x,P.y,64,1.05);lob(lx,ly,60,1.2);
-      for(let i=0;i<(E?3:1);i++){const g=b+i*TAU/3;lob(P.x+Math.cos(g)*125,P.y+Math.sin(g)*125,58,1.35)}
+      const lob=(x,y,r,dur)=>{const z=zone(x,y,r,dur,m);z.sx=m.x;z.sy=m.y},lx=T.x+(T.vx||0)*.55,ly=T.y+(T.vy||0)*.55,b=rand()*TAU;
+      lob(T.x,T.y,64,1.05);lob(lx,ly,60,1.2);
+      for(let i=0;i<(E?3:1);i++){const g=b+i*TAU/3;lob(T.x+Math.cos(g)*125,T.y+Math.sin(g)*125,58,1.35)}
       sfx(240,.25,'triangle',.2,90);m.st='idle';m.t=E?1.2:1.7;m.rest=1}return}
     if(m.rest>0)m.rest-=dt;else if(move(m,d<170?a+Math.PI:d>330?a:a+Math.PI/2*m.side,(d<170?62:70)/mspd(),dt))m.side*=-1; // it sits where it threw from for a second: the opening for anyone on foot
     if(d<m.r+78&&!(m.hopT>0)){m.hopT=6;zone(m.x,m.y,m.r+60,.8,m);
@@ -641,10 +659,10 @@ const AI={
   },
   // Grave Caller: raises husks and cannot be hurt while two or more of them stand. Thin them out and it is open until it has raised the next lot.
   summoner(m,dt,a,d){
-    const E=m.rage,full=E?4:3;let mine=0;for(const x of mons)if(x.owner===m)mine++;
+    const E=m.rage,full=E?4:3;let mine=0;if(SIDE)mine=broodN(m);else for(const x of mons)if(x.owner===m)mine++;
     if(mine>=2)m.ward=Math.max(m.ward,.15);
     if(m.st==='wind'){if((m.t-=dt)<=0){
-      for(let i=mine;i<full;i++){const g=a+(i-(full-1)/2)*.7,h=spawn('husk',m.x+Math.cos(g)*(m.r+34),m.y+Math.sin(g)*(m.r+34));h.owner=m;h.t=0;puff(h,'#7fd66b',8)}
+      for(let i=mine;i<full;i++){const g=a+(i-(full-1)/2)*.7,h=brood(m,'husk',m.x+Math.cos(g)*(m.r+34),m.y+Math.sin(g)*(m.r+34));if(!h)break;if(!SIDE)h.owner=m;h.t=0;puff(h,'#7fd66b',8)}
       sfx(140,.5,'sawtooth',.2,70);m.st='idle';m.t=E?4:5}return}
     if(m.slide>0)m.slide-=dt;
     if(move(m,m.slide>0?a+Math.PI/2*m.side:d<230?a+Math.PI:d>380?a:a+Math.PI/2*m.side,d<230?80:60,dt)){m.side*=-1;m.slide=.7}
@@ -658,11 +676,11 @@ const AI={
       if((m.sh=(m.sh||1.2)-dt)<=0){m.sh=E?1.6:2.3;for(const k of[-.22,0,.22])shoot(m.x,m.y,a+k,185);sfx(520,.1,'sine',.15,260)}
       if((m.t-=dt)<=0){m.st='wind';m.t=.95;m.ba=a;sfx(900,.9,'sine',.12,1500)}}
     else if(m.st==='wind'){if(m.t>.4)m.ba=a; // the line locks before it fires, so stepping off it at the last moment works
-      if((m.t-=dt)<=0){m.st='beam';m.t=E?3:2.4;m.bs=Math.sin(a-m.ba)>=0?1:-1;S.shake=Math.max(S.shake,.15);sfx(110,.5,'sawtooth',.25,70);noise(.4,.2,2400,600)}}
+      if((m.t-=dt)<=0){m.st='beam';m.t=E?3:2.4;m.bs=Math.sin(a-m.ba)>=0?1:-1;quake(.15);sfx(110,.5,'sawtooth',.25,70);noise(.4,.2,2400,600)}}
     else{m.ba+=m.bs*(E?.8:.68)*dt;if((m.t-=dt)<=0){m.st='idle';m.t=E?1.3:1.9;m.beam=null;return}}
     if(m.st==='idle')return;
     const n=E?2:1,on=m.st==='beam';if(!m.beam||m.beam.rays.length!==n)m.beam={on,w:12,rays:Array.from({length:n},()=>({a:0,len:0}))};
-    m.beam.on=on;m.beam.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(on&&segDist(P,m.x,m.y,r.a,r.len)<m.beam.w+9)hurtP(blow(0),'beam')});
+    m.beam.on=on;m.beam.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(on){if(SIDE)beamHits(m,r);else if(segDist(P,m.x,m.y,r.a,r.len)<m.beam.w+9)hurtP(blow(0),'beam')}});
   },
   burrower(m,dt,a){
     const E=m.rage;
@@ -674,21 +692,21 @@ const AI={
       if((m.t-=dt)<=0){m.st='under';m.hidden=true;m.t=1.2+rand()*.8}}
   },
   mimic(m,dt,a){
-    const E=boss&&boss.rage;
+    const E=SIDE?m.rage:boss&&boss.rage,main=SIDE?!m.minion:m.boss;
     if(move(m,a+m.side*1.3,E?118:95,dt))m.side*=-1;
-    if((m.t-=dt)<=0){if(E&&m.boss)for(const k of[-.25,0,.25])shoot(m.x,m.y,a+k,190);else shoot(m.x,m.y,a,190);m.t=1.6+rand()*1.2}
+    if((m.t-=dt)<=0){if(E&&main)for(const k of[-.25,0,.25])shoot(m.x,m.y,a+k,190);else shoot(m.x,m.y,a,190);m.t=1.6+rand()*1.2}
     if(m.boss&&has('smell')&&rand()<dt*14)bits.push({x:m.x+rand()*20-10,y:m.y-m.r,vx:rand()*20-10,vy:-30-rand()*20,life:.9,max:.9,c:'#a6e06b',r:3})
   },
   hollow(m,dt,a){
     const ph=m.phase||1,crown=m.s.crown,g=[1,.8,.65][ph-1];
     if(m.vol>0&&(m.vol-=dt)<=0){ringShot(m,12,160,a+.26*m.volN);if(--m.volN>0)m.vol=.32}
     if(m.spiral>0){m.spiral-=dt;if((m.spT-=dt)<=0){m.spT=.11;m.spA+=.33;for(let i=0,n=crown&&ph>=3?4:2;i<n;i++)shoot(m.x,m.y,m.spA+i*TAU/n,170)}}
-    if(m.chase>0&&(m.chT-=dt)<=0){m.chT=.4;m.chase--;zone(P.x,P.y,62,.8,m)}
+    if(m.chase>0&&(m.chT-=dt)<=0){m.chT=.4;m.chase--;zone(T.x,T.y,62,.8,m)}
     if(m.st==='idle'){move(m,a,[62,84,100][ph-1],dt);if((m.t-=dt)<=0){const k=m.n++%(ph>1||crown?5:4);
       if(k===0){m.st='wind';m.t=ph>=3?.5:.7;m.again=0}
       else if(k===1){ringShot(m,12,160,a);m.volN=ph-1;if(m.volN)m.vol=.32;m.t=1.4*g}
-      else if(k===2){zone(P.x,P.y,85,.9,m);for(let i=0;i<3;i++){const b=a+i*TAU/3;zone(P.x+Math.cos(b)*150,P.y+Math.sin(b)*150,70,1.25,m)}if(ph>=2){m.chase=crown?4:2;m.chT=.7}m.t=1.6*g}
-      else if(k===3){for(let i=0;i<=ph;i++)if(mons.length<5+ph){const b=rand()*TAU;spawn('mite',m.x+Math.cos(b)*50,m.y+Math.sin(b)*50)}m.t=1.2*g}
+      else if(k===2){zone(T.x,T.y,85,.9,m);for(let i=0;i<3;i++){const b=a+i*TAU/3;zone(T.x+Math.cos(b)*150,T.y+Math.sin(b)*150,70,1.25,m)}if(ph>=2){m.chase=crown?4:2;m.chT=.7}m.t=1.6*g}
+      else if(k===3){for(let i=0;i<=ph;i++)if(broodOk(m,5+ph)){const b=rand()*TAU;brood(m,'mite',m.x+Math.cos(b)*50,m.y+Math.sin(b)*50)}m.t=1.2*g}
       else{m.spiral=1.5;m.spT=0;m.spA=a;m.t=1.9*g}}}
     else chargeStates(m,dt,a,.9*g,ph>=3);
   },
@@ -707,10 +725,11 @@ function hurtM(m,d,quiet){
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
   if(m.markT>0)d*=1.5;
+  // (the three-phase bosses shed morsels as their health falls: the Hollow at every fifth, the King and the tyrants at every eighth, because their fight is long and their blows are heavy)
   const before=m.hp;m.hp-=d;ST.dmgDealt+=Math.max(0,Math.min(d,before));
-  if(byPet){PETS.dmg+=Math.max(0,Math.min(d,before));const a=byPet;if(a.perk==='vampiric'&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<.6)){a.vAt=S.t;a.hp=Math.min(a.maxHp,a.hp+Math.ceil(a.maxHp*.03))}}
+  if(byPet){PETS.dmg+=Math.max(0,Math.min(d,before));const a=byPet;if(a.pet&&a.mods.includes('vampiric')&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<4)&&(a.vSum||0)<a.maxHp*.16){const h=Math.min(a.maxHp-a.hp,a.maxHp*.02);a.hp+=h;a.vAt=S.t;a.vSum=(a.vSum||0)+h;puff(a,'#b8263d',8,120)}} // 2% of its health, at most once in four seconds, 16% in a level: the monsters' own rule
   m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(d),life:.7,c:'#e7dfcd'});
-  const ch=m.maxHp/5;if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({x:m.x,y:m.y});
+  const ch=m.maxHp/(m.s.crown?8:5);if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({x:m.x,y:m.y});
   if(m.boss&&m.hp>0){if(m.ai==='hollow'){const ph=m.hp<=m.maxHp/3?3:m.hp<=m.maxHp*2/3?2:1;if(ph>(m.phase||1)){m.phase=ph;phaseShift(m)}}else if(!m.rage&&m.hp<=m.maxHp*.4)enrage(m)}
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
   if(m.mods.length&&m.hp>0){
@@ -888,24 +907,61 @@ function playerStep(dt){
 }
 
 /* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
-// PETS.roster holds as many as you have taken: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
-// as many as your mana can hold (see PCOST: each one out keeps that much of the pool locked; the wolf and the thralls cost nothing). There is no limit on the roster and none on the field but the pool.
-// Several pets share the work: each has the bite of petK(n) = n^-PEXP of a lone pet when n are out, so the whole field hits like n^(1-PEXP) lone pets (1, 1.37, 1.64, 1.87, 2.06 ... 2.8 for ten, 3.9 for twenty, 5.8 for fifty),
-// and the health of petKh(n) = n^-PHEXP of a lone pet (a big field is made of smaller bodies, but not as small as their bite).
-// In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
-// PETS.auto: fallen pets are raised again from the free pool (the toggle on the pets screen). PETS.fallen: the entries that are down, in the order they fell. PETS.fieldCount: how many pets or familiars stand in the arena now (information only).
-const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],fallen:[],auto:true,get form(){return form()||'pet'},get fieldCount(){let n=0;for(const a of allies)if((a.pet||a.trophy)&&!a.minion)n++;return n}},
-  PETSANE=2000,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PEXP=.55,PHEXP=.2,MINIONS=4;
-const petK=n=>Math.pow(Math.max(1,n),-PEXP),petKh=n=>Math.pow(Math.max(1,n),-PHEXP);
+// A bound pet IS that monster, fighting for you. It runs the monster's own AI (the AI table above, with SIDE set): the same attacks, timings and patterns, the same rage below 40% health,
+// the three phases of a tyrant or the King, and every modifier it carried (m.mods), all aimed at monsters.
+// PETS.roster holds as many as you have taken: {kind (SPEC id), ai, name, col, r, lv (the level it was bound on, 0-based), mods (its modifiers), plv (pet level), perk (mods[0], kept for the HUD and the trophy forms), crown}.
+// PETS.active lists the roster indices of those that go with you, in order: as many as your mana can hold. There is no limit on the roster and none on the field but the pool.
+//
+// Its strength is the monster's, not yours:
+//   health  = the health it was generated with on level lv            x GROW x LVL  (x1.4 for a Lich)
+//   a blow  = the share of a player's health its blow took on level lv (blowAt(lv)/PHP(lv): a brush 10%, a bolt 19%, a telegraphed blow 31%)
+//             x PETK x GREF(level it stands at)                        x LVL        (x thrall-and-pet trinket, Legion, Reaper)
+//   GREF(n) = the health of the reference ordinary monster of level n (560 x genMul(n); 115 on levels 9-12)
+//   PETK    = .03: THE conversion from the player's health scale to the monsters'. A blow that would take a share s of a typical player's health takes s x 3% of an ordinary monster's health of that level.
+//             The same conversion is used the other way: a monster's blow on a pet costs the pet blow/PHP(now) x PETK x GREF(now).
+//   it stands at level Le = lv + PGROW x (now - lv): an old pet makes up 60% of the levels since it was bound. GROW = GREF(Le)/GREF(lv). LVL = 1 + 3% per pet level (one per fight it joins, 25 at most).
+// Nothing is divided by the number of pets out. What limits the field is mana: a pet holds C0(n) x REL of the pool while it is out, where C0 = 16 + 0.45 per level past the ninth (it keeps step with a pool that is not built for pets) is what a fresh ordinary
+// monster of the level you are on would hold, and REL = its power relative to that monster: GREF(Le)/GREF(now) x LVL x PATK[kind] (x PCROWNK for a tyrant or the King, x PMODK for a swift or a burning one), never less than PMIN.
+// A fallen pet rises again REVT seconds later beside you at REVHP of its health for REVK x what it holds, from the free pool, and REVUP times more each further time in one level.
+// PETS.auto: fallen pets are raised again from the free pool (the toggle on the pets screen). PETS.fallen: the entries that are down, in the order they fell. PETS.fieldCount: how many pets or familiars stand in the arena now.
+// PETS.info(e): {power, cost, revive, hp, hit:[brush, bolt, blow], lv, at} of a roster entry as things stand, for the screens.
+const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],fallen:[],auto:true,get form(){return form()||'pet'},get fieldCount(){let n=0;for(const a of allies)if((a.pet||a.trophy)&&!a.minion)n++;return n},info:e=>petInfo(e)},
+  PETSANE=2000,PLVMAX=25,MINIONS=60,PETK=.03,PGROW=.6,PLVK=.03,PMIN=5,REVK=1.25,STREF=115;
+// How hard each kind hits as a pet, measured (r7-balance/atk.js): the damage one of them does alone against a boss of its own level, relative to the middle of the pool. Only the mana it holds follows from this (and the power shown).
+// PCROWNK: a tyrant or the King also hits a tenth harder (BOSSDMG) and has several times the health. PMODK: what the modifiers that add damage are worth.
+const PATK={crawler:2.2,hound:.7,witch:.95,fist:1.4,mother:1,burrower:2.3,bomber:1.75,summoner:1,beamer:.95,mimic:.95,hollow:2.7,mite:.3},PCROWNK=1.45,PMODK={swift:1.1,burning:1.12};
+const petK=n=>Math.pow(Math.max(1,n),-.55); // familiars only: several share the work (pets do not)
+const GREF=n=>{const g=560*genMul(Math.max(12,n));return n>=12?g:n<=11?STREF:STREF+(g-STREF)*(n-11)};
+const petScale=n=>PETK*GREF(n)/PHP(n); // what one point of a blow in the player's measure is on the monsters' scale, on level n
+const C0=n=>16+.45*Math.max(0,n-8);
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
 // the forms that are held with mana: pets and familiars. The other trophies cost nothing and go one at a time.
 const resvForm=()=>{const f=form();return f==='pet'||f==='familiar'?f:null};
+const petLe=e=>e.lv+PGROW*Math.max(0,S.level-e.lv),petLvl=e=>1+PLVK*e.plv;
+const petAtk=e=>{let k=(PATK[e.ai]||1)*(e.crown?PCROWNK:1);for(const m of e.mods||[])k*=PMODK[m]||1;return k};
+// its power relative to a fresh ordinary monster of the level you stand on, and the number shown for it (100 = an ordinary monster of level 13)
+const petRel=e=>GREF(petLe(e))/GREF(S.level)*petLvl(e)*petAtk(e);
+const petPower=e=>Math.max(1,Math.round(100*GREF(petLe(e))/GREF(12)*petLvl(e)*petAtk(e)));
+// the health it was generated with on the level it was bound (without the cut a level with packs takes)
+function petHp0(e){
+  if(e.lv<LEVELS.length&&LEVELS[e.lv].boss===e.kind)return SPEC[e.kind].hp;
+  let hp=GREF(e.lv)*(GENHP[e.ai]||560)/560*(e.crown?TYRHP*(e.lv>=59?TYRLATE:1):1);for(const k of e.mods||[])hp*=MODHP[k]||1;return hp;
+}
+const petHp=e=>Math.max(6,Math.round(petHp0(e)*GREF(petLe(e))/GREF(e.lv)*petLvl(e)*(S.adv==='lich'?1.4:1)));
+// what its blows do: [a brush, a bolt or a beam, a telegraphed blow]
+function petDu(e){
+  const k=PETK*GREF(petLe(e))/PHP(e.lv)*petLvl(e)*(1+eqv('thr')/100)*(S.cls==='necro'?1+.04*S.b.spec:1)*(S.adv==='reaper'?2:1);
+  return[-1,0,1].map(h=>Math.max(.05,Math.round(blowAt(e.lv,h)*k*100)/100));
+}
 // what one of them holds while it is out, and what it costs to raise it again after it fell (dearer each time within a level)
-const petCost=e=>{const f=resvForm();return f?Math.max(1,Math.round((e.crown?PCROWN:PCOST)[f]*(f==='pet'&&(S.adv==='lich'||S.adv==='beastmaster')||f==='familiar'&&S.adv==='archmage'?.8:1))):0};
-const reviveCost=e=>Math.round((e.crown?REVCROWN:REVIVE)*Math.pow(REVUP,e.revN||0));
+const petCost=e=>{const f=resvForm();if(!f)return 0;
+  if(f==='familiar')return Math.max(1,Math.round((e.crown?PCROWN:PCOST).familiar*(S.adv==='archmage'?.8:1)));
+  return Math.max(PMIN,Math.round(C0(S.level)*petRel(e)*(S.adv==='lich'||S.adv==='beastmaster'?.8:1)))};
+const reviveCost=e=>Math.round(petCost(e)*REVK*Math.pow(REVUP,e.revN||0));
+const petInfo=e=>({power:petPower(e),cost:petCost(e),revive:reviveCost(e),hp:petHp(e),hit:petDu(e),lv:e.lv,at:petLe(e)});
 const petCap=()=>resvForm()?1e9:form()?1:0;
 // how strong a roster entry is, for sorting and for "fill from the strongest down"
-const petRank=e=>(e.crown?1e4:0)+e.plv*10+(e.perk?5:0)+e.r/100;
+const petRank=e=>form()==='pet'?petPower(e):(e.crown?1e4:0)+e.plv*10+(e.perk?5:0)+e.r/100;
 // the roster entries that go with you, in order: everything on the active list that the pool can hold
 const petOn=()=>{const out=[],f=form();if(!f)return out;const rs=resvForm(),M=rs?manaMax():0;let sum=0;
   for(const i of PETS.active){const e=PETS.roster[i];if(!e)continue;if(rs){const c=petCost(e);if(sum+c>M)continue;sum+=c}else if(out.length)break;out.push(e)}return out};
@@ -921,48 +977,93 @@ function petTrim(){
   PETS.active=A;return out;
 }
 const petTag=e=>e.name+(e.plv?' +'+e.plv:'');
-const PERK={swift:'moves and acts faster',shielded:'takes less damage',burning:'hits harder',vampiric:'heals itself when it hits',thorned:'hurts whatever touches it',splitting:'gets up once after it falls'};
-const PETDO={crawler:'It lunges at its prey.',hound:'It charges through its prey.',witch:'It throws bolts from a distance.',fist:'It leaps and slams the ground.',mother:'It hatches mites that fight for you.',burrower:'It digs under its prey and erupts.',bomber:'It lobs bombs.',summoner:'It raises husks that fight for you.',beamer:'It sweeps a beam across the room.',mimic:'It circles its prey and throws bolts.',hollow:'It throws rings of bolts.',mite:'It bites.'};
-// tougher kinds make tougher pets
-const petTough=k=>Math.sqrt((GENHP[k]||560)/560);
-const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col,crown:e.crown?1:0,r:Math.round(Math.max(16,Math.min(30,e.r*.8)))});
-// A pet is rescaled every time it enters a fight: its health follows yours and its blows follow your damage, so an old pet keeps pace and a new one is no stronger.
-const petHp=(e,k=1)=>Math.max(6,Math.round(P.maxHp*PETHP*k*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
-const petPow=a=>(PETD[a.owner]||1)*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
-function makePet(e,frac=1,owner=petOwner(),k=1,slot=0,n=1){
-  const s=petSpec(e),g=n>1?slot/n*TAU+rand()*.5:rand()*TAU,hp=petHp(e,petKh(n)),far=n>12?46+rand()*70:n>4?62:46,lag=Math.min(.45,1.5/n);
-  const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*far,y:P.y+Math.sin(g)*far,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
-    st:'idle',t:1.2+slot*lag,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:slot*lag*.66,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
+const PERK={swift:'Swift: it acts faster',shielded:'Shielded: every nine seconds a ward closes round it and nothing can hurt it for a while',burning:'Burning: the ground at its feet bursts into fire and burns monsters near it',vampiric:'Vampiric: it heals when it wounds a monster',thorned:'Thorned: each fifth of its health it loses throws a ring of thorns',splitting:'Splitting: wounded, it sheds a lesser copy of itself that fights for you, twice'};
+const PETDO={crawler:'It stalks its prey, spits three bolts and lunges; enraged, it lunges twice and throws a ring.',hound:'It circles, then charges through its prey; enraged, it charges twice.',witch:'It keeps its distance and throws fans and rings of bolts; enraged, more of them, and it blasts the ground.',fist:'It leaps and slams the ground, and every third slam cracks the ground around it.',mother:'It hatches mites that bite, and spits.',burrower:'It digs under its prey, erupts in a ring of bolts and spits while it is up.',bomber:'It lobs bombs where its prey is and where it is going.',summoner:'It raises husks, and nothing can hurt it while two of them stand.',beamer:'It throws bolts, then sweeps a beam across the room; enraged, two beams.',mimic:'It circles its prey and throws bolts.',hollow:'It charges, throws rings and spirals of bolts, cracks the ground and calls mites, in three phases as its health falls.',mite:'It bites.'};
+const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col,crown:e.crown?1:0,r:Math.round(Math.max(16,Math.min(e.crown?36:30,e.r*.8)))});
+const petCol=a=>a.owner==='necro'?'#7fd66b':'#8fd3ff';
+// what a modifier needs on the body that carries it (monsters get the same from arm)
+function petArm(a){if(a.mods.includes('swift'))a.spdK=1.12;a.shT=5;a.burnT=2.5;a.fifth=4;a.thornT=0;a.splitN=2}
+function makePet(e,frac=1,owner=petOwner(),slot=0,n=1){
+  const s=petSpec(e),g=n>1?slot/n*TAU+rand()*.5:rand()*TAU,hp=petHp(e),far=n>12?46+rand()*70:n>4?62:46,lag=Math.min(.45,1.5/n);
+  const a={kind:'pet',pet:true,owner:owner||'necro',e,k:1,slot,s,ai:AI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*far,y:P.y+Math.sin(g)*far,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
+    st:'idle',t:1.2+slot*lag,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,ring:0,hits:0,hidden:false,lift:0,seed:rand()*9,life:1e9,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,mods:(e.mods||[]).slice(),ward:0,beam:null,boss:false,moving:false,
+    du:petDu(e),touch:new Map(),rage:false,phase:1};
+  petArm(a);
+  // one that comes back wounded comes back as far gone as it is
+  if(a.ai==='hollow'){a.phase=a.hp<=hp/3?3:a.hp<=hp*2/3?2:1;a.rage=a.phase>=3}else a.rage=a.hp<=hp*.4;
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);return a;
 }
-// what a mother or a caller pet raises: small, short-lived, cannot be hurt
-function petMinion(a,kind,dmg,life){
-  const g=rand()*TAU,s={...SPEC[kind],ai:'mite',col:a.s.col},m={kind:'pet',pet:true,minion:true,trophy:!!a.trophy,par:a,owner:a.trophy?'beast':a.owner,s,ai:'mite',name:s.name,plv:0,x:a.x+Math.cos(g)*(a.r+16),y:a.y+Math.sin(g)*(a.r+16),r:s.r,hp:1,maxHp:1,
+// what a pet's AI raises (mites, husks) and what a splitting pet sheds: small bodies on your side. They bite, they can be killed, and they go when their parent goes.
+const broodN=a=>{const p=a.par||a;let n=0;for(const x of allies)if(x.par===p&&x.life>0)n++;return n};
+const minionN=()=>{let n=0;for(const x of allies)if(x.minion&&x.life>0)n++;return n};
+// may this body raise one more: a monster while fewer than `cap` monsters stand (itself included), a pet while it has fewer than cap-1 of its own (and all pets together fewer than MINIONS, so a huge field stays playable)
+const broodOk=(m,cap)=>SIDE?broodN(m)<cap-1&&minionN()<MINIONS:mons.length<cap;
+function brood(m,kind,x,y){
+  if(!SIDE)return spawn(kind,x,y);
+  if(minionN()>=MINIONS)return null;
+  const p=m.par||m,s={...SPEC[kind],ai:'mite',col:p.s.col},hp=petScale(S.level)*blow(-1)*(kind==='husk'?2.2:1.5); // a mite on your side dies to a bolt, a blast or a second brush, as theirs do to you
+  const c={kind:'pet',pet:true,minion:true,par:p,owner:p.owner,s,ai:'mite',name:s.name,plv:0,x,y,r:s.r,hp,maxHp:hp,st:'idle',t:1,n:0,ang:rand()*TAU,face:0,flash:0,ring:0,hits:0,hidden:false,lift:0,seed:rand()*9,life:1e9,walk:0,flip:false,inv:0,side:1,
+    mods:[],ward:0,beam:null,boss:false,moving:false,du:p.du,touch:new Map(),rage:false,phase:1};
+  clamp(c,c.r);if(obstacles.length)collide(c,c.r,true);allies.push(c);puff(c,petCol(p),6);return c;
+}
+function petLesser(a){
+  if(minionN()>=MINIONS)return null;
+  const g=rand()*TAU,base=SPEC[a.e?a.e.kind:a.ai]||a.s,s={...a.s,name:'Lesser '+base.name.replace('The ',''),r:Math.max(10,Math.round(a.r*.72)),crown:0},hp=Math.max(.1,a.maxHp*.07);
+  const c={kind:'pet',pet:true,minion:true,lesser:true,par:a,owner:a.owner,s,ai:a.ai,name:s.name,plv:0,x:a.x+Math.cos(g)*(a.r+30),y:a.y+Math.sin(g)*(a.r+30),r:s.r,hp,maxHp:hp,st:'idle',t:1+rand()*.6,n:0,ang:g,face:g,flash:0,ring:0,hits:0,hidden:false,lift:0,seed:rand()*9,life:1e9,
+    walk:0,flip:false,inv:0,side:1,mods:[],ward:0,beam:null,boss:false,moving:false,du:a.du,touch:new Map(),rage:false,phase:1,spdK:.8};
+  clamp(c,c.r);if(obstacles.length)collide(c,c.r,true);allies.push(c);puff(c,col(a.s.col),10);return c;
+}
+// the small helpers a trophy raises (mother, caller): short-lived, cannot be hurt, bite for a set amount. These are not pets and keep the old rules.
+function troMinion(a,kind,dmg,life){
+  const g=rand()*TAU,s={...SPEC[kind],ai:'mite',col:a.s.col},m={kind:'pet',pet:true,minion:true,helper:true,trophy:!!a.trophy,par:a,owner:a.trophy?'beast':a.owner,s,ai:'mite',name:s.name,plv:0,x:a.x+Math.cos(g)*(a.r+16),y:a.y+Math.sin(g)*(a.r+16),r:s.r,hp:1,maxHp:1,
     st:'idle',t:0,n:0,ang:g,face:g,flash:0,hidden:false,lift:0,seed:rand()*9,life,cd:.3,walk:0,flip:false,inv:0,side:1,mods:[],ward:0,beam:null,boss:false,moving:false,dk:dmg};
   clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);allies.push(m);puff(m,a.owner==='necro'?'#7fd66b':'#8fd3ff',6);return m;
 }
 const minions=a=>{let n=0;for(const x of allies)if(x.par===a&&x.life>0)n++;return n};
-// a pet may raise one more while it has fewer than `per` of its own and all pets together have fewer than MINIONS
-const minionRoom=(a,per)=>{let all=0;for(const x of allies)if(x.minion&&x.life>0)all++;return all<MINIONS&&minions(a)<per};
+// a trophy may raise one more helper while it has fewer than `per` of its own and all of them together are fewer than four
+const minionRoom=(a,per)=>{let all=0;for(const x of allies)if(x.helper&&x.life>0)all++;return all<4&&minions(a)<per};
 let byPet=null;
 // a coarse grid of the pets that stand in the arena, rebuilt once a step: neighbours are found through it instead of by looking at every other pet
 const PG=new Map(),PGC=80;
 function petGrid(){PG.clear();for(const a of allies){if(!a.pet||a.minion||a.life<=0)continue;const k=Math.floor(a.x/PGC)+Math.floor(a.y/PGC)*64;let c=PG.get(k);if(!c)PG.set(k,c=[]);c.push(a)}}
-// every blow a pet lands goes through here, so it can be counted and so perks can react
+// every blow a pet lands goes through here, so it can be counted and so a vampiric pet can feed
 function petHit(m,d,a){if(!mons.includes(m))return;byPet=a||true;hurtM(m,d,true);byPet=null;leech()}
 function petShot(a,g,spd,dmg,r=4,pierce=0){pshots.push({x:a.x+Math.cos(g)*a.r*.8,y:a.y+Math.sin(g)*a.r*.8,vx:Math.cos(g)*spd,vy:Math.sin(g)*spd,r,dmg,kind:a.owner==='necro'?'skull':'bolt',pierce,hit:new Set(),sx:a.x,sy:a.y,pet:a})}
 function petBlast(a,at,r,dur,dmg){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,pet:a};clamp(z,10);zones.push(z);return z}
+// a pet's beam: everything it lies across is burned like a bolt, each monster at most once a second (as you are, by theirs)
+function beamHits(a,r){const ms=mons;for(const m of ms)if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r-4&&petTouch(a,m,'b'))petHit(m,a.du[1],a.par||a)}
+// one pet can hurt one monster by touch (or by beam) once a second, the way your own second of grace works against them
+function petTouch(a,m,k){const T2=k?(a.touchB||(a.touchB=new Map())):a.touch,l=T2.get(m);if(l!==undefined&&S.t-l<1)return false;if(T2.size>40)T2.clear();T2.set(m,S.t);return true}
+function petRage(a){a.rage=true;a.flash=.3;rings.push({x:a.x,y:a.y,life:.6,max:.6,r:a.r+90,fx:true});puff(a,petCol(a),18,220);floats.push({x:a.x,y:a.y-a.r-18,txt:a.name+' rages',life:1.4,c:petCol(a)});sfx(110,.5,'sawtooth',.12,55)}
+// a tyrant or the King on your side changes phase as it would against you: a moment of ward, a ring, two mites, and rage in the third
+function petPhase(a){
+  const was=SIDE;SIDE=a;
+  if(a.phase>=3)petRage(a);else{a.flash=.3;rings.push({x:a.x,y:a.y,life:.6,max:.6,r:a.r+90,fx:true});puff(a,petCol(a),18,220);floats.push({x:a.x,y:a.y-a.r-18,txt:a.name+' changes',life:1.4,c:petCol(a)});sfx(110,.5,'sawtooth',.12,55)}
+  a.ward=1;a.st='idle';a.t=1;a.again=0;a.lift=0;a.beam=null;ringShot(a,14,150,rand()*TAU);
+  for(let i=0;i<2;i++)if(broodOk(a,8)){const b=rand()*TAU;brood(a,'mite',a.x+Math.cos(b)*50,a.y+Math.sin(b)*50)}
+  SIDE=was;
+}
+// d: a blow in the player's measure (blow()); it lands on the monsters' scale
 function hurtPet(a,d){
-  if(a.minion||a.inv>0||a.hidden||a.st==='leap'||a.hp<=0||S.mode!=='play')return;
-  if(a.perk==='shielded')d=Math.max(1,Math.round(d*.7));
-  a.hp-=d;a.inv=1.4;a.flash=.15;puff(a,col(a.s.col),5,120);floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+d,life:.6,c:'#ffb3bf'});
-  if(a.hp>0)return;
-  if(a.up){a.up=false;a.hp=Math.ceil(a.maxHp/2);a.inv=1.5;puff(a,'#d6a544',14,180);floats.push({x:a.x,y:a.y-a.r-20,txt:'Gets up',life:1.2,c:'#d6a544'});return}
-  a.hp=0;a.life=0;a.beam=null;a.e.down=true;a.e.frac=0;a.e.revT=REVT;if(!PETS.fallen.includes(a.e))PETS.fallen.push(a.e);PETS.down=petOn().every(e=>e.down);puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
+  if(a.helper||a.inv>0||a.hidden||a.st==='leap'||a.hp<=0||a.life<=0||S.mode!=='play')return;
+  if(a.ward>0)return;
+  d=Math.max(.1,Math.round(d*petScale(S.level)*10)/10);
+  a.hp-=d;a.inv=1;a.flash=.15;puff(a,col(a.s.col),5,120);if(!a.minion||a.lesser)floats.push({x:a.x,y:a.y-a.r-8,txt:'-'+fmt(d),life:.6,c:'#ffb3bf'});
+  if(a.hp>0){
+    if(a.minion)return;
+    if(a.ai==='hollow'){const ph=a.hp<=a.maxHp/3?3:a.hp<=a.maxHp*2/3?2:1;if(ph>(a.phase||1)){a.phase=ph;petPhase(a)}}else if(!a.rage&&a.hp<=a.maxHp*.4)petRage(a);
+    if(a.mods.length){
+      if(a.mods.includes('thorned')){const t=Math.floor(a.hp/a.maxHp*5);if(t<a.fifth&&!(a.thornT>0)){a.fifth=t;a.thornT=.6;rings.push({x:a.x,y:a.y,life:.6,max:.6,r:a.r+60,fx:true});floats.push({x:a.x,y:a.y-a.r-18,txt:'Thorns',life:.9,c:petCol(a)})}}
+      if(a.mods.includes('splitting')&&a.splitN>0&&a.hp<=a.maxHp*a.splitN/3){a.splitN--;petLesser(a);rings.push({x:a.x,y:a.y,life:.5,max:.5,r:a.r+70,fx:true});floats.push({x:a.x,y:a.y-a.r-18,txt:'It splits',life:1.3,c:petCol(a)})}
+    }
+    return}
+  a.hp=0;a.life=0;a.beam=null;
+  if(a.minion){puff(a,col(a.s.col),8,140);return}
+  a.e.down=true;a.e.frac=0;a.e.revT=REVT;if(!PETS.fallen.includes(a.e))PETS.fallen.push(a.e);PETS.down=petOn().every(e=>e.down);puff(a,col(a.s.col),22,220);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40);
 }
 // who a pet goes for: the nearest monster above ground, but the boss unless something small is close, and nothing warded while there is a choice
 function petTarget(a){let t=null,bd=1e9;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,a)-m.r-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}return t}
-// pets walk like monsters do: they steer round pillars and pits, and a charge (raw) reports what it ran into
+// (the helpers of the trophy forms still walk with this)
 function petMove(a,g,sp,dt,raw,dgoal=1e9){
   const room=obstacles.length&&!a.hidden,ox=a.x,oy=a.y;
   if(room&&!raw)g=steer(a,g,dgoal);
@@ -970,73 +1071,34 @@ function petMove(a,g,sp,dt,raw,dgoal=1e9){
   let hit=false;if(room&&collide(a,a.r,true)&&raw)hit=(a.x-ox)*Math.cos(g)+(a.y-oy)*Math.sin(g)<sp*dt*.35;
   return clamp(a,a.r)||hit;
 }
-// hold a distance: close in when far, back off at a slant when crowded, otherwise circle
-function petKeep(a,dt,t,g,d,lo,hi,sp){
-  const e=d-t.r;
-  if(e>hi)petMove(a,g,sp*1.7,dt,false,d);
-  else if(petMove(a,g+(e<lo?Math.PI*.72:Math.PI/2)*a.side,sp,dt,false))a.side*=-1;
+// what its modifiers do as time passes, for a monster and for a pet alike (SIDE decides whom the thorns and the fire hurt)
+function modStep(m,dt){
+  if(m.thornT>0&&(m.thornT-=dt)<=0&&!m.hidden){ringShot(m,7,150,rand()*TAU);puff(m,'#e7dfcd',10,200);sfx(500,.12,'square',.14,250)}
+  if(m.mods.length&&!(m.stun>0)){
+    if(m.mods.includes('shielded')&&(m.shT-=dt)<=0){m.shT=9;m.ward=2.5;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+50,fx:true});sfx(880,.3,'sine',.14,1320)}
+    if(m.mods.includes('burning')){if(rand()<dt*10)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y+rand()*m.r-m.r/2,vx:rand()*30-15,vy:-60-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5});
+      if((m.burnT-=dt)<=0){m.burnT=3.2;if(!m.hidden&&m.st!=='leap')zone(m.x,m.y,m.r+40,1,m)}}}
 }
-const PETAI={
-  mite(a,dt,t,g,d){if(d>t.r+a.r)petMove(a,g+Math.sin(S.t*3+a.seed)*.4,190,dt,false,d);else if(a.cd<=0){a.cd=.7;petHit(t,a.dk||petPow(a),a.par||a)}},
-  crawler(a,dt,t,g,d,D){
-    if(a.st==='idle'){const reach=t.r+a.r+56;if(d>reach)petMove(a,g,165,dt,false,d);if((a.t-=dt)<=0&&d<reach+40){a.st='wind';a.t=.3;a.ang=g}}
-    else if(a.st==='wind'){if(t)a.ang=g;if((a.t-=dt)<=0){a.st='lunge';a.t=.3;a.struck=false}}
-    else{petMove(a,a.ang,420,dt,true);if(!a.struck&&t&&d<t.r+a.r+8){a.struck=true;petHit(t,4.6*D,a)}if((a.t-=dt)<=0){a.st='idle';a.t=1.2}}
-  },
-  hound(a,dt,t,g,d,D){
-    if(a.st==='idle'){const e=d-t.r;if(e>230)petMove(a,g,180,dt,false,d);else if(petMove(a,g+(e<110?2.2:1.3)*a.side,120,dt,false))a.side*=-1;if((a.t-=dt)<=0&&e<300){a.st='wind';a.t=.45;a.ang=g}}
-    else if(a.st==='wind'){if(t)a.ang=g;if((a.t-=dt)<=0){a.st='charge';a.t=.7;a.hitS=new Set()}}
-    else if(a.st==='charge'){const hit=petMove(a,a.ang,520,dt,true);
-      for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!a.hitS.has(m)&&dist(m,a)<m.r+a.r+6){a.hitS.add(m);petHit(m,(m.boss?6.4:3)*D,a)}
-      if(hit||(a.t-=dt)<=0){a.st='dazed';a.t=hit?.7:.4}}
-    else if((a.t-=dt)<=0){a.st='idle';a.t=1.1}
-  },
-  witch(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,130,260,80);if((a.t-=dt)<=0){a.t=1.2;for(const k of[-.16,0,.16])petShot(a,g+k,380,1.1*D);sfx(520,.1,'sine',.08,260)}},
-  fist(a,dt,t,g,d,D){
-    if(a.st==='leap'){a.t-=dt;const p=Math.min(1,1-a.t/a.dur);a.x=a.sx+(a.tx-a.sx)*p;a.y=a.sy+(a.ty-a.sy)*p;a.lift=Math.sin(p*Math.PI);a.moving=true;if(a.t<=0){a.lift=0;a.st='idle';a.t=1.7;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}return}
-    if(!t)return;
-    if(d>t.r+a.r+50)petMove(a,g,120,dt,false,d);
-    if((a.t-=dt)<=0&&d<340){const k=Math.max(0,d-t.r-a.r-6),to={x:a.x+Math.cos(g)*k,y:a.y+Math.sin(g)*k};clamp(to,a.r);if(obstacles.length)collide(to,a.r,true);
-      a.st='leap';a.t=a.dur=.7;a.sx=a.x;a.sy=a.y;a.tx=to.x;a.ty=to.y;petBlast(a,t,88,.7,6*D)}
-  },
-  mother(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,230,60);if((a.t-=dt)<=0){a.t=2.2;if(minionRoom(a,3)){petMinion(a,'mite',.8*D,7);sfx(300,.12,'sine',.08,500)}}},
-  burrower(a,dt,t,g,d,D){
-    if(a.st==='idle'){a.st='under';a.t=1.5;a.hidden=true;puff(a,col(a.s.col),8)}
-    else if(a.st==='under'){const near=d<t.r+a.r+14;if(!near)petMove(a,g,200,dt,true,d);if(near||(a.t-=dt)<=0){a.st='rise';a.t=.5;if(obstacles.length){a.hidden=false;collide(a,a.r,true);a.hidden=true}petBlast(a,a,80,.5,5.4*D)}}
-    else if(a.st==='rise'){if((a.t-=dt)<=0){a.hidden=false;a.st='up';a.t=1.7;a.cd=.4;puff(a,col(a.s.col),12)}}
-    else{if(t&&a.cd<=0){a.cd=.55;petShot(a,g,380,1.3*D)}if((a.t-=dt)<=0){a.st='under';a.hidden=true;a.t=1.5}}
-  },
-  bomber(a,dt,t,g,d,D){
-    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=1.7;if(t){for(const k of[0,.6]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.85,3.3*D);z.sx=a.x;z.sy=a.y}sfx(240,.2,'triangle',.1,90)}}return}
-    petKeep(a,dt,t,g,d,160,290,70);if((a.t-=dt)<=0&&d<440){a.st='wind';a.t=.35}
-  },
-  summoner(a,dt,t,g,d,D){
-    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='idle';a.t=3;for(let i=0;i<2&&minionRoom(a,2);i++)petMinion(a,'husk',.9*D,8);sfx(140,.4,'sawtooth',.1,70)}return}
-    petKeep(a,dt,t,g,d,160,290,65);if(a.cd<=0){a.cd=1.6;petShot(a,g,360,D)}
-    if((a.t-=dt)<=0){if(minionRoom(a,2)){a.st='wind';a.t=.6}else a.t=1}
-  },
-  beamer(a,dt,t,g,d,D){
-    if(a.st==='idle'){a.beam=null;petKeep(a,dt,t,g,d,140,270,60);if(a.cd<=0){a.cd=1.3;petShot(a,g,360,.8*D)}if((a.t-=dt)<=0){a.st='wind';a.t=.6;a.ba=g}}
-    else if(a.st==='wind'){a.ba=g;if((a.t-=dt)<=0){a.st='beam';a.t=1.8;a.bk=0;sfx(110,.4,'sawtooth',.12,70)}}
-    else{a.ba+=Math.max(-1.1*dt,Math.min(1.1*dt,Math.atan2(Math.sin(g-a.ba),Math.cos(g-a.ba))));if((a.t-=dt)<=0){a.st='idle';a.t=2.2;a.beam=null;return}}
-    if(a.st==='idle')return;
-    const on=a.st==='beam';if(!a.beam)a.beam={on,w:10,rays:[{a:0,len:0}]};a.beam.on=on;const r=a.beam.rays[0];r.a=a.ba;r.len=rayLen(a.x,a.y,r.a);
-    if(on&&(a.bk-=dt)<=0){a.bk=.2;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r)petHit(m,D,a)}
-  },
-  mimic(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,120,240,95);if((a.t-=dt)<=0){a.t=.85;petShot(a,g,380,2*D,5)}},
-  hollow(a,dt,t,g,d,D){petKeep(a,dt,t,g,d,110,220,70);if((a.t-=dt)<=0){a.t=2.1;a.n++;for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,300,.7*D);for(const k of[-.14,0,.14])petShot(a,g+k,380,1.3*D,5);sfx(200,.2,'sawtooth',.1,90)}},
-};
+const MID={lunge:1,charge:1,dazed:1,leap:1,rise:1};
 function petStep(a,dt){
-  a.moving=false;if(a.flash>0)a.flash-=dt;if(a.inv>0)a.inv-=dt;if(a.avT>0)a.avT-=dt;
-  if(a.minion){a.life-=dt;if(a.par&&!(a.par.life>0))a.life=0;if(a.life<=0){puff(a,'#e7dfcd',5);return}}
-  if(a.perk==='swift')dt*=1.12;a.cd-=dt;
-  const t=petTarget(a),ox=a.x,oy=a.y;
-  if(t){const g=angTo(a,t);a.face=g;PETAI[a.ai](a,dt,t,g,dist(a,t),a.minion?0:petPow(a))}
-  else{
-    // nothing to fight: finish a move already begun, otherwise come back to its owner (or its parent)
-    if(a.st==='lunge'||a.st==='charge'||a.st==='dazed'||a.st==='leap'||a.st==='rise')PETAI[a.ai](a,dt,null,a.ang,1e9,petPow(a));
-    else{a.st='idle';a.hidden=false;a.beam=null;a.t=Math.min(a.t,.8);const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);if(d>to.r+a.r+44||!to.r&&d>70){const g=angTo(a,to);a.face=g;petMove(a,g,220,dt,false,d)}}
-  }
+  a.moving=false;if(a.flash>0)a.flash-=dt;if(a.inv>0)a.inv-=dt;
+  if(a.par&&!(a.par.life>0))a.life=0;
+  if(a.helper){ // a trophy's helper: walks up and bites, for as long as it lasts
+    a.life-=dt;if(a.life<=0){puff(a,'#e7dfcd',5);return}
+    if(a.avT>0)a.avT-=dt;a.cd-=dt;const t=petTarget(a);
+    if(t){const g=angTo(a,t),d=dist(a,t);a.face=g;if(d>t.r+a.r)petMove(a,g+Math.sin(S.t*3+a.seed)*.4,190,dt,false,d);else if(a.cd<=0){a.cd=.7;petHit(t,a.dk,a.par||a)}}
+    else{const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);if(d>(to.r||0)+a.r+44){const g=angTo(a,to);a.face=g;petMove(a,g,220,dt,false,d)}}
+    return}
+  if(a.life<=0){puff(a,col(a.s.col),6,120);return}
+  if(a.ward>0)a.ward-=dt;
+  const t=petTarget(a),ox=a.x,oy=a.y,k=aiK(a);
+  SIDE=a;
+  if(t){T=t;const g=angTo(a,t);a.face=g;a.lx=t.x;a.ly=t.y;AI[a.ai](a,dt*k,g,Math.max(0,dist(a,t)-t.r+11))}
+  else if(MID[a.st]){T={x:a.lx===undefined?a.x:a.lx,y:a.ly===undefined?a.y:a.ly,r:11,vx:0,vy:0};AI[a.ai](a,dt*k,angTo(a,T),1e9)} // nothing to fight: a move already begun is finished where its prey last stood
+  else{ // otherwise it comes back to its owner (or its parent)
+    a.st='idle';a.hidden=false;a.beam=null;a.lift=0;a.t=Math.min(a.t,.8);const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);T=to;if(d>(to.r||0)+a.r+44){const g=angTo(a,to);a.face=g;move(a,g,220,dt)}}
+  if(S.mode==='play')modStep(a,dt);
+  SIDE=null;T=P;
   if(a.st==='charge'||a.st==='lunge')a.face=a.ang;
   // pets keep a little room between them, so two never stand on one spot
   else if(!a.minion&&!a.hidden&&a.st!=='leap'&&a.st!=='dazed'){
@@ -1046,12 +1108,16 @@ function petStep(a,dt){
       for(const b of cell){if(b===a||b.hidden||b.st==='leap'||b.life<=0)continue;const dx=a.x-b.x,dy=a.y-b.y,d=Math.hypot(dx,dy),min=a.r+b.r+14;
         if(d<min){const g=d>1?Math.atan2(dy,dx):a.slot*2.1+1,p=min-d;px+=Math.cos(g)*p;py+=Math.sin(g)*p;hit++}}}
     if(hit){const l=Math.hypot(px,py),p=Math.min(l,90*dt);if(l>.01){a.x+=px/l*p;a.y+=py/l*p;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}}}
-  if(obstacles.length&&!a.hidden&&a.st!=='leap'&&a.moving){if(Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
+  if(obstacles.length&&!a.hidden&&a.st!=='leap'){collide(a,a.r,true);
+    if(a.moving&&Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
+  if(a.moving){a.walk+=dt*12;if(Math.abs(a.x-ox)>.01)a.flip=a.x<ox}
+  // its touch: a brush against a monster is a light blow, a charge or a lunge that connects is a heavy one
+  if(!a.hidden&&a.st!=='leap'&&a.st!=='dazed'&&S.mode==='play'){const ms=mons;for(const m of ms){if(m.hidden||m.decoy||dist(a,m)>=a.r+m.r-4||!mons.includes(m)||!petTouch(a,m))continue;petHit(m,a.du[a.st==='charge'||a.st==='lunge'?2:0],a.par||a)}}
 }
-// what a monster does to pets: its touch, its charge and its beam hurt them
+// what a monster does to pets: its touch, its charge and its beam hurt them, as they would hurt you
 function monVsPets(m){
-  for(const a of allies){if(!a.pet||a.minion||a.hidden||a.st==='leap'||a.inv>0||a.life<=0)continue;
-    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,a)<m.r+a.r){hurtPet(a,blow(m.st==='charge'||m.st==='lunge'?1:-1));if(a.perk==='thorned')petHit(m,1.5*petPow(a),a)}
+  for(const a of allies){if(!a.pet||a.helper||a.hidden||a.st==='leap'||a.inv>0||a.life<=0)continue;
+    if(!m.hidden&&m.st!=='leap'&&m.st!=='dazed'&&!(m.stun>0)&&dist(m,a)<m.r+a.r-4)hurtPet(a,blow(m.st==='charge'||m.st==='lunge'?1:-1));
     else if(m.beam&&m.beam.on&&!m.hidden)for(const r of m.beam.rays)if(segDist(a,m.x,m.y,r.a,r.len)<m.beam.w+a.r*.6){hurtPet(a,blow(0));break}}
 }
 // The active pets take their places beside you at the start of a level (mid false), or when the choice changes from the pause screen (mid true).
@@ -1063,9 +1129,9 @@ function fieldPets(mid){
   if(!mid){for(const e of PETS.roster){e.down=false;e.frac=undefined;e.revN=0;e.revT=0}PETS.fallen=[];
     const w=petTrim();if(w.length)S.note=(w.length>1?w.length+' pets wait':w[0].name+' waits')+': not enough mana to hold '+(w.length>1?'them':'it')}
   resvSync();
-  const on=petOn(),out=on.filter(e=>!e.down),k=petK(on.length),low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
+  const on=petOn(),out=on.filter(e=>!e.down),low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
   PETS.fallen=PETS.fallen.filter(e=>e.down&&on.includes(e));for(const e of PETS.roster)if(e.down&&!on.includes(e))e.down=false; // one that was called back while it was down is simply waiting
-  out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),k,i,out.length);if(was){a.x=was.x;a.y=was.y}
+  out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),i,out.length);if(was){a.x=was.x;a.y=was.y}
     allies.push(a);made.push(a);if(!PETS.fielded.includes(e))PETS.fielded.push(e);if(!was)puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150)});
   PETS.down=on.length>0&&on.every(e=>e.down);return made;
 }
@@ -1078,7 +1144,7 @@ function reviveStep(dt){
   const c=reviveCost(e);if(e.revT>0||P.mana<c)return;
   const on=petOn(),i=on.indexOf(e);F.shift();if(i<0){e.down=false;return}
   P.mana-=c;e.down=false;e.revN=(e.revN||0)+1;e.frac=REVHP;PETS.down=false;
-  const g=rand()*TAU,a=makePet(e,REVHP,petOwner(),petK(on.length),i,on.length);a.x=P.x+Math.cos(g)*(a.r+18);a.y=P.y+Math.sin(g)*(a.r+18);a.t=.8;a.inv=1.2;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);
+  const g=rand()*TAU,a=makePet(e,REVHP,petOwner(),i,on.length);a.x=P.x+Math.cos(g)*(a.r+18);a.y=P.y+Math.sin(g)*(a.r+18);a.t=.8;a.inv=1.2;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);
   allies.push(a);const cc=a.owner==='necro'?'#7fd66b':'#8fd3ff';puff(a,cc,18,170);rings.push({x:a.x,y:a.y,life:.5,max:.5,r:a.r+34,fx:true});
   floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' rises · -'+c+' mana',life:1.5,c:cc});sfx(196,.3,'triangle',.16,392);sfx(392,.25,'sine',.1,784,.12);haptic([20,30,40]);
 }
@@ -1087,7 +1153,7 @@ function reviveStep(dt){
 // The same roster as pets (PETS.roster, PETS.active), but the entry is not a creature that walks: the boss's signature attack is thrown by the class in its own way.
 // Fighter: a technique, after every fourth blow that lands. Tank: a ward, when hit or blocking. Assassin: a venom, on the strike after a dash and on Shadowstep.
 // Ranger (before Beastmaster): an arrowhead, on every sixth arrow that hits. Mage: familiars, on a timer. Healer: a guardian, on a timer, with a small shield.
-// Every firing goes through troFire: it deals its damage through the pets' own channels (petHit, petShot, petBlast, petMinion) and leaves an entry in `echoes` for the renderers.
+// Every firing goes through troFire: it deals its damage through the pets' own channels (petHit, petShot, petBlast, troMinion) and leaves an entry in `echoes` for the renderers.
 const FORM={fighter:'technique',tank:'ward',assassin:'venom',mage:'familiar',ranger:'arrowhead',healer:'guardian'};
 const form=()=>petOwner()?'pet':S.cls&&FORM[S.cls]||null;
 // what one firing is worth, in multiples of your damage (TRO scales every kind's attack to about one unit against a single target), and how often the timed ones fire
@@ -1103,10 +1169,10 @@ const TRO={
   hound(a,t,g,D){const len=dist(a,t)+90;for(const m of[...mons])if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,g,len)<m.r+24)petHit(m,(m===t?.95:.6)*D,a)},
   witch(a,t,g,D){troBolts(a,g,.4*D)},
   fist(a,t,g,D){petBlast(a,t,88,.45,1.15*D);return true},
-  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))petMinion(a,'mite',.07*D,7);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
+  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))troMinion(a,'mite',.07*D,7);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
   burrower(a,t,g,D){petBlast(a,t,80,.4,1.15*D);return true},
   bomber(a,t,g,D){for(const k of[0,.5]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.7,.62*D);z.sx=a.x;z.sy=a.y}},
-  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))petMinion(a,'husk',.07*D,8);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
+  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))troMinion(a,'husk',.07*D,8);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
   beamer(a,t,g,D){petShot(a,g,950,D,9,99)},
   mimic(a,t,g,D){petShot(a,g,620,1.05*D,6)},
   hollow(a,t,g,D){for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,320,.12*D,4);troBolts(a,g,.3*D)},
@@ -1168,7 +1234,7 @@ function troStrike(m,amb){
 
 /* ---------- loop ---------- */
 function step(dt){
-  S.t+=dt;if(S.shake>0)S.shake-=dt;
+  S.t+=dt;if(S.shake>0)S.shake-=dt;SIDE=null;T=P;
   for(const b of bits){b.x+=b.vx*dt;b.y+=b.vy*dt;b.vx*=.94;b.vy*=.94;b.life-=dt}bits=bits.filter(b=>b.life>0);
   for(const r of rings)r.life-=dt;rings=rings.filter(r=>r.life>0);
   for(const f of floats){f.y-=34*dt;f.life-=dt}floats=floats.filter(f=>f.life>0);
@@ -1218,11 +1284,7 @@ function step(dt){
     if(obstacles.length&&!m.hidden&&m.st!=='leap'){collide(m,m.r,true);
       // a walker that is trying to move and getting nowhere tries the other way round
       if(m.moving&&Math.hypot(m.x-ox,m.y-oy)<12*dt){if((m.stk=(m.stk||0)+dt)>.45){m.stk=0;m.avS=-(m.avS||1);m.avT=1.2;m.side*=-1}}else m.stk=0}
-    if(m.thornT>0&&(m.thornT-=dt)<=0&&!m.hidden){ringShot(m,7,150,rand()*TAU);puff(m,'#e7dfcd',10,200);sfx(500,.12,'square',.14,250)}
-    if(m.mods.length&&!(m.stun>0)){
-      if(m.mods.includes('shielded')&&(m.shT-=dt)<=0){m.shT=9;m.ward=2.5;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+50,fx:true});sfx(880,.3,'sine',.14,1320)}
-      if(m.mods.includes('burning')){if(rand()<dt*10)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y+rand()*m.r-m.r/2,vx:rand()*30-15,vy:-60-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5});
-        if((m.burnT-=dt)<=0){m.burnT=3.2;if(!m.hidden&&m.st!=='leap')zone(m.x,m.y,m.r+40,1,m)}}}
+    modStep(m,dt);
     m.vx=(m.x-ox)/dt;m.vy=(m.y-oy)/dt;
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
@@ -1231,7 +1293,7 @@ function step(dt){
   }
   if(S.mode!=='play')return;
   for(const s of shots){s.x+=s.vx*dt;s.y+=s.vy*dt;if(dist(s,P)<s.r+10){hurtP(blow(S.level<8?-1:0),'shot');s.dead=true}
-    else for(const a of allies)if(a.pet&&!(a.inv>0)&&dist(s,a)<s.r+a.r*.7)hurtPet(a,blow(-1)); // a bolt hurts a pet in its path and flies on
+    else for(const a of allies)if(a.pet&&!(a.inv>0)&&dist(s,a)<s.r+a.r*.7)hurtPet(a,blow(0)); // a bolt hurts a pet in its path and flies on
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
@@ -1637,11 +1699,25 @@ function loadout(done,fresh){
       fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>({title:c.skills[v].name,sub:'Slot '+(j+1),body:c.skills[v].text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}})),btns:[['Back',again]]})}}),
     btns:[['Done',done]]});
 }
-// what a level's boss looks like on the roster: its name without its modifiers, at most one of them kept as a perk
-function petEntry(n,L){const s=L.spec,gen=n>=LEVELS.length,ty=!!s.crown;
-  return{kind:L.kind,ai:s.ai||L.kind,name:gen&&!ty?PRE[n%10]+' '+SPEC[L.kind].name.replace('The ',''):s.name,col:s.col,r:s.r,plv:0,perk:(L.mods||[])[0]||null,crown:ty?1:0}}
+// what a level's boss looks like on the roster: its name without its modifiers, the level it was taken on, and every modifier it carried
+function petEntry(n,L){const s=L.spec,gen=n>=LEVELS.length,ty=!!s.crown,mods=(L.mods||[]).slice();
+  return{kind:L.kind,ai:s.ai||L.kind,name:gen&&!ty?PRE[n%10]+' '+SPEC[L.kind].name.replace('The ',''):s.name,col:s.col,r:s.r,plv:0,lv:n,mods,perk:mods[0]||null,crown:ty?1:0}}
+// A pet out of a save from before pets kept their level: the level it was bound on is worked out from what the save does hold. A story boss was bound on its own level, a tyrant on the tenth level of the land in its name,
+// and a generated monster's name and kind give its level exactly (the prefix repeats every 10 levels, the kind every 9): the latest such level it can have been, given how often it has grown.
+function petLvGuess(e,now){
+  const st=LEVELS.findIndex(L=>L.boss===e.kind);if(st>=8)return st;
+  const hi=Math.max(12,now-1-(e.plv||0));
+  if(e.crown){const m=/^Tyrant of (.+)$/.exec(e.name),ai=m?AREAS.findIndex(a=>a[0].replace('The ','')===m[1]):-1;let n=19+10*Math.max(0,ai);if(ai===4)while(n+10<=now-1)n+=10;return n}
+  const pi=PRE.findIndex(x=>e.name.startsWith(x+' '));
+  for(const top of[hi,Math.max(12,now-1)])for(let n=top;n>=12;n--)if((pi<0||n%10===pi)&&POOL[(n*5+3)%POOL.length]===e.kind)return n;
+  return hi;
+}
+function petFix(now){for(const e of PETS.roster){if(!Number.isInteger(e.lv))e.lv=Math.max(8,petLvGuess(e,now));if(!Array.isArray(e.mods))e.mods=e.perk?[e.perk]:[];e.perk=e.mods[0]||null}}
 const TRDO={crawler:'a lunge that hits one monster hard',hound:'a charge through everything in a line',witch:'three bolts',fist:'a slam on the ground under your target',mother:'two mites that fight for you',burrower:'an eruption under your target',bomber:'two bombs',summoner:'two husks that fight for you',beamer:'a beam through everything in its path',mimic:'one heavy bolt',hollow:'a ring of bolts',mite:'a bite'};
-const petLine=e=>(form()&&form()!=='pet'?'Its attack: '+(TRDO[e.ai]||TRDO.mite)+'.'+(e.perk?' It kept a mark of the boss and hits a little harder.':''):PETDO[e.ai]+(e.perk?' It '+PERK[e.perk]+'.':''))+(e.plv?' It has grown '+e.plv+(e.plv>1?' times':' time')+', and is stronger for it.':'');
+const petLine=e=>{if(form()&&form()!=='pet')return'Its attack: '+(TRDO[e.ai]||TRDO.mite)+'.'+(e.perk?' It kept a mark of the boss and hits a little harder.':'')+(e.plv?' It has grown '+e.plv+(e.plv>1?' times':' time')+', and is stronger for it.':'');
+  const i=petInfo(e);return'Power '+num(i.power)+': '+num(i.hp)+' health, and its blows do '+fmt(i.hit[0])+' (a brush), '+fmt(i.hit[1])+' (a bolt) and '+fmt(i.hit[2])+' (a charge, a lunge or a blast). Bound on level '+(e.lv+1)+(e.plv?', grown '+e.plv+(e.plv>1?' times':' time'):'')+'. '+(PETDO[e.ai]||PETDO.mite)+(e.mods&&e.mods.length?' '+e.mods.map(k=>PERK[k]).join('. ')+'.':'')};
+// the short form for a row: its power and what it holds
+const petSub=e=>'Power '+num(petPower(e))+' · holds '+petCost(e);
 // the words for what a class takes from a boss: [noun, plural, the card that takes it, the heading, what it does, the word once taken, what it is in the pause screen]
 const TW={
   technique:['technique','techniques','Learn it','A technique to learn','Learn how it fought. After every fourth blow you land, its attack follows yours.','Learned','Your techniques'],
@@ -1667,7 +1743,7 @@ function petFit(){const cap=Math.min(2,petCap()),R=PETS.roster;PETS.active=PETS.
 function petDrop(i){PETS.roster.splice(i,1);PETS.active=PETS.active.filter(v=>v!==i).map(v=>v>i?v-1:v)}
 // the words for how much mana is held and how much is left: used by every screen that deals with pets or familiars
 const heldLine=(on=petOn())=>{const M=manaMax(),h=petHeld(on);return'Deployed '+on.length+' · reserving '+num(h)+' of '+num(M)+' mana · '+num(M-h)+' left for skills'};
-// After the drop the boss itself can be taken: bound or tamed as a pet, or as the class's own kind of trophy. Always optional. Tyrants and the Flayed King can only rarely be taken.
+// After the drop the boss itself can be taken: bound or tamed as a pet, or as the class's own kind of trophy. Always optional. The bosses of the tenth levels (the Flayed King, the tyrants) can only rarely be taken.
 function bindScreen(n,next){
   const f=form(),L=S.L;if(!f||n<8||!L||L.kind==='mimic')return next();
   const rare=!!L.spec.crown,dv=window.__mb?window.__mb.bind:undefined; // dev: __mb.bind = true or false decides instead of the dice
@@ -1680,7 +1756,7 @@ function bindScreen(n,next){
   const leave={title:'Leave it',sub:'Walk on',col:'var(--ash)',body:'Take nothing. '+w.later,fn:next};
   show({wide:true,col:w.col,kick:rare?w.rare:w.kick,title:e.name,
     body:w.how+' '+petLine(e)+(rs?' You can keep as many '+w.pl+' as you like. Each one you send out holds some of your mana for as long as it is out ('+petCost(e)+' for this one, of your '+num(manaMax())+'), so the more that fight, the less is left for skills.':' You can keep as many '+w.pl+' as you like. One is in use at a time.'),
-    cards:[{title:w.take,sub:R.length?cap1(w.n)+' '+(R.length+1):'Your first '+w.n,col:w.col,body:(w.pet?e.name+' joins you. ':'')+'It is as strong as the level you take it into, however old it is.',fn:take},leave]});
+    cards:[{title:w.take,sub:w.pet?petSub(e):R.length?cap1(w.n)+' '+(R.length+1):'Your first '+w.n,col:w.col,body:w.pet?e.name+' joins you and fights as it fought you: the same attacks, the same strength'+(e.mods.length?', the same modifiers':'')+'. It grows a little with every fight it joins, and keeps most of its worth as you climb. The stronger a pet, the more mana it holds.':'It is as strong as the level you take it into, however old it is.',fn:take},leave]});
 }
 // a new one has joined. Held with mana (pets, familiars): send it out if the pool can hold it, let it wait, or open the list. Otherwise one is in use at a time: pick which.
 function petPick(next,fresh){
@@ -1689,7 +1765,7 @@ function petPick(next,fresh){
     return show({wide:true,kick:w.done+' · '+heldLine(on),title:can?'Send it out?':'No mana to hold it',
       body:can?petTag(fresh)+' would hold '+c+' of your mana while it is out, and leave '+num(M-h-c)+' for skills. You can change who goes with you at any time from the pause screen.'
         :petTag(fresh)+' needs '+c+' mana to hold, and only '+num(M-h)+' of your '+num(M)+' is not held already. It waits until you withdraw another or your pool grows.',
-      cards:[...(can?[{title:w.send,sub:'Holds '+c+' mana',col:w.col,body:'It goes with you into the next level. '+petLine(fresh),fn:()=>{PETS.active.push(i);next()}}]:[]),
+      cards:[...(can?[{title:w.send,sub:w.pet?petSub(fresh)+' mana':'Holds '+c+' mana',col:w.col,body:'It goes with you into the next level. '+petLine(fresh),fn:()=>{PETS.active.push(i);next()}}]:[]),
         {title:'Let it wait',sub:w.off,col:'var(--ash)',body:'It holds no mana until you send it out.',fn:next},
         {title:'Choose who goes',sub:cap1(w.pl)+' · '+R.length+' kept',col:'var(--mana)',body:'Open the list: deploy, withdraw, or set how many go with you.',fn:()=>petsScreen(next)}]})}
   show({wide:true,kick:w.done,title:'Which one is set aside?',body:'Only one '+w.n+' is in use at a time. Pick the one to set aside. You can change this from the pause screen.',
@@ -1731,11 +1807,12 @@ function petsScreen(back,note){
   show({wide:true,list:R.length>3,kick:rel?'Release · pick one to let go':rs?heldLine(on):cap1(w.pl)+' · '+R.length+' kept',title:w.mine,
     body:!R.length?'You keep none. Kill a boss, and you may '+(w.pet?(petOwner()==='necro'?'bind':'tame')+' it.':'take one.')
       :rel?'Pick the one to release. It is gone for good.'
-      :rs?'Pick one to send it out or call it back. Each one that is out holds part of your mana for as long as it is out: held mana cannot be spent on skills and does not refill. The more that fight at once, the weaker each one is.'+(w.pet?' One that falls rises again after '+REVT+' seconds for '+REVIVE+' mana from what is left ('+REVCROWN+' for a crowned one), and half as much again each further time in a level'+(PETS.auto?'.':'; that is switched off now, so the fallen stay down until the next level.'):'')
+      :rs&&w.pet?'Pick one to send it out or call it back. Each is the monster it was, with its own attacks and its own power, however many stand beside it. Each one that is out holds mana for as long as it is out, the more the stronger it is: held mana cannot be spent on skills and does not refill. One that falls rises again after '+REVT+' seconds for a quarter more than it holds, from what is left, and half as much again each further time in a level'+(PETS.auto?'.':'; that is switched off now, so the fallen stay down until the next level.')
+      :rs?'Pick one to send it out or call it back. Each one that is out holds part of your mana for as long as it is out: held mana cannot be spent on skills and does not refill. The more that fight at once, the weaker each one is.'
       :'Pick one to use it. One is in use at a time.',
     keys:note||'',
     cards:order.map(i=>{const p=R[i],act=on.includes(p),c=petCost(p);return{title:petTag(p),
-      sub:rel?'Release'+(act?' · '+w.on.toLowerCase():''):act?(p.down?(PETS.auto?'Fallen · rises for '+reviveCost(p)+' mana':'Fallen · back next level'):w.on)+(rs?' · holds '+c:''):w.off+(rs?' · needs '+c+(h+c>M?' · no mana':''):''),
+      sub:(w.pet?'Power '+num(petPower(p))+' · ':'')+(rel?'Release'+(act?' · '+w.on.toLowerCase():''):act?(p.down?(PETS.auto?'Fallen · rises for '+reviveCost(p)+' mana':'Fallen · back next level'):w.on)+(rs?' · holds '+c+' mana':''):w.off+(rs?' · needs '+c+' mana'+(h+c>M?' · not enough':''):'')),
       col:rel?'var(--warn)':act?(rs?w.col:''):'var(--ash)',body:petLine(p),
       fn:rel?()=>show({kick:'Release',title:'Let '+p.name+' go?',body:'It is gone for good.',btns:[['Keep it',()=>again()],['Release it',()=>{petRelease(R.indexOf(p));again()}]]})
         :act?()=>{if(rs)petBack(i);again()}
@@ -1756,12 +1833,12 @@ function reward2(n){
     return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Go deeper',()=>begin(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges. Every skill costs mana, the bar under your health: it seeps back on its own, and twice as fast while you stand still.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges, and what each costs in mana. Mana seeps back on its own, and twice as fast while you stand still.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
+    return show({soft:true,kick:(n===9?'The Flayed King is dead · ':'')+'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges. Every skill costs mana, the bar under your health: it seeps back on its own, and twice as fast while you stand still.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges, and what each costs in mana. Mana seeps back on its own, and twice as fast while you stand still.'):n===9?(touch?'Your fourth skill button is live. More skills come at levels '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at levels '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty levels. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the run.',
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;if(id==='beastmaster')petFit();begin(S.level)}}))});
   const pool=BOONS.filter(b=>S.b[b.id]<(b.id==='spec'?c.boon[2]:b.cap||99));
   for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]]}
-  show({wide:true,kick:n===11?'The Flayed King is dead. The road goes on.':'Level '+(n+1)+' cleared',title:'Choose a boon',
+  show({wide:true,kick:tenth(n)?S.L.spec.name+' is dead. The road goes on.':'Level '+(n+1)+' cleared',title:'Choose a boon',
     cards:pool.slice(0,3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;begin(S.level)}}})});
 }
 function chooseClass(){
@@ -1788,19 +1865,25 @@ const petsClear=()=>{PETS.roster.length=0;PETS.active=[];PETS.down=false;PETS.fi
 function actIn(v,len,cap){if(v===undefined||v===null)v=len?[len-1]:[];if(Number.isInteger(v))v=v<0?[]:[v];
   return Array.isArray(v)&&v.length<=cap&&v.every((x,i)=>Number.isInteger(x)&&x>=0&&x<len&&v.indexOf(x)===i)?v.slice():null}
 // how many can be active in a save: what the mana of that class can hold (see petCap), so an older save keeps the pets it had out
-// A pet in a save is a short list, so a long roster stays a short code: [kind, name, colour, r, plv, perk, crown], where a generated name is the index of its prefix (PRE), a stock colour its index (TINT),
-// the perk its place in MODS plus one, and zeros at the end are left out. Saves from before this carry objects ({kind,name,col,r,plv,perk,crown}); both are read.
+// A pet in a save is a short list, so a long roster stays a short code: [kind, name, colour, r, plv, perk, crown, lv, mods], where a generated name is the index of its prefix (PRE), a stock colour its index (TINT),
+// the perk the place of its first modifier in MODS plus one, lv the level it was bound on, mods its modifiers as bits in the order of MODS, and zeros at the end are left out.
+// Saves from before pets kept their level and all their modifiers stop at crown, and older ones still carry objects ({kind,name,col,r,plv,perk,crown}); all are read, and petFix works out what is missing.
 const petName=(kind,i)=>PRE[i]+' '+SPEC[kind].name.replace('The ','');
-function petOut(e){const pi=PRE.findIndex((x,i)=>petName(e.kind,i)===e.name),ci=TINT.indexOf(e.col),o=[e.kind,pi>=0?pi:e.name,ci>=0?ci:e.col,e.r,e.plv,e.perk?MODS.indexOf(e.perk)+1:0,e.crown?1:0];while(o.length>4&&!o[o.length-1])o.pop();return o}
+function petOut(e){const pi=PRE.findIndex((x,i)=>petName(e.kind,i)===e.name),ci=TINT.indexOf(e.col),m=e.mods||[],o=[e.kind,pi>=0?pi:e.name,ci>=0?ci:e.col,e.r,e.plv,m.length?MODS.indexOf(m[0])+1:e.perk?MODS.indexOf(e.perk)+1:0,e.crown?1:0,Number.isInteger(e.lv)?e.lv:0,m.reduce((a,k)=>a|1<<MODS.indexOf(k),0)];while(o.length>4&&!o[o.length-1])o.pop();return o}
 function petIn(p){
-  if(Array.isArray(p)){const[kind,nm,cl,r,plv,pk,crown]=p;if(typeof kind!=='string'||!own(SPEC,kind)||p.length<4||p.length>7)return null;
+  if(Array.isArray(p)){const[kind,nm,cl,r,plv,pk,crown,lv,mk]=p;if(typeof kind!=='string'||!own(SPEC,kind)||p.length<4||p.length>9)return null;
     if(pk!==undefined&&!(Number.isInteger(pk)&&pk>=0&&pk<=MODS.length))return null;
-    p={kind,name:Number.isInteger(nm)&&nm>=0&&nm<PRE.length?petName(kind,nm):nm,col:Number.isInteger(cl)&&cl>=0&&cl<TINT.length?TINT[cl]:cl,r,plv:plv===undefined?0:plv,perk:pk?MODS[pk-1]:null,crown:crown?1:0}}
+    if(mk!==undefined&&!(Number.isInteger(mk)&&mk>=0&&mk<1<<MODS.length))return null;
+    p={kind,name:Number.isInteger(nm)&&nm>=0&&nm<PRE.length?petName(kind,nm):nm,col:Number.isInteger(cl)&&cl>=0&&cl<TINT.length?TINT[cl]:cl,r,plv:plv===undefined?0:plv,perk:pk?MODS[pk-1]:null,crown:crown?1:0,lv:lv||undefined,mods:lv?MODS.filter((x,i)=>(mk||0)>>i&1):undefined}}
   if(!p||typeof p!=='object'||typeof p.kind!=='string'||!own(SPEC,p.kind)||p.kind==='mite'||p.kind==='husk')return null;
   if(typeof p.name!=='string'||!p.name.trim()||p.name.length>48||typeof p.col!=='string'||!/^#[0-9a-f]{6}$/i.test(p.col))return null;
   if(typeof p.r!=='number'||!(p.r>=8&&p.r<=60)||!Number.isInteger(p.plv)||p.plv<0||p.plv>PLVMAX)return null;
   if(p.perk!==null&&p.perk!==undefined&&!MODS.includes(p.perk))return null;
-  return{kind:p.kind,ai:SPEC[p.kind].ai||p.kind,name:p.name.trim(),col:p.col.toLowerCase(),r:p.r,plv:p.plv,perk:p.perk||null,crown:p.crown?1:0};
+  if(p.lv!==undefined&&!(Number.isInteger(p.lv)&&p.lv>=8&&p.lv<=9998))return null;
+  if(p.mods!==undefined&&!(Array.isArray(p.mods)&&p.mods.length<=MODS.length&&p.mods.every((k,i)=>MODS.includes(k)&&p.mods.indexOf(k)===i)))return null;
+  const e={kind:p.kind,ai:SPEC[p.kind].ai||p.kind,name:p.name.trim(),col:p.col.toLowerCase(),r:p.r,plv:p.plv,perk:p.perk||null,crown:p.crown?1:0};
+  if(p.lv!==undefined){e.lv=p.lv;e.mods=p.mods?p.mods.slice():e.perk?[e.perk]:[];e.perk=e.mods[0]||null}
+  return e;
 }
 const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
@@ -1811,7 +1894,7 @@ function snapshot(n){
 function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 // read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
-function applyRun(r){
+function applyRun(r,now=0){
   try{r=r&&typeof r==='object'?r:{};
     S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
@@ -1820,7 +1903,7 @@ function applyRun(r){
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
     // older saves have no pets; a broken entry is dropped, the rest are kept
     petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETSANE)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length;
-      PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[])}
+      PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[]);petFix(now)}
     PETS.auto=!(r.rev===0||r.rev===false); // raising the fallen is on unless the save says otherwise
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
   }catch(e){S.cls=S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
@@ -1847,7 +1930,7 @@ function checkSave(o){
 function loadSave(o){
   const r=checkSave(o);if(!r)return false;
   if(S.paused){S.paused=false;const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed','false')}
-  applyRun(r);save(r.level);title(r.level);return true;
+  applyRun(r,r.level);save(r.level);title(r.level);return true;
 }
 function storedLevel(){try{return Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0))}catch(e){return SAVE.level}}
 function newRun(){S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
@@ -2020,7 +2103,7 @@ function start(data){
   let saved=storedLevel();
   setLoad();
   let r={};try{r=JSON.parse(localStorage.getItem('marrowborn.run')||'{}')||{}}catch(e){}
-  applyRun(r);SAVE=snapshot(S.cls?saved:Math.min(saved,8)); // without a class the furthest a run can stand is the class choice
+  applyRun(r,saved);SAVE=snapshot(S.cls?saved:Math.min(saved,8)); // without a class the furthest a run can stand is the class choice
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
@@ -2029,11 +2112,17 @@ if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     startLevel(n)},kill:()=>{if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},skill:si=>skill(si),reward,loadout,dropScreen,
   // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
-  pet:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;
-    const e={kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,perk:MODS.includes(o.perk)?o.perk:null,crown:ty?1:0};
+  // pet(kind, o): o: {plv, lv (the level it was bound on, 0-based; the level you are on when left out), mods:[...] or perk, owner, name}
+  pet:(kind,o)=>{const e=window.__mb.petNew(kind,o);if(!e)return null;o=o||{};
     const cap=petCap()||3;PETS.roster.push(e);PETS.active.push(PETS.roster.length-1);while(PETS.active.length>cap||form()&&PETS.active.length>1&&!petOn().includes(e))PETS.active.shift();if(S.mode!=='play'||!P)return e; // the oldest step back until the pool can hold the new one
     if(form()&&!(o.owner&&!petOwner())){const made=fieldPets(true);save(S.level);hud();return allies.find(a=>a.e===e)||TSRC.find(a=>a.e===e)||made[0]||e} // the class's own form: a pet, a familiar or guardian entity, or the stand-in of a technique, ward, venom or arrowhead
-    const k=petK(PETS.active.length),a=makePet(e,1,o.owner==='beast'?'beast':'necro',k,PETS.active.length-1,PETS.active.length);allies.push(a);PETS.fielded.push(e);return a},PETS,
+    const a=makePet(e,1,o.owner==='beast'?'beast':'necro',PETS.active.length-1,PETS.active.length);allies.push(a);PETS.fielded.push(e);return a},PETS,
+  // petNew: only make the roster entry. petTry: put it on the roster and the active list if what is held stays within `budget` mana (then call field()). petInfo(e): power, cost, health, blows. hurtPet(a, blow): hurt a pet as a monster would.
+  petNew:(kind,o)=>{o=o||{};const ty=kind==='tyrant';if(ty)kind='hollow';const b=SPEC[kind];if(!b)return null;const mods=(Array.isArray(o.mods)?o.mods:o.perk?[o.perk]:[]).filter((x,i,l)=>MODS.includes(x)&&l.indexOf(x)===i);
+    return{kind,ai:b.ai||kind,name:o.name||(ty?'Tyrant of Ash Road':PRE[PETS.roster.length*3%10]+' '+b.name.replace('The ','')),col:ty?'#8c2f39':TINT[(PETS.roster.length*3+kind.length)%10],r:b.r+(ty?6:2),plv:o.plv|0,lv:Number.isInteger(o.lv)?Math.max(8,o.lv):Math.max(8,S.level),mods,perk:mods[0]||null,crown:ty||b.crown?1:0}},
+  petAt:(lv,plv)=>{const e=petEntry(lv,levelDef(lv));e.plv=Math.min(PLVMAX,plv|0);return e},
+  petTry:(kind,o,budget)=>{const e=typeof kind==='object'?kind:window.__mb.petNew(kind,o);if(!e||petHeld()+petCost(e)>budget)return null;PETS.roster.push(e);PETS.active.push(PETS.roster.length-1);return e},
+  field:()=>{const m=fieldPets(true);hud();return m.length},petInfo:e=>petInfo(e),hurtPet:(a,d)=>hurtPet(a,d),blow:h=>blow(h),petScale:n=>petScale(n===undefined?S.level:n),GREF,PHP,blowAt,
   // mana(v): set the free mana (v undefined: just read MB.mana). well(n): set the Wellspring count and rebuild the pool at once.
   mana:v=>{if(P&&v!==undefined){P.mana=Math.max(0,Math.min(manaRoom(),+v||0));syncSkills()}return MANA},
   // fire(): make the active trophy go off now (when there is something to hit). Returns how many echoes are live afterwards.

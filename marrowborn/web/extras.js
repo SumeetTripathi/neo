@@ -123,20 +123,22 @@ function saveLine(s){
 var REC_FIELDS=['best','runs','deaths','time','kills','bosses'];
 function blankRec(){return{best:0,runs:0,deaths:0,time:0,kills:0,bosses:0}}
 function cleanRec(r){
-  var o=blankRec(),k,i;o.v=1;o.cls={};o.fast={};
+  var o=blankRec(),k,i;o.v=2;o.cls={};o.fast={};
   if(!r||typeof r!=='object')return o;
   for(i=0;i<REC_FIELDS.length;i++){k=REC_FIELDS[i];o[k]=clamp(Math.floor(num(r[k])),0,1e9)}
   if(r.cls&&typeof r.cls==='object')for(k in r.cls)if(MB.CLASSES&&Object.prototype.hasOwnProperty.call(MB.CLASSES,k)&&r.cls[k]&&typeof r.cls[k]==='object'){
     o.cls[k]=blankRec();for(i=0;i<REC_FIELDS.length;i++)o.cls[k][REC_FIELDS[i]]=clamp(Math.floor(num(r.cls[k][REC_FIELDS[i]])),0,1e9)}
   if(r.fast&&typeof r.fast==='object')for(k in r.fast){var f=r.fast[k],lv=Math.floor(+k);
     if(f&&typeof f==='object'&&lv>=0&&lv<10000&&num(f.t)>0)o.fast[lv]={t:Math.round(num(f.t)*10)/10,cls:typeof f.cls==='string'&&MB.CLASSES&&Object.prototype.hasOwnProperty.call(MB.CLASSES,f.cls)?f.cls:null}}
+  // records from before level 10 became the Flayed King's: the time kept for that level was set against a lesser monster, and could never be beaten now
+  if(num(r.v)<2)delete o.fast[9];
   return o;
 }
 var rec=cleanRec(store.get('records',null));
 function saveRec(){
   // keep the list of fastest kills bounded: drop the slowest ordinary levels first
   var keys=Object.keys(rec.fast);
-  if(keys.length>80){keys.sort(function(a,b){return rec.fast[b].t-rec.fast[a].t});for(var i=0;i<keys.length&&Object.keys(rec.fast).length>80;i++)if((+keys[i]+1)%10&&+keys[i]!==7&&+keys[i]!==11)delete rec.fast[keys[i]]}
+  if(keys.length>80){keys.sort(function(a,b){return rec.fast[b].t-rec.fast[a].t});for(var i=0;i<keys.length&&Object.keys(rec.fast).length>80;i++)if((+keys[i]+1)%10&&+keys[i]!==7)delete rec.fast[keys[i]]}
   store.set('records',rec);
 }
 function mergeRec(other){
@@ -363,13 +365,15 @@ function importView(back){
 var TALES={
   0:['The crypt','You were buried without a name, and the dark kept the rest: heart, skin, eyes, tongue. The things that crawl down here are wearing what was yours. Get up. Bones can still hold a blade.'],
   8:['Out of the crypt','The crypt door stands open behind you and nothing follows you out. You have a heartbeat again, and a face you do not recognise. A body has to eat, so you take up a trade, and the only work on this side of the door is killing what the door let loose.'],
-  12:[null,'The King is dead and his road is yours to walk. It runs through country that burned a long time ago and never quite went out. Whatever outlived the fire did it by becoming worse.'],
+  12:[null,'The King is dead behind you, and his road is yours to walk. It runs through country that burned a long time ago and never quite went out. Whatever outlived the fire did it by becoming worse.'],
   20:[null,'The road ends where the water begins. The fen swallowed a town once. Its roofs still show at low water, and the bell rings when something large moves underneath. Watch where you put your feet.'],
   30:[null,'Above the fen the ground rises into ribs. These peaks are a carcass, something vast that lay down here before there was anyone to see it fall. What nests in it has never had a reason to be afraid.'],
   40:[null,'Past the peaks stands a court with no kingdom left to rule. Its nobles keep their seats, their banners and their grudges. They have heard of you. That is new: until now, nothing had.'],
   50:[null,'Beyond the court there is no road and no map, only the dark that every one of these things crawled out of. People set candles in their windows now and say your name over them. There is no last monster. There is only how far you go.']
 };
+// one line before each boss of a tenth level: the Flayed King on level 10 (index 9), then the tyrants
 var TYRANTS={
+  9:'They flayed him for the crown and he kept it anyway. Everything past this hall still pays him its tithe. He is the first of the tyrants, and he has been expecting someone.',
   19:'It lit the fire that made this road, and it has stood guard over the cinders ever since.',
   29:'It drowned the town to have subjects who could never leave. It counts them every night.',
   39:'It has gnawed at the great carcass for an age, and it is not yet full.',
@@ -440,7 +444,7 @@ guard('hints',function(){
     {id:'skills',t:.5,when:function(){return !!S().cls&&S().level>=8},until:function(){var sk=MB.skills;return !!(sk&&sk[0]&&sk[0].cd>0)},
       touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 to 6 use your skills as you unlock them. The bar under the arena counts the seconds until each is ready again.'},
     {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active&&p.active.length&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
-      touch:'A pet fights on its own and cannot hurt you. Each one that is out holds part of your mana. If it falls, it rises again after a moment, paid for with mana. Pause to choose how many go with you.',keys:'A pet fights on its own and cannot hurt you. Each one that is out holds part of your mana. If it falls, it rises again after a moment, paid for with mana. Pause (Esc) to choose how many go with you.'},
+      touch:'A pet fights on its own, with every attack it had as a monster, and cannot hurt you. Each one that is out holds part of your mana, the stronger the more. If it falls, it rises again after a moment, paid for with mana. Pause to choose how many go with you.',keys:'A pet fights on its own, with every attack it had as a monster, and cannot hurt you. Each one that is out holds part of your mana, the stronger the more. If it falls, it rises again after a moment, paid for with mana. Pause (Esc) to choose how many go with you.'},
     {id:'mana',t:2,when:function(){var m=MB.mana;return !!S().cls&&S().level>=8&&!!m&&m.max>0&&m.cur<(m.max-m.reserved)*.7},
       touch:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.',keys:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.'}
   ];
