@@ -549,7 +549,7 @@ function variant(mat,kind){
   var h=BODY.get(mat);if(h===undefined)return mat;
   var map=VAR[kind],v=map.get(mat);if(v)return v;
   _c.setHex(h);
-  if(kind==='hit'){_c.lerp(_c2.set(0xfff2e4),.5);v=toonM(_c.getHex(),{emissive:0xffe9d8,emissiveIntensity:.34})}
+  if(kind==='hit'){_c.lerp(_c2.set(0xfff2e4),.4);v=toonM(_c.getHex(),{emissive:0xffe9d8,emissiveIntensity:.26})}
   else if(kind==='slow'){_c.lerp(_c2.set(0x3f8cff),.6);v=toonM(_c.getHex(),{emissive:0x1a3f9a,emissiveIntensity:.5})}
   else{_c.lerp(_c2.set(0xff2a30),.28);v=toonM(_c.getHex(),{emissive:0xff1a26,emissiveIntensity:kind==='rage1'?.72:.3})}
   map.set(mat,v);return v;
@@ -884,7 +884,7 @@ function spectre(src,MB,r){
   for(i=0;i<u.meshes.length;i++){
     o=u.meshes[i];mat=o.material;o.castShadow=false;o.userData.noOutline=true;
     if(mat===FX.pupil){o.visible=false;continue}
-    o.material=u.mats[i]=mat===FX.eye||mat===FX.eyeRed||mat===FX.eyeGreen||mat===FX.ember||mat===FX.iris||mat===FX.ring||mat===FX.crack?em:sm;
+    o.material=u.mats[i]=mat===FX.eye||mat===FX.eyeRed||mat===FX.eyeGreen||mat===FX.iris||mat===FX.ring||mat===FX.crack?em:sm;
   }
   if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=false;
   u.fx.visible=false;
@@ -903,7 +903,7 @@ function specPose(g,x,y,face,q,MB,dt){
 function specTint(g,c1,c2,a,base,t){
   var sp=g.userData.mb.spec,un=sp.mat.uniforms;
   un.uC.value.setHex(c1);un.uC2.value.setHex(c2);un.uA.value=a;un.uB.value=base;un.uT.value=t;
-  sp.eye.color.setHex(c2).convertSRGBToLinear();sp.eye.opacity=a>1?1:a;
+  sp.eye.color.setHex(c2).convertSRGBToLinear();sp.eye.opacity=a>1.2?.85:a*.7;
 }
 function specReset(g){var u=g.userData.mb;u.init=false;u.sx=u.sy=u.sz=1;u.tilt=0;u.shake=0;u.slam=0;u.prev='idle';u.px=u.spec.m.x;u.pz=u.spec.m.y;u.mv=0}
 

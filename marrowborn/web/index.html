@@ -121,6 +121,7 @@ button:disabled{opacity:.35;cursor:default}
 /* ---- vitals row: health pips, pets, boss bar, toggles ---- */
 .vitals{display:flex;flex-wrap:wrap;gap:8px 24px;align-items:center;justify-content:space-between}
 .vitals>div{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;min-width:0}
+.vitals>div:last-child{margin-left:auto;justify-content:flex-end}
 .lab{font-family:var(--display);font-weight:600;font-size:.84rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ash);font-variant-numeric:tabular-nums}
 #hp{display:flex;flex-wrap:wrap;gap:4px 3px;align-items:center;min-width:0;padding:0 3px}
 #hp.many{gap:2px 1px}#hp.many i{width:5px}#hp.lots i{width:3px}
@@ -130,6 +131,7 @@ button:disabled{opacity:.35;cursor:default}
 #bossName{color:#ffb3c0}
 #bossBar{width:min(260px,40vw);height:10px;background:var(--stone-2);clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%)}
 #bossFill{height:100%;width:100%;background:linear-gradient(90deg,#a80f38,var(--foe))}
+.togs{display:flex;gap:8px;align-items:center;margin-left:auto}
 .tog{--c:6px;padding:4px 12px;font-size:.84rem;min-height:32px;color:var(--text)}
 .tog[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
 #pauseB[aria-pressed="true"]{--e:var(--power2);color:var(--power2)}
@@ -151,13 +153,14 @@ button:disabled{opacity:.35;cursor:default}
 .wrap #skillBar{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
 .wrap #skillBar li{--c:6px;--e:var(--line);--f:rgba(16,20,42,.85);flex:1 1 118px;min-width:0;display:flex;align-items:center;gap:7px;padding:6px 10px;border:0;
   clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));box-shadow:inset 0 0 0 1px var(--e);
-  font-family:var(--display);font-weight:600;font-size:.88rem;line-height:1.1;letter-spacing:.07em;text-transform:uppercase;color:var(--ash);
+  font-family:var(--display);font-weight:600;font-size:.84rem;line-height:1.1;letter-spacing:.05em;text-transform:uppercase;color:var(--ash);
   background:linear-gradient(135deg,var(--e) calc(var(--c)*.7071 + 1px),transparent 0),linear-gradient(315deg,var(--e) calc(var(--c)*.7071 + 1px),transparent 0),
     linear-gradient(to right,rgba(139,77,255,.34) calc(var(--cd,0)*100%),transparent 0),var(--f)}
 .wrap #skillBar li.ready{--e:var(--power);color:var(--bone)}
 .wrap #skillBar li.locked{opacity:.45}
 .wrap #skillBar .c,.wrap .sk .c{color:var(--power2);font-weight:700;font-variant-numeric:tabular-nums}
-.wrap #skillBar .c{margin-left:auto;letter-spacing:.04em}
+.wrap #skillBar .c{margin-left:auto;letter-spacing:.04em;flex:none}
+.wrap #skillBar .n{min-width:0;overflow-wrap:anywhere}
 .wrap #skillBar li:not(.ready) .c{color:var(--power-hi)}
 #skillBar kbd{background:rgba(139,77,255,.2);border-color:transparent;color:var(--power2);min-width:1.1em;text-align:center}
 @media (pointer:coarse){.wrap #skillBar{display:none}}
@@ -181,14 +184,14 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
 #bDash{grid-area:dash;--e:var(--power2);--f:rgba(14,26,44,.92);color:var(--power2)}
 #bAtk{grid-area:atk;--c:calc(16px*var(--mb-btn,1));font-size:calc(1.2rem*var(--mb-btn,1))}
 /* a skill button: name over the seconds left; the dark wedge is the cooldown, sweeping away clockwise as --cd falls from 1 to 0 */
-.wrap .touch .acts button.sk{--c:calc(9px*var(--mb-btn,1));--e:#3d477a;--f:rgba(14,17,36,.94);border-radius:0;font-size:calc(.7rem*var(--mb-btn,1));font-weight:600;letter-spacing:.03em;line-height:1.02;
+.wrap .touch .acts button.sk{--c:calc(9px*var(--mb-btn,1));--e:#3d477a;--f:rgba(14,17,36,.94);border-radius:0;font-size:calc(.74rem*var(--mb-btn,1));font-weight:600;letter-spacing:0;line-height:1.02;text-transform:none;hyphens:auto;-webkit-hyphens:auto;
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;overflow:hidden;overflow-wrap:anywhere;color:var(--text);
   background:linear-gradient(135deg,var(--e) calc(var(--c)*.7071 + 1px),transparent 0),linear-gradient(315deg,var(--e) calc(var(--c)*.7071 + 1px),transparent 0),
     conic-gradient(rgba(139,77,255,.3) calc(var(--cd,0)*1turn),transparent 0),var(--f)}
 .wrap .touch .acts button.sk:not(:disabled){--e:var(--power);--f:linear-gradient(160deg,rgba(60,32,130,.94),rgba(18,20,46,.94));color:#fff}
 .wrap .touch .acts button.sk:disabled{opacity:.8}
-.wrap .sk .c{font-size:1.5em;line-height:1}.sk .c:empty{display:none}
-@media (max-width:420px){.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
+.wrap .sk .c{font-size:1.4em;line-height:1;letter-spacing:.02em}.sk .c:empty{display:none}
+@media (max-width:420px){.wrap .touch .acts button.sk{font-size:calc(.68rem*var(--mb-btn,1))}.touch{flex-wrap:wrap;gap:12px}.touch .acts{--s:calc(54px*var(--mb-btn,1));--a:calc(72px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1))}}
 
 /* phone held sideways: the arena fills the screen, controls float over its edges */
 @media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
@@ -208,7 +211,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .vitals{position:fixed;z-index:2;top:max(6px,env(safe-area-inset-top,0px));left:max(12px,env(safe-area-inset-left,0px));right:max(12px,env(safe-area-inset-right,0px));pointer-events:none;align-items:flex-start;gap:4px 16px;text-shadow:0 1px 2px #000,0 0 6px #000}
   .vitals>div{min-height:24px}
   .lab{font-size:.78rem}
-  .vitals button{pointer-events:auto;--f:rgba(9,11,24,.6);text-shadow:none}#hp em{max-width:38vw;font-size:.74rem;line-height:1.2}#bossBar{width:20vw}
+  .vitals button{pointer-events:auto;--f:rgba(9,11,24,.55);--e:rgba(74,85,140,.8);text-shadow:none}#hp em{max-width:38vw;font-size:.74rem;line-height:1.2}#bossBar{width:20vw}
   .tog{font-size:.76rem;padding:4px 9px}
   .touch{position:fixed;z-index:2;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));pointer-events:none}
   #pad,.touch .acts{pointer-events:auto}#pad{opacity:.62}
@@ -219,7 +222,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .touch{align-items:flex-end;flex-wrap:nowrap}
   .touch .acts{--s:calc(56px*var(--mb-btn,1));--g:calc(6px*var(--mb-btn,1));--h:min(var(--s),calc((100vh - 76px)/4.5));
     grid-template-columns:var(--s) var(--s);grid-template-rows:var(--h) var(--h) var(--h) calc(var(--h)*1.3);grid-template-areas:"s5 s6" "s3 s4" "s1 s2" "dash atk"}
-  .wrap .touch .acts button.sk{font-size:calc(.64rem*var(--mb-btn,1))}
+  .wrap .touch .acts button.sk{font-size:calc(.7rem*var(--mb-btn,1))}
   #bAtk,#bDash{font-size:calc(.95rem*var(--mb-btn,1));--c:calc(11px*var(--mb-btn,1))}
   .mb-left .wrap .touch .acts{grid-template-columns:var(--s) var(--s);grid-template-areas:"s6 s5" "s4 s3" "s2 s1" "atk dash"}
   #petHud{gap:2px 10px}.petName,#petHud.n3 .petName{max-width:96px}#petHud.n2 .petName{max-width:76px}#petHud.n3 .petName{max-width:54px}.petBar{width:32px}
@@ -298,6 +301,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
 .panel .mbx-note b{color:var(--gold);font-weight:600}
 @media (prefers-reduced-motion:reduce){.panel,.mbx-panel,.mbx-story{animation:none}#mbHint{transition:none;transform:none}.mbx-sw span::after{transition:none}}
 @media (max-width:480px){
+  .vitals>div:last-child{width:100%}#bossBar{flex:1;width:auto;min-width:60px}
   h1{font-size:1.5rem}#lvl{font-size:.86rem}
   #ov{padding:8px}.panel{padding:18px 14px}.panel h2{font-size:1.9rem}
   #mbx{padding:8px}.mbx-panel{padding:16px 12px}.mbx-story{padding:22px 16px}.mbx-row{grid-template-columns:104px minmax(0,1fr);gap:8px}.mbx-row .val{min-width:2.6em}
@@ -337,7 +341,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   <div class="vitals">
     <div><span class="lab">You</span><span id="hp"></span></div>
     <div><span class="lab" id="bossName">—</span><div id="bossBar"><div id="bossFill"></div></div>
-      <button id="snd" class="tog" type="button" aria-pressed="true">Sound</button><button id="hap" class="tog" type="button" aria-pressed="true">Haptics</button></div>
+      <span class="togs"><button id="snd" class="tog" type="button" aria-pressed="true">Sound</button><button id="hap" class="tog" type="button" aria-pressed="true">Haptics</button></span></div>
   </div>
   <div class="touch">
     <div id="pad"><div id="knob"></div></div>

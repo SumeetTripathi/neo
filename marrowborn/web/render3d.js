@@ -1003,7 +1003,9 @@ function echoClaim(e){
 function syncEchoes(dt,sight){
   const list=R.testEchoes||MB.echoes||NONE,SM=window.MBModels&&window.MBModels.spectre,t=MB.S.t;
   if(!list.length&&!echoMap.size)return;
-  let live=0;
+  // entries that have run out give their spectre back first, so the ones arriving this frame can use it
+  if(echoMap.size)for(const[e,rec]of echoMap)if(list.indexOf(e)<0){echoMap.delete(e);if(rec!==ECHO_SKIP&&rec.e===e){rec.e=null;rec.root.visible=false}}
+  echoLive=0;for(let i=0;i<echoRecs.length;i++)if(echoRecs[i].e)echoLive++;
   for(let i=0;i<list.length;i++){
     const e=list[i];if(!e||typeof e.x!=='number'||typeof e.y!=='number')continue;
     let rec=echoMap.get(e);
@@ -1013,7 +1015,7 @@ function syncEchoes(dt,sight){
       if(sight&&(!Q.low||rec===ECHO_SKIP))flashAt(e.x,rec===ECHO_SKIP?14:24,e.y,rec===ECHO_SKIP?30:20,rec===ECHO_SKIP?110:80,echoHex(e.col),.2,.85);
     }
     if(rec===ECHO_SKIP)continue;
-    rec.stamp=stamp;live++;rec.age+=dt;
+    rec.age+=dt;
     const max=e.max>0?e.max:.6,q=clamp01(typeof e.life==='number'?1-e.life/max:rec.age/max),ang=typeof e.ang==='number'&&e.ang===e.ang?e.ang:0;
     if(!sight){rec.root.visible=false;continue}
     rec.root.visible=true;
@@ -1021,14 +1023,9 @@ function syncEchoes(dt,sight){
       const lift=SM.pose(rec.g,e.x,e.y,ang,q,MB,dt),d=4+(ECHO_FWD[rec.ai]||.3)*rec.r*easeOut(clamp01((q-.3)/.5)),k=(.72+.28*easeOut(clamp01(q*5)))*(1+.1*q);
       rec.root.position.set(e.x+Math.cos(ang)*d,0,e.y+Math.sin(ang)*d);
       rec.g.position.y=lift*LIFT*.7;rec.g.scale.setScalar(k);
-      SM.tint(rec.g,rec.c1,rec.c2,1.7*clamp01(q*9)*Math.pow(1-q,1.2),.2,t);
+      SM.tint(rec.g,rec.c1,rec.c2,1.8*clamp01(q*9)*(1-q*q*q),.24,t);
     }catch(err){warnOnce('echo',err);rec.root.visible=false}
     const rk=rec.r*(1.2+1.3*easeOut(q));rec.ring.scale.setScalar(rk);rec.ring.material.opacity=.9*(1-q)*(1-q);
-  }
-  echoLive=live;
-  if(echoMap.size>list.length||(echoMap.size&&!list.length))for(const[e,rec]of echoMap){
-    if(rec===ECHO_SKIP){if(list.indexOf(e)<0)echoMap.delete(e);continue}
-    if(rec.stamp!==stamp){echoMap.delete(e);if(rec.e===e){rec.e=null;rec.root.visible=false}}
   }
 }
 
@@ -1098,7 +1095,7 @@ function hudBottom(){
   try{
     if(hudEl===undefined)hudEl=document.querySelector('.vitals')||null;
     const c=cv.getBoundingClientRect(),v=hudEl&&hudEl.getBoundingClientRect();
-    hudY=v&&c.height>0&&v.height>0&&v.top<c.top+c.height*.3&&v.bottom>c.top&&v.right>c.left&&v.left<c.right&&getComputedStyle(hudEl).visibility!=='hidden'?Math.min(H*.4,(v.bottom-c.top)/c.height*H):0;
+    hudY=v&&c.height>0&&v.height>0&&v.height<c.height*.4&&v.top<c.top+c.height*.3&&v.bottom>c.top&&v.right>c.left&&v.left<c.right&&getComputedStyle(hudEl).visibility!=='hidden'?Math.min(H*.4,(v.bottom-c.top)/c.height*H):0;
   }catch(e){hudY=0}
   return hudY;
 }

@@ -198,7 +198,8 @@ const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
 const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
 // (the last factor came in with six carried skills: it climbs from level 15 to +18% at level 25 and stays there)
-const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))};
+// (and a flat quarter more since every class takes a trophy from the bosses it kills)
+const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))*1.25};
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
 const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
@@ -986,11 +987,11 @@ function fieldPets(mid){
 const FORM={fighter:'technique',tank:'ward',assassin:'venom',mage:'familiar',ranger:'arrowhead',healer:'guardian'};
 const form=()=>petOwner()?'pet':S.cls&&FORM[S.cls]||null;
 // what one firing is worth, in multiples of your damage (TRO scales every kind's attack to about one unit against a single target), and how often the timed ones fire
-const TRX={technique:3,ward:10,venom:6,familiar:11,arrowhead:3.5,guardian:9},TRT={familiar:3.5,guardian:4};
+const TRX={technique:3,ward:22,venom:7,familiar:9.5,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
 const TCOL={fighter:'#ffa64d',tank:'#6ea3e0',assassin:'#b6e04a',mage:'#b88cff',ranger:'#7fe0c0',healer:'#ffe08a'};
 let TSRC=[]; // for the forms that are not entities: one stand-in per active trophy, so damage, minions and levelling have something to hang on
-const troPow=a=>(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/Math.sqrt(cdMul()):1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
-const troBolts=(a,g,D,n=3)=>{for(let i=0;i<n;i++)petShot(a,g+(i-(n-1)/2)*.16,440,D,4)};
+const troPow=a=>(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
+const troBolts=(a,g,D,n=3)=>{for(let i=0;i<n;i++)petShot(a,g+(i-(n-1)/2)*.16,600,D,4)};
 // one firing per monster kind: (source, target, angle to it, damage of one unit). Returns true when the attack lands on the target itself, so its echo is drawn beside the target.
 const TRO={
   mite(a,t,g,D){petHit(t,D,a);return true},
@@ -998,17 +999,17 @@ const TRO={
   hound(a,t,g,D){const len=dist(a,t)+90;for(const m of[...mons])if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,g,len)<m.r+24)petHit(m,(m===t?.95:.6)*D,a)},
   witch(a,t,g,D){troBolts(a,g,.4*D)},
   fist(a,t,g,D){petBlast(a,t,88,.45,1.15*D);return true},
-  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))petMinion(a,'mite',.13*D,7);else petShot(a,g+(i?.12:-.12),440,.45*D,4)},
+  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))petMinion(a,'mite',.11*D,7);else petShot(a,g+(i?.12:-.12),600,.45*D,4)},
   burrower(a,t,g,D){petBlast(a,t,80,.4,1.15*D);return true},
   bomber(a,t,g,D){for(const k of[0,.5]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.7,.62*D);z.sx=a.x;z.sy=a.y}},
-  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))petMinion(a,'husk',.13*D,8);else petShot(a,g+(i?.12:-.12),440,.45*D,4)},
+  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))petMinion(a,'husk',.11*D,8);else petShot(a,g+(i?.12:-.12),600,.45*D,4)},
   beamer(a,t,g,D){petShot(a,g,950,D,9,99)},
-  mimic(a,t,g,D){petShot(a,g,460,1.05*D,6)},
+  mimic(a,t,g,D){petShot(a,g,620,1.05*D,6)},
   hollow(a,t,g,D){for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,320,.12*D,4);troBolts(a,g,.3*D)},
 };
 function troFire(a,t){
   if(S.mode!=='play'||S.banner>1.5||!t||!mons.includes(t)||t.hidden)return false;
-  const g=angTo(a,t),D=troPow(a),near=(TRO[a.ai]||TRO.mite)(a,t,g,D)===true,s=a.s;
+  const lead=Math.min(.5,dist(a,t)/600),g=Math.atan2(t.y+(t.vy||0)*lead-a.y,t.x+(t.vx||0)*lead-a.x),D=troPow(a),near=(TRO[a.ai]||TRO.mite)(a,t,g,D)===true,s=a.s;
   if(a.form==='venom'&&mons.includes(t)){t.venT=3;t.venD=Math.max(t.venT>0&&t.venD||0,.05*D);t.venK=.5;t.venBy=a;puff(t,TCOL.assassin,10,120)} // a short poison: six ticks, about a third of the blow in all
   const o=a.ent?a:{x:P.x+Math.cos(g)*22,y:P.y+Math.sin(g)*22},e=near?{x:t.x-Math.cos(g)*(t.r+s.r*.7),y:t.y-Math.sin(g)*(t.r+s.r*.7)}:{x:o.x,y:o.y};clamp(e,10);
   echoes.push({ai:a.ai,s,x:e.x,y:e.y,ang:g,life:.6,max:.6,owner:S.cls,col:TCOL[S.cls]||'#b88cff'});if(echoes.length>10)echoes.shift();
