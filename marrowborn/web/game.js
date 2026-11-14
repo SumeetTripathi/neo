@@ -64,9 +64,9 @@ const EXTRA={
  fighter:{boon:['Fury','Swing 8% faster.',5],adv:[['champion','Champion','Raw power','Hit 50% harder and gain 6 health.'],['duelist','Duelist','Footwork','Swing 50% faster and move 15% faster.']]},
  assassin:{boon:['Ambush','Your strike after a dash hits even harder.',5],adv:[['nightblade','Nightblade','Sharper','Every strike hits 60% harder.'],['phantom','Phantom','Unseen','Shadowstep recharges more than twice as fast and costs half the mana, and you move 10% faster.']]},
  healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health. Your mana comes back a quarter faster.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
- tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
+ tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health and gives back twice the mana, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
  mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, your skills recharge twice as fast and cost a fifth less mana, and each familiar holds less of your mana.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
- ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level, never tires and costs nothing. Bosses you kill can be tamed and fight for you as well, as many as your mana can hold. Arrowheads you have carved become tamed beasts.']]},
+ ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level, never tires and costs nothing. Bosses you kill can be tamed and fight for you as well, as many as your mana can hold, and a tamed beast holds a fifth less mana than a bound one. Arrowheads you have carved become tamed beasts.']]},
  necro:{boon:['Legion','One more thrall at your side, and your bound pets hit 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pets have 40% more health and hold less of your mana.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pets.']]},
 };
 for(const k in EXTRA)Object.assign(CLASSES[k],EXTRA[k]);
@@ -162,7 +162,7 @@ const MCOST={
  tank:[8,9,18,9,22,45,18,13,22,14],
  assassin:[8,9,18,14,20,48,16,16,13,20],
  mage:[14,12,20,24,30,60,26,18,18,20],
- ranger:[9,10,13,18,14,48,26,20,16,16],
+ ranger:[8,9,11,15,12,45,22,18,14,14],
  healer:[12,20,18,22,26,58,26,13,20,16],
  necro:[14,12,13,13,20,58,12,22,18,22],
 };
@@ -730,7 +730,7 @@ function hurtP(d,src){
   if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null} // hit, blocked or shrugged off: the ward answers
   if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
-  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK);if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
+  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
   if(P.stoneT>0)d=Math.ceil(d/2);
   ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
@@ -901,7 +901,7 @@ const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaste
 // the forms that are held with mana: pets and familiars. The other trophies cost nothing and go one at a time.
 const resvForm=()=>{const f=form();return f==='pet'||f==='familiar'?f:null};
 // what one of them holds while it is out, and what it costs to raise it again after it fell (dearer each time within a level)
-const petCost=e=>{const f=resvForm();return f?Math.max(1,Math.round((e.crown?PCROWN:PCOST)[f]*(f==='pet'&&S.adv==='lich'||f==='familiar'&&S.adv==='archmage'?.8:1))):0};
+const petCost=e=>{const f=resvForm();return f?Math.max(1,Math.round((e.crown?PCROWN:PCOST)[f]*(f==='pet'&&(S.adv==='lich'||S.adv==='beastmaster')||f==='familiar'&&S.adv==='archmage'?.8:1))):0};
 const reviveCost=e=>Math.round((e.crown?REVCROWN:REVIVE)*Math.pow(REVUP,e.revN||0));
 const petCap=()=>resvForm()?1e9:form()?1:0;
 // how strong a roster entry is, for sorting and for "fill from the strongest down"
@@ -1091,7 +1091,7 @@ function reviveStep(dt){
 const FORM={fighter:'technique',tank:'ward',assassin:'venom',mage:'familiar',ranger:'arrowhead',healer:'guardian'};
 const form=()=>petOwner()?'pet':S.cls&&FORM[S.cls]||null;
 // what one firing is worth, in multiples of your damage (TRO scales every kind's attack to about one unit against a single target), and how often the timed ones fire
-const TRX={technique:3,ward:14,venom:7,familiar:9,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
+const TRX={technique:3,ward:14,venom:7,familiar:7.5,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
 const TCOL={fighter:'#ffa64d',tank:'#6ea3e0',assassin:'#b6e04a',mage:'#b88cff',ranger:'#7fe0c0',healer:'#ffe08a'};
 let TSRC=[]; // for the forms that are not entities: one stand-in per active trophy, so damage, minions and levelling have something to hang on
 const troPow=a=>(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(a.form==='ward'?Math.min(3,Math.max(1,(P.trW||0)/2.5)):1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);

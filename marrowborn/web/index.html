@@ -279,7 +279,8 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   #petHud{gap:2px 10px}.petName,#petHud.n3 .petName{max-width:96px}#petHud.n2 .petName{max-width:76px}#petHud.n3 .petName{max-width:54px}.petBar{width:32px}
   .vbrk,#mana .manaLab,#manaHeld{display:none}#manaBar{width:84px;height:8px}#manaNum{font-size:.74rem}#manaTag{font-size:.66rem;letter-spacing:.12em}
   .pip{width:7px;height:13px}.petPips{gap:2px 3px}.petCount,.petMore{font-size:.72rem}
-  .cards.list{max-height:none;overflow:visible;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  .cards.list{max-height:max(104px,calc(100vh - 250px));grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+  #ovPanel:has(.cards.list) #ovBody{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}#ovPanel:has(.cards.list) .btns button{min-height:40px;padding-block:4px}
   .cards button{padding:8px 10px 9px 15px;gap:3px}.cards span{font-size:.8rem}.cards b{font-size:1.25rem}.cards small{font-size:.72rem}
 }
 /* ---- touch layout options (settings): --mb-btn scales the stick and buttons, .mb-left mirrors them ---- */

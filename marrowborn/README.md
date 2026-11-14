@@ -34,9 +34,14 @@ Bosses from level 9 drop a weapon, armor or trinket for your class in four rarit
 You can melt the drop into your current item to upgrade it, replace the current item,
 or destroy the drop for a small permanent bonus.
 
-Every class can also claim something from a boss it kills, kept in a roster of eight.
-The Necromancer binds the monster as a pet (up to three fight at once) and the Ranger's
-Beastmaster upgrade tames it. The other classes take a trophy that replays the boss's
+Skills cost mana as well as having cooldowns. Mana refills on its own, faster while
+you stand still, and the pool has no upper limit: it grows with every level cleared,
+with the Wellspring boon and with equipment.
+
+Every class can also claim something from a boss it kills. The Necromancer binds the
+monster as a pet and the Ranger's Beastmaster upgrade tames it. There is no limit on
+pets held or deployed: each deployed pet holds back some mana, and a fallen pet
+revives by spending mana. The other classes take a trophy that replays the boss's
 attack: a technique (Fighter), ward (Tank), venom (Assassin), familiar (Mage),
 arrowhead (Ranger before the upgrade) or guardian (Healer).
 
@@ -51,7 +56,7 @@ Runs can be exported and imported as a text code.
   `game.js` (rules), `render3d.js` (3D scene), `models-player.js`, `models-monsters.js`,
   `extras.js` (settings, records, hints, story), plus bundled fonts and three.js.
 - `android/` is a thin WebView wrapper that packages `web/` as an app.
-- `dist/Marrowborn.apk` is a prebuilt, installable APK (Android 6.0+). `Marrowborn-3.0.apk`
+- `dist/Marrowborn.apk` is a prebuilt, installable APK (Android 6.0+). `Marrowborn-3.1.apk`
   is the previous release and `Marrowborn-2.0.apk` the last 2D-only build.
 
 ## Play in a browser
