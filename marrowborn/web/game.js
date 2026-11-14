@@ -1275,7 +1275,7 @@ function step(dt){
       if(p.kind==='arrow'&&!p.pet&&TSRC.length&&TSRC[0].form==='arrowhead'&&++P.trN>=6){P.trN=0;P.trQ=1;P.trT=m}
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
-      if(!m.boss&&!mons.includes(m))continue; // a shot that kills something small flies on, so a swarm cannot soak up every single bolt
+      if(!m.boss&&(!mons.includes(m)||m._gone))continue; // a shot that kills something small flies on, so a swarm cannot soak up every single bolt
       if(p.pierce>0)p.pierce--;else{p.dead=true;break}}}
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
@@ -1994,8 +1994,9 @@ const API={
   show:o=>show(o||{},true),
   // hands the overlay back to the game: gone during play, otherwise the screen the game needs (title, pause, reward, death)
   hide(){if(S.mode==='title')titleShow();else if(S.paused)pauseShow();else if(S.mode==='play'||S.mode==='clear'||!lastScreen)$('ov').hidden=true;else show(lastScreen)},
-  startLevel:n=>{n=Math.floor(+n);if(!(n>=0&&n<=9998))return false;if(n>=8&&!CLASSES[S.cls]){chooseClass();return true}startLevel(n);return true},
-  title:()=>title(),
+  startLevel:n=>{n=Math.floor(+n);if(!(n>=0&&n<=9998)||MP.on)return false; // (in a co-op game the host starts the levels)
+    if(n>=8&&!CLASSES[S.cls]){chooseClass();return true}startLevel(n);return true},
+  title:()=>{if(!MP.on)title()},
   refreshTitle(){if(S.mode==='title'&&!$('ov').hidden&&lastScreen&&lastScreen.kick==='Bones first. Legend later.')titleShow()},
   getSave:()=>JSON.parse(JSON.stringify({...SAVE,rank:S.cls?rank(SAVE.level):''})),
   loadSave,
@@ -2193,6 +2194,8 @@ function mpHurtM(m,d,quiet){
   const dd=m.markT>0?d*1.5:d,got=Math.max(0,Math.min(dd,m.hp));ST.dmgDealt+=got;if(byPet)petFed(got);
   m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(dd),life:.7,c:'#e7dfcd'});
   m._mine=(m._mine||0)+dd;MP.qd.set(m.id,(MP.qd.get(m.id)||0)+d);
+  // something small that this blow should have killed is gone here at once (the host confirms it a moment later; if it disagrees, it is back)
+  if(!m.boss&&m._mine>=m.hp&&!m._gone){m._gone=performance.now()+450;m.hidden=true;puff(m,col(m.s.col),10,160)}
 }
 function mpFlush(){
   if(!MP.q.length&&!MP.qd.size)return;const l=MP.q;MP.q=[];
@@ -2269,14 +2272,14 @@ function mpOnWorld(w,from){
     else if(hp>m.hp+.9&&m.boss)floats.push({x:m.x,y:m.y-m.r-10,txt:'+'+fmt(Math.round((hp-m.hp)*10)/10),life:1,c:'#7fd66b'});
     if(m._mine>0)m._mine*=.85;m.hp=hp;
     if(m.st!==st){if(st==='charge'){sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}else if(st==='beam'){sfx(110,.5,'sawtooth',.25,70);noise(.4,.2,2400,600)}else if(st==='dazed'&&m.st==='charge')sfx(70,.2,'square',.35,40);m.st=st}
-    m.hidden=!!(f&1);if(f&2&&!(m.flash>0))m.flash=.1;m.ward=f&4?(f&512?.5:.2):0;
+    if(m._gone&&now>m._gone){m._gone=0;m._mine=0}m.hidden=!!(f&1)||m._gone>0;if(f&2&&!(m.flash>0))m.flash=.1;m.ward=f&4?(f&512?.5:.2):0;
     if(f&8){if(!m.rage&&!fresh&&m.ai!=='hollow')enrage(m);m.rage=true}else m.rage=false;
     m.stun=f&16?.2:0;m.slow=f&32?.2:0;m.markT=f&64?.2:0;m.dotT=f&128?.2:0;m.moving=!!(f&256);m.side=f&1024?-1:1;m.tgt=mpHeroAt(a[6]);
     if(a[7]!==undefined&&m.ai!=='mite')m.t=a[7]/10;if(a[8])m.ang=a[8]/100;
     const ph=(a[10]||0)+1;if(ph>(m.phase||1)){m.phase=ph;if(!fresh)phaseFx(m)}m.phase=ph;
     const bd=w.b&&w.b[m.id];if(bd)beamIn(m,bd);else if(m.beam)m.beam=null;
     list.push(m);if(m.boss)bs=m}
-  if(byId.size>list.length)for(const[id,m]of byId)if(m._seen!==seen){byId.delete(id);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P&&!P.down)manaGive(P.maxMana*MKILL)}
+  if(byId.size>list.length)for(const[id,m]of byId)if(m._seen!==seen){byId.delete(id);if(!m._gone)puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P&&!P.down)manaGive(P.maxMana*MKILL)}
   mons=list;boss=bs;if(lost)mpNeedSync(now);
   if(w.sn){if(!w.f&&w.sn.length)sfx(520,.1,'sine',.12,260);for(const a of w.sn){const vx=+a[3]||0,vy=+a[4]||0,k=w.f?0:MPDELAY/1000;shots.push({id:a[0],x:a[1]-vx*k,y:a[2]-vy*k,vx,vy,r:+a[5]||6,g:k?k+.03:0})}}
   if(w.sd&&w.sd.length)shots=shots.filter(s=>!w.sd.includes(s.id));
@@ -2320,6 +2323,7 @@ function mpSendMe(now,force){
   while(p.length>7&&!p[p.length-1])p.pop();
   const msg={t:'me',c:Math.round(now),p};let ev=false;
   if(inLv){
+    if(MP.wasAway){MP.wasAway=false;for(const a of allies)a._sent=false}
     const n=allies.length,every=n<=6?1:n<=16?2:3;
     for(const a of allies)if(!a._sent){a._sent=true;(msg.an||(msg.an=[])).push(mpAllyStatic(a))}
     if(n||MP.hadAl){if(msg.an||!n||MP.tick%every===0){msg.a=allies.map(mpAllyDyn);for(const a of allies)if(a.beam&&a.pet)(msg.ab||(msg.ab={}))[a.nid]=beamOut(a.beam);MP.hadAl=n>0}ev=true}
@@ -2329,7 +2333,7 @@ function mpSendMe(now,force){
     for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;(msg.f||(msg.f=[])).push([Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)])}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
     if(msg.s||msg.e||msg.z||msg.f||msg.r)ev=true;
-  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0}
+  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0;MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
   // nothing new to say: three times a second is enough
   const key=p.join();if(!ev&&!force&&key===MP.pKey&&now-MP.tSent<320)return;MP.pKey=key;MP.tSent=now;
   nsend(msg);
@@ -2358,7 +2362,7 @@ function mpAllyIn(o,d,c){
 function mpOnMe(msg,from){
   const r=MP.rById.get(''+from);if(!r)return;const now=performance.now(),p=msg.p,c=+msg.c||0;clkIn(r._clk,c,now);
   if(Array.isArray(p)){const q=r.P,f=p[3]|0,aw=!!(f&64);
-    if(aw!==r.away){r.away=aw;q._s=null;if(aw){r.allies.length=0;r._al.clear();r.pshots.length=0}}
+    if(aw!==r.away){r.away=aw;q._s=null;if(aw){r.allies.length=0;r.pshots.length=0}}
     sPush(q,c,+p[0]||0,+p[1]||0,0);sVel(q);if(!q._s||q._s.length<=4){q.x=+p[0]||0;q.y=+p[1]||0;q.vx=q.vy=0}
     q.face=(p[2]||0)/100;q.moving=!!(f&1);q.inv=f&2?.2:0;q.shield=!!(f&16);r.dead=q.down=!!(f&32);r.look.skill0Ready=!!(f&128);q.skCd=f&128?0:1;q.hp=+p[4]||0;q.maxHp=+p[5]||1;q.swing=(p[6]||0)/100;if(p[7]>0)q.atk=p[7]/100;if(p[8]>0)q.dashT=p[8]/100}
   if(msg.an)for(const a of msg.an)mpMkAlly(r,a);
@@ -2500,7 +2504,7 @@ function mpHudMake(){
 #mpParty .bar i{display:block;height:100%;width:100%;background:var(--blood,#f0355a)}
 #mpParty .row.down .nm{color:var(--ash,#99a)}#mpParty .row.down .cl{color:var(--warn,#ff8497)}#mpParty .row.away{opacity:.6}
 #mpParty .note{padding:3px 9px;background:var(--plate,rgba(16,20,42,.92));color:var(--warn,#ff8497);font-size:.78rem;font-weight:600;letter-spacing:.06em}
-@media (pointer:coarse) and (max-height:600px){#mpParty{left:calc(6px + env(safe-area-inset-left,0px));top:6px;gap:2px}#mpParty .row{font-size:.66rem;padding:1px 7px 1px 5px}#mpParty .bar{width:34px}#mpParty .cl{display:none}}`;document.head.appendChild(st)}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){#mpParty{left:calc(6px + env(safe-area-inset-left,0px));top:60px;gap:2px}#mpParty .row{font-size:.66rem;padding:1px 7px 1px 5px}#mpParty .bar{width:34px}#mpParty .cl{display:none}}`;document.head.appendChild(st)}
   const stage=cv.parentNode;if(stage)stage.appendChild(el);MP.hud=el;MP.hudKey='';
 }
 function mpHud(now){
@@ -2538,7 +2542,7 @@ function mpDraw2d(pass){
       if(r.echoes.length)drawEchoes(r.echoes);continue}
     const P0=P,c0=S.cls,a0=S.adv,l0=S.level;DR=r;P=r.P;S.cls=r.look.cls;S.adv=r.look.adv;S.level=Math.max(8,r.look.level);
     try{drawPlayer()}finally{P=P0;S.cls=c0;S.adv=a0;S.level=l0;DR=null;ctx.globalAlpha=1}
-    const q=r.P,c=MP.colors[r.idx%MP.colors.length];ctx.textAlign='center';ctx.font='600 13px Spectral,Georgia,serif';ctx.fillStyle='#0d0c11';ctx.fillText(r.name,q.x+1,q.y-49);ctx.fillStyle=c;ctx.fillText(r.name,q.x,q.y-50);
+    const q=r.P,c=MP.colors[r.idx%MP.colors.length];ctx.textAlign='center';ctx.font='700 13px Rajdhani,"Barlow Condensed","Arial Narrow",sans-serif';ctx.fillStyle='#0d0c11';ctx.fillText(r.name,q.x+1,q.y-49);ctx.fillStyle=c;ctx.fillText(r.name,q.x,q.y-50);
     if(!r.dead){ctx.fillStyle='rgba(13,12,17,.8)';ctx.fillRect(q.x-17,q.y-46,34,5);ctx.fillStyle=c;ctx.fillRect(q.x-16,q.y-45,32*Math.max(0,Math.min(1,q.hp/(q.maxHp||1))),3)}
   }
 }
@@ -2566,6 +2570,7 @@ function mpBegin(cfg){
   beginTok++;S.paused=false;const pb=$('pauseB');if(pb){pb.setAttribute('aria-pressed','false');pb.textContent='Menu'}S.stop=0;S.wave=null;
   mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];morsels=[];echoes=[];TSRC=[];obstacles=[];boss=null;
   newRun();stReset();chooseClass();freshBody();hud();$('bossName').textContent='—';
+  if(cfg.mode&&cfg.mode!=='coop'){MP.toast='This version plays co-op only';MP.toastT=performance.now()+6000} // versus is the next phase: MP.mode, remote.team and the per-member attribution of hits (REM) are where it will hook in
   mpHudMake();if(!MP.timer)MP.timer=setInterval(mpBack,250);
   mpSendMe(performance.now(),true);emit('mp',{on:true});return true;
 }
@@ -2598,7 +2603,7 @@ function frame(ts){const real=(ts-last)/1000||0,dt=Math.min(.033,real);last=ts;
   else for(let i=0;i<fast;i++)tick(dt);
   skillUi();manaUi();petUi();
   const R=MB.renderer;
-  if(R&&R.ok){try{R.draw(dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
+  if(R&&R.ok){try{R.draw(MP.on?Math.max(0,Math.min(.2,real)):dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
   bossBar();requestAnimationFrame(frame)}
 function start(data){

@@ -132,7 +132,7 @@ several devices.
 - `android/` is a thin WebView wrapper that packages `web/` as an app and can run the relay for hosting.
 - `ios/` is an Xcode project for a WKWebView wrapper, source only and never built; see `ios/README.md`.
 - `dist/` holds the builds: `Marrowborn.apk` is the current single-player release (3.3) and `Marrowborn-3.4-mp1.apk`
-  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.2.apk` is the previous release and
+  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.3.apk` is the previous release and
   `Marrowborn-2.0.apk` the last 2D-only build; `marrowborn-server.jar` with its three launchers is the desktop server.
 
 ## Play in a browser
