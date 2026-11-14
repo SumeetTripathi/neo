@@ -42,11 +42,11 @@ const CLASSES={
   ['Sanctuary','Your wounds close every 2.5 seconds.'],
   ['Mend','A new skill. Heal 5 health at once and throw back everything near you.'],
   ['Smite','Your orbs hit 60% harder.']]},
- tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds. Slowest on foot. Bosses you kill leave you a ward.',pows:[
+ tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds, and a blocked hit gives back some mana. Slowest on foot. Bosses you kill leave you a ward.',pows:[
   ['Bulwark','Your shield recharges in 3.5 seconds, and a blocked hit throws a shockwave that hurts everything near you.'],
   ['Earthsplitter','A new skill. Slam the ground to hit everything around you hard and wipe out nearby bolts.'],
   ['Iron Heart','4 more health, your wounds close twice as fast, and you hit 25% harder.']]},
- mage:{name:'Mage',gear:'Staff, robe, hat',hp:0,text:'Arcane bolts that strike from across the room. Your dash becomes a blink that jumps you through danger. 10 health. Bosses you kill can be shaped into familiars.',pows:[
+ mage:{name:'Mage',gear:'Staff, robe, hat',hp:0,text:'Arcane bolts that strike from across the room. Your dash becomes a blink that jumps you through danger. 10 health, and the deepest mana. Bosses you kill can be shaped into familiars, each held with a share of your mana.',pows:[
   ['Forked Bolt','Every cast throws three bolts in a spread.'],
   ['Nova','A new skill. A ring of bolts bursts out of you and erases enemy bolts nearby.'],
   ['Arcane Lance','Your bolts pass straight through everything they hit.']]},
@@ -54,7 +54,7 @@ const CLASSES={
   ['Quickdraw','You loose arrows much faster.'],
   ['Volley','A new skill. Loose a fan of seven arrows at once.'],
   ['Longshot','Arrows that fly more than a few strides hit for double.']]},
- necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two. Bosses you kill can be bound to fight for you. 11 health.',pows:[
+ necro:{name:'Necromancer',gear:'Skull staff, grave robe',hp:1,text:'Bone spears at range, and the dead fight for you: a thrall rises every 6 seconds, up to two, and costs nothing. Bosses you kill can be bound to fight for you, each held with a share of your mana. 11 health.',pows:[
   ['Grave Call','Thralls rise every 4 seconds, and you can hold four.'],
   ['Army of Bones','A new skill. Four extra thralls claw out of the ground at once.'],
   ['Soul Leech','Every tenth hit by you or your thralls heals you a little.']]},
@@ -62,17 +62,17 @@ const CLASSES={
 // per class: a stacking boon [name, text, cap] and the two upgrades offered after level 50
 const EXTRA={
  fighter:{boon:['Fury','Swing 8% faster.',5],adv:[['champion','Champion','Raw power','Hit 50% harder and gain 6 health.'],['duelist','Duelist','Footwork','Swing 50% faster and move 15% faster.']]},
- assassin:{boon:['Ambush','Your strike after a dash hits even harder.',5],adv:[['nightblade','Nightblade','Sharper','Every strike hits 60% harder.'],['phantom','Phantom','Unseen','Shadowstep recharges more than twice as fast, and you move 10% faster.']]},
- healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
+ assassin:{boon:['Ambush','Your strike after a dash hits even harder.',5],adv:[['nightblade','Nightblade','Sharper','Every strike hits 60% harder.'],['phantom','Phantom','Unseen','Shadowstep recharges more than twice as fast and costs half the mana, and you move 10% faster.']]},
+ healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health. Your mana comes back a quarter faster.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
  tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
- mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, and your skill recharges twice as fast.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
- ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level and never tires. Bosses you kill can be tamed, and two of them fight for you as well. Arrowheads you have carved become tamed beasts.']]},
- necro:{boon:['Legion','One more thrall at your side, and your bound pets hit 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pets have 40% more health.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pets.']]},
+ mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, your skills recharge twice as fast and cost a fifth less mana, and each familiar holds less of your mana.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
+ ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level, never tires and costs nothing. Bosses you kill can be tamed and fight for you as well, as many as your mana can hold. Arrowheads you have carved become tamed beasts.']]},
+ necro:{boon:['Legion','One more thrall at your side, and your bound pets hit 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pets have 40% more health and hold less of your mana.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pets.']]},
 };
 for(const k in EXTRA)Object.assign(CLASSES[k],EXTRA[k]);
-// Ten active skills per class, six carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs].
+// Ten active skills per class, six carried at a time. Each row: [id, name, cooldown in seconds, text, effects, needs, mana cost (filled in from MCOST below)].
 // Effects are small shared building blocks run in order by cast() (see there for the arguments); damage numbers are multiples of your damage multiplier.
-// needs: 't' a monster above ground, 'near' one within reach, 'thrall' at least one thrall. A skill that cannot be used keeps its cooldown.
+// needs: 't' a monster above ground, 'near' one within reach, 'thrall' at least one thrall. A skill that cannot be used keeps its cooldown and its mana.
 const SKILLS={
  fighter:[
   ['whirlwind','Whirlwind',5,'Spin and hit everything around you hard.',[['shock',115,3]]],
@@ -153,9 +153,29 @@ const SKILLS={
   ['pact','Dark Pact',25,'Unmake your thralls. Each one heals a tenth of your health, up to half.',[['pact']],'thrall']],
 };
 const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
-const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds.';
-for(const k in SKILLS){const c=CLASSES[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
-const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1}));
+/* ---------- mana: what skills are paid with, from the day you have a class ---------- */
+// MANA0: the pool of each class. MCOST: what each skill costs, in the order of SKILLS (it is copied onto the skill row as its seventh entry).
+// Costs follow strength and the size of the class's pool: the quick skills are cheap, the ultimate takes about half a pool.
+const MANA0={mage:140,healer:120,necro:120,ranger:100,assassin:100,fighter:90,tank:90};
+const MCOST={
+ fighter:[8,9,16,12,22,45,13,18,9,16],
+ tank:[8,9,18,9,22,45,18,13,22,14],
+ assassin:[8,9,18,14,20,48,16,16,13,20],
+ mage:[14,12,20,24,30,60,26,18,18,20],
+ ranger:[9,10,13,18,14,48,26,20,16,16],
+ healer:[12,20,18,22,26,58,26,13,20,16],
+ necro:[14,12,13,13,20,58,12,22,18,22],
+};
+// MREGEN: the share of your free mana that comes back each second, whatever you do. Standing still draws it in from the room: after STILL0 seconds without a step the flow starts to rise,
+// and STILL1 seconds later it is MDRAW times the base. A step or a dash resets it. MKILL: the share of the pool a lesser kill gives back. MBLOCK: what a tank's blocked hit gives back.
+const MREGEN=.05,MDRAW=2,STILL0=.3,STILL1=.7,MKILL=.03,MBLOCK=.08;
+// Pets and familiars are held with mana: each one in the field keeps a share of the pool locked away for as long as it is out. All of them together may hold RESVCAP of the pool at most.
+const RESV={pet:.14,familiar:.12},RESVCAP=.9;
+const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+d[6]+'.';
+for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
+const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1,cost:0,affordable:false}));
+// MB.mana: cur and max, regen (mana per second right now), reserved (held by pets or familiars), drawing (the standing bonus is flowing)
+const MANA={cur:0,max:0,regen:0,reserved:0,drawing:false};
 const known=(lv=S.level)=>S.cls&&lv>=8?SKLV.filter(l=>lv+1>=l).length:0;
 const NSK=6,load0=()=>[0,1,2,3,4,5];
 const okLoad=(l,n=NSK)=>Array.isArray(l)&&l.length===n&&l.every((v,i)=>Number.isInteger(v)&&v>=0&&v<10&&l.indexOf(v)===i);
@@ -168,6 +188,7 @@ const BOONS=[
  {id:'vigor',name:'Vigor',text:'+3 maximum health.'},
  {id:'focus',name:'Focus',text:'Your skill recharges 12% faster.',cap:5},
  {id:'fleet',name:'Fleet',text:'Move 6% faster.',cap:5},
+ {id:'well',name:'Wellspring',text:'+15% maximum mana, and mana comes back 10% faster.',cap:5},
  {id:'spec'},
 ];
 const SPEC={
@@ -243,10 +264,12 @@ const SLOTS=['weapon','armor','trinket'];
 const RAR=[['common','#b9b2c6',1,.15],['rare','#6ea3e0',1.5,.2],['epic','#b88cff',2.1,.3],['legendary','#f0b848',2.8,.4]]; // name, colour, stat multiplier, upgrade step it gives when melted down
 const QUAL=['Plain','Fine','Runed','Ancient'];
 const GEAR={fighter:['Greatsword','Harness','Headband'],tank:['Sword','Plate','Iron Band'],assassin:['Daggers','Shadow Wrap','Mask'],mage:['Staff','Robe','Hat'],ranger:['Bow','Hood','Quiver'],healer:['Sun Staff','White Robe','Circlet'],necro:['Skull Staff','Grave Robe','Bone Charm']};
-const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall and pet damage',10,'%']};
+const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall and pet damage',10,'%'],mana:['max mana',6,'%']};
 const slotStats=(c,slot)=>slot==='weapon'?['dmg','spd']:slot==='armor'?['hp','guard']:['cdr',c==='tank'?'sh':c==='healer'?'mend':c==='necro'?'thr':'mv'];
 // an item is fully described by class, slot, rarity r (0-3), upgrade count lvl and upgrade total up; common items carry one stat line, the rest two
-function item(c,slot,r,lvl=0,up=0){return{slot,name:QUAL[r]+' '+GEAR[c][SLOTS.indexOf(slot)],rarity:RAR[r][0],r,lvl,up,keys:slotStats(c,slot).slice(0,r?2:1)}}
+// m: a trinket of a casting class (CASTER) that carries max mana as its second line instead of the usual one; it is the only thing about an item that is rolled
+const CASTER={mage:1,healer:1,necro:1};
+function item(c,slot,r,lvl=0,up=0,m=0){const keys=slotStats(c,slot).slice(0,r?2:1);m=m&&slot==='trinket'&&r>0&&CASTER[c]?1:0;if(m)keys[1]='mana';return{slot,name:QUAL[r]+' '+GEAR[c][SLOTS.indexOf(slot)],rarity:RAR[r][0],r,lvl,up,m,keys}}
 const statV=(it,k)=>{const v=STAT[k][1]*RAR[it.r][2]*(1+it.up);return k==='hp'?Math.round(v):Math.round(v*10)/10};
 const itemLine=it=>it.keys.map(k=>'+'+statV(it,k)+STAT[k][2]+' '+STAT[k][0]).join(', ');
 const itemName=it=>it.name+(it.lvl?' +'+it.lvl:'');
@@ -256,9 +279,10 @@ function eqSync(){EQ={};if(S.eq)for(const sl of SLOTS){const it=S.eq[sl];if(it)f
 const eqv=k=>S.level>=8&&S.cls&&EQ[k]||0;
 function dropItem(n){
   const N=n+1,big=N===12||N%10===0,pL=Math.min(.25,.01+(N-9)*.004)*(big?4:1),pE=Math.min(.35,.05+(N-9)*.008)*(big?2:1),x=rand();
-  return item(S.cls,SLOTS[Math.floor(rand()*3)],x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0);
+  const slot=SLOTS[Math.floor(rand()*3)],r=x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0;
+  return item(S.cls,slot,r,0,0,slot==='trinket'&&r>0&&CASTER[S.cls]&&rand()<.4?1:0);
 }
-const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,spec:0});
+const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,well:0,spec:0});
 const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[],echoes=[];
 /* ---------- settings, events and run counters, shared with extras.js through MB ---------- */
@@ -281,6 +305,25 @@ const adv=k=>(ADV[S.adv]||{})[k];
 const dmgMul=()=>(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
 const cdMul=()=>1/((P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1); // Phantom only speeds up Shadowstep
+// mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
+const manaMax=()=>{const c=cls();return c?Math.round(MANA0[c]*(1+.15*S.b.well)*(1+eqv('mana')/100)):0};
+const skCost=si=>{const c=cls(),d=c&&SKILLS[c][si];return d?Math.max(1,Math.round(d[6]*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1))):0};
+const manaRoom=()=>P?Math.max(0,P.maxMana-P.resv):0;
+const manaRate=()=>manaRoom()*MREGEN*(1+.1*S.b.well)*(S.adv==='saint'?1.25:1);
+function manaGive(v){if(!P||!P.maxMana)return;P.mana=Math.min(manaRoom(),P.mana+v)}
+function manaSync(){if(!P)return;MANA.cur=Math.floor(P.mana+1e-6);MANA.max=P.maxMana;MANA.reserved=P.resv;MANA.drawing=P.drawK>0&&P.mana<manaRoom()-.01;MANA.regen=P.maxMana&&P.mana<manaRoom()-.01?Math.round(manaRate()*(1+(MDRAW-1)*P.drawK)*10)/10:0}
+// a skill that was asked for and cannot be paid: a soft sound and a flag for the HUD (which button, when), and nothing else
+const manaCue={i:-1,at:-1e9,n:0};
+function noMana(si){const now=performance.now();if(now-manaCue.at>250){SND.nomana();haptic(8)}manaCue.i=S.load.indexOf(si);manaCue.at=now;manaCue.n++}
+// every step: the free part of the pool refills, faster the longer you have stood still; while the standing bonus flows, motes drift in from the room
+function manaStep(dt){
+  if(!P.maxMana)return;
+  P.still=P.moving||P.dashT>0?0:P.still+dt;P.drawK=Math.max(0,Math.min(1,(P.still-STILL0)/STILL1));
+  const room=manaRoom();
+  if(P.mana<room){P.mana=Math.min(room,P.mana+manaRate()*(1+(MDRAW-1)*P.drawK)*dt);
+    if(P.drawK>0&&rand()<dt*(SET.gfx==='low'?7:14)*P.drawK){const a=rand()*TAU,d=62+rand()*40,v=230+rand()*90;bits.push({x:P.x+Math.cos(a)*d,y:P.y-6+Math.sin(a)*d,vx:-Math.cos(a)*v,vy:-Math.sin(a)*v,life:.42,max:.42,c:rand()<.6?'#6fe3ff':'#a98bff',r:2,mana:true})}}
+  else if(P.mana>room)P.mana=room;
+}
 const aiK=m=>mspd()*(m.rage?(S.level<3?1.12:m.ai==='hollow'?1.15:1.3):1)*(m.spdK||1);
 const melee=c=>!c||c==='tank'||c==='fighter'||c==='assassin';
 const mspd=()=>S.level<8?1:Math.min(1.7,1.25+Math.max(0,S.level-12)*.01);
@@ -440,6 +483,7 @@ const SND={
     else if(c==='necro'){sfx(120,.5,'sawtooth',.22,240);for(let i=0;i<5;i++)noise(.03,.2,2400,1800,.08+i*.07)}
     else for(let i=0;i<3;i++){sfx(1250-i*120,.06,'triangle',.14,480,i*.045);noise(.05,.1,4200,2600,i*.045)}},
   fizzle(){sfx(220,.08,'triangle',.12,160)},
+  nomana(){sfx(330,.09,'sine',.1,247);sfx(165,.12,'sine',.07,123,.03)},
   pickup(){sfx(600,.1,'sine',.2,900);sfx(900,.16,'sine',.18,1350,.08)},
   levelStart(){sfx(196,.7,'triangle',.2,98);sfx(146.83,.9,'sine',.16,73,.05);sfx(392,.5,'sine',.05,388,.02)},
   bossDeath(){sfx(90,.7,'sawtooth',.36,30);noise(.6,.4,1200,90);[392,311,233,155].forEach((f,i)=>sfx(f,.4,'triangle',.14,f*.97,.15+i*.12))},
@@ -665,7 +709,7 @@ function hurtM(m,d,quiet){
       rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+70,fx:true});floats.push({x:m.x,y:m.y-m.r-18,txt:'It splits',life:1.3,c:'#ff5b6e'});sfx(200,.3,'sawtooth',.2,400)}
   }
   if(m.hp<=0){
-    mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;
+    mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P)manaGive(P.maxMana*MKILL);
     if(m.boss){mons=[];shots=[];pshots=[];zones=[];fields=[];S.mode='clear';S.clearT=1.2;S.shake=.4;SND.bossDeath();haptic([60,40,220]);S.stop=.12;emit('bossdead',{level:S.level,time:ST.levelTime,cls:S.cls})}
     else if(has('taste')&&rand()<.35){const f={x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}
   }
@@ -674,9 +718,9 @@ function hurtP(d,src){
   if(P.inv>0||S.mode!=='play')return;
   if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
   if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null} // hit, blocked or shrugged off: the ward answers
-  if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);shock(115,2);return}
+  if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
-  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
+  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK);if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
   if(P.stoneT>0)d=Math.ceil(d/2);
   ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
@@ -760,12 +804,13 @@ function cast(op,x){
   }
 }
 function skill(si){
-  const c=cls(),sk=SKILLS[c][si],need=sk[5];
+  const c=cls(),sk=SKILLS[c][si],need=sk[5],cost=skCost(si);
+  if(P.mana<cost){noMana(si);return false} // not enough mana: nothing happens and the cooldown does not start
   let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
   // nothing to use it on: keep the skill ready instead of wasting the cooldown
   if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')){SND.fizzle();return false}
   const x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()};
-  P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
+  P.mana-=cost;P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
   for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam')&&!mons.includes(t))continue;cast(op,x)}
   if(sk[0]==='shadowstep'&&TSRC.length&&TSRC[0].form==='venom'){P.trQ=1;P.trT=t}
   P.mxS[si]=sk[2]*skMul(si);P.cdS[si]=P.mxS[si];syncSkills();return true;
@@ -782,7 +827,7 @@ function channels(dt){
 }
 // slot i (0-5) carries skill S.load[i] once that skill is learned
 const slotSkill=i=>{const si=S.load[i];return cls()&&si<known()?si:-1};
-function syncSkills(){const c=cls();for(let i=0;i<NSK;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0]}
+function syncSkills(){const c=cls();for(let i=0;i<NSK;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&SKILLS[c][si];s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;s.cost=d?skCost(si):0;s.affordable=!!d&&!!P&&P.mana>=s.cost;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0];manaSync()}
 // the room against the player: pillars push back, a pit swallows you unless you are dashing across it, raised spikes and burning braziers hurt
 function roomP(){
   collide(P,14,false);
@@ -814,6 +859,7 @@ function playerStep(dt){
   for(const k of['inv','atk','cd','dashCd','amb','rageT','guardT','legT','fleetT','stoneT'])if(P[k]>0)P[k]-=dt;
   for(let i=0;i<10;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
   if(S.mode==='play')channels(dt);
+  manaStep(dt);
   const held=S.banner>1.5; // the monster stands frozen while the level banner is up, so you cannot hit it either
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
@@ -1470,7 +1516,8 @@ function hud(){
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0);
-  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,trW:2.5,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
+  const maxMana=manaMax();
+  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,mana:maxMana,maxMana,resv:0,still:0,drawK:0,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,trW:2.5,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
 }
 // dev only: __mb.over = {kind, mods, waves, room} replaces parts of a generated level, for testing one thing at a time
 function devDef(L,n){
