@@ -417,7 +417,7 @@ function rebuildPlayer(g,MB){
   b.put('ready',glow(pw,.6),gRing(.9,28,0,TAU),0,.9,0,-HP,0,0,19,19,1);b.put('ready',glow(pw2,.5),gRing(.8,4,0,TAU),0,.95,0,-HP,0,0,14.5,14.5,1);
   const full=c==='fighter'&&MB.pw(1),R=c?(full?74:62):54;ud.full=full;
   SLASH.color.setHex(c?acc:C.bone).lerp(_white,.45);ud.slashMat=SLASH;
-  if(full)b.put('slash',SLASH,gRing(.62,32,0,TAU),0,0,0,-HP,0,0,R,R,1);else b.put('slash',SLASH,gRing(.62,14,-HP-1.15,2.3),0,0,0,-HP,0,0,R,R,1);
+  if(full){b.put('slash',SLASH,gRing(.93,48,0,TAU),0,0,0,-HP,0,0,R,R,1);b.put('slash',SLASH,gRing(.975,40,0,TAU),0,0,0,-HP,0,0,R*.8,R*.8,1)}else b.put('slash',SLASH,gRing(.62,14,-HP-1.15,2.3),0,0,0,-HP,0,0,R,R,1);
   s.slash.position.set(0,32,0);
   b.flush();
   ud.shieldMeshes.length=0;ud.shieldOn=null;
@@ -531,7 +531,7 @@ const player={
     s.ready.visible=rd;if(rd){s.ready.rotation.y=-t*.9;const f=1+.04*Math.sin(t*5);s.ready.scale.set(f,1,f)}
     // melee slash arc fades over the swing
     const sl=s.slash;sl.visible=atk&&mel;
-    if(sl.visible){SLASH.opacity=.8*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
+    if(sl.visible){SLASH.opacity=(ud.full?.62:.8)*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
   }
 };
 

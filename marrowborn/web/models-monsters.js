@@ -517,7 +517,7 @@ BUILD.beamer=function(b,m,p){
 ANIM.beamer=function(p,m,t,tt,st,look,u){
   var wind=st==='wind',beam=st==='beam',i,q,k;
   p.ball.rotation.y=wind||beam?0:look*.5;p.ball.rotation.x=beam?.22:wind?.12:.05*sin(tt*1.7);
-  var hot=beam||wind&&sin(t*38)>0,mat=u&&u.pv?(u.pv==='necro'?(hot?FX.irisNHot:FX.irisN):(hot?FX.irisBHot:FX.irisB)):hot?FX.irisHot:FX.iris;if(p.iris.material!==FX.white&&p.iris.material!==u.ghost&&p.iris.material!==mat)p.iris.material=mat;
+  var hot=beam||wind&&sin(t*38)>0,mat=u&&u.pv?(u.pv==='necro'?(hot?FX.irisNHot:FX.irisN):(hot?FX.irisBHot:FX.irisB)):hot?FX.irisHot:FX.iris;if(!u.spec&&p.iris.material!==FX.white&&p.iris.material!==u.ghost&&p.iris.material!==mat)p.iris.material=mat;
   k=beam?1.12+.06*sin(t*50):wind?.8+.25*(1-max(0,min(1,(m.t||0)/.95))):1+.05*sin(tt*3);p.iris.scale.set(.5*k,.5*k,.4);
   k=beam?.5:wind?1.3:1;p.pupil.scale.set(.22*k,.3*k,.18);
   for(i=0;i<p.nerves.length;i++){q=p.nerves[i];q.a.rotation.x=sin(tt*2.2+q.ph)*.3+(beam?.5:0);q.a.rotation.z=cos(tt*1.8+q.ph)*.25;q.b.rotation.x=sin(tt*3+q.ph)*.4}
@@ -544,12 +544,13 @@ function fxm(){
   return FXM;
 }
 // tinted twins of a body material: further cached variants (rage has a dim and a bright one, for the pulse), shared by every monster of that colour
-var VAR={rage:new Map(),rage1:new Map(),slow:new Map()};
+var VAR={rage:new Map(),rage1:new Map(),slow:new Map(),hit:new Map()};
 function variant(mat,kind){
   var h=BODY.get(mat);if(h===undefined)return mat;
   var map=VAR[kind],v=map.get(mat);if(v)return v;
   _c.setHex(h);
-  if(kind==='slow'){_c.lerp(_c2.set(0x3f8cff),.6);v=toonM(_c.getHex(),{emissive:0x1a3f9a,emissiveIntensity:.5})}
+  if(kind==='hit'){_c.lerp(_c2.set(0xfff2e4),.5);v=toonM(_c.getHex(),{emissive:0xffe9d8,emissiveIntensity:.34})}
+  else if(kind==='slow'){_c.lerp(_c2.set(0x3f8cff),.6);v=toonM(_c.getHex(),{emissive:0x1a3f9a,emissiveIntensity:.5})}
   else{_c.lerp(_c2.set(0xff2a30),.28);v=toonM(_c.getHex(),{emissive:0xff1a26,emissiveIntensity:kind==='rage1'?.72:.3})}
   map.set(mat,v);return v;
 }
@@ -668,8 +669,8 @@ function mk0(geo,mat,par,x,y,z,sx,sy,sz){var o=new T.Mesh(geo,mat);o.position.se
 
 function create(m,MB){
   geos();fx();fxm();
-  var s=m.s||{},ai=pickAi(m),pv=petKind(m,MB);
-  if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st};
+  var s=m.s||{},ai=pickAi(m),spec=!!m.spectre,pv=spec?0:petKind(m,MB);
+  if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st,spectre:m.spectre};
   var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[],glows:[],trails:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
   REG=[];PV=pv;CUR=p;
   try{BUILD[ai](body,m,p,root)}finally{PV=0;CUR=null}
@@ -687,7 +688,7 @@ function create(m,MB){
     pv:pv,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0,rl:0,crown:null,lw:r<14?.7:m.boss&&!pv&&ai!=='mimic'?1.25:1};
   u.fx.scale.setScalar(r);
   if(pv){u.own=[];petDress(u,g,m,pv)}
-  else if(m.boss&&ai!=='mimic'){
+  else if(m.boss&&!spec&&ai!=='mimic'){
     var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;au.userData.noOutline=true;g.add(au);u.aura=au;
     // the level's master wears a slow halo of dark shards with burning slivers between them
     var cr=grp(root,0,cfg.top*.72,0),dkm=M(m.s.col,-.6);u.crown=cr;
@@ -696,8 +697,8 @@ function create(m,MB){
     o=mk0(merged('bossSlivers',function(add){for(var i=0;i<5;i++){var a=(i+.5)*TAU/5;add(G.cone4,cos(a)*1.42,.1,sin(a)*1.42,0,1,0,.05,.4,.05);add(G.cone4,cos(a)*1.42,.1,sin(a)*1.42,0,-1,0,.05,.2,.05)}}),FX.crack,cr,0,0,0,1,1,1);
     o.castShadow=false;o.userData.noOutline=true;meshes.push(o);mats.push(FX.crack);
   }
-  g.userData.mb=u;g.name=(pv?'pet:':'mon:')+ai;
-  ink(g,u.lw);
+  g.userData.mb=u;g.name=(spec?'spectre:':pv?'pet:':'mon:')+ai;
+  if(!spec)ink(g,u.lw);
   return g;
 }
 // what a pet looks at: an explicit target if the game gives one, else the nearest monster that is not underground
@@ -766,7 +767,7 @@ function update(g,m,MB,dt){
   var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));u.fx.scale.setScalar(r);if(u.aura)u.aura.scale.setScalar(r*2.3)}
   // facing
   var a=P?Math.atan2(P.y-m.y,P.x-m.x):0;
-  if(u.pv){ // a pet watches its prey, not its master; with nothing to fight it looks where it is walking
+  if(u.pv||u.spec){ // a pet watches its prey, not its master; with nothing to fight it looks where it is walking
     o=petFocus(m,MB);
     if(o.ok)a=Math.atan2(o.y-m.y,o.x-m.x);
     else{k=m.x-u.hx;q=m.y-u.hz;if(k*k+q*q>36){u.ha=Math.atan2(q,k);u.hx=m.x;u.hz=m.y}a=typeof u.ha==='number'?u.ha:a+PI}
@@ -826,8 +827,9 @@ function update(g,m,MB,dt){
   // body materials: hit flash, then chill, then rage
   var mode=m.flash>0?1:m.slow>0?3:rage?2:0,ms,mt;
   if(mode!==u.mode){
-    u.mode=mode;ms=u.meshes;mt=u.mats;var kind=mode===2?'rage':'slow';
-    for(i=0;i<ms.length;i++)ms[i].material=mode===0?mt[i]:mode===1?FX.white:variant(mt[i],kind);
+    u.mode=mode;ms=u.meshes;mt=u.mats;var kind=mode===2?'rage':'slow',soft=mode===1&&(m.boss||r>=30)&&!u.pv;
+    // a hit: small things blink white; a boss fills most of the view, so it only brightens to a pale tint of its own colour (eyes and glows keep theirs)
+    for(i=0;i<ms.length;i++)ms[i].material=mode===0?mt[i]:mode===1?(soft?variant(mt[i],'hit'):FX.white):variant(mt[i],kind);
     u.rl=0;
   }
   // rage beats between two cached tints (a hard cel pulse, nothing mutated)
@@ -861,6 +863,153 @@ function update(g,m,MB,dt){
     }
   }
 }
+/* ---------- spectres: a rim-lit, see-through copy of a monster body. Used for trophy echoes, the healer's guardian and the mote inside a
+   mage's familiar. The body is built by create() (shared geometry) and then every mesh is handed one material owned by this spectre, so its
+   colour and strength can change freely without touching a cached material. No outlines, no shadows, one cheap additive pass. ---------- */
+var SPEC_VS='varying vec3 vN;varying vec3 vV;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vN=normalMatrix*normal;vV=-mv.xyz;gl_Position=projectionMatrix*mv;}';
+var SPEC_FS='uniform vec3 uC;uniform vec3 uC2;uniform float uA;uniform float uB;uniform float uT;varying vec3 vN;varying vec3 vV;void main(){float f=1.0-abs(dot(normalize(vN),normalize(vV)));float rim=smoothstep(0.34,0.6,f);float band=0.84+0.16*sin(gl_FragCoord.y*0.8-uT*9.0);float a=(uB+(1.0-uB)*rim)*uA*band;gl_FragColor=vec4(mix(uC,uC2,rim*0.7)*a,1.0);}';
+function addM(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})}
+function specMat(){return new T.ShaderMaterial({uniforms:{uC:{value:new T.Color(0x8b4dff)},uC2:{value:new T.Color(0xffffff)},uA:{value:1},uB:{value:.2},uT:{value:0}},
+  vertexShader:SPEC_VS,fragmentShader:SPEC_FS,transparent:true,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})}
+function hexOf(c,d){if(typeof c==='number'&&c===c)return c;if(typeof c==='string'&&/^#[0-9a-f]{6}$/i.test(c))return parseInt(c.slice(1),16);return d}
+// the two states an attack runs through, by body (anything else: a wind-up, then at rest)
+var ATK={crawler:['wind','lunge'],hound:['wind','charge'],fist:['leap','leap'],burrower:['up','up'],beamer:['wind','beam'],bomber:['wind','wind'],summoner:['wind','wind']};
+function spectre(src,MB,r){
+  geos();fx();fxm();
+  src=src||{};
+  var s=src.s&&typeof src.s==='object'?src.s:{};
+  var m={spectre:true,s:s,ai:src.ai,r:r||src.r||s.r||20,x:src.x||0,y:src.y||0,st:'idle',ang:0,face:0,ba:0,seed:src.seed||0,lift:0,flash:0,slow:0,t:1,hp:1,maxHp:1,boss:false,hidden:false};
+  var g=create(m,MB),u=g.userData.mb,sm=specMat(),em=addM(0xffffff,1),i,o,mat;
+  u.spec={m:m,mat:sm,eye:em};u.own=[sm,em];
+  for(i=0;i<u.meshes.length;i++){
+    o=u.meshes[i];mat=o.material;o.castShadow=false;o.userData.noOutline=true;
+    if(mat===FX.pupil){o.visible=false;continue}
+    o.material=u.mats[i]=mat===FX.eye||mat===FX.eyeRed||mat===FX.eyeGreen||mat===FX.ember||mat===FX.iris||mat===FX.ring||mat===FX.crack?em:sm;
+  }
+  if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=false;
+  u.fx.visible=false;
+  return g;
+}
+// place and animate: q<0 = at rest, 0..1 = through its attack. Returns the lift (0..1) of a leaping body.
+function specPose(g,x,y,face,q,MB,dt){
+  var u=g.userData.mb,m=u.spec.m,a=ATK[u.ai];
+  if(!(face===face))face=0;
+  m.x=x;m.y=y;m.face=m.ang=m.ba=face;
+  if(q<0){m.st=u.ai==='burrower'?'up':'idle';m.t=1;m.lift=0}
+  else{m.st=q<.34?(a?a[0]:'wind'):a?a[1]:'idle';m.t=u.ai==='burrower'?q*.9:q;m.lift=u.ai==='fist'?sin(min(1,q*1.25)*PI):0}
+  update(g,m,MB,dt);
+  return m.lift;
+}
+function specTint(g,c1,c2,a,base,t){
+  var sp=g.userData.mb.spec,un=sp.mat.uniforms;
+  un.uC.value.setHex(c1);un.uC2.value.setHex(c2);un.uA.value=a;un.uB.value=base;un.uT.value=t;
+  sp.eye.color.setHex(c2).convertSRGBToLinear();sp.eye.opacity=a>1?1:a;
+}
+function specReset(g){var u=g.userData.mb;u.init=false;u.sx=u.sy=u.sz=1;u.tilt=0;u.shake=0;u.slam=0;u.prev='idle';u.px=u.spec.m.x;u.pz=u.spec.m.y;u.mv=0}
+
+/* ---------- trophies that stand in the arena: the mage's familiar (a floating gyroscope of violet rings around a small spectre of its
+   monster) and the healer's guardian (a tall gold-white spectre of the monster under a halo, with a shell of light while its ward is ready).
+   Anything else that is flagged as a trophy is drawn as a plain friendly wisp. Never a hostile body, never an outline in foe colours. ---------- */
+var TRO=null;
+function tro(){
+  if(TRO)return TRO;
+  geos();fx();
+  var cv=document.createElement('canvas');cv.width=cv.height=128;var x=cv.getContext('2d'),i,a;
+  x.translate(64,64);x.strokeStyle='#fff';x.fillStyle='#fff';x.lineCap='round';
+  var g=x.createRadialGradient(0,0,10,0,0,62);g.addColorStop(0,'rgba(255,255,255,.3)');g.addColorStop(.6,'rgba(255,255,255,.12)');g.addColorStop(1,'rgba(255,255,255,0)');x.fillStyle=g;x.beginPath();x.arc(0,0,62,0,TAU);x.fill();
+  x.lineWidth=2.6;x.beginPath();x.arc(0,0,46,0,TAU);x.stroke();
+  x.lineWidth=1.4;x.setLineDash([7,6]);x.beginPath();x.arc(0,0,37,0,TAU);x.stroke();x.setLineDash([]);
+  x.fillStyle='#fff';for(i=0;i<4;i++){a=i*TAU/4;x.save();x.translate(cos(a)*46,sin(a)*46);x.rotate(a);x.beginPath();x.moveTo(8,0);x.lineTo(0,4.5);x.lineTo(-8,0);x.lineTo(0,-4.5);x.closePath();x.fill();x.restore()}
+  return TRO={mark:new T.CanvasTexture(cv),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2),thin:new T.TorusGeometry(1,.055,5,28).rotateX(PI/2),band:new T.TorusGeometry(1,.075,5,26).rotateX(PI/2),shell:new T.SphereGeometry(1,16,10)};
+}
+function lowQ(){var S=window.MBStyle;return !!(S&&S.quality==='low')}
+function troCreate(a,MB){
+  var R=tro();a=a||{};
+  var g=new T.Group(),kind=a.kind==='guardian'?'guardian':a.kind==='familiar'?'familiar':'wisp',s=a.s&&typeof a.s==='object'?a.s:null,own=[],i,o;
+  var pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),holy=pal('holy',0xffd66e);
+  var col=hexOf(s&&s.col,pw2),u={tro:kind,own:own,spec:null,col:col,col2:_c.setHex(col).lerp(_c2.set(0xffffff),.6).getHex(),ct:9,was:'idle',sh:0,shOn:false,rot:0,t0:undefined,r:0,seed:typeof a.seed==='number'?a.seed:0};
+  var gm=new T.MeshBasicMaterial({map:R.mark,color:kind==='guardian'?holy:pw,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+  own.push(gm);o=new T.Mesh(R.quad,gm);o.position.y=1.15;o.renderOrder=2;o.userData.noOutline=true;g.add(o);u.gmark=o;u.gmat=gm;
+  if(kind==='guardian'){
+    var r=max(15,min(40,a.r||s&&s.r||20));u.r=r;
+    if(s&&typeof s.col==='string'){try{u.spec=spectre(a,MB,r)}catch(e){u.spec=null}}
+    if(u.spec){g.add(u.spec);o=u.spec.userData.mb;u.top=o.top*r*1.16;o.root.scale.set(r*(o.cfg.k||1)*.94,r*(o.cfg.k||1)*1.16,r*(o.cfg.k||1)*.94)}
+    else{u.top=r*2.6;u.body=grp(g,0,0,0);fxMesh(G.robe,glowM(holy,.4),u.body,0,0,0,r*.8,r*1.5,r*.8);fxMesh(G.sph,glowM(0xfff4dc,.55),u.body,0,r*2.1,0,r*.42)}
+    // halo over the head, and the shell of light it lends while the ward is ready
+    u.halo=grp(g,0,u.top+r*.3,0);fxMesh(G.torus,glowM(0xfff4dc,.95),u.halo,0,0,0,r*.5,r*.5,r*.5);fxMesh(R.thin,glowM(holy,.8),u.halo,0,0,0,r*.72,r*.72,r*.72);
+    var shm=specMat();own.push(shm);shm.uniforms.uC.value.setHex(holy);shm.uniforms.uC2.value.setHex(0xfffbf0);shm.uniforms.uB.value=.03;shm.side=T.DoubleSide;
+    u.shell=fxMesh(R.shell,shm,g,0,u.top*.5,0,r*1.5,u.top*.62,r*1.5);u.shell.renderOrder=5;u.shell.visible=false;u.shm=shm;
+    u.motes=grp(g);for(i=0;i<4;i++)fxMesh(G.sphLo,glowM(holy,.8),u.motes,0,0,0,1);
+  }else{
+    // familiar (or wisp): rings turning about a core that floats at shoulder height
+    u.core=grp(g,0,30,0);
+    var ringM=toonM(pw,{emissive:pw,emissiveIntensity:.75}),shardM=toonM(0xdff6ff,{emissive:pw2,emissiveIntensity:.9});
+    u.rings=[grp(u.core),grp(u.core)];
+    o=new T.Mesh(R.band,ringM);o.scale.set(13.5,13.5,13.5);o.castShadow=true;u.rings[0].add(o);
+    o=new T.Mesh(R.band,ringM);o.scale.set(11.5,11.5,11.5);o.castShadow=true;u.rings[1].add(o);
+    u.shards=grp(u.core);for(i=0;i<3;i++){o=new T.Mesh(G.oct,shardM);o.scale.set(1.5,3.1,1.5);o.castShadow=true;u.shards.add(o)}
+    var hm=new T.SpriteMaterial({map:FX.auraTex,color:col,transparent:true,opacity:.6,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+    own.push(hm);u.haloS=new T.Sprite(hm);u.haloS.scale.setScalar(44);u.haloS.userData.noOutline=true;u.core.add(u.haloS);u.hm=hm;
+    if(kind==='familiar'&&s&&typeof s.col==='string'){try{u.spec=spectre(a,MB,9)}catch(e){u.spec=null}}
+    if(u.spec){u.mini=grp(u.core,0,0,0);u.mini.add(u.spec);o=u.spec.userData.mb;u.mh=o.top*9*.5;u.spec.position.y=-u.mh}
+    else fxMesh(G.ico1,glowM(col,.9),u.core,0,0,0,4.6); // a wisp carries only a light
+    ink(u.core,.7);
+  }
+  g.userData.mbt=u;g.name='trophy:'+kind;
+  return g;
+}
+function troUpdate(g,a,MB,dt){
+  var u=g.userData.mbt;if(!u)return;
+  var t=MB.S.t,seed=u.seed,cast=a.st==='cast',low=lowQ(),i,o,k,q,n,c;
+  dt=dt>0?min(dt,.1):1/60;
+  if(u.t0===undefined)u.t0=t;var born=t-u.t0,grow=born<.45?easeO(born/.45):1;
+  if(cast&&u.was!=='cast')u.ct=0;u.was=a.st;u.ct+=dt;
+  var cq=u.ct<.55?u.ct/.55:-1,flare=max(cq>=0?1-cq:0,a.flash>0?min(1,a.flash*5):0),face=typeof a.face==='number'?a.face:0;
+  o=u.gmark;o.position.y=1.15-g.position.y;
+  if(u.tro==='guardian'){
+    var r=u.r;
+    k=r*3.5*(.9+.1*grow)*(1+.12*flare);o.scale.set(k,1,k);o.rotation.y=t*.4+seed;u.gmat.opacity=(.62+.1*sin(t*2.2+seed)+.3*flare)*grow;
+    if(u.spec){
+      var lift=specPose(u.spec,a.x||0,a.y||0,face,cq,MB,dt);
+      specTint(u.spec,0xffd66e,0xfffbf0,(.92+.08*sin(t*2.6+seed)+.5*flare)*grow,.24,t+seed);
+      u.spec.position.y=lift*r*.8+r*.06*(1+sin(t*1.7+seed));
+    }else if(u.body){u.body.position.y=2+sin(t*1.7+seed)*2;u.body.rotation.y=PI/2-face}
+    u.halo.rotation.y=t*.9;u.halo.position.y=u.top+r*.34+sin(t*2.1+seed)*r*.05;k=grow*(1+.25*flare);u.halo.scale.set(k,k,k);
+    // the ward: a shell while it is ready; when it is spent the shell bursts outward once
+    var on=a.shield===true||a.shield>0;
+    if(on!==u.shOn){if(!on&&u.shOn)u.sh=.4;u.shOn=on}
+    if(u.sh>0)u.sh=max(0,u.sh-dt);
+    o=u.shell;o.visible=on||u.sh>0;
+    if(o.visible){q=on?0:1-u.sh/.4;k=1+.04*sin(t*3.3+seed)+q*.5;o.scale.set(r*1.5*k,u.top*.62*k,r*1.5*k);o.rotation.y=t*.5;
+      u.shm.uniforms.uA.value=on?(.5+.12*sin(t*4.4+seed))*grow:.9*(1-q)*(1-q);u.shm.uniforms.uT.value=t*.6}
+    o=u.motes;o.visible=!low;
+    if(!low){n=o.children.length;for(i=0;i<n;i++){q=(t*.42+i/n+seed)%1;if(q<0)q+=1;k=i*TAU/n+seed+q*1.6;c=o.children[i];
+      c.position.set(cos(k)*r*(1.1-.3*q),2+q*u.top*1.05,sin(k)*r*(1.1-.3*q));k=max(1.1,r*.06)*sin(q*PI);c.scale.set(k,k*2.2,k)}}
+    return;
+  }
+  k=(30+6*flare)*(.9+.1*grow);o.scale.set(k,1,k);o.rotation.y=-t*.6+seed;u.gmat.opacity=(.5+.1*sin(t*3+seed)+.4*flare)*grow;
+  c=u.core;c.position.y=30+2.6*sin(t*2.3+seed)+3*flare;k=grow*(1+.3*flare);c.scale.set(k,k,k);
+  u.rot+=dt*(1.6+9*flare);
+  u.rings[0].rotation.set(.5+.25*sin(t*.9+seed),u.rot,0);u.rings[1].rotation.set(u.rot*1.3+1,0,.6);
+  o=u.shards;o.visible=!low||flare>0;
+  if(o.visible){n=o.children.length;q=16.5+5*flare;for(i=0;i<n;i++){k=-u.rot*.7+i*TAU/n;c=o.children[i];c.position.set(cos(k)*q,sin(t*1.9+i*2)*2.5,sin(k)*q);c.rotation.y=k}}
+  q=a.tm>0&&typeof a.t==='number'?max(0,min(1,1-a.t/a.tm)):.5; // brightens as its next cast comes due
+  u.hm.opacity=min(1,.34+.3*q+.06*sin(t*5+seed)+.5*flare);k=38+10*q+30*flare;u.haloS.scale.set(k,k,1);
+  if(u.spec){
+    specPose(u.spec,a.x||0,a.y||0,face,cq,MB,dt);u.spec.position.set(0,-u.mh,0);
+    specTint(u.spec,u.col,u.col2,1.5+.9*flare,.5,t+seed);
+  }
+}
+function easeO(q){q=1-q;return 1-q*q*q}
+function troDispose(g){
+  var u=g&&g.userData&&g.userData.mbt;if(!u)return;
+  if(u.spec)dispose(u.spec);
+  for(var i=0;i<u.own.length;i++)u.own[i].dispose();u.own.length=0;
+}
+window.MBModels.spectre={create:spectre,pose:specPose,tint:specTint,reset:specReset,dispose:dispose,
+  top:function(g){var u=g&&g.userData&&g.userData.mb;return u?u.top*u.r:40},ai:function(g){var u=g&&g.userData&&g.userData.mb;return u?u.ai:''}};
+window.MBModels.trophy={create:troCreate,update:troUpdate,dispose:troDispose,
+  height:function(a){return a&&a.kind==='guardian'?max(15,min(40,a.r||20))*3:52}};
 window.MBModels.monster={create:create,update:update,fade:fade,petKind:petKind,
   // optional helpers for the renderer: world height of the top of the head, and a no-op dispose (geometry and materials are shared)
   height:function(m){var c=CFG[pickAi(m)]||CFG.mimic;return c.top*(c.k||1)*(m.r||20)},dispose:dispose};

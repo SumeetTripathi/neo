@@ -714,6 +714,7 @@ const pools={
   pbomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.bolt),halo=new THREE.Sprite(glowMat(0x4fb4ff,.9));b.scale.setScalar(5.5);b.castShadow=true;halo.scale.setScalar(30);g.add(b,halo);return g}),
   bomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.dark),halo=new THREE.Sprite(glowMat(0xff7a30,.9)),f=new THREE.Mesh(G.sphere,mCore.e);b.scale.setScalar(6.5);b.castShadow=true;halo.scale.setScalar(30);f.scale.setScalar(2.2);f.position.y=6.5;g.add(b,halo,f);return g}),
   blob:new Pool(()=>{const m=new THREE.Mesh(G.quad,blobMat);m.renderOrder=0;return m}),
+  ward:new Pool(()=>{const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:PAL.holy,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.25;m.renderOrder=4;return m}),
   ring:new Pool(()=>{const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.1;m.renderOrder=4;return m}),
 };
 
@@ -895,6 +896,14 @@ function phAlly(a){
   return shadowAll(g);
 }
 function phAllyUpdate(g,a){g.rotation.y=a.flip?-Math.PI/2:Math.PI/2;g.position.y=Math.abs(Math.sin(a.walk||0))*2}
+// a trophy the model file cannot draw (or an ally of a kind nobody knows): a plain friendly light, never a monster body
+PH.wisp=basic(PAL.power2,{transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,fog:false});
+PH.wispHalo=glowMat(PAL.power,.7);
+function phTrophy(a){
+  const g=new THREE.Group(),c=noLine(new THREE.Mesh(G.sphere,PH.wisp)),h=new THREE.Sprite(PH.wispHalo),gold=a&&a.kind==='guardian';
+  c.scale.setScalar(gold?9:5);h.scale.setScalar(gold?70:40);c.position.y=h.position.y=gold?40:34;g.add(c,h);g.userData={c,h,y:c.position.y};return g;
+}
+function phTrophyUpdate(g,a){const u=g.userData,y=u.y+Math.sin(MB.S.t*2.3+(a.seed||0))*2.5;u.c.position.y=u.h.position.y=y}
 
 const warned={};
 function warnOnce(k,e){if(warned[k])return;warned[k]=1;console.warn('Marrowborn renderer: '+k+' model failed, using placeholder.',e&&e.message||e)}
@@ -916,14 +925,21 @@ let playerRec=null,stamp=0;
 const monMap=new Map(),allyMap=new Map();
 // Allies that carry a monster spec (bound or tamed pets and whatever they raise) are drawn with the monster bodies; the model reads pet/owner and builds the friendly variant.
 const isPet=e=>!!(e&&(e.pet||e.owner==='necro'||e.owner==='beast')&&(e.s||e.ai));
+// Trophies that stand in the arena (a mage's familiar, a healer's guardian) have their own friendly models. An ally of a kind this file has
+// never heard of is drawn the same way (as a plain wisp), so nothing friendly can ever come out looking like a hostile monster or throw.
+const isTrophy=e=>!!(e&&(e.kind==='familiar'||e.kind==='guardian'||(e.trophy&&e.kind!=='pet')));
+const allyModel=e=>isTrophy(e)?'trophy':isPet(e)?'monster':e.kind==='thrall'||e.kind==='wolf'?'ally':'trophy';
 const dying=[]; // pets that left the list in the middle of a fight: they fade out where they stood
 let dyingLevel=-1;
-function dropEnt(rec){ents.remove(rec.g);if(rec.pet&&rec.real){const M=modelOf('monster');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}}
+function dropEnt(rec){ents.remove(rec.g);
+  if(rec.tro&&rec.real){const M=modelOf('trophy');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}
+  if(rec.pet&&rec.real){const M=modelOf('monster');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}}
 function syncMap(map,list,name,dt,phMake,phUpdate,sight){
   const P=MB.P;
   for(let i=0;i<list.length;i++){
     const e=list[i];if(!e)continue;let rec=map.get(e);
-    if(!rec){const pet=name==='ally'&&isPet(e);rec=pet?makeEnt('monster',e,phMonster):makeEnt(name,e,phMake);rec.pet=pet;rec.e=e;map.set(e,rec)}
+    if(!rec){const k=name==='ally'?allyModel(e):name,pet=name==='ally'&&k==='monster',tro=k==='trophy';
+      rec=tro?makeEnt('trophy',e,phTrophy):pet?makeEnt('monster',e,phMonster):makeEnt(name,e,phMake);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec)}
     rec.stamp=stamp;
     let hide=!!e.hidden||(rec.pet&&(e.dead||e.hp<=0));
     if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=FOG+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
@@ -931,9 +947,10 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight){
     if(rec.pet){
       if(e.dead||e.hp<=0){if(!rec.gone){rec.gone=true;startFade(rec)}continue} // still listed but dead: its ghost is already fading
       rec.gone=false;updateEnt(rec,'monster',e,dt,phMonster,phMonsterUpdate);
-    }else updateEnt(rec,name,e,dt,phMake,phUpdate);
+    }else if(rec.tro)updateEnt(rec,'trophy',e,dt,phTrophy,phTrophyUpdate);
+    else updateEnt(rec,name,e,dt,phMake,phUpdate);
     if(hide)rec.g.visible=false;
-    else if(Q.low){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
+    else if(Q.low&&!rec.tro){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
   }
   if(map.size>list.length||(map.size&&!list.length))for(const[e,rec]of map)if(rec.stamp!==stamp){
     map.delete(e);
@@ -955,6 +972,64 @@ function syncDying(dt){
   for(let i=dying.length-1;i>=0;i--){const d=dying[i],q=(MB.S.t-d.t0)/.8;
     if(q>=1||q<0||!M){dropEnt(d);dying.splice(i,1);continue}
     try{M.fade(d.g,q)}catch(e){dropEnt(d);dying.splice(i,1)}}
+}
+
+/* ---------- trophy echoes: MB.echoes = [{ai,s,x,y,ang,life,max,owner,col}] ----------
+   Each entry is the monster a trophy was taken from, seen for a moment as a rim-lit spectre in the owner's accent colour, playing its attack
+   and fading. The spectres are pooled and kept between uses (a trophy fires the same body again and again), so a firing builds nothing after
+   the first. High graphics shows up to 6 at once, low graphics 2; past that an echo is only a flare on the floor. */
+const ECHO_MAX=8,echoRecs=[],echoMap=new Map(),ECHO_SKIP={skip:true,stamp:0};
+const ECHO_FWD={crawler:1.5,hound:1.9,fist:.9,mite:1,mimic:.5};
+let echoLive=0;const HEX_RE=/^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
+function echoHex(c){if(typeof c==='number'&&c===c)return c;if(typeof c==='string'&&HEX_RE.test(c))return parseInt(c.length===4?c[1]+c[1]+c[2]+c[2]+c[3]+c[3]:c.slice(1),16);return PAL.power}
+function echoRing(){const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:PAL.power,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.3;m.renderOrder=4;noLine(m);return m}
+function echoDrop(rec){fx.remove(rec.root);try{window.MBModels.spectre.dispose(rec.g)}catch(e){}rec.ring.material.dispose()}
+function echoClaim(e){
+  const SM=window.MBModels&&window.MBModels.spectre;if(!SM||warned.echo||echoLive>=(Q.low?2:6))return null;
+  const s=e.s&&typeof e.s==='object'?e.s:null,r=Math.max(13,Math.min(32,+(s&&s.r)||+e.r||20));
+  const key=(e.ai||'')+'|'+(s?s.col+'|'+(s.eyes||0)+'|'+(s.legs||0)+'|'+(s.spikes||0):'')+'|'+r;
+  let rec=null,spare=-1;
+  for(let i=0;i<echoRecs.length;i++){const q=echoRecs[i];if(q.e)continue;if(q.key===key){rec=q;break}spare=i}
+  if(!rec){
+    if(echoRecs.length>=(Q.low?3:ECHO_MAX)){if(spare<0)return null;echoDrop(echoRecs[spare]);echoRecs.splice(spare,1)}
+    let g;try{g=SM.create({s:s||{},ai:e.ai,seed:e.seed||0},MB,r)}catch(err){warnOnce('echo',err);return null}
+    rec={key,r,g,root:new THREE.Group(),ring:echoRing(),e:null,c1:0,c2:0,age:0,stamp:0,ai:SM.ai(g),top:SM.top(g)};
+    rec.root.add(g,rec.ring);fx.add(rec.root);echoRecs.push(rec);
+  }
+  const c=echoHex(e.col);rec.c1=c;rec.c2=_col.setHex(c).lerp(_c0.setHex(0xffffff),.45).getHex();rec.ring.material.color.setHex(c);
+  rec.e=e;rec.age=0;rec.root.visible=true;echoLive++;try{SM.reset(rec.g)}catch(err){}
+  return rec;
+}
+function syncEchoes(dt,sight){
+  const list=R.testEchoes||MB.echoes||NONE,SM=window.MBModels&&window.MBModels.spectre,t=MB.S.t;
+  if(!list.length&&!echoMap.size)return;
+  let live=0;
+  for(let i=0;i<list.length;i++){
+    const e=list[i];if(!e||typeof e.x!=='number'||typeof e.y!=='number')continue;
+    let rec=echoMap.get(e);
+    if(!rec){
+      rec=echoClaim(e)||ECHO_SKIP;echoMap.set(e,rec);
+      // the moment it appears: a flare where it stands (this is all there is of an echo past the limit)
+      if(sight&&(!Q.low||rec===ECHO_SKIP))flashAt(e.x,rec===ECHO_SKIP?14:24,e.y,rec===ECHO_SKIP?30:20,rec===ECHO_SKIP?110:80,echoHex(e.col),.2,.85);
+    }
+    if(rec===ECHO_SKIP)continue;
+    rec.stamp=stamp;live++;rec.age+=dt;
+    const max=e.max>0?e.max:.6,q=clamp01(typeof e.life==='number'?1-e.life/max:rec.age/max),ang=typeof e.ang==='number'&&e.ang===e.ang?e.ang:0;
+    if(!sight){rec.root.visible=false;continue}
+    rec.root.visible=true;
+    try{
+      const lift=SM.pose(rec.g,e.x,e.y,ang,q,MB,dt),d=4+(ECHO_FWD[rec.ai]||.3)*rec.r*easeOut(clamp01((q-.3)/.5)),k=(.72+.28*easeOut(clamp01(q*5)))*(1+.1*q);
+      rec.root.position.set(e.x+Math.cos(ang)*d,0,e.y+Math.sin(ang)*d);
+      rec.g.position.y=lift*LIFT*.7;rec.g.scale.setScalar(k);
+      SM.tint(rec.g,rec.c1,rec.c2,1.7*clamp01(q*9)*Math.pow(1-q,1.2),.2,t);
+    }catch(err){warnOnce('echo',err);rec.root.visible=false}
+    const rk=rec.r*(1.2+1.3*easeOut(q));rec.ring.scale.setScalar(rk);rec.ring.material.opacity=.9*(1-q)*(1-q);
+  }
+  echoLive=live;
+  if(echoMap.size>list.length||(echoMap.size&&!list.length))for(const[e,rec]of echoMap){
+    if(rec===ECHO_SKIP){if(list.indexOf(e)<0)echoMap.delete(e);continue}
+    if(rec.stamp!==stamp){echoMap.delete(e);if(rec.e===e){rec.e=null;rec.root.visible=false}}
+  }
 }
 
 /* ---------- camera ---------- */
@@ -1016,6 +1091,17 @@ function groundEllipse(x,z,r){ // screen-space ellipse of a circle lying on the 
   toScreen(x,0,z);const cx=sp.x,cy=sp.y;toScreen(x+r,0,z);const rx=Math.abs(sp.x-cx);toScreen(x,0,z+r);const a=Math.abs(sp.y-cy);toScreen(x,0,z-r);const b=Math.abs(sp.y-cy);
   return{cx,cy:cy+(a-b)/2,rx,ry:(a+b)/2};
 }
+// how far the page's floating HUD (.vitals is fixed over the arena on small screens) reaches down the view, in overlay units; measured twice a second
+let hudY=0,hudAt=-1,hudEl;
+function hudBottom(){
+  const now=MB.S.t;if(now>=hudAt&&now-hudAt<.5)return hudY;hudAt=now;
+  try{
+    if(hudEl===undefined)hudEl=document.querySelector('.vitals')||null;
+    const c=cv.getBoundingClientRect(),v=hudEl&&hudEl.getBoundingClientRect();
+    hudY=v&&c.height>0&&v.height>0&&v.top<c.top+c.height*.3&&v.bottom>c.top&&v.right>c.left&&v.left<c.right&&getComputedStyle(hudEl).visibility!=='hidden'?Math.min(H*.4,(v.bottom-c.top)/c.height*H):0;
+  }catch(e){hudY=0}
+  return hudY;
+}
 let vig=null;
 function vignette(){if(!vig){vig=ctx.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*.98);vig.addColorStop(0,'rgba(6,4,18,0)');vig.addColorStop(.6,'rgba(6,4,18,.3)');vig.addColorStop(1,'rgba(5,3,16,.8)')}return vig}
 // overlay text helpers: condensed, slightly slanted, inked
@@ -1066,14 +1152,17 @@ function drawOverlay(sight){
   const floats=MB.floats;
   if(floats.length){ctx.textAlign='center';ctx.textBaseline='alphabetic';
     for(let i=0;i<floats.length;i++){const f=floats[i];toScreen(f.x,26,f.y);if(!sp.ok)continue;
-      const b0=born.get(f)||f.life,age=b0-f.life,a=clamp01(f.life*3),txt=''+f.txt,c0=txt.charCodeAt(0),v=parseFloat(txt),num=v===v&&(c0===45||c0===43||(c0>=48&&c0<=57));
+      const cl=clOf.get(f);if(cl&&cl.lead!==f)continue; // folded into a newer number of its group
+      const b0=born.get(f)||f.life,age=b0-f.life,a=clamp01(f.life*3),txt=cl?cl.txt:''+f.txt,c0=txt.charCodeAt(0),v=cl?cl.sum:parseFloat(txt),num=v===v&&(c0===45||c0===43||(c0>=48&&c0<=57));
       ctx.save();ctx.globalAlpha=a;
       if(num){
-        const hit=c0>=48&&c0<=57&&f.c==='#e7dfcd',k=hit&&FX.avg>0?v/FX.avg:1,pop=age<.1?1.7-.7*(age/.1):1,size=hit?Math.min(46,17+9*Math.min(3.2,k)):c0===45?27:22;
-        const col=hit?(k>=1.7?CSS.foe:k>=1.15?CSS.gold:CSS.bone):c0===45?CSS.foe:f.c,rot=((f.x*7.13+i)%1-.5)*.26;
-        slant(sp.x,sp.y-age*10,rot,pop*.9,pop);ctx.font='700 '+size+'px '+FONT;
-        if(hit&&k>=1.7&&sight){ctx.fillStyle=tint(CSS.power);ctx.globalAlpha=a*.55;ctx.fillText(txt,2.5,2.5);ctx.globalAlpha=a}
+        // a merged number grows with its total but only a single heavy blow turns crimson
+        const many=cl&&cl.n>1,hit=c0>=48&&c0<=57&&f.c==='#e7dfcd',k=hit&&FX.avg>0?v/FX.avg:1,pop=age<.1?(many?1.35:1.7)-(many?.35:.7)*(age/.1):1,size=hit?Math.min(46,17+9*Math.min(3.2,many?1+(k-1)*.5:k)):c0===45?27:22;
+        const col=hit?(k>=1.7&&!many?CSS.foe:k>=1.15?CSS.gold:CSS.bone):c0===45?CSS.foe:f.c,rot=many?-.05:((f.x*7.13+i)%1-.5)*.26;
+        slant(sp.x,sp.y-age*10+(cl?cl.oy:0),rot,pop*.9,pop);ctx.font='700 '+size+'px '+FONT;
+        if(hit&&k>=1.7&&sight&&!many){ctx.fillStyle=tint(CSS.power);ctx.globalAlpha=a*.55;ctx.fillText(txt,2.5,2.5);ctx.globalAlpha=a}
         inked(txt,0,0,tint(col),size>30?5:4);
+        if(many){const w=ctx.measureText(txt).width;ctx.font='700 '+Math.round(size*.5)+'px '+FONT;ctx.textAlign='left';inked(cl.tag,w/2+3,-size*.34,tint(CSS.power2),3);ctx.textAlign='center'}
       }else{
         const t2=txt.toUpperCase(),in1=easeOut(clamp01(age/.16));
         slant(sp.x+(1-in1)*-26,sp.y,0,.92,1);ctx.font='700 17px '+FONT;spaced(2);
@@ -1095,7 +1184,8 @@ function drawOverlay(sight){
     for(let i=0;i<al.length;i++){const a=al[i];if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))continue;
       let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
       toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)continue;
-      const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=sp.x-bw/2,by=sp.y-8;
+      // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
+      const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=Math.max(18,Math.min(W-bw-6,sp.x-bw/2)),by=Math.max(hudBottom()+7,sp.y-8);
       ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
       ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
       ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
@@ -1173,6 +1263,19 @@ const TF={
 };
 const FX={prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0};
 const born=new WeakMap(),prevZones=[],prevRings=[];
+// Damage numbers that land on the same spot within half a second are shown as ONE number (the running total, with a small hit count), led by
+// the newest float of the group; the older ones are not drawn. Numbers that cannot merge (a heavy hit, another colour) are stacked upward.
+const CL=[],clOf=new WeakMap();for(let i=0;i<24;i++)CL.push({lead:null,sum:0,n:0,tl:0,heavy:false,c:'',oy:0,txt:'',tag:''});
+let clI=0;
+function clusterNew(f,v,heavy,t){
+  if(!heavy)for(let i=0;i<CL.length;i++){const c=CL[i],l=c.lead;
+    if(!l||!(l.life>0)||c.heavy||c.c!==f.c||t-c.tl>.55||Math.abs(f.x-l.x)>38||Math.abs(f.y-l.y)>36)continue;
+    c.sum+=v;c.n++;c.tl=t;c.lead=f;c.txt=c.sum%1?c.sum.toFixed(1):''+c.sum;c.tag='\u00d7'+c.n;clOf.set(f,c);return}
+  let near=0;
+  for(let i=0;i<CL.length;i++){const l=CL[i].lead;if(l&&l.life>0&&Math.abs(f.x-l.x)<46&&Math.abs(f.y-l.y)<30)near++}
+  const c=CL[clI];clI=(clI+1)%CL.length;
+  c.lead=f;c.sum=v;c.n=1;c.tl=t;c.heavy=heavy;c.c=f.c;c.oy=-19*(near%4);c.txt=''+f.txt;c.tag='';clOf.set(f,c);
+}
 const auraP=makePoints(48);pointSets.push(auraP);auraP.mat.blending=THREE.AdditiveBlending;
 const auraDisc=new THREE.Mesh(G.quad,flatGlowMat(PAL.power,.2));auraDisc.position.y=.62;auraDisc.renderOrder=1;auraDisc.visible=false;fx.add(auraDisc);
 const easeOut=q=>1-(1-q)*(1-q)*(1-q);
@@ -1241,10 +1344,12 @@ function syncFx(dt,sight){
       const v=parseFloat(f.txt);if(!(v===v)||typeof f.txt!=='string')continue;
       const c0=f.txt.charCodeAt(0);
       if(c0===45){if(P&&Math.abs(f.x-P.x)<4&&f.c==='#ff5b6e')FX.hurt=1;continue} // '-': something of ours was hurt
-      if(c0===43||f.c!=='#e7dfcd')continue;
+      if(c0===43)continue;
+      if(f.c!=='#e7dfcd'){if(c0>=48&&c0<=57)clusterNew(f,v,false,t);continue}
       FX.nAvg++;FX.avg=FX.nAvg<4?(FX.avg*(FX.nAvg-1)+v)/FX.nAvg:FX.avg+(v-FX.avg)*.12;
-      if(!sight)continue;
       const k=FX.avg>0?v/FX.avg:1,heavy=k>=1.7&&FX.nAvg>3;
+      clusterNew(f,v,heavy,t);
+      if(!sight)continue;
       if(heavy){flashAt(f.x,26,f.y+22,30,120+26*Math.min(3,k),0xffffff,.17,1);if(!low)burstAt(f.x,26,f.y+22,50,150+40*Math.min(3,k),cls?PAL.power2:0xffffff,.2)}
       else if(!low)flashAt(f.x,26,f.y+20,14,50,cls?PAL.power2:0xffffff,.11,.8)}}
   TF.slash.run(fdt,upSlash);TF.ghost.run(fdt,upGhost);TF.streak.run(fdt,upStreak);TF.flash.run(fdt,upFlash);TF.burst.run(fdt,upFlash);TF.crack.run(fdt,upCrack);
@@ -1334,6 +1439,7 @@ function draw(dt){
   syncDying(dt);
   syncMap(allyMap,allies,'ally',dt,phAlly,phAllyUpdate,true);
   syncFx(dt,sight);
+  syncEchoes(dt,sight);
 
   // projectiles
   const shots=MB.shots;
@@ -1359,6 +1465,9 @@ function draw(dt){
       u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
       if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
       else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}}
+  // the guardian's ward, while it is ready to take a blow: a thin gold ring at the healer's feet
+  if(P&&sight)for(let i=0;i<allies.length;i++){const a=allies[i];if(!a||a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
+    const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4));o.rotation.y=t*.8;o.material.opacity=.5+.15*Math.sin(t*4);break}
   for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue; // a pet's beam is the same shape in friendly blue
     for(let j=0;j<b.rays.length;j++){const ry=b.rays[j],o=pools.pbeam.get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12;
       o.position.set(m.x+Math.cos(ry.a)*len/2,SHOT_Y,m.y+Math.sin(ry.a)*len/2);o.rotation.y=-ry.a;
@@ -1421,5 +1530,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.scene=scene;R.camera=camera;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.scene=scene;R.camera=camera;R.ok=true;
 })();
