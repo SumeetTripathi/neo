@@ -1548,8 +1548,9 @@ function tw(){
   return{pet:false,n:t[0],pl:t[1],take:t[2],kick:t[3],rare:'A tyrant. '+t[3],how:t[4],done:t[5],mine:t[6],later:'Another boss will offer one later.',on:'In use',off:'Set aside',send:'Use it',back:'Set it aside',col:TCOL[S.cls]};
 }
 // short names for the small labels beside the health bar
-const SHORT={crawler:'Crawler',hound:'Hound',witch:'Witch',fist:'Fist',mother:'Mother',burrower:'Burrower',mimic:'Mimic',hollow:'Hollow',knight:'Knight',lich:'Lich',wyrm:'Wyrm',king:'King',bomber:'Toad',summoner:'Caller',beamer:'Eye'};
-const petShort=e=>(e.crown&&e.kind==='hollow'?'Tyrant':SHORT[e.kind]||e.name)+(e.plv?' +'+e.plv:'');
+const SHORT={crawler:'Crawler',hound:'Hound',witch:'Witch',fist:'Fist',mother:'Brood',burrower:'Borer',mimic:'Mimic',hollow:'Hollow',knight:'Knight',lich:'Lich',wyrm:'Wyrm',king:'King',bomber:'Toad',summoner:'Caller',beamer:'Eye'};
+// with three rows there is room for about seven letters, so the level is left to the pause screen
+const petShort=(e,n)=>{const s=e.crown&&e.kind==='hollow'?'Tyrant':SHORT[e.kind]||e.name;return n>2||!e.plv?s:s+(s.length+(''+e.plv).length>7?'+':' +')+e.plv};
 // when the class changes what it does with its roster (a ranger taking Beastmaster): fill the places at your side
 function petFit(){const cap=petCap(),R=PETS.roster;PETS.active=PETS.active.filter((v,i,l)=>v<R.length&&l.indexOf(v)===i).slice(0,cap);for(let i=R.length-1;i>=0&&PETS.active.length<cap;i--)if(!PETS.active.includes(i))PETS.active.push(i)}
 // PETS.active holds roster indices; these keep it right when the roster changes
@@ -1803,7 +1804,7 @@ function petUi(){
   const cl=(own==='beast'?'beast':'')+(tro?'tro '+f:'')+' n'+on.length;if(petHud.className!==cl)petHud.className=cl;
   // the full name only where there is room for it: one row on a wide screen
   const tight=on.length>1||innerWidth<720||matchMedia('(pointer:coarse)').matches,w=tw();
-  petRows.forEach((r,i)=>{const e=on[i],a=e&&!tro&&allies.find(x=>x.e===e&&!x.minion),ch=e&&tro?Math.round(troCharge(e,i)*20)*5:0,lab=e?(tight?petShort(e):petTag(e)):'',key=e?lab+'|'+f+'|'+(tro?ch:e.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f'):'';
+  petRows.forEach((r,i)=>{const e=on[i],a=e&&!tro&&allies.find(x=>x.e===e&&!x.minion),ch=e&&tro?Math.round(troCharge(e,i)*20)*5:0,lab=e?(tight?petShort(e,on.length):petTag(e)):'',key=e?lab+'|'+f+'|'+(tro?ch:e.down?'x':a?Math.ceil(a.hp/a.maxHp*25):'f'):'';
     if(key===r.key)return;r.key=key;r.row.hidden=!e;if(!e)return;
     const pct=tro?ch:e.down?0:a?Math.max(0,Math.round(a.hp/a.maxHp*100)):100;r.row.className='petRow'+(e.down&&!tro?' down':'')+(tro&&pct>=100?' ready':'');r.n.textContent=lab+(e.down&&!tro?' · fallen':'');r.n.title=petTag(e);r.f.style.width=pct+'%';
     r.n.style.color=tro?TCOL[S.cls]:'';r.f.style.background=tro?TCOL[S.cls]:'';
