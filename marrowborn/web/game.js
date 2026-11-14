@@ -879,11 +879,18 @@ function playerStep(dt){
 
 /* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
 // PETS.roster holds up to eight: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
-// up to three for a Necromancer, two (beside the wolf) for a Beastmaster. Several pets share the work: each has the health and the bite of PETK[how many are out - 1] of a lone pet.
+// as many as your mana can hold (see RESV: each one out keeps a share of the pool locked; the wolf and the thralls cost nothing). Several pets share the work: each has the health and the bite of PETK[how many are out - 1] of a lone pet,
+// so a full field is stronger than a small one, but each one added brings less than the one before (1, 1.3, 1.5, 1.68, 1.8, 1.92, 2.03 and 2.16 lone pets' worth for one to eight).
 // In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
-const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],get form(){return form()||'pet'}},PETMAX=8,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PETK=[1,.65,.5],MINIONS=4;
+const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],get form(){return form()||'pet'}},PETMAX=8,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PETK=[1,.65,.5,.42,.36,.32,.29,.27],MINIONS=4;
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
-const petCap=()=>({necro:3,beast:2})[petOwner()]||(S.cls==='mage'?2:S.cls?1:0);
+// the share of the pool one of them holds while it is out: pets and familiars only; the other trophies cost nothing and go one at a time
+const resvOf=()=>{const f=form();return f==='pet'?(S.adv==='lich'?.11:RESV.pet):f==='familiar'?(S.adv==='archmage'?.1:RESV.familiar):0};
+// how many can be out at once: what RESVCAP of the pool can hold, the roster at most
+const petCap=()=>{const f=form(),r=f?resvOf():0;return!f?0:r?Math.min(PETMAX,Math.floor(RESVCAP/r+1e-9)):1};
+const resvMana=n=>Math.round(manaMax()*n*resvOf());
+// the reserve follows who is in the field: called whenever that changes
+function resvSync(){if(!P)return;P.resv=P.maxMana?Math.min(P.maxMana,Math.round(P.maxMana*petOn().length*resvOf())):0;if(P.mana>manaRoom())P.mana=manaRoom();manaSync()}
 // the roster entries that go with you, in order
 const petOn=()=>{const n=petCap(),out=[];for(const i of PETS.active){const e=PETS.roster[i];if(e&&out.length<n&&!out.includes(e))out.push(e)}return out};
 const petTag=e=>e.name+(e.plv?' +'+e.plv:'');
@@ -895,10 +902,10 @@ const petSpec=e=>({...(SPEC[e.kind]||SPEC.crawler),ai:e.ai,name:e.name,col:e.col
 // A pet is rescaled every time it enters a fight: its health follows yours and its blows follow your damage, so an old pet keeps pace and a new one is no stronger.
 const petHp=(e,k=1)=>Math.max(6,Math.round(P.maxHp*PETHP*k*petTough(e.ai)*(1+.03*e.plv)*(S.adv==='lich'?1.4:1)*(e.crown?1.1:1)));
 const petPow=a=>(PETD[a.owner]||1)*(a.k||1)*dmgMul()/Math.sqrt(cdMul())*(1+eqv('thr')/100)*(1+.02*a.plv)*(a.perk==='burning'?1.12:1)*(a.crown?1.1:1)*(S.cls==='necro'?1+.04*S.b.spec:1);
-function makePet(e,frac=1,owner=petOwner(),k=1,slot=0){
-  const s=petSpec(e),g=rand()*TAU,hp=petHp(e,k);
-  const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*46,y:P.y+Math.sin(g)*46,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
-    st:'idle',t:1.2+slot*.45,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:slot*.3,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
+function makePet(e,frac=1,owner=petOwner(),k=1,slot=0,n=1){
+  const s=petSpec(e),g=n>1?slot/n*TAU+rand()*.5:rand()*TAU,hp=petHp(e,k),far=n>4?62:46,lag=Math.min(.45,1.5/n);
+  const a={kind:'pet',pet:true,owner:owner||'necro',e,k,slot,s,ai:PETAI[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,perk:e.perk,crown:e.crown,x:P.x+Math.cos(g)*far,y:P.y+Math.sin(g)*far,r:s.r,hp:Math.max(1,Math.round(hp*frac)),maxHp:hp,
+    st:'idle',t:1.2+slot*lag,n:0,ang:-Math.PI/2,face:-Math.PI/2,flash:0,hidden:false,lift:0,seed:rand()*9,life:1e9,cd:slot*lag*.66,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,up:e.perk==='splitting',mods:[],ward:0,beam:null,boss:false,moving:false};
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);return a;
 }
 // what a mother or a caller pet raises: small, short-lived, cannot be hurt
@@ -1019,8 +1026,9 @@ function fieldPets(mid){
   const old=allies.filter(a=>a.pet&&!a.minion);for(const a of old)a.e.frac=a.hp/a.maxHp;
   allies=allies.filter(a=>!a.pet&&!a.trophy);TSRC=[];if(!P)return[];
   if(!mid)for(const e of PETS.roster){e.down=false;e.frac=undefined}
+  resvSync();
   const on=petOn(),out=on.filter(e=>!e.down),k=PETK[Math.min(PETK.length,on.length)-1]||1,low=old.length?Math.min(...old.map(a=>a.hp/a.maxHp)):1,made=[];
-  out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),k,i);if(was){a.x=was.x;a.y=was.y}
+  out.forEach((e,i)=>{const was=old.find(a=>a.e===e),a=makePet(e,mid?(e.frac===undefined?low:e.frac):1,petOwner(),k,i,out.length);if(was){a.x=was.x;a.y=was.y}
     allies.push(a);made.push(a);if(!PETS.fielded.includes(e))PETS.fielded.push(e);if(!was)puff(a,a.owner==='necro'?'#7fd66b':'#8fd3ff',14,150)});
   PETS.down=on.length>0&&on.every(e=>e.down);return made;
 }
@@ -1064,12 +1072,12 @@ function troFire(a,t){
 }
 // where a familiar floats (a slow circle round the mage) and where a guardian stands (behind the healer)
 function troSpot(a){
-  if(a.kind==='familiar'){const g=S.t*.9+a.slot*Math.PI+a.seed*.1;return{x:P.x+Math.cos(g)*40,y:P.y+Math.sin(g)*30-6}}
+  if(a.kind==='familiar'){const n=Math.max(2,a.of||2),g=S.t*.9+a.slot*TAU/n+(n>2?0:a.seed*.1),w=n>4?1.25:1;return{x:P.x+Math.cos(g)*40*w,y:P.y+Math.sin(g)*30*w-6}} // familiars share one circle, evenly spaced
   return{x:P.x-Math.cos(P.face)*(a.r+24),y:P.y-Math.sin(P.face)*(a.r+24)};
 }
-function makeTrophy(e,f,k,slot){
+function makeTrophy(e,f,k,slot,n=1){
   const s=petSpec(e),ent=f==='familiar'||f==='guardian',tm=TRT[f]||0;
-  const a={kind:ent?f:'trophy',trophy:true,ent,form:f,owner:S.cls,e,k,slot,s,ai:TRO[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,x:P.x,y:P.y,r:f==='familiar'?9:f==='guardian'?s.r:0,t:tm?tm*(.5+slot*.5):0,tm,
+  const a={kind:ent?f:'trophy',trophy:true,ent,form:f,owner:S.cls,e,k,slot,s,ai:TRO[e.ai]?e.ai:'mite',name:e.name,plv:e.plv,x:P.x,y:P.y,r:f==='familiar'?9:f==='guardian'?s.r:0,of:n,t:tm?tm*(.5+.5*slot/Math.max(1,n-1)):0,tm,
     seed:rand()*9,face:-Math.PI/2,st:'idle',stT:0,flash:0,life:1e9,hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false,moving:false,walk:0,flip:false};
   if(f==='guardian'){a.shield=true;a.shT=0}
   if(ent){Object.assign(a,troSpot(a));clamp(a,a.r)}
@@ -1078,8 +1086,9 @@ function makeTrophy(e,f,k,slot){
 // the active trophies take their places: at the start of a level, and again when the choice changes from the pause screen
 function fieldTrophies(){
   const old=allies.filter(a=>a.trophy&&a.ent);allies=allies.filter(a=>!a.pet&&!a.trophy);TSRC=[];PETS.down=false;if(!P)return[];
+  resvSync();
   const f=form(),on=f?petOn():[],k=PETK[Math.min(PETK.length,on.length)-1]||1,made=[];
-  on.forEach((e,i)=>{const a=makeTrophy(e,f,k,i),was=old.find(o=>o.e===e);if(!PETS.fielded.includes(e))PETS.fielded.push(e);
+  on.forEach((e,i)=>{const a=makeTrophy(e,f,k,i,on.length),was=old.find(o=>o.e===e);if(!PETS.fielded.includes(e))PETS.fielded.push(e);
     if(!a.ent){TSRC.push(a);return}
     if(was){a.x=was.x;a.y=was.y;a.t=Math.min(a.tm,Math.max(was.t,.5));a.shield=was.shield;a.shT=was.shT}else puff(a,TCOL[S.cls],12,140);
     allies.push(a);made.push(a)});
@@ -1599,7 +1608,7 @@ const SHORT={crawler:'Crawler',hound:'Hound',witch:'Witch',fist:'Fist',mother:'B
 // with three rows there is room for about seven letters, so the level is left to the pause screen
 const petShort=(e,n)=>{const s=e.crown&&e.kind==='hollow'?'Tyrant':SHORT[e.kind]||e.name;return n>2||!e.plv?s:s+(s.length+(''+e.plv).length>7?'+':' +')+e.plv};
 // when the class changes what it does with its roster (a ranger taking Beastmaster): fill the places at your side
-function petFit(){const cap=petCap(),R=PETS.roster;PETS.active=PETS.active.filter((v,i,l)=>v<R.length&&l.indexOf(v)===i).slice(0,cap);for(let i=R.length-1;i>=0&&PETS.active.length<cap;i--)if(!PETS.active.includes(i))PETS.active.push(i)}
+function petFit(){const cap=Math.min(2,petCap()),R=PETS.roster;PETS.active=PETS.active.filter((v,i,l)=>v<R.length&&l.indexOf(v)===i).slice(0,cap);for(let i=R.length-1;i>=0&&PETS.active.length<cap;i--)if(!PETS.active.includes(i))PETS.active.push(i)}
 // PETS.active holds roster indices; these keep it right when the roster changes
 const petActive=e=>PETS.active.includes(PETS.roster.indexOf(e));
 function petDrop(i){PETS.roster.splice(i,1);PETS.active=PETS.active.filter(v=>v!==i).map(v=>v>i?v-1:v)}
@@ -1690,7 +1699,8 @@ const petsClear=()=>{PETS.roster.length=0;PETS.active=[];PETS.down=false;PETS.fi
 // the active list out of a save: a list of roster indices, or the single index older saves carry. null when it makes no sense.
 function actIn(v,len,cap){if(v===undefined||v===null)v=len?[len-1]:[];if(Number.isInteger(v))v=v<0?[]:[v];
   return Array.isArray(v)&&v.length<=cap&&v.every((x,i)=>Number.isInteger(x)&&x>=0&&x<len&&v.indexOf(x)===i)?v.slice():null}
-const capOf=(c,a)=>c==='necro'?3:c==='ranger'&&a==='beastmaster'?2:c==='mage'?2:c?1:0;
+// how many can be active in a save: what the mana of that class can hold (see petCap), so an older save keeps the pets it had out
+const capOf=(c,a)=>c==='necro'||c==='ranger'&&a==='beastmaster'?(a==='lich'?8:6):c==='mage'?(a==='archmage'?8:7):c?1:0;
 const petOut=e=>({kind:e.kind,name:e.name,col:e.col,r:e.r,plv:e.plv,perk:e.perk||null,crown:e.crown?1:0});
 function petIn(p){
   if(!p||typeof p!=='object'||typeof p.kind!=='string'||!own(SPEC,p.kind)||p.kind==='mite'||p.kind==='husk')return null;
@@ -1702,7 +1712,7 @@ function petIn(p){
 const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
-  const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS)eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};
+  const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS){eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};if(S.eq[sl].m)eq[sl].m=1} // m: a trinket that carries mana
   return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
 function save(n){SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,st:SAVE.stats}))}
@@ -1714,7 +1724,7 @@ function applyRun(r){
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
     S.load=fixLoad(r.load)||load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
-    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0)}}}
+    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
     // older saves have no pets; a broken entry is dropped, the rest are kept
     petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETMAX)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length,cap=capOf(S.cls,S.adv);
       PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i).slice(0,cap):r.pet,n,cap)||(n?[n-1]:[])}
@@ -1730,8 +1740,8 @@ function checkSave(o){
   const c=o.cls;if(!c&&(o.level>8||o.adv||o.eq))return null;
   if(o.adv!==null&&o.adv!==undefined&&!(c&&CLASSES[c].adv.some(a=>a[0]===o.adv)))return null;
   const b=noBoons();if(!o.b||typeof o.b!=='object')return null;
-  for(const k in b){const v=o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
-  let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400))return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up}}}
+  for(const k in b){const v=k==='well'&&o.b[k]===undefined?0:o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
+  let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400)||e.m!==undefined&&e.m!==0&&e.m!==1)return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up,m:e.m?1:0}}}
   const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
   let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETMAX||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
     pet=actIn(o.pet,pets.length,capOf(c,o.adv));if(!pet)return null}
