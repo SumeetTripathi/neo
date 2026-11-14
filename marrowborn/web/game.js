@@ -680,7 +680,7 @@ function hurtP(d,src){
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
   if(P.stoneT>0)d=Math.ceil(d/2);
   ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
-  if(boss&&boss.hp>0&&boss.mods.includes('vampiric')&&boss.hp<boss.maxHp){const h=Math.min(boss.maxHp-boss.hp,Math.round(boss.maxHp*.04));boss.hp+=h;puff(boss,'#b8263d',12,140);floats.push({x:boss.x,y:boss.y-boss.r-10,txt:'+'+fmt(Math.round(h*10)/10),life:1,c:'#7fd66b'})}
+  if(boss&&boss.hp>0&&boss.mods.includes('vampiric')&&boss.hp<boss.maxHp&&!(S.t-boss.vAt<4)&&(boss.vSum||0)<boss.maxHp*.16){const h=Math.min(boss.maxHp-boss.hp,Math.round(boss.maxHp*.02));boss.hp+=h;boss.vAt=S.t;boss.vSum=(boss.vSum||0)+h;puff(boss,'#b8263d',12,140);floats.push({x:boss.x,y:boss.y-boss.r-10,txt:'+'+fmt(Math.round(h*10)/10),life:1,c:'#7fd66b'})}
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
   if(P.hp<=0){S.mode='dead';SND.dead();ST.deaths++;save(S.level);
     show({kick:'You came apart',title:has('skin')?'Flesh fails':'A pile of bones again',body:'You keep everything you have won back so far. '+S.L.spec.name+' is still waiting.',btns:[['Try level '+(S.level+1)+' again',()=>startLevel(S.level)]]});
