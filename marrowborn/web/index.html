@@ -108,10 +108,10 @@ button:disabled{opacity:.35;cursor:default}
 @media (pointer:coarse){button{min-height:44px}}
 
 /* ---- choice cards. The <small> line carries the colour the game gives it (rarity, pet kind, "not carried" grey): its pseudo-elements paint the card's accent bar and wash in that colour ---- */
-.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;width:100%}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(166px,1fr));gap:10px;width:100%}
 .cards button{--c:11px;--f:rgba(17,22,46,.94);position:relative;display:flex;flex-direction:column;gap:5px;text-align:left;align-items:flex-start;justify-content:flex-start;padding:12px 13px 13px 18px;min-width:0;
   font-family:var(--body);font-weight:400;font-size:1rem;letter-spacing:0;text-transform:none}
-.cards b{font-family:var(--display);font-weight:700;font-size:1.45rem;line-height:1;letter-spacing:.05em;text-transform:uppercase;color:var(--bone);overflow-wrap:anywhere}
+.cards b{font-family:var(--display);font-weight:700;font-size:1.3rem;line-height:1;letter-spacing:.03em;text-transform:uppercase;color:var(--bone);overflow-wrap:break-word;max-width:100%}
 .cards small{font-family:var(--display);font-weight:600;font-size:.78rem;line-height:1.25;letter-spacing:.12em;text-transform:uppercase;color:var(--power-hi);font-variant-numeric:tabular-nums}
 .cards small::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:currentColor}
 .cards small::after{content:"";position:absolute;inset:0;background:linear-gradient(125deg,currentColor,transparent 46%);opacity:.11;pointer-events:none}
@@ -212,7 +212,11 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .vitals>div{min-height:24px}
   .lab{font-size:.78rem}
   .vitals button{pointer-events:auto;--f:rgba(9,11,24,.55);--e:rgba(74,85,140,.8);text-shadow:none}#hp em{max-width:38vw;font-size:.74rem;line-height:1.2}#bossBar{width:20vw}
-  .tog{font-size:.76rem;padding:4px 9px}
+  /* the toggles sit in the top corner on their own; the rest of the row keeps clear of them */
+  .vitals{padding-right:204px}.togs{position:fixed;top:max(4px,env(safe-area-inset-top,0px));right:max(8px,env(safe-area-inset-right,0px));gap:6px}
+  .mb-left .vitals{padding-right:0;padding-left:204px}.mb-left .togs{right:auto;left:max(8px,env(safe-area-inset-left,0px))}
+  .vitals>div:last-child{margin-left:0}
+  .tog{font-size:.76rem;padding:4px 9px;min-width:58px}
   .touch{position:fixed;z-index:2;bottom:max(14px,env(safe-area-inset-bottom,0px));left:max(8px,env(safe-area-inset-left,0px));right:max(8px,env(safe-area-inset-right,0px));pointer-events:none}
   #pad,.touch .acts{pointer-events:auto}#pad{opacity:.62}
   /* the buttons float over the edge of the arena: see-through until pressed, so what stands under them still shows */
@@ -260,7 +264,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
 .mbx-seg{display:flex;flex:1;min-width:0;gap:5px}
 .mbx-seg label{flex:1;position:relative;display:block;min-width:0}
 .mbx-seg input,.mbx-sw input{position:absolute;opacity:0;inset:0;width:100%;height:100%;margin:0;cursor:pointer}
-.mbx-seg span{--c:6px;--e:#4a558c;display:flex;align-items:center;justify-content:center;min-height:40px;box-sizing:border-box;padding:4px 6px;color:var(--text);
+.mbx-seg span{--c:6px;--e:#4a558c;display:flex;align-items:center;justify-content:center;min-height:44px;box-sizing:border-box;padding:4px 6px;color:var(--text);
   font-family:var(--display);font-weight:600;font-size:.95rem;letter-spacing:.09em;text-transform:uppercase}
 .mbx-seg input:checked+span{--e:#c3aaff;--f:linear-gradient(100deg,#5f2bd6,#8b4dff 55%,#a273ff);color:#fff;font-weight:700}
 .mbx-seg input:focus-visible+span{--e:var(--power2);box-shadow:inset 0 0 0 2px var(--power2),inset 0 0 14px rgba(196,244,255,.45)}
@@ -316,7 +320,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .mbx-panel textarea{min-height:64px;font-size:12px}
   .mbx-story{padding:14px 24px;gap:8px}.mbx-story .tale{font-size:1rem;line-height:1.45}
   .mbx-tiles b{font-size:1.4rem}.mbx-tiles div{padding:4px 10px}.mbx-rec table,.mbx-rec ol{font-size:.84rem}
-  #mbHint{margin-top:56px;font-size:.85rem;max-width:min(360px,calc(100% - 24px))}
+  #mbHint{margin-top:64px;font-size:.85rem;max-width:min(360px,calc(100% - 24px))}
 }
 </style>
 

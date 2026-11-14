@@ -198,8 +198,8 @@ const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
 const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
 // (the last factor came in with six carried skills: it climbs from level 15 to +18% at level 25 and stays there)
-// (and a flat quarter more since every class takes a trophy from the bosses it kills)
-const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))*1.25};
+// (and a flat 18% more since every class takes a trophy from the bosses it kills)
+const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))*1.18};
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
 const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
@@ -987,11 +987,11 @@ function fieldPets(mid){
 const FORM={fighter:'technique',tank:'ward',assassin:'venom',mage:'familiar',ranger:'arrowhead',healer:'guardian'};
 const form=()=>petOwner()?'pet':S.cls&&FORM[S.cls]||null;
 // what one firing is worth, in multiples of your damage (TRO scales every kind's attack to about one unit against a single target), and how often the timed ones fire
-const TRX={technique:3,ward:22,venom:7,familiar:9.5,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
+const TRX={technique:3,ward:14,venom:7,familiar:9,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
 const TCOL={fighter:'#ffa64d',tank:'#6ea3e0',assassin:'#b6e04a',mage:'#b88cff',ranger:'#7fe0c0',healer:'#ffe08a'};
 let TSRC=[]; // for the forms that are not entities: one stand-in per active trophy, so damage, minions and levelling have something to hang on
-const troPow=a=>(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
-const troBolts=(a,g,D,n=3)=>{for(let i=0;i<n;i++)petShot(a,g+(i-(n-1)/2)*.16,600,D,4)};
+const troPow=a=>(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(a.form==='ward'?Math.min(3,Math.max(1,(P.trW||0)/2.5)):1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
+const troBolts=(a,g,D,n=3)=>{for(let i=0;i<n;i++)petShot(a,g+(i-(n-1)/2)*.07,600,D,4)};
 // one firing per monster kind: (source, target, angle to it, damage of one unit). Returns true when the attack lands on the target itself, so its echo is drawn beside the target.
 const TRO={
   mite(a,t,g,D){petHit(t,D,a);return true},
@@ -999,10 +999,10 @@ const TRO={
   hound(a,t,g,D){const len=dist(a,t)+90;for(const m of[...mons])if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,g,len)<m.r+24)petHit(m,(m===t?.95:.6)*D,a)},
   witch(a,t,g,D){troBolts(a,g,.4*D)},
   fist(a,t,g,D){petBlast(a,t,88,.45,1.15*D);return true},
-  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))petMinion(a,'mite',.11*D,7);else petShot(a,g+(i?.12:-.12),600,.45*D,4)},
+  mother(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,3))petMinion(a,'mite',.07*D,7);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
   burrower(a,t,g,D){petBlast(a,t,80,.4,1.15*D);return true},
   bomber(a,t,g,D){for(const k of[0,.5]){const z=petBlast(a,{x:t.x+(t.vx||0)*k,y:t.y+(t.vy||0)*k},62,.7,.62*D);z.sx=a.x;z.sy=a.y}},
-  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))petMinion(a,'husk',.11*D,8);else petShot(a,g+(i?.12:-.12),600,.45*D,4)},
+  summoner(a,t,g,D){for(let i=0;i<2;i++)if(minionRoom(a,2))petMinion(a,'husk',.07*D,8);else petShot(a,g+(i?.05:-.05),600,.5*D,4)},
   beamer(a,t,g,D){petShot(a,g,950,D,9,99)},
   mimic(a,t,g,D){petShot(a,g,620,1.05*D,6)},
   hollow(a,t,g,D){for(let i=0;i<10;i++)petShot(a,g+.31+i*TAU/10,320,.12*D,4);troBolts(a,g,.3*D)},
@@ -1049,9 +1049,9 @@ function trophyStep(a,dt){
 }
 // the forms the player throws himself: a trigger only asks (P.trQ), and the attack goes out here, at a point in the frame where nothing else is half done
 function trophyTick(dt){
-  if(P.trCd>0)P.trCd-=dt;const a=TSRC[0];if(!a){P.trQ=0;return}
+  if(P.trCd>0)P.trCd-=dt;P.trW+=dt;const a=TSRC[0];if(!a){P.trQ=0;return}
   a.x=P.x;a.y=P.y;if(a.flash>0)a.flash-=dt;
-  if(P.trQ){const t=P.trT&&mons.includes(P.trT)&&!P.trT.hidden?P.trT:petTarget(P);if(t&&troFire(a,t)){P.trQ=0;P.trT=null}}
+  if(P.trQ){const t=P.trT&&mons.includes(P.trT)&&!P.trT.hidden?P.trT:petTarget(P);if(t&&troFire(a,t)){P.trQ=0;P.trT=null;P.trW=0}}
 }
 // a melee strike that landed on m: the fighter counts to four; the assassin's ambush carries venom (not more often than every 1.5 seconds, however fast the dash comes back)
 function troStrike(m,amb){
@@ -1470,7 +1470,7 @@ function hud(){
 }
 function freshBody(){
   const c=cls(),maxHp=4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0);
-  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
+  P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(10).fill(0),mxS:Array(10).fill(0),rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,trW:2.5,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
 }
 // dev only: __mb.over = {kind, mods, waves, room} replaces parts of a generated level, for testing one thing at a time
 function devDef(L,n){
@@ -1535,7 +1535,7 @@ const petLine=e=>(form()&&form()!=='pet'?'Its attack: '+(TRDO[e.ai]||TRDO.mite)+
 // the words for what a class takes from a boss: [noun, plural, the card that takes it, the heading, what it does, the word once taken, what it is in the pause screen]
 const TW={
   technique:['technique','techniques','Learn it','A technique to learn','Learn how it fought. After every fourth blow you land, its attack follows yours.','Learned','Your techniques'],
-  ward:['ward','wards','Take it','A ward to take','Bind its fury into your guard. When you are hit or you block, its attack answers, at most once every 2.5 seconds.','Taken','Your wards'],
+  ward:['ward','wards','Take it','A ward to take','Bind its fury into your guard. When you are hit or you block, its attack answers, at most once every 2.5 seconds. The longer it has waited, the harder it answers, up to three times as hard.','Taken','Your wards'],
   venom:['venom','venoms','Distil it','A venom to distil','Distil it. Your first strike after a dash, and Shadowstep, carry its attack and a short poison.','Distilled','Your venoms'],
   familiar:['familiar','familiars','Shape it','A familiar to shape','Shape what is left into a familiar. It floats beside you and casts its attack every 3.5 seconds.','Shaped','Your familiars'],
   arrowhead:['arrowhead','arrowheads','Carve it','An arrowhead to carve','Carve an arrowhead from it. Every sixth arrow that hits looses its attack.','Carved','Your arrowheads'],
