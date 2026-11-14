@@ -14,6 +14,8 @@ var store={
 };
 var listen=function(name,fn){if(typeof MB.on!=='function')return false;try{MB.on(name,function(d){try{fn(d||{})}catch(e){console.warn('extras: '+name,e)}});return true}catch(e){return false}};
 var api=function(){return MB.api||{}};
+// multiplayer (MB.mp, game.js): records, the story and the pause hint are for the single-player run only
+var inMp=function(){return !!(MB.mp&&MB.mp.on)};
 var guard=function(label,fn){try{fn()}catch(e){try{console.warn('extras: '+label+' is off',e)}catch(_){}}};
 var num=function(v,d){v=+v;return isFinite(v)?v:(d||0)};
 var clamp=function(v,a,b){return Math.max(a,Math.min(b,v))};
@@ -166,6 +168,7 @@ function levelSeconds(given){
 guard('records',function(){
   if(typeof MB.on!=='function')return;
   listen('levelstart',function(d){
+    if(inMp())return;
     var lv=Math.floor(num(d.level,MB.S?MB.S.level:0)),retry=run.died===lv,c=classRec(MB.S&&MB.S.cls);
     run.died=-1;run.t0=Date.now();run.kills0=stat('kills');run.newBest=false;
     if(lv===0&&!retry){rec.runs++;run.crypt=true} // a new skeleton
@@ -174,6 +177,7 @@ guard('records',function(){
     saveRec();
   });
   listen('classpicked',function(d){
+    if(inMp())return;
     var c=classRec(d.cls||(MB.S&&MB.S.cls));
     if(!run.crypt)rec.runs++; // straight to the class choice: that is a run too
     run.crypt=false;
@@ -181,6 +185,7 @@ guard('records',function(){
     saveRec();
   });
   listen('bossdead',function(d){
+    if(inMp())return;
     var lv=Math.floor(num(d.level,MB.S?MB.S.level:0)),t=levelSeconds(d.time),cid=d.cls||(MB.S&&MB.S.cls)||null,c=classRec(cid),old=rec.fast[lv];
     bankLevel(t);rec.bosses++;if(c)c.bosses++;
     if(lv===7)run.crypt=true; // the class choice that follows belongs to this run
@@ -189,6 +194,7 @@ guard('records',function(){
     saveRec();
   });
   listen('death',function(d){
+    if(inMp())return;
     var lv=Math.floor(num(d.level,MB.S?MB.S.level:0)),t=levelSeconds(0),c=classRec(MB.S&&MB.S.cls);
     bankLevel(t);rec.deaths++;if(c)c.deaths++;run.died=lv;
     saveRec();
@@ -391,7 +397,7 @@ guard('story',function(){
   if(!Array.isArray(seen))seen=[];
   seen=seen.filter(function(x){return typeof x==='number'}).slice(-60);
   // a new class is a new story from the crypt door on
-  listen('classpicked',function(){seen=seen.filter(function(x){return x<8});store.set('tales',seen)});
+  listen('classpicked',function(){if(inMp())return;seen=seen.filter(function(x){return x<8});store.set('tales',seen)});
   MB.interlude=function(level,done){
     try{
       var lv=Math.floor(num(level,-1));
@@ -439,7 +445,7 @@ guard('hints',function(){
       touch:'You have no eyes yet. The pale rings are footsteps. When they come fast, something is about to hit you.',keys:'You have no eyes yet. The pale rings are footsteps. When they come fast, something is about to hit you.'},
     {id:'dash',t:.5,when:function(){return has('organs')&&!MB.S.cls},until:function(){return P().dashT>0},
       touch:'You have lungs now. Tap Dash to dart the way you are moving. Nothing can hurt you mid-dash.',keys:'You have lungs now. Shift dashes the way you are moving. Nothing can hurt you mid-dash.'},
-    {id:'pause',t:8,when:function(){return S().level>=2},
+    {id:'pause',t:8,when:function(){return S().level>=2&&!inMp()},
       touch:'Need a breath? Pause is at the top of the screen. Settings are in there too.',keys:'Need a breath? Esc or P pauses. Settings are in there too.'},
     {id:'skills',t:.5,when:function(){return !!S().cls&&S().level>=8},until:function(){var sk=MB.skills;return !!(sk&&sk[0]&&sk[0].cd>0)},
       touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 to 6 use your skills as you unlock them. The bar under the arena counts the seconds until each is ready again.'},

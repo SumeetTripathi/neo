@@ -1,6 +1,8 @@
 // 3D player and ally models. Registers window.MBModels.player and window.MBModels.ally.
 // Feet at Y=0, forward is +Z, the character's left is +X. Sub-meshes are merged per (slot, material) and rebuilt only
 // when the stage/class/upgrade/rank key changes; update() only writes transforms and visibility.
+// Everything about WHO is drawn comes from the object handed to create()/update() (has, cls, pw, S {adv, rank, mode, t}, skills) and from P:
+// the local hero passes window.MB, another member's hero passes a small view object built from its look. Nothing here reads the global MB.
 // Look: cel-shaded through window.MBStyle (toon / glow / outline) when the renderer provides it; without it the same
 // shapes are drawn with this file's own standard materials and no outlines.
 window.MBModels=window.MBModels||{};
@@ -36,8 +38,9 @@ function glow(hex,op){
 }
 // the dimmed twin of a material (spent shield): another cached variant, never a mutation
 function dimOf(m){const i=INFO.get(m);return i?mat(i[0],Object.assign({},i[1]||{},{transparent:true,opacity:.3,depthWrite:false})):m}
-// the one material this file animates (the melee arc fades): owned here, never shared with the style cache
-const SLASH=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});NOL.add(SLASH);
+// the one material this file animates (the melee arc fades): one per hero (several heroes can be on screen in multiplayer), owned by
+// its model and never shared with the style cache
+function slashMat(){const m=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});NOL.add(m);return m}
 function pal(k,d){const S=window.MBStyle;return S&&S.palette&&typeof S.palette[k]==='number'?S.palette[k]:d}
 function ink(g,th){const S=window.MBStyle;if(S&&typeof S.outline==='function')try{S.outline(g,{thickness:th||1})}catch(e){}}
 const C={bone:0xece4d2,boneS:0xa89f90,dark:0x100e18,skin:0xc68863,skinD:0x8f5a40,hand:0xe2a783,gold:0xf0b848,steel:0x596078,steelL:0xc9d2e4,lea:0x4a3528,hair:0xe9e4da,hairS:0xb9b3c4,green:0x5cf07a};
@@ -416,7 +419,7 @@ function rebuildPlayer(g,MB){
   if(adv){b.put('aura',glow(pw,.42),gRing(.9,8,0,TAU),0,.7,0,-HP,0,0,24,24,1);b.put('aura',glow(pw2,.4),gRing(.95,28,0,TAU),0,.7,0,-HP,0,0,28.5,28.5,1);b.put('aura',glow(pw,.1),gRing(.01,20,0,TAU),0,.6,0,-HP,0,0,21.6,21.6,1)}
   b.put('ready',glow(pw,.6),gRing(.9,28,0,TAU),0,.9,0,-HP,0,0,19,19,1);b.put('ready',glow(pw2,.5),gRing(.8,4,0,TAU),0,.95,0,-HP,0,0,14.5,14.5,1);
   const full=c==='fighter'&&MB.pw(1),R=c?(full?74:62):54;ud.full=full;
-  SLASH.color.setHex(c?acc:C.bone).lerp(_white,.45);ud.slashMat=SLASH;
+  const SLASH=ud.slashMat||(ud.slashMat=slashMat());SLASH.color.setHex(c?acc:C.bone).lerp(_white,.45);
   if(full){b.put('slash',SLASH,gRing(.93,48,0,TAU),0,0,0,-HP,0,0,R,R,1);b.put('slash',SLASH,gRing(.975,40,0,TAU),0,0,0,-HP,0,0,R*.8,R*.8,1)}else b.put('slash',SLASH,gRing(.62,14,-HP-1.15,2.3),0,0,0,-HP,0,0,R,R,1);
   s.slash.position.set(0,32,0);
   b.flush();
@@ -435,7 +438,7 @@ const player={
   drawsSlash:true,drawsAura:true,drawsReadyRing:true,   // hints for the renderer: these ground effects are already part of the model
   create(MB){
     const g=new T.Group();g.name='player';const s=mkSlots(g,P_TREE);
-    g.userData={s,key:'',rot:null,mb:0,ab:0,k:1,dl:0,yv:0,atkDur:.16,lastAtk:0,cls:null,adv:null,skin:false,robe:false,wtype:'club',full:false,shieldMeshes:[],slashMat:SLASH,shieldOn:null,
+    g.userData={s,key:'',rot:null,mb:0,ab:0,k:1,dl:0,yv:0,atkDur:.16,lastAtk:0,cls:null,adv:null,skin:false,robe:false,wtype:'club',full:false,shieldMeshes:[],slashMat:slashMat(),shieldOn:null,
       wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13};
     // rising wisps of power: a fixed handful of shared-geometry meshes, placed in update()
     const wg=new T.Group();wg.name='wisps';g.add(wg);
@@ -531,8 +534,10 @@ const player={
     s.ready.visible=rd;if(rd){s.ready.rotation.y=-t*.9;const f=1+.04*Math.sin(t*5);s.ready.scale.set(f,1,f)}
     // melee slash arc fades over the swing
     const sl=s.slash;sl.visible=atk&&mel;
-    if(sl.visible){SLASH.opacity=(ud.full?.62:.8)*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
-  }
+    if(sl.visible){ud.slashMat.opacity=(ud.full?.62:.8)*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
+  },
+  // a hero that leaves (another member in multiplayer): free what this one model owns. Cached materials and unit geometry are shared and stay.
+  dispose(g){const ud=g&&g.userData;if(!ud||!ud.s)return;clearSlots(ud.s);if(ud.slashMat){ud.slashMat.dispose();ud.slashMat=null}}
 };
 
 /* ================= ALLIES ================= */

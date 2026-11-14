@@ -89,7 +89,7 @@ const LINE_VS=[
   'void main(){',
   ' vec3 n=mbN;float l=length(n);vec4 p=vec4(position,1.0);',
   ' #ifdef USE_INSTANCING',
-  '  mat3 im=mat3(instanceMatrix);n/=vec3(dot(im[0],im[0]),dot(im[1],im[1]),dot(im[2],im[2]));n=im*n;p=instanceMatrix*p;',
+  '  mat3 im=mat3(instanceMatrix[0].xyz,instanceMatrix[1].xyz,instanceMatrix[2].xyz);n/=vec3(dot(im[0],im[0]),dot(im[1],im[1]),dot(im[2],im[2]));n=im*n;p=instanceMatrix*p;',
   ' #endif',
   ' vec3 vn=normalMatrix*n;float vl=length(vn);vn=vl>1e-6?vn/vl*l:vec3(0.0);',
   ' vec4 mvPosition=modelViewMatrix*p;mvPosition.xyz+=vn*max(uT,uMin);',
@@ -882,7 +882,7 @@ function phMonster(m){
   g.userData={mat,body,r};return shadowAll(g);
 }
 function phMonsterUpdate(g,m){
-  const u=g.userData,P=MB.P,a=(m.st==='charge'||m.st==='lunge')?m.ang:(P?Math.atan2(P.y-m.y,P.x-m.x):0);
+  const u=g.userData,P=m.tgt&&typeof m.tgt.x==='number'?m.tgt:MB.P,a=(m.st==='charge'||m.st==='lunge')?m.ang:(P?Math.atan2(P.y-m.y,P.x-m.x):0);
   g.rotation.y=Math.PI/2-(a||0);u.mat.emissive.setScalar(m.flash>0?.8:0);
   const t=MB.S.t+(m.seed||0);u.body.position.y=u.r*.85+Math.sin(t*3)*u.r*.05;
   if(m.st==='wind')g.position.x+=Math.sin(t*60)*1.5;
@@ -909,14 +909,15 @@ const warned={};
 function warnOnce(k,e){if(warned[k])return;warned[k]=1;console.warn('Marrowborn renderer: '+k+' model failed, using placeholder.',e&&e.message||e)}
 function modelOf(name){const M=window.MBModels&&window.MBModels[name];return M&&typeof M.create==='function'&&typeof M.update==='function'?M:null}
 const ents=new THREE.Group();scene.add(ents);
-function makeEnt(name,e,phMake){
-  const M=!warned[name]&&modelOf(name);
-  if(M){try{const g=name==='player'?M.create(MB):M.create(e,MB);if(g&&g.isObject3D){ents.add(g);return{g,real:true}}throw new Error('create() returned no Object3D')}catch(err){warnOnce(name,err)}}
-  const g=phMake(e);ents.add(g);return{g,real:false};
+// V: the MB-like object a model reads its owner from. Nothing (the local path) = the game itself; another member's hero and allies pass that member's view.
+function makeEnt(name,e,phMake,V){
+  const M=!warned[name]&&modelOf(name),B=V||MB;
+  if(M){try{const g=name==='player'?M.create(B):M.create(e,B);if(g&&g.isObject3D){ents.add(g);return{g,real:true,V:V||null}}throw new Error('create() returned no Object3D')}catch(err){warnOnce(name,err)}}
+  const g=phMake(e);ents.add(g);return{g,real:false,V:V||null};
 }
 function updateEnt(rec,name,e,dt,phMake,phUpdate){
   if(rec.real){
-    try{if(name==='player')window.MBModels.player.update(rec.g,e,MB,dt);else window.MBModels[name].update(rec.g,e,MB,dt);return}
+    try{const B=rec.V||MB;if(name==='player')window.MBModels.player.update(rec.g,e,B,dt);else window.MBModels[name].update(rec.g,e,B,dt);return}
     catch(err){warnOnce(name,err);const pos=rec.g.position.clone();ents.remove(rec.g);rec.g=phMake(e);rec.g.position.copy(pos);rec.real=false;ents.add(rec.g)}
   }
   phUpdate(rec.g,e,dt);
@@ -934,12 +935,12 @@ let dyingLevel=-1;
 function dropEnt(rec){ents.remove(rec.g);
   if(rec.tro&&rec.real){const M=modelOf('trophy');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}
   if(rec.pet&&rec.real){const M=modelOf('monster');if(M&&typeof M.dispose==='function')try{M.dispose(rec.g)}catch(e){}}}
-function syncMap(map,list,name,dt,phMake,phUpdate,sight){
+function syncMap(map,list,name,dt,phMake,phUpdate,sight,V){
   const P=MB.P;
   for(let i=0;i<list.length;i++){
     const e=list[i];if(!e)continue;let rec=map.get(e);
     if(!rec){const k=name==='ally'?allyModel(e):name,pet=name==='ally'&&k==='monster',tro=k==='trophy';
-      rec=tro?makeEnt('trophy',e,phTrophy):pet?makeEnt('monster',e,phMonster):makeEnt(name,e,phMake);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec)}
+      rec=tro?makeEnt('trophy',e,phTrophy,V):pet?makeEnt('monster',e,phMonster,V):makeEnt(name,e,phMake,V);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec)}
     rec.stamp=stamp;
     let hide=!!e.hidden||(rec.pet&&(e.dead||e.hp<=0));
     if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=FOG+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
@@ -962,7 +963,7 @@ function startFade(rec,own){
   let g=rec.g;const M=rec.real&&modelOf('monster');
   if(!M||typeof M.fade!=='function'){if(own)dropEnt(rec);return}
   if(!own){ // the pet object stays in the list (dead for this level): fade a twin, keep the record
-    try{g=M.create(rec.e,MB);g.position.copy(rec.g.position);g.position.y=0;const a=rec.g.userData.mb,b=g.userData.mb;if(a&&b){b.root.rotation.y=a.root.rotation.y;b.born=9;b.grown=false}ents.add(g)}catch(e){return}
+    try{g=M.create(rec.e,rec.V||MB);g.position.copy(rec.g.position);g.position.y=0;const a=rec.g.userData.mb,b=g.userData.mb;if(a&&b){b.root.rotation.y=a.root.rotation.y;b.born=9;b.grown=false}ents.add(g)}catch(e){return}
   }
   g.visible=true;dying.push({g,t0:MB.S.t,pet:true,real:true});
 }
@@ -985,13 +986,13 @@ function echoHex(c){if(typeof c==='number'&&c===c)return c;if(typeof c==='string
 function echoRing(){const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:PAL.power,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.3;m.renderOrder=4;noLine(m);return m}
 function echoDrop(rec){fx.remove(rec.root);try{window.MBModels.spectre.dispose(rec.g)}catch(e){}rec.ring.material.dispose()}
 function echoClaim(e){
-  const SM=window.MBModels&&window.MBModels.spectre;if(!SM||warned.echo||echoLive>=(Q.low?2:6))return null;
+  const SM=window.MBModels&&window.MBModels.spectre;if(!SM||warned.echo||echoLive>=(Q.low?2:6)+(Q.low?1:2)*rems.length)return null;
   const s=e.s&&typeof e.s==='object'?e.s:null,r=Math.max(13,Math.min(32,+(s&&s.r)||+e.r||20));
   const key=(e.ai||'')+'|'+(s?s.col+'|'+(s.eyes||0)+'|'+(s.legs||0)+'|'+(s.spikes||0):'')+'|'+r;
   let rec=null,spare=-1;
   for(let i=0;i<echoRecs.length;i++){const q=echoRecs[i];if(q.e)continue;if(q.key===key){rec=q;break}spare=i}
   if(!rec){
-    if(echoRecs.length>=(Q.low?3:ECHO_MAX)){if(spare<0)return null;echoDrop(echoRecs[spare]);echoRecs.splice(spare,1)}
+    if(echoRecs.length>=(Q.low?3:ECHO_MAX)+(Q.low?1:3)*rems.length){if(spare<0)return null;echoDrop(echoRecs[spare]);echoRecs.splice(spare,1)}
     let g;try{g=SM.create({s:s||{},ai:e.ai,seed:e.seed||0},MB,r)}catch(err){warnOnce('echo',err);return null}
     rec={key,r,g,root:new THREE.Group(),ring:echoRing(),e:null,c1:0,c2:0,age:0,stamp:0,ai:SM.ai(g),top:SM.top(g)};
     rec.root.add(g,rec.ring);fx.add(rec.root);echoRecs.push(rec);
@@ -1001,7 +1002,7 @@ function echoClaim(e){
   return rec;
 }
 function syncEchoes(dt,sight){
-  const list=R.testEchoes||MB.echoes||NONE,SM=window.MBModels&&window.MBModels.spectre,t=MB.S.t;
+  const list=rems.length?echoMerge():R.testEchoes||MB.echoes||NONE,SM=window.MBModels&&window.MBModels.spectre,t=MB.S.t;
   if(!list.length&&!echoMap.size)return;
   // entries that have run out give their spectre back first, so the ones arriving this frame can use it
   if(echoMap.size)for(const[e,rec]of echoMap)if(list.indexOf(e)<0){echoMap.delete(e);if(rec!==ECHO_SKIP&&rec.e===e){rec.e=null;rec.root.visible=false}}
@@ -1109,6 +1110,23 @@ let hasSpacing=null;
 function spaced(px){if(hasSpacing===null)hasSpacing='letterSpacing' in ctx;if(hasSpacing)ctx.letterSpacing=px+'px'}
 function slant(x,y,rot,sx,sy){ctx.translate(x,y);if(rot)ctx.rotate(rot);ctx.transform(sx,0,-.2*sy,sy,0,0)}
 function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.strokeStyle=CSS.ink;ctx.strokeText(txt,x,y);ctx.fillStyle=fill;ctx.fillText(txt,x,y)}
+// a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
+function petBar(a,MM,idCss){
+  if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
+  let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
+  toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)return;
+  if(idCss&&(sp.x<-12||sp.x>W+12||sp.y>H+12))return; // another member's pet out of frame: no bar pinned to the edge
+  // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
+  const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=Math.max(18,Math.min(W-bw-6,sp.x-bw/2)),by=Math.max(hudBottom()+7,sp.y-8);
+  ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
+  ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
+  ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
+  ctx.strokeStyle=beast?'rgba(207,234,255,.9)':'rgba(125,255,140,.85)';ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,8);
+  // a small diamond pip marks it as yours; another member's pet carries a round pip in that member's colour
+  if(idCss){ctx.fillStyle=idCss;ctx.beginPath();ctx.arc(bx-9,by+2.5,4,0,TAU);ctx.fill()}
+  else{ctx.fillStyle=beast?'#cfeaff':'#7dff8c';ctx.beginPath();ctx.moveTo(bx-9,by-1);ctx.lineTo(bx-5,by+2.5);ctx.lineTo(bx-9,by+6);ctx.lineTo(bx-13,by+2.5);ctx.closePath();ctx.fill()}
+  ctx.strokeStyle='rgba(8,8,12,.8)';ctx.stroke();
+}
 function drawOverlay(sight){
   const S=MB.S,P=MB.P;
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,cv.width,cv.height);
@@ -1178,18 +1196,8 @@ function drawOverlay(sight){
   }
   // pets: a small health bar over the head, in the owner's colour (also one more thing no hostile monster has)
   {const al=R.testAllies||MB.allies||NONE,MM=modelOf('monster');
-    for(let i=0;i<al.length;i++){const a=al[i];if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))continue;
-      let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
-      toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)continue;
-      // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
-      const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=Math.max(18,Math.min(W-bw-6,sp.x-bw/2)),by=Math.max(hudBottom()+7,sp.y-8);
-      ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
-      ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
-      ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
-      ctx.strokeStyle=beast?'rgba(207,234,255,.9)':'rgba(125,255,140,.85)';ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,8);
-      // a small heart-shaped pip marks it as yours
-      ctx.fillStyle=beast?'#cfeaff':'#7dff8c';ctx.beginPath();ctx.moveTo(bx-9,by-1);ctx.lineTo(bx-5,by+2.5);ctx.lineTo(bx-9,by+6);ctx.lineTo(bx-13,by+2.5);ctx.closePath();ctx.fill();
-      ctx.strokeStyle='rgba(8,8,12,.8)';ctx.stroke()}}
+    for(let i=0;i<al.length;i++)petBar(al[i],MM,null);
+    if(rems.length)remoteOverlay(MM,sight)}
   // held beats and wounds: letterbox bars, focus lines toward the boss, a red pulse at the edges
   if(FX.hurt>0&&MB.has('touch')){const a=FX.hurt*FX.hurt*.5;ctx.fillStyle=sight?'rgba(255,45,85,'+a+')':'rgba(230,230,240,'+a*.7+')';
     ctx.globalCompositeOperation='lighter';ctx.fillRect(0,0,W,10);ctx.fillRect(0,H-10,W,10);ctx.fillRect(0,0,10,H);ctx.fillRect(W-10,0,10,H);
@@ -1258,7 +1266,7 @@ const TF={
   crack:new Timed(7,()=>{const g=new THREE.Group(),d=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:crackTex,color:0x06050e,transparent:true,depthWrite:false,fog:false,toneMapped:false})),h=new THREE.Mesh(G.quad,addMat(crackTex,PAL.foe));
     d.position.y=.42;h.position.y=.5;d.renderOrder=1;h.renderOrder=2;g.add(d,h);g.userData.d=d;g.userData.h=h;return g}),
 };
-const FX={prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0};
+const FX={fall:0,prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0};
 const born=new WeakMap(),prevZones=[],prevRings=[];
 // Damage numbers that land on the same spot within half a second are shown as ONE number (the running total, with a small hit count), led by
 // the newest float of the group; the older ones are not drawn. Numbers that cannot merge (a heavy hit, another colour) are stacked upward.
@@ -1281,15 +1289,40 @@ function upGhost(o,q){o.material.opacity=(1-q)*o.userData.k;o.scale.y=1-.08*q}
 function upStreak(o,q){const u=o.userData;o.material.opacity=(1-q)*.85;o.scale.set(u.len,1,u.w*(1-.7*q))}
 function upFlash(o,q){const u=o.userData,e=easeOut(q);o.scale.setScalar(u.s0+(u.s1-u.s0)*e);o.material.opacity=(1-q)*(1-q)*u.k}
 function upCrack(o,q){const u=o.userData;u.d.material.opacity=Math.min(1,(1-q)*2.6)*.82;u.h.material.opacity=Math.max(0,1-q*4.5)*.95;u.h.visible=u.hot&&q<.23}
-function flashAt(x,y,z,s0,s1,hex,life,k){const o=TF.flash.spawn(life||.14),u=o.userData;o.position.set(x,y,z);u.s0=s0;u.s1=s1;u.k=k===undefined?1:k;o.material.color.setHex(hex);o.material.rotation=(x*.37+z*.11)%1.5;o.scale.setScalar(s0);return o}
+function flashAt(x,y,z,s0,s1,hex,life,k,pool){const o=(pool||TF.flash).spawn(life||.14),u=o.userData;o.position.set(x,y,z);u.s0=s0;u.s1=s1;u.k=k===undefined?1:k;o.material.color.setHex(hex);o.material.rotation=(x*.37+z*.11)%1.5;o.scale.setScalar(s0);return o}
 function burstAt(x,y,z,s0,s1,hex,life){const o=TF.burst.spawn(life||.2),u=o.userData;o.position.set(x,y,z);u.s0=s0;u.s1=s1;u.k=.9;o.material.color.setHex(hex);o.material.rotation=(x*.21+z*.4)%TAU;o.scale.setScalar(s0)}
 function crackAt(x,z,r,hex,life){const o=TF.crack.spawn(life||2.6),u=o.userData;o.position.set(x,0,z);o.rotation.y=(x*.13+z*.29)%TAU;o.scale.setScalar(Math.max(40,r*2.5));u.hot=!Q.low;u.h.material.color.setHex(hex)}
+function clearFx(){for(const k in TF)TF[k].clear();if(TFR)for(const k in TFR)TFR[k].clear()}
 function drama(kind,x,z,len){if(calm)return;FX.drama=FX.dramaMax=len;FX.kind=kind;FX.bx=x;FX.bz=z}
 const RANK_K={'':0,E:.22,D:.38,C:.54,B:.7,A:.85,S:1};
 if(typeof MB.on==='function')try{
   MB.on('bossdead',()=>{if(!alive)return;const x=FX.bx,z=FX.bz;drama('death',x,z,1.25);flashAt(x,34,z,60,330,0xffffff,.42,1);burstAt(x,34,z,90,420,PAL.power2,.38);crackAt(x,z,90,PAL.power,3.4)});
-  MB.on('levelstart',()=>{for(const k in TF)TF[k].clear();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
+  MB.on('levelstart',()=>{clearFx();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
 }catch(e){}
+// what a hero's own movement throws off: F = that hero's little state {prevAtk,dir,ghostT,px,py}, T = the timed pools to draw from
+// (the local hero has its own; the other members share a larger set)
+function heroFx(F,P,cls,dt,sight,low,T){
+  // weapon trail on a swing, a muzzle flare on a cast or shot
+  const atk=P.atk||0;
+  if(atk>F.prevAtk+.04){
+    const ang=P.swing===undefined?P.face:P.swing,melee=MB.melee(cls);
+    if(melee){const o=T.slash.spawn(cls==='assassin'?.16:.22),u=o.userData;F.dir=-F.dir;u.ang=ang;u.dir=F.dir;u.arc=cls==='assassin'?1.1:cls==='tank'?1.3:1.6;u.reach=cls==='tank'?58:cls?64:50;
+      o.position.set(P.x,cls?30:26,P.y);u.a.material.color.setHex(cls?PAL.power:0xcfd0e6);u.b.material.color.setHex(cls?PAL.power2:0xffffff);upSlash(o,0)}
+    else if(!low){const hex=cls==='healer'?PAL.holy:cls==='necro'?PAL.necro:cls==='ranger'?PAL.power2:PAL.power;flashAt(P.x+Math.cos(ang)*20,36,P.y+Math.sin(ang)*20,16,58,hex,.13,.95,T.flash)}
+  }
+  F.prevAtk=atk;
+  // afterimages: a trail of ghosts on a dash, a streak and ghosts along a blink
+  const dx=P.x-F.px,dy=P.y-F.py,jump=dx*dx+dy*dy;
+  if(!low&&sight){
+    if(P.dashT>0){F.ghostT-=dt;if(F.ghostT<=0){F.ghostT=.034;const o=T.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.36;o.material.color.setHex(PAL.power)}}
+    else{F.ghostT=0;
+      if(jump>80*80&&jump<260*260&&cls==='mage'){const len=Math.sqrt(jump),a=Math.atan2(dy,dx);
+        for(let i=0;i<4;i++){const o=T.ghost.spawn(.3+i*.05),q=i/4;o.position.set(F.px+dx*q,0,F.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.2+.1*i;o.material.color.setHex(i%2?PAL.power2:PAL.power)}
+        const s=T.streak.spawn(.3),u=s.userData;s.position.set(F.px+dx/2,22,F.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;upStreak(s,0);
+        flashAt(P.x,34,P.y,24,96,PAL.power2,.2,.9,T.flash)}}
+  }
+  F.px=P.x;F.py=P.y;
+}
 function syncFx(dt,sight){
   const S=MB.S,P=MB.P,low=Q.low,t=S.t,cls=MB.cls();
   if(FX.drama>0)FX.drama=Math.max(0,FX.drama-dt);
@@ -1297,7 +1330,7 @@ function syncFx(dt,sight){
   const d=FX.drama>0?FX.drama/FX.dramaMax:0,fdt=dt*(1-.72*Math.sin(Math.min(1,d*1.4)*Math.PI/2)); // effects run slow while a big moment holds
   FX.clock+=fdt;
   const play=S.mode==='play';
-  if(S.level!==FX.lvl||S.mode!==FX.mode){if(S.level!==FX.lvl||S.mode==='title'){for(const k in TF)TF[k].clear();FX.drama=0}FX.lvl=S.level;FX.mode=S.mode;if(P){FX.px=P.x;FX.py=P.y}FX.prevAtk=P?P.atk:0;FX.boss=null}
+  if(S.level!==FX.lvl||S.mode!==FX.mode){if(S.level!==FX.lvl||S.mode==='title'){clearFx();FX.drama=0}FX.lvl=S.level;FX.mode=S.mode;if(P){FX.px=P.x;FX.py=P.y}FX.prevAtk=P?P.atk:0;FX.boss=null}
   // the boss: a phase breaking or the rage starting is a held beat
   const B=MB.boss;
   if(B!==FX.boss){FX.boss=B;FX.ph=B?B.phase||1:0;FX.rage=B?!!B.rage:false}
@@ -1305,28 +1338,7 @@ function syncFx(dt,sight){
     if((ph>FX.ph||(rg&&!FX.rage))&&play){drama('phase',B.x,B.y,.85);if(sight){flashAt(B.x,B.r+10,B.y,B.r*2,B.r*7,PAL.foe,.32,1);if(!low)burstAt(B.x,B.r+10,B.y,B.r*3,B.r*9,PAL.foe2,.3);crackAt(B.x,B.y,B.r*1.5,PAL.foe,3)}}
     FX.ph=ph;FX.rage=rg}
   if(B&&B.hp>0){FX.bx=B.x;FX.bz=B.y}
-  if(P&&play){
-    // weapon trail on a swing, a muzzle flare on a cast or shot
-    const atk=P.atk||0;
-    if(atk>FX.prevAtk+.04){
-      const ang=P.swing===undefined?P.face:P.swing,melee=MB.melee(cls);
-      if(melee){const o=TF.slash.spawn(cls==='assassin'?.16:.22),u=o.userData;FX.dir=-FX.dir;u.ang=ang;u.dir=FX.dir;u.arc=cls==='assassin'?1.1:cls==='tank'?1.3:1.6;u.reach=cls==='tank'?58:cls?64:50;
-        o.position.set(P.x,cls?30:26,P.y);u.a.material.color.setHex(cls?PAL.power:0xcfd0e6);u.b.material.color.setHex(cls?PAL.power2:0xffffff);upSlash(o,0)}
-      else if(!low){const hex=cls==='healer'?PAL.holy:cls==='necro'?PAL.necro:cls==='ranger'?PAL.power2:PAL.power;flashAt(P.x+Math.cos(ang)*20,36,P.y+Math.sin(ang)*20,16,58,hex,.13,.95)}
-    }
-    FX.prevAtk=atk;
-    // afterimages: a trail of ghosts on a dash, a streak and ghosts along a blink
-    const dx=P.x-FX.px,dy=P.y-FX.py,jump=dx*dx+dy*dy;
-    if(!low&&sight){
-      if(P.dashT>0){FX.ghostT-=dt;if(FX.ghostT<=0){FX.ghostT=.034;const o=TF.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.36;o.material.color.setHex(PAL.power)}}
-      else{FX.ghostT=0;
-        if(jump>80*80&&jump<260*260&&cls==='mage'){const len=Math.sqrt(jump),a=Math.atan2(dy,dx);
-          for(let i=0;i<4;i++){const o=TF.ghost.spawn(.3+i*.05),q=i/4;o.position.set(FX.px+dx*q,0,FX.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.2+.1*i;o.material.color.setHex(i%2?PAL.power2:PAL.power)}
-          const s=TF.streak.spawn(.3),u=s.userData;s.position.set(FX.px+dx/2,22,FX.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;upStreak(s,0);
-          flashAt(P.x,34,P.y,24,96,PAL.power2,.2,.9)}}
-    }
-    FX.px=P.x;FX.py=P.y;
-  }
+  if(P&&play&&!P.down)heroFx(FX,P,cls,dt,sight,low,TF);else if(P&&P.down){FX.px=P.x;FX.py=P.y;FX.prevAtk=P.atk||0}
   // slams: a telegraphed blast going off, or a heavy shockwave, cracks the floor for a while
   {const zs=MB.zones;
     for(let i=0;i<prevZones.length;i++){const z=prevZones[i];if(zs.indexOf(z)>=0||!(z.t>=z.dur*.92)||!play)continue;
@@ -1350,6 +1362,7 @@ function syncFx(dt,sight){
       if(heavy){flashAt(f.x,26,f.y+22,30,120+26*Math.min(3,k),0xffffff,.17,1);if(!low)burstAt(f.x,26,f.y+22,50,150+40*Math.min(3,k),cls?PAL.power2:0xffffff,.2)}
       else if(!low)flashAt(f.x,26,f.y+20,14,50,cls?PAL.power2:0xffffff,.11,.8)}}
   TF.slash.run(fdt,upSlash);TF.ghost.run(fdt,upGhost);TF.streak.run(fdt,upStreak);TF.flash.run(fdt,upFlash);TF.burst.run(fdt,upFlash);TF.crack.run(fdt,upCrack);
+  if(TFR){TFR.slash.run(fdt,upSlash);TFR.ghost.run(fdt,upGhost);TFR.streak.run(fdt,upStreak);TFR.flash.run(fdt,upFlash)}
   // power rising off the hero: more of it with every rank
   {let k=0;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=r&&r[0]==='S'?1:RANK_K[r]||.12}
     FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK;
@@ -1362,6 +1375,298 @@ function syncFx(dt,sight){
     auraDisc.visible=rk>.02&&!!P;if(auraDisc.visible){auraDisc.position.x=P.x;auraDisc.position.z=P.y;auraDisc.scale.setScalar(64+52*rk+4*Math.sin(c*3));auraDisc.material.opacity=.1+.2*rk+.03*Math.sin(c*5)}}
 }
 
+// one of our side's projectiles (pool = which body: bolt, orb, skull, arrow), drawn at x,y
+function drawPshot(p,i,x,y,t,low,pool){
+  const r=p.r||5,o=pool.get(),vx=p.vx||0,vy=p.vy||0;o.position.set(x,SHOT_Y,y);
+  if(o.userData.trail)o.userData.trail.visible=!low;
+  if(pool===pools.arrow)o.rotation.y=Math.PI/2-Math.atan2(vy,vx);
+  else if(pool===pools.skull){const a=Math.atan2(vy,vx);o.scale.setScalar(r*1.25);o.rotation.y=0;o.userData.trail.rotation.y=-a;o.userData.trail.position.set(-Math.cos(a)*3.8,0,-Math.sin(a)*3.8);o.userData.core.rotation.y=Math.PI/2-a;o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
+  else{o.scale.setScalar(Math.max(4.5,r));o.rotation.y=-Math.atan2(vy,vx);o.userData.core.scale.setScalar(.8)}
+}
+// a pet's beam is the same shape as a monster's, in friendly blue
+function allyBeams(allies,t){
+  for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue;
+    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j];if(!ry)continue;const o=pools.pbeam.get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12,a=+ry.a||0;
+      o.position.set(m.x+Math.cos(a)*len/2,SHOT_Y,m.y+Math.sin(a)*len/2);o.rotation.y=-a;
+      u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
+      if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
+      else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}
+}
+
+/* ---------- multiplayer: the other members of the party ----------
+   MB.mp.remotes (or the test hook R.testRemotes, same shape) = [{id, name, dead, slot?, P:{x,y,face,moving,walk,hp,maxHp,inv,atk,swing,dashT,shield,skCd},
+     look:{level,cls,adv,rank,pw:[b,b,b],parts,skill0Ready}, allies:[...as MB.allies, each with a stable nid], pshots:[{x,y,vx,vy,r,kind}], echoes:[...as MB.echoes]}]
+   Every member is drawn exactly as the local hero is: the same player model reading a small per-member VIEW object in place of the game (its
+   class, upgrade, rank and powers come from look), the same ally / pet / familiar / guardian paths (syncMap with that view), the same shots,
+   echoes, slash trails and afterimages. What arrives is plain data that may be replaced by fresh objects many times a second, so nothing here
+   holds on to it: each hero and each ally has a persistent copy (allies keyed by nid, else by index) whose position is eased from snapshot
+   to snapshot, and whose short timers (swing, dash, blink) run on locally between snapshots.
+   Identity: each member has one colour (by slot when the data carries one, else by place in the list): a broken ring with a facing notch under
+   the hero, a thin ring under each of their allies, the name tag, the pip on their pets' bars and the arrow at the edge of the view.
+   None of this exists until the first remote appears, and none of it runs in single-player. */
+const ID_HEX=[0x4fd8ff,0xff9f1a,0x7dff5a,0xff5ad2,0xffe14a,0x6a8cff,0x3df5c0,0xd8c8ff];
+const cssOf=h=>'#'+('00000'+h.toString(16)).slice(-6);
+// a member's colour by index: the session's own list when it has one (MB.mp.colors, which the party list on the page uses too), else this one
+function memberHex(i){i=i|0;const mp=MB.mp,c=mp&&mp.colors&&mp.colors[i];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);return ID_HEX[((i%8)+8)%8]}
+function memberColor(i){return cssOf(memberHex(i))}
+const rems=[],remById=new Map(),echoAll=[];
+let TFR=null,auraR=null,idTexH=null,idTexA=null,remStamp=0,PART_IX=null;
+const PK={bolt:1,orb:1,skull:1,arrow:1},CLS_OK={fighter:1,tank:1,assassin:1,mage:1,ranger:1,healer:1,necro:1},WORD_RE=/^[a-z]{1,24}$/,NOLOOK={};
+const NAME_RE=/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff9-\ufffb]/g;
+const num=(v,d)=>typeof v==='number'&&v===v&&v!==Infinity&&v!==-Infinity?v:d;
+function cleanName(n,i){let s='';try{s=typeof n==='string'?n:n==null?'':''+n}catch(e){s=''}
+  s=s.replace(NAME_RE,'').replace(/\s+/g,' ').trim();if(s.length>16)s=Array.from(s).slice(0,16).join('').trim();return s||'Player '+(i+1)}
+function remSetup(){
+  if(TFR)return;
+  // the same timed effects the local hero has, enough of them for seven more
+  TFR={
+    slash:new Timed(16,()=>{const g=new THREE.Group(),a=new THREE.Mesh(G.quad,addMat(slashTex,PAL.power)),b=new THREE.Mesh(G.quad,addMat(slashTex,PAL.power2));b.scale.setScalar(.9);b.position.y=.6;a.renderOrder=b.renderOrder=7;g.add(a,b);g.userData.a=a;g.userData.b=b;return g}),
+    ghost:new Timed(48,()=>{const m=new THREE.Mesh(GHOST_GEO,new THREE.MeshBasicMaterial({color:PAL.power,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false,toneMapped:false}));m.renderOrder=6;return m}),
+    streak:new Timed(8,()=>{const m=new THREE.Mesh(G.quad,flatGlowMat(PAL.power,.8));m.renderOrder=6;return m}),
+    flash:new Timed(20,()=>new THREE.Sprite(addMat(flareTex,0xffffff,true)))};
+  auraR=makePoints(384);auraR.mat.blending=THREE.AdditiveBlending;auraR.mat.uniforms.uScale.value=bitsP.mat.uniforms.uScale.value;pointSets.push(auraR);
+  const ring=(g,h,R,lw,parts,gap,ink)=>{g.lineCap='butt';
+    for(let pass=0;pass<2;pass++){g.strokeStyle=pass?'#fff':'rgba(0,0,0,'+ink+')';g.lineWidth=pass?lw:lw+h*.07;
+      for(let i=0;i<parts;i++){const a=i*TAU/parts;g.beginPath();g.arc(0,0,R,a+gap,a+TAU/parts-gap);g.stroke()}}};
+  // hero: a ring broken in three with a notch pointing the way the hero faces (+x of the texture)
+  idTexH=fxTex(128,(g,h)=>{ring(g,h,h*.8,h*.085,3,.2,.5);
+    g.fillStyle='rgba(0,0,0,.5)';g.beginPath();g.moveTo(h*.99,0);g.lineTo(h*.74,h*.17);g.lineTo(h*.74,-h*.17);g.closePath();g.fill();
+    g.fillStyle='#fff';g.beginPath();g.moveTo(h*.95,0);g.lineTo(h*.78,h*.11);g.lineTo(h*.78,-h*.11);g.closePath();g.fill();
+    g.globalAlpha=.55;g.strokeStyle='#fff';g.lineWidth=h*.022;g.beginPath();g.arc(0,0,h*.62,0,TAU);g.stroke()});
+  // ally: a thin ring in two halves with a bead on each gap
+  idTexA=fxTex(128,(g,h)=>{ring(g,h,h*.86,h*.06,2,.16,.45);g.fillStyle='#fff';for(const a of[0,Math.PI]){g.beginPath();g.arc(Math.cos(a)*h*.86,Math.sin(a)*h*.86,h*.055,0,TAU);g.fill()}});
+}
+const newSm=()=>({init:false,x:0,y:0,w:0,l:0,fx:0,fy:0,fw:0,fl:0,tx:0,ty:0,tw:0,tl:0,T:0,el:0,since:0,iv:.083});
+// ease a position (and a walk phase and a lift) from one snapshot to the next. A new target starts a straight run from where the thing is drawn
+// now, timed by how often targets have been arriving; data that already moves every frame is simply followed; a big jump (blink, new level) snaps.
+function chase(sm,tx,ty,tw,tl,dt,snap){
+  if(!sm.init){sm.init=true;sm.x=sm.fx=sm.tx=tx;sm.y=sm.fy=sm.ty=ty;sm.w=sm.fw=sm.tw=tw;sm.l=sm.fl=sm.tl=tl;sm.T=0;sm.since=0;return}
+  sm.since+=dt;
+  if(tx!==sm.tx||ty!==sm.ty||tw!==sm.tw||tl!==sm.tl){
+    const dx=tx-sm.tx,dy=ty-sm.ty;
+    if(dx*dx+dy*dy>snap*snap||Math.abs(tw-sm.tw)>30){sm.x=tx;sm.y=ty;sm.w=tw;sm.l=tl;sm.T=0}
+    else{if(sm.since<.25)sm.iv+=(Math.max(.004,sm.since)-sm.iv)*.35;sm.fx=sm.x;sm.fy=sm.y;sm.fw=sm.w;sm.fl=sm.l;sm.T=sm.iv;sm.el=0}
+    sm.tx=tx;sm.ty=ty;sm.tw=tw;sm.tl=tl;sm.since=0;
+  }
+  if(sm.T>0){sm.el+=dt;const q=sm.el>=sm.T?1:sm.el/sm.T;sm.x=sm.fx+(sm.tx-sm.fx)*q;sm.y=sm.fy+(sm.ty-sm.fy)*q;sm.w=sm.fw+(sm.tw-sm.fw)*q;sm.l=sm.fl+(sm.tl-sm.fl)*q;if(q>=1)sm.T=0}
+  else{sm.x=sm.tx;sm.y=sm.ty;sm.w=sm.tw;sm.l=sm.tl}
+}
+// a countdown that arrives in steps: it runs on here between snapshots and takes the sent value only when a new one disagrees
+function runTimer(tm,k,rk,raw,dt){let v=tm[k]-dt;if(v<0)v=0;raw=num(raw,0);if(raw<0)raw=0;
+  if(raw!==tm[rk]){tm[rk]=raw;if(raw>v+.045||raw<v-.08)v=raw}
+  return tm[k]=v}
+function remNew(id){
+  const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0};
+  const S={adv:null,rank:'',level:0,mode:'play',t:0,cls:null,paused:false},sk0={unlocked:true,ready:false};
+  // the view: everything the models ask the game about their owner, answered for this member
+  const V={S,P,remote:true,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
+    has(p){if(!PART_IX){PART_IX={};const a=MB.PARTS||[];for(let i=0;i<a.length;i++)PART_IX[a[i]&&a[i].id||a[i]]=i}const i=PART_IX[p];return i===undefined?true:i<V.parts},
+    cls(){return S.cls},pw(i){const a=V.pwA;return !!(a&&a[i-1])},rank(){return S.rank},
+    get mons(){return MB.mons},get allies(){return rm.allyList},get boss(){return MB.boss}};
+  const rm={id,idx:0,i:0,stamp:0,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false},
+    allyMap:new Map(),allyList:[],allyRecs:new Map(),aStamp:0,echo:[],eStamp:0,psRef:null,psX:NaN,psN:0,psAge:0,
+    name:'',initial:'?',nameW:0,nameAt:-9,rawName:undefined,nameI:-1,dead:false,fall:0,vis:false,rankK:0,
+    mat:null,matA:null,mark:null,marks:null,disc:null,beacon:null,hex:-1,css:'#ffffff',soft:'#ffffff'};
+  return rm;
+}
+const MARKS=48;
+function remColour(rm,idx){
+  const hex=memberHex(idx);if(rm.hex===hex)return;
+  rm.hex=hex;rm.css=cssOf(hex);rm.soft='#'+_col.setHex(hex).lerp(_c0.setHex(0xffffff),.45).getHexString();
+  if(!rm.mat){
+    const mk=tex=>new THREE.MeshBasicMaterial({map:tex,color:hex,transparent:true,opacity:.92,depthWrite:false,toneMapped:false,fog:false});
+    rm.mat=mk(idTexH);rm.matA=mk(idTexA);
+    rm.mark=noLine(new THREE.Mesh(G.quad,rm.mat));rm.mark.renderOrder=2;rm.mark.position.y=1;
+    rm.marks=noLine(new THREE.InstancedMesh(G.quad,rm.matA,MARKS));rm.marks.count=0;rm.marks.frustumCulled=false;rm.marks.renderOrder=2;rm.marks.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    rm.disc=new THREE.Mesh(G.quad,flatGlowMat(PAL.power,.2));rm.disc.position.y=.62;rm.disc.renderOrder=1;rm.disc.visible=false;
+    rm.beacon=new THREE.Sprite(glowMat(hex,.4));rm.beacon.visible=false;
+    fx.add(rm.mark,rm.marks,rm.disc,rm.beacon);
+  }else{rm.mat.color.setHex(hex);rm.matA.color.setHex(hex);rm.beacon.material.color.setHex(hex)}
+}
+function remDrop(rm){
+  if(rm.rec){ents.remove(rm.rec.g);if(rm.rec.real){const M=modelOf('player');if(M&&typeof M.dispose==='function')try{M.dispose(rm.rec.g)}catch(e){}}rm.rec=null}
+  for(const rec of rm.allyMap.values())dropEnt(rec);rm.allyMap.clear();rm.allyRecs.clear();rm.allyList.length=0;rm.echo.length=0;
+  if(rm.mat){fx.remove(rm.mark,rm.marks,rm.disc,rm.beacon);rm.marks.dispose();rm.mat.dispose();rm.matA.dispose();rm.disc.material.dispose();rm.beacon.material.dispose();rm.mat=null}
+}
+// does this incoming ally still describe the body its persistent copy was built as?
+function sameBody(q,a){const s=a.s&&typeof a.s==='object'?a.s:NOLOOK;
+  return q.kind===a.kind&&q.ai===a.ai&&q.owner===a.owner&&q.pet===!!a.pet&&q.minion===!!a.minion&&q.trophy===!!a.trophy&&q.col===s.col&&q.eyes===s.eyes&&q.legs===s.legs&&q.spikes===s.spikes}
+function remAllies(rm,src,dt){
+  const list=rm.allyList,recs=rm.allyRecs,st=++rm.aStamp;let n=0;
+  for(let i=0;i<src.length&&n<96;i++){
+    const a=src[i];if(!a||typeof a!=='object'||num(a.x,null)===null||num(a.y,null)===null)continue;
+    let key=a.nid;if(key==null||typeof key==='object'||key!==key)key=-1-i;
+    let q=recs.get(key);
+    if(q&&q.stamp===st){key=-1001-i;q=recs.get(key)} // the same nid twice in one list: the second goes by its place
+    if(!q||!sameBody(q,a)){const s=a.s&&typeof a.s==='object'?a.s:NOLOOK;
+      q={pe:{},sm:newSm(),stamp:0,kind:a.kind,ai:a.ai,owner:a.owner,pet:!!a.pet,minion:!!a.minion,trophy:!!a.trophy,col:s.col,eyes:s.eyes,legs:s.legs,spikes:s.spikes};recs.set(key,q)}
+    q.stamp=st;const pe=q.pe;
+    for(const k in a)pe[k]=a[k];
+    for(const k in pe)if(!(k in a))pe[k]=undefined;
+    chase(q.sm,a.x,a.y,num(a.walk,0),num(a.lift,0),dt,170);
+    pe.x=q.sm.x;pe.y=q.sm.y;pe.lift=q.sm.l;if(typeof a.walk==='number')pe.walk=q.sm.w;
+    if(typeof pe.r!=='number'||!(pe.r>0))pe.r=pe.s&&pe.s.r>0?+pe.s.r:pe.kind==='thrall'||pe.kind==='wolf'?10:16;
+    list[n++]=pe;
+  }
+  list.length=n;
+  if(recs.size>n)for(const[k,q]of recs)if(q.stamp!==st)recs.delete(k);
+}
+// echoes are short and stand still: one is recognised from snapshot to snapshot by its nid, or else by what and where it is
+function remEchoes(rm,src,dt){
+  const mine=rm.echo,st=++rm.eStamp;let n=0;
+  for(let i=0;i<src.length&&n<10;i++){
+    const e=src[i];if(!e||typeof e!=='object'||num(e.x,null)===null||num(e.y,null)===null)continue;
+    const life=num(e.life,-1);let pe=null;
+    for(let j=0;j<mine.length;j++){const q=mine[j];if(q.stamp===st)continue;
+      if(e.nid!=null?q.nid===e.nid:(q.ai===e.ai&&q.x===e.x&&q.y===e.y&&!(life>q.raw+.05))){pe=q;break}}
+    if(!pe){pe={ai:e.ai,s:e.s,x:e.x,y:e.y,ang:e.ang,life:life<0?undefined:life,max:e.max,owner:e.owner,col:e.col,seed:e.seed,nid:e.nid,raw:life,stamp:0};mine.push(pe)}
+    else if(life!==pe.raw){pe.raw=life;if(life>=0)pe.life=life}
+    else if(typeof pe.life==='number')pe.life=Math.max(0,pe.life-dt);
+    pe.stamp=st;n++;
+  }
+  if(mine.length>n){let k=0;for(let j=0;j<mine.length;j++)if(mine[j].stamp===st)mine[k++]=mine[j];mine.length=k}
+}
+function echoMerge(){
+  const own=R.testEchoes||MB.echoes||NONE;echoAll.length=0;
+  for(let i=0;i<own.length;i++)echoAll.push(own[i]);
+  for(let i=0;i<rems.length;i++){const e=rems[i].echo;for(let j=0;j<e.length;j++)echoAll.push(e[j])}
+  return echoAll;
+}
+// a hero that is down: tipped onto its back about its feet, and slid so the body lies centred on the spot where it stood
+function layDown(g,P,f){const e=easeOut(f),ry=g.rotation.y;g.rotation.x=-e*(Math.PI/2-.07);g.position.set(P.x+Math.sin(ry)*30*e,4.2*f,P.y+Math.cos(ry)*30*e)}
+function markAt(im,n,x,z,size,ry){_d.position.set(x,1,z);_d.scale.set(size,1,size);_d.rotation.set(0,ry,0);_d.updateMatrix();im.setMatrixAt(n,_d.matrix)}
+function syncRemotes(list,dt,sight){
+  const S0=MB.S,t=S0.t,low=Q.low,play=S0.mode==='play',LP=MB.P,st=++remStamp;
+  if(list.length)remSetup();
+  for(let i=0;i<list.length&&i<16;i++){
+    const r=list[i];if(!r||typeof r!=='object')continue;
+    const id=r.id==null?'#'+i:r.id;let rm=remById.get(id);
+    if(!rm){rm=remNew(id);remById.set(id,rm);rems.push(rm)}
+    if(rm.stamp===st)continue;rm.stamp=st;rm.i=i;
+    const slot=num(r.idx,num(r.slot,null));remColour(rm,slot===null?i:slot|0);
+    if(r.name!==rm.rawName||i!==rm.nameI){rm.rawName=r.name;rm.nameI=i;rm.name=cleanName(r.name,slot===null?i+1:slot|0);rm.initial=Array.from(rm.name)[0].toUpperCase();rm.nameAt=-9}
+    // who they are
+    const L=r.look&&typeof r.look==='object'?r.look:NOLOOK,V=rm.V,S=V.S,P=rm.P,dead=!!r.dead;
+    S.cls=typeof L.cls==='string'&&CLS_OK[L.cls]===1?L.cls:null;S.adv=S.cls&&typeof L.adv==='string'&&WORD_RE.test(L.adv)?L.adv:null;
+    S.rank=typeof L.rank==='string'&&L.rank.length<6?L.rank:'';S.level=num(L.level,S0.level);S.mode=S0.mode;S.t=t;
+    V.parts=typeof L.parts==='number'?L.parts:7;V.pwA=Array.isArray(L.pw)?L.pw:null;
+    // where they are and what they are doing
+    const sp=r.P&&typeof r.P==='object'?r.P:NOLOOK,tm=rm.tm;
+    if(num(sp.x,null)!==null&&num(sp.y,null)!==null)chase(rm.sm,sp.x,sp.y,num(sp.walk,0),0,dt,130);
+    if(rm.sm.init){P.x=rm.sm.x;P.y=rm.sm.y;P.walk=rm.sm.w}
+    P.face=num(sp.face,P.face);P.swing=num(sp.swing,P.face);P.moving=!!sp.moving&&!dead;
+    P.maxHp=Math.max(1,num(sp.maxHp,P.maxHp));P.hp=Math.max(0,Math.min(P.maxHp,num(sp.hp,P.hp)));P.shield=sp.shield===true?1:num(sp.shield,0);P.skCd=num(sp.skCd,0);
+    P.atk=runTimer(tm,'atk','ratk',sp.atk,dt);P.dashT=runTimer(tm,'dashT','rdashT',sp.dashT,dt);P.inv=runTimer(tm,'inv','rinv',sp.inv,dt);
+    if(dead){P.atk=P.dashT=P.inv=tm.atk=tm.dashT=tm.inv=0}
+    V.sk0.ready=!dead&&(L.skill0Ready===undefined?V.pw(2)&&P.skCd<=0:!!L.skill0Ready);
+    rm.dead=dead;rm.fall+=((dead?1:0)-rm.fall)*Math.min(1,dt*(dead?5:9));
+    const away=!!r.away;let hide=!rm.sm.init||away;
+    if(!hide&&!sight&&LP){const dx=P.x-LP.x,dy=P.y-LP.y,lim=FOG+22;if(dx*dx+dy*dy>lim*lim)hide=true}
+    rm.vis=!hide;
+    // the hero
+    if(!rm.rec)rm.rec=makeEnt('player',P,phPlayer,V);
+    rm.rec.g.position.set(P.x,0,P.y);rm.rec.g.visible=!hide;
+    updateEnt(rm.rec,'player',P,dt,phPlayer,phPlayerUpdate);
+    const g=rm.rec.g,f=rm.fall;
+    // down: the body lies where it fell, on its back, and a pale column of the member's colour stands over it
+    g.rotation.order='YXZ';if(f>.002)layDown(g,P,f);else g.rotation.x=0;
+    if(low&&!hide){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70+30*f,1,56+30*f)}
+    const F=rm.fx;
+    if(!F.init||!play||dead||hide){F.init=true;F.px=P.x;F.py=P.y;F.prevAtk=P.atk;F.ghostT=0}
+    else heroFx(F,P,S.cls,dt,sight,low,TFR);
+    // their allies, through the same path as ours
+    remAllies(rm,!away&&Array.isArray(r.allies)?r.allies:NONE,dt);
+    syncMap(rm.allyMap,rm.allyList,'ally',dt,phAlly,phAllyUpdate,true,V);
+    const al=rm.allyList;
+    allyBeams(al,t);
+    if(sight&&!hide&&!dead)for(let j=0;j<al.length;j++){const a=al[j];if(a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
+      const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4+i));o.rotation.y=t*.8+i;o.material.opacity=.5+.15*Math.sin(t*4+i);break}
+    // identity marks: the notched ring under the hero, a thin ring under every ally
+    const mk=rm.mark,pulse=dead?1+.1*Math.sin(t*5+i):1;
+    mk.visible=!hide;mk.position.x=P.x;mk.position.z=P.y;mk.scale.setScalar(74*pulse);mk.rotation.y=dead?t*.7:g.rotation.y-Math.PI/2;rm.mat.opacity=dead?.5+.3*Math.sin(t*5+i):.92;
+    {const im=rm.marks;let n=0;
+      for(let j=0;j<al.length&&n<MARKS;j++){const a=al[j];if(a.hidden||a.dead||a.hp<=0)continue;
+        const r0=a.r||12,rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
+        markAt(im,n++,a.x,a.y,rad*2.33,t*(j%2?.5:-.5)+j)}
+      im.count=n;im.visible=n>0;if(n)im.instanceMatrix.needsUpdate=true}
+    const bc=rm.beacon;bc.visible=f>.05&&!hide;if(bc.visible){bc.position.set(P.x,46,P.y);bc.scale.set(26+4*Math.sin(t*3+i),150,1);bc.material.opacity=(.62+.14*Math.sin(t*3+i))*f}
+    // their shots: drawn where the last snapshot put them, carried on along their flight until the next one
+    {const ps=!away&&Array.isArray(r.pshots)?r.pshots:NONE,p0=ps.length?ps[0]:null,x0=p0?p0.x:NaN;
+      if(ps!==rm.psRef||x0!==rm.psX||ps.length!==rm.psN){rm.psRef=ps;rm.psX=x0;rm.psN=ps.length;rm.psAge=0}else rm.psAge=Math.min(.3,rm.psAge+dt);
+      for(let j=0;j<ps.length&&j<160;j++){const p=ps[j];if(!p||num(p.x,null)===null||num(p.y,null)===null)continue;
+        drawPshot(p,j,p.x+num(p.vx,0)*rm.psAge,p.y+num(p.vy,0)*rm.psAge,t,low,pools[PK[p.kind]===1?p.kind:'bolt'])}}
+    remEchoes(rm,!away&&Array.isArray(r.echoes)?r.echoes:NONE,dt);
+    // power rising off them, as it does off the local hero
+    {let k=0;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
+      rm.rankK+=(k-rm.rankK)*Math.min(1,dt*2);const rk=rm.rankK,d=rm.disc,c=FX.clock;
+      d.visible=rk>.02&&!hide;if(d.visible){d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*rk+4*Math.sin(c*3+i));d.material.opacity=.1+.2*rk+.03*Math.sin(c*5+i)}}
+  }
+  // members who have left
+  for(let i=rems.length-1;i>=0;i--){const rm=rems[i];if(rm.stamp!==st){remDrop(rm);remById.delete(rm.id);rems.splice(i,1)}}
+  // one cloud of rising motes for all of them
+  {const pos=auraR.pos,col=auraR.col,size=auraR.size,c=FX.clock;let k=0;
+    for(let m=0;m<rems.length;m++){const rm=rems[m],rk=rm.rankK,P=rm.P,n=rk<.02||!rm.vis?0:Math.round((low?3:8)+(low?9:40)*rk);
+      for(let i=0;i<n&&k<384;i++,k++){const a=i*2.399+c*(.5+i%3*.22)+m,rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk)+m*9)%(54+34*rk),q=h/(54+34*rk);
+        pos[k*3]=P.x+Math.cos(a)*rad;pos[k*3+1]=3+h;pos[k*3+2]=P.y+Math.sin(a)*rad*.8;
+        const hot=i%4===0;col[k*4]=hot?.77:.55;col[k*4+1]=hot?.96:.3;col[k*4+2]=1;col[k*4+3]=Math.sin(q*Math.PI)*(.5+.4*rk);size[k]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}}
+    auraR.geo.setDrawRange(0,k);
+    if(k){auraR.geo.attributes.position.needsUpdate=true;auraR.geo.attributes.aCol.needsUpdate=true;auraR.geo.attributes.aSize.needsUpdate=true}}
+}
+// where the page's touch controls (stick, buttons) lie over the view, in overlay units: an edge badge is nudged out from under them. Measured twice a second.
+const TAG_FONT='700 14px '+FONT,TAG_FONT_S='700 11px '+FONT;
+const padBox=[{on:false,x0:0,y0:0,x1:0,y1:0},{on:false,x0:0,y0:0,x1:0,y1:0}];let padAt=-1,padEls;
+function padBoxes(){
+  const now=MB.S.t;if(now>=padAt&&now-padAt<.5)return;padAt=now;
+  try{
+    if(padEls===undefined)padEls=[document.getElementById('pad'),document.querySelector('.touch .acts')];
+    const c=cv.getBoundingClientRect();
+    for(let i=0;i<2;i++){const b=padBox[i],el=padEls[i],r=el&&c.width>0?el.getBoundingClientRect():null;
+      b.on=!!(r&&r.width>0&&r.height>0&&r.right>c.left&&r.left<c.right&&r.bottom>c.top&&r.top<c.bottom);
+      if(b.on){b.x0=(r.left-c.left)/c.width*W;b.x1=(r.right-c.left)/c.width*W;b.y0=(r.top-c.top)/c.height*H;b.y1=(r.bottom-c.top)/c.height*H}}
+  }catch(e){padBox[0].on=padBox[1].on=false}
+}
+// overlay: name and health over each member, bars over their pets, and an arrow at the edge of the view toward anyone out of frame
+function remoteOverlay(MM,sight){
+  const top=hudBottom(),now=MB.S.t;
+  for(let m=0;m<rems.length;m++){const al=rems[m].allyList,css=rems[m].css;for(let i=0;i<al.length;i++)petBar(al[i],MM,css)}
+  ctx.save();ctx.textBaseline='alphabetic';ctx.lineJoin='round';
+  for(let m=0;m<rems.length;m++){
+    const rm=rems[m];if(!rm.vis)continue;
+    const P=rm.P,css=rm.css,soft=rm.soft,dead=rm.dead;
+    v3.set(P.x,dead?26:76,P.y).project(camera);
+    let nx=v3.x,ny=v3.y;const behind=v3.z>1;if(behind){nx=-nx;ny=-ny}
+    const px=(nx*.5+.5)*W,py=(.5-ny*.5)*H;
+    if(!behind&&px>-6&&px<W+6&&py>-4&&py<H+34){
+      // over the head: the name in the member's colour, then a small health bar
+      ctx.textAlign='center';ctx.font=TAG_FONT;ctx.globalAlpha=dead?.75:1;
+      if(now-rm.nameAt>2||now<rm.nameAt){rm.nameAt=now;rm.nameW=ctx.measureText(rm.name).width} // measured now and then (the page's font may arrive late)
+      const hw=Math.max(27,Math.min(60,rm.nameW/2))+4,bw=46,by=Math.max(top+19,Math.min(H-8,py-5)),x=Math.max(hw,Math.min(W-hw,px)),bx=x-bw/2;
+      ctx.lineWidth=3.5;ctx.strokeStyle=CSS.ink;ctx.strokeText(rm.name,x,by-5,120);ctx.fillStyle=dead?CSS.dim:soft;ctx.fillText(rm.name,x,by-5,120);
+      if(dead){ctx.font=TAG_FONT_S;spaced(1.5);ctx.lineWidth=3;ctx.strokeText('DOWN',x,by+7);ctx.fillStyle=CSS.foe;ctx.fillText('DOWN',x,by+7);spaced(0)}
+      else{const q=Math.max(0,Math.min(1,P.hp/P.maxHp));
+        ctx.fillStyle='rgba(8,8,12,.85)';ctx.fillRect(bx-2,by-2,bw+4,8);ctx.fillStyle='#1c1a30';ctx.fillRect(bx,by,bw,4);
+        ctx.fillStyle=q<.3?CSS.foe:CSS.bone;ctx.fillRect(bx,by,bw*q,4);
+        ctx.strokeStyle=css;ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,7)}
+      ctx.globalAlpha=1;
+    }else{
+      // out of frame: a badge on the edge of the view, on the line from the middle of the screen to where they are
+      const cx=W/2,cy=H/2,x0=26,x1=W-26,y0=Math.max(26,top+24),y1=H-26;let dx=px-cx,dy=py-cy;
+      if(Math.abs(dx)<.01&&Math.abs(dy)<.01)dy=1;
+      let k=1e9;if(dx>0)k=Math.min(k,(x1-cx)/dx);else if(dx<0)k=Math.min(k,(x0-cx)/dx);if(dy>0)k=Math.min(k,(y1-cy)/dy);else if(dy<0)k=Math.min(k,(y0-cy)/dy);
+      let ex=cx+dx*k;const ey=cy+dy*k,a=Math.atan2(dy,dx),q=dead?0:Math.max(0,Math.min(1,P.hp/P.maxHp));
+      padBoxes();for(let j=0;j<2;j++){const b=padBox[j];if(b.on&&ex>b.x0-22&&ex<b.x1+22&&ey>b.y0-16&&ey<b.y1+16)ex=(b.x0+b.x1)/2<cx?Math.min(cx,b.x1+24):Math.max(cx,b.x0-24)}
+      ctx.save();ctx.translate(ex,ey);ctx.globalAlpha=.95;
+      ctx.rotate(a);ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(12,-7);ctx.lineTo(12,7);ctx.closePath();ctx.fillStyle=css;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.rotate(-a);
+      ctx.beginPath();ctx.arc(0,0,12,0,TAU);ctx.fillStyle='rgba(11,10,22,.9)';ctx.fill();
+      ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();
+      if(q>0){ctx.beginPath();ctx.arc(0,0,12,-Math.PI/2,-Math.PI/2+TAU*q);ctx.strokeStyle=q<.3?CSS.foe:css;ctx.stroke()}
+      if(dead){ctx.strokeStyle=CSS.foe;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-4.5,-4.5);ctx.lineTo(4.5,4.5);ctx.moveTo(4.5,-4.5);ctx.lineTo(-4.5,4.5);ctx.stroke()}
+      else{ctx.font=TAG_FONT;ctx.textAlign='center';ctx.fillStyle=soft;ctx.fillText(rm.initial,0,5,18)}
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}
 /* ---------- graphics quality, switched live ---------- */
 function applyQuality(){
   const low=isLow();Q.low=low;
@@ -1429,12 +1734,17 @@ function draw(dt){
     if(!playerRec)playerRec=makeEnt('player',P,phPlayer);
     playerRec.g.position.set(P.x,0,P.y);playerRec.g.visible=true;
     updateEnt(playerRec,'player',P,dt,phPlayer,phPlayerUpdate);
+    if(P.down||FX.fall>0){ // multiplayer: our own hero is down and lies where it fell, as the other members' do
+      const f=FX.fall+=((P.down?1:0)-FX.fall)*Math.min(1,dt*(P.down?5:9)),g=playerRec.g;if(!P.down&&f<.004)FX.fall=0;
+      g.rotation.order='YXZ';layDown(g,P,FX.fall)}
     if(low){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70,1,56)}
   }else if(playerRec)playerRec.g.visible=false;
   syncMap(monMap,MB.mons,'monster',dt,phMonster,phMonsterUpdate,sight);
   const allies=R.testAllies||MB.allies||NONE;
   syncDying(dt);
   syncMap(allyMap,allies,'ally',dt,phAlly,phAllyUpdate,true);
+  // multiplayer: the other members' heroes, allies, shots and echoes (nothing at all happens here in single-player)
+  {const mp=MB.mp,rl=R.testRemotes||(mp&&mp.on&&mp.remotes)||null;if((rl&&rl.length)||rems.length)syncRemotes(rl||NONE,dt,sight)}
   syncFx(dt,sight);
   syncEchoes(dt,sight);
 
@@ -1442,11 +1752,7 @@ function draw(dt){
   const shots=MB.shots;
   for(let i=0;i<shots.length;i++){const s=shots[i],o=pools.shot.get(),r=s.r||5;o.position.set(s.x,SHOT_Y,s.y);o.scale.setScalar(r);o.rotation.y=-Math.atan2(s.vy||0,s.vx||0);o.userData.trail.visible=!low&&!!(s.vx||s.vy);o.userData.core.scale.setScalar(.8+.12*Math.sin(t*30+i))}
   const ps=MB.pshots;
-  for(let i=0;i<ps.length;i++){const p=ps[i],r=p.r||5,pool=pools[p.kind]||pools.bolt,o=pool.get();o.position.set(p.x,SHOT_Y,p.y);
-    if(o.userData.trail)o.userData.trail.visible=!low;
-    if(p.kind==='arrow')o.rotation.y=Math.PI/2-Math.atan2(p.vy,p.vx);
-    else if(p.kind==='skull'){o.scale.setScalar(r*1.25);o.rotation.y=0;o.userData.trail.rotation.y=-Math.atan2(p.vy,p.vx);o.userData.trail.position.set(-Math.cos(Math.atan2(p.vy,p.vx))*3.8,0,-Math.sin(Math.atan2(p.vy,p.vx))*3.8);o.userData.core.rotation.y=Math.PI/2-Math.atan2(p.vy,p.vx);o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
-    else{o.scale.setScalar(Math.max(4.5,r));o.rotation.y=-Math.atan2(p.vy||0,p.vx||0);o.userData.core.scale.setScalar(.8)}}
+  for(let i=0;i<ps.length;i++){const p=ps[i];drawPshot(p,i,p.x,p.y,t,low,pools[p.kind]||pools.bolt)}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
   {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'?f.kind:'other');
@@ -1465,12 +1771,7 @@ function draw(dt){
   // the guardian's ward, while it is ready to take a blow: a thin gold ring at the healer's feet
   if(P&&sight)for(let i=0;i<allies.length;i++){const a=allies[i];if(!a||a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
     const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4));o.rotation.y=t*.8;o.material.opacity=.5+.15*Math.sin(t*4);break}
-  for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue; // a pet's beam is the same shape in friendly blue
-    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j],o=pools.pbeam.get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12;
-      o.position.set(m.x+Math.cos(ry.a)*len/2,SHOT_Y,m.y+Math.sin(ry.a)*len/2);o.rotation.y=-ry.a;
-      u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
-      if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
-      else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}
+  allyBeams(allies,t);
   {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=(z.mine?pools.pbomb:pools.bomb).get();
     o.position.set(z.sx+(z.x-z.sx)*q,12+Math.sin(q*Math.PI)*(70+z.dur*40),z.sy+(z.y-z.sy)*q);o.rotation.x=t*7+i}}
   if(sight){const rs=MB.rings,hear=MB.has('hearing');
@@ -1527,5 +1828,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.scene=scene;R.camera=camera;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
 })();

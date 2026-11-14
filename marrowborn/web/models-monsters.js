@@ -759,7 +759,8 @@ function dispose(g){
 }
 function update(g,m,MB,dt){
   var u=g.userData.mb;if(!u||u.ghost)return;
-  var P=MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st||'idle',cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
+  // who it faces: the hero it is fighting when the game names one (multiplayer: m.tgt is the local hero or another member's), else the local hero
+  var P=m.tgt&&typeof m.tgt.x==='number'?m.tgt:MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st||'idle',cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
   dt=dt>0?min(dt,.1):1/60;
   var rage=!!m.rage,stun=m.stun>0;
   if(rage)u.extra+=dt*.8; // enraged: everything idles faster
