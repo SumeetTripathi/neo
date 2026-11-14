@@ -86,16 +86,16 @@ const SKILLS={
   ['hurl','Blade Hurl',8,'Throw your blade. It passes through everything in its path and hits hard.',[['fan',1,0,640,5,8,'bolt',99]]],
   ['challenge','Challenge',16,'Roar a challenge. Every monster near you is dragged closer and stunned for a moment.',[['pull',340],['near',340,{stun:1.2}],['ring',340]]]],
  tank:[
-  ['earthsplitter','Earthsplitter',6,'Slam the ground to hit everything around you hard and wipe out nearby bolts.',[['shock',125,4]]],
-  ['charge','Shield Charge',8,'Rush forward behind your shield, hitting and stunning whatever is in the way.',[['rush',3,1]]],
+  ['earthsplitter','Earthsplitter',5,'Slam the ground to hit everything around you hard and wipe out nearby bolts.',[['shock',125,4]]],
+  ['charge','Shield Charge',7,'Rush forward behind your shield, hitting and stunning whatever is in the way.',[['rush',3,1]]],
   ['bastion','Bastion',14,'For 3 seconds every hit is blocked and thrown back as a shockwave.',[['buff','guardT',3],['shield'],['ring',60]]],
-  ['throw','Hammer Throw',7,'Hurl a hammer that passes through everything, hits hard and stuns.',[['fan',1,0,560,4,8,'bolt',99,{stun:1}]]],
+  ['throw','Hammer Throw',6,'Hurl a hammer that passes through everything, hits hard and stuns.',[['fan',1,0,560,4,8,'bolt',99,{stun:1}]]],
   ['rally','Rally',22,'Heal a third of your health and raise your shield at once.',[['heal',.34],['shield']]],
-  ['cataclysm','Cataclysm',50,'Ultimate. Three shockwaves roll out of you, each wider than the last.',[['shock',130,4],['seq','quake']]],
+  ['cataclysm','Cataclysm',42,'Ultimate. Three shockwaves roll out of you, each wider than the last.',[['shock',130,4],['seq','quake']]],
   ['stoneskin','Stone Skin',18,'For 6 seconds every hit on you does half damage.',[['buff','stoneT',6],['ring',60]]],
-  ['tremor','Tremor',10,'Send a tremor toward your target: three bursts in a line, each hitting hard.',[['line',3,90,70,5]]],
+  ['tremor','Tremor',8,'Send a tremor toward your target: three bursts in a line, each hitting hard.',[['line',3,90,70,5]]],
   ['banner','War Banner',25,'Plant a banner for 8 seconds. It mends you while you stand near it and burns monsters near it.',[['field','halo','self',130,8,.5,1,false]]],
-  ['leapslam','Leap Slam',12,'Leap onto your target and slam the ground around it.',[['tele'],['shock',130,5]],'t']],
+  ['leapslam','Leap Slam',10,'Leap onto your target and slam the ground around it.',[['tele'],['shock',130,5]],'t']],
  assassin:[
   ['shadowstep','Shadowstep',5,'Appear behind the nearest monster and stab it for heavy damage.',[['tele'],['hit',5,{}]],'t'],
   ['knives','Fan of Knives',6,'Throw five knives in a fan.',[['fan',5,.15,620,2,3,'arrow',0]]],
@@ -172,13 +172,15 @@ const MREGEN=.05,MDRAW=2,STILL0=.3,STILL1=.7,MKILL=.03,MBLOCK=.08;
 // The pool has no ceiling: MWELL more for every Wellspring boon (it can be taken any number of times) and MLEVEL more for every level cleared since you took a class, and a trinket's mana line multiplies all of it.
 const MWELL=20,MLEVEL=2,MWELLR=.03,MWELLRMAX=.6;
 // Skills cost a little more as the levels climb, so a deep pool does not make them free: MRISE of the listed cost per level past the ninth.
-const MRISE=0;
+const MRISE=.007;
 // Pets and familiars are held with mana: each one in the field keeps PCOST of the pool locked away for as long as it is out (PCROWN for a crowned one). Held mana cannot be spent and does not refill.
 // There is no other limit on how many go with you. A pet that falls rises again REVT seconds later beside you at REVHP of its health, paid from the free pool:
 // REVIVE (REVCROWN for a crowned one), and REVUP times more each time the same pet has to be raised again in one level.
-const PCOST={pet:16,familiar:14},PCROWN={pet:28,familiar:24},REVIVE=20,REVCROWN=32,REVT=4,REVHP=.5,REVUP=1.5;
-const skText=d=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+d[6]+'.';
-for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d),level:SKLV[i]}));c.pows[1]=[SKILLS[k][3][1],'A new skill. '+skText(SKILLS[k][3])]}
+const PCOST={pet:16,familiar:18},PCROWN={pet:28,familiar:30},REVIVE=20,REVCROWN=32,REVT=4,REVHP=.5,REVUP=1.5;
+// a skill's text says what it costs at the level you stand on (mana: the listed cost, before the rise)
+const skText=(d,k,i)=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+(S.cls===k&&S.level>=8?skCost(i):d[6])+'.';
+for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],get text(){return skText(d,k,i)},level:SKLV[i]}));
+  c.pows[1]=[SKILLS[k][3][1],''];Object.defineProperty(c.pows[1],1,{get:()=>'A new skill. '+skText(SKILLS[k][3],k,3),enumerable:true})}
 const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1,cost:0,affordable:false}));
 // MB.mana: cur and max, regen (mana per second right now), reserved (held by pets or familiars), drawing (the standing bonus is flowing)
 const MANA={cur:0,max:0,regen:0,reserved:0,drawing:false};
@@ -224,9 +226,9 @@ const POOL=['crawler','hound','witch','fist','beamer','burrower','bomber','summo
 const TINT=['#7c9a52','#c9c1a8','#8566b8','#8f8474','#b3557a','#c0823c','#3fa596','#5f8fc9','#c9585a','#9aa34a'];
 // health of a generated boss: a base per kind (tuned so each takes about as long to kill) times a curve that keeps pace with boons, equipment and skills
 const GENHP={crawler:700,hound:600,witch:510,fist:740,mother:360,burrower:390,hollow:1270,bomber:560,summoner:400,beamer:540};
-// (the last factor came in with six carried skills: it climbs from level 15 to +18% at level 25 and stays there)
-// (and a flat 18% more since every class takes a trophy from the bosses it kills)
-const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*(1+.18*Math.min(1,Math.max(0,(n-13)/11)))*1.18};
+// (a flat 18% more since every class takes a trophy from the bosses it kills. The 18% that came in with six carried skills, climbing from level 15 to 25, went out again with mana:
+// skills now have to be paid for, and that costs about as much as the two extra skills gave.)
+const genMul=n=>{const k=Math.max(0,n-12);return(1+.062*k+.0055*k*k)*1.18};
 // Everything about a level follows from its number, so a retry meets the same room and the same monster.
 // Modifiers (m.mods) from level 15: one on most levels, a second on some from level 41. Tyrants carry none.
 const MODS=['shielded','swift','burning','vampiric','thorned','splitting'];
@@ -888,12 +890,12 @@ function playerStep(dt){
 /* ---------- pets: a boss you have killed, bound (Necromancer) or tamed (Beastmaster) to fight beside you ---------- */
 // PETS.roster holds as many as you have taken: {kind (SPEC id), ai, name, col, r, plv (pet level), perk (one modifier it kept, or null), crown}. PETS.active lists the roster indices of those that go with you, in order:
 // as many as your mana can hold (see PCOST: each one out keeps that much of the pool locked; the wolf and the thralls cost nothing). There is no limit on the roster and none on the field but the pool.
-// Several pets share the work: each has the bite of petK(n) = n^-PEXP of a lone pet when n are out, so the whole field hits like n^(1-PEXP) lone pets (1, 1.3, 1.52, 1.69, 1.84 ... 2.4 for ten, 3.1 for twenty),
+// Several pets share the work: each has the bite of petK(n) = n^-PEXP of a lone pet when n are out, so the whole field hits like n^(1-PEXP) lone pets (1, 1.37, 1.64, 1.87, 2.06 ... 2.8 for ten, 3.9 for twenty, 5.8 for fifty),
 // and the health of petKh(n) = n^-PHEXP of a lone pet (a big field is made of smaller bodies, but not as small as their bite).
 // In a fight the active pet is an entry in `allies` with kind 'pet': it has the fields of a monster (s, ai, st, ang, flash, hidden, lift...) so the same models can draw it.
 // PETS.auto: fallen pets are raised again from the free pool (the toggle on the pets screen). PETS.fallen: the entries that are down, in the order they fell. PETS.fieldCount: how many pets or familiars stand in the arena now (information only).
 const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],fallen:[],auto:true,get form(){return form()||'pet'},get fieldCount(){let n=0;for(const a of allies)if((a.pet||a.trophy)&&!a.minion)n++;return n}},
-  PETSANE=2000,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PEXP=.62,PHEXP=.4,MINIONS=4;
+  PETSANE=2000,PLVMAX=25,PETD={necro:1,beast:2},PETHP=2.2,PEXP=.55,PHEXP=.2,MINIONS=4;
 const petK=n=>Math.pow(Math.max(1,n),-PEXP),petKh=n=>Math.pow(Math.max(1,n),-PHEXP);
 const petOwner=()=>S.cls==='necro'?'necro':S.cls==='ranger'&&S.adv==='beastmaster'?'beast':null;
 // the forms that are held with mana: pets and familiars. The other trophies cost nothing and go one at a time.
@@ -1630,7 +1632,7 @@ function newSkill(n,next){
 }
 function loadout(done,fresh){
   const c=CLASSES[S.cls],k=known(),again=()=>{syncSkills();loadout(done,fresh)};
-  show({wide:true,kick:'Skills · '+c.name,title:'Choose your six',body:(matchMedia('(pointer:coarse)').matches?'You carry six skills, one on each skill button.':'You carry six skills, on keys 1 to 6.')+' Pick a skill you are not carrying to swap it in.',
+  show({wide:true,kick:'Skills · '+c.name,title:'Choose your six',body:(matchMedia('(pointer:coarse)').matches?'You carry six skills, one on each skill button.':'You carry six skills, on keys 1 to 6.')+' Pick a skill you are not carrying to swap it in.'+(MRISE?' Skills cost '+MRISE*100+'% more mana with every level past the ninth; your pool grows faster than that.':''),
     cards:c.skills.slice(0,k).map((sk,i)=>{const slot=S.load.indexOf(i);return{title:sk.name,sub:slot>=0?'Carried · '+(slot+1):i===fresh?'New · not carried':'Not carried',col:slot>=0?'':'#958ea3',body:sk.text,
       fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>({title:c.skills[v].name,sub:'Slot '+(j+1),body:c.skills[v].text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}})),btns:[['Back',again]]})}}),
     btns:[['Done',done]]});
@@ -1764,7 +1766,7 @@ function reward2(n){
 }
 function chooseClass(){
   S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the crypt';hud();
-  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown and its cost in mana, and you carry six at a time. Mana comes back on its own, faster while you stand still, and your pool grows with every level. After level 50 the class can be upgraded.',
+  show({wide:true,kick:'You are whole. You walk out of the crypt as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown and its cost in mana, and you carry six at a time. Mana comes back on its own, faster while you stand still. Your pool grows with every level, and skills cost a little more as you climb. After level 50 the class can be upgraded.',
     cards:Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' '+c.mana+' mana. First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))});
 }
 function pauseShow(){
