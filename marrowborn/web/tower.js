@@ -366,7 +366,7 @@ function begin(msg){
 /* ---------- testing: jump to any floor (only while the Checkpoints testing switch is on, never in multiplayer). It uses what the game already offers:
    MB.api.startLevel(n) for the hero as it is, MB.tower.startAt for a ready-made hero. ---------- */
 var jumpF=0,pendingJump=null,JMAX=9999;
-function testing(){try{return hasSetting('testUnlock')&&MB.settings.testUnlock===true}catch(e){return false}}
+function testing(){try{return hasSetting('testUnlock')&&MB.settings.testUnlock===true&&!(MB.mp&&MB.mp.vs)}catch(e){return false}}
 function isTrial(k){return k==='survive'||k==='guard'||k==='race'||k==='ordeal'||k==='cross'}
 // the floor a ready-made hero is made for: the floor itself where a climb can start there, else the nearest checkpoint below (0: none)
 function heroFloor(t,f){var a=cps(t).filter(function(c){return c>=11&&c<=f});return a.length?a[a.length-1]:0}
@@ -511,8 +511,10 @@ addButton();
 var peek=null,peekT=0,peekAt=0,peekFloor=-1,peekWhen=0;
 var peekWait=0;
 function hidePeek(){clearTimeout(peekT);clearInterval(peekWait);peekT=0;if(peek)peek.classList.remove('on')}
+function versus(){try{return !!(MB.mp&&MB.mp.vs)}catch(e){return false}}
 function showPeek(d){
   var t=T();if(!t)return;
+  if(versus()){hidePeek();return} // a versus round is not a floor of the climb
   var floor=Math.round(num(d&&d.floor,num(t.floor,0)));if(floor<1)return;
   var now=Date.now();if(floor===peekFloor&&now-peekWhen<1500)return;peekFloor=floor;peekWhen=now;
   var stage=doc.querySelector('.stage');if(!stage)return;

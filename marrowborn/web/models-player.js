@@ -733,7 +733,7 @@ function rebuildPlayer(g,MB){
   ud.cls=c;ud.adv=adv;ud.apex=apex;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.bowH=13;
   // versus: an opponent's marks on the floor (upgrade aura, skill-ready ring, the apex ground and aura) are laid in the foe palette; the body is untouched
   const foe=MB.foe===true;ud.foe=foe;
-  const b=new Builder(s),pw=foe?pal('foe',0xff2d55):pal('power',0x8b4dff),pw2=foe?pal('foe2',0xffb0a0):pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone;
+  const AXP=APX[apex],b=new Builder(s),pw=foe?pal('foe',0xff2d55):AXP?AXP.a:pal('power',0x8b4dff),pw2=foe?pal('foe2',0xffb0a0):AXP?AXP.h:pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone; // (a newer path: the upgrade aura and the ready ring take its colours)
   if(skin)buildHuman(b,s,ud,st,c,adv,tier,apex);else buildSkeleton(b,s,!!(st&1));
   if(apex){const W=ud.apexMat||(ud.apexMat=slashMat()),AX=APX[apex];W.color.setHex(foe?pal('foe',0xff2d55):AX?AX.a:apex==='dominion'?pal('power',0x8b4dff):pal('power2',0xc4f4ff));
     if(apex==='tide'){const W2=ud.apexMat2||(ud.apexMat2=slashMat());W2.color.copy(W.color)}
