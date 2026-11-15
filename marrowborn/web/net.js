@@ -152,14 +152,90 @@ var MBNet={
   setReady:function(v){raw('R'+(v?1:0));var me=member(MBNet.id);if(me&&me.ready!==!!v){me.ready=!!v;emit('net:ready',{id:MBNet.id,ready:!!v})}},
   setName:function(n){n=cleanName(n);if(!n)return;store.set('mpname',n);var me=member(MBNet.id);if(me&&me.name!==n){me.name=n;raw('N'+encodeURIComponent(n));emit('net:name',{id:MBNet.id,name:n})}},
   name:function(){return cleanName(store.get('mpname',''))},
-  /** Host only: start the game for everyone in the room. */
-  start:function(){if(MBNet.isHost&&MBNet.state==='lobby')raw('S'+Math.floor(Math.random()*2147483647))},
+  /** Host only: start the game for everyone in the room. In versus it needs two players and, with teams, somebody on each side: returns false (and starts nothing) otherwise. */
+  start:function(){
+    if(!MBNet.isHost||MBNet.state!=='lobby'||MBNet.startBlock())return false;
+    if(MBNet.room.mode==='versus')vsTell(); // the last word on options and teams reaches every member before the start does (one ordered queue)
+    return raw('S'+Math.floor(Math.random()*2147483647));
+  },
+  /** Why the host cannot start right now ('' = it can). Ready states are the lobby screen's business, not checked here. */
+  startBlock:function(){
+    if(MBNet.room.mode!=='versus')return '';
+    if(MBNet.members.length<2)return 'Versus needs at least two players.';
+    if(MBNet.vs.format==='teams'){var c=teamCount();if(!c[0]||!c[1])return 'Each team needs at least one player.'}
+    return '';
+  },
+  /** Host only, in the lobby: 'coop' or 'versus'. Everyone hears it as net:mode. */
+  setMode:function(m){if(MBNet.isHost&&MBNet.state==='lobby'&&(m==='coop'||m==='versus')&&m!==MBNet.room.mode)raw('O'+m)},
+  /* ---- versus options and teams. The host owns both; they travel as ordinary relayed messages (lb:o, lb:t, lb:q) and every change is announced as net:vs ---- */
+  /** The versus options {format:'ffa'|'teams', floor, wins, time} as the room has them now (a fresh object after every change). */
+  vs:null,
+  /** Who is on which side in teams: {memberId: 0|1}. */
+  teams:{},
+  /** Host only, in the lobby: change some of the options, e.g. setVs({format:'teams'}). Values outside the offered ones are ignored. */
+  setVs:function(patch){
+    if(!MBNet.isHost||MBNet.state!=='lobby'||!patch)return false;
+    var next=vsClean(patch,MBNet.vs),k,same=true;for(k in VS_OPT)if(next[k]!==MBNet.vs[k])same=false;
+    if(same)return false;
+    MBNet.vs=next;store.set('mpvs',JSON.stringify(next));vsTell();emit('net:vs',{});return true;
+  },
+  /** Choose a side (0 or 1). Members may do so while they are not ready; the host decides and tells everyone. The host may pass a member id to move somebody else. */
+  setTeam:function(team,id){
+    team=team?1:0;if(MBNet.state!=='lobby')return false;
+    if(MBNet.isHost){var m=member(id||MBNet.id);if(!m||MBNet.teams[m.id]===team)return false;MBNet.teams[m.id]=team;vsTell();emit('net:vs',{});return true}
+    var me=member(MBNet.id);if(!me||me.ready)return false;
+    return MBNet.send({t:'lb:t',team:team},MBNet.hostId);
+  },
+  /** Host only: even the two sides out, moving as few players as possible (the latest arrivals first). */
+  balance:function(){
+    if(!MBNet.isHost||MBNet.state!=='lobby')return false;
+    var c=teamCount(),moved=false,i,big;
+    while(Math.abs(c[0]-c[1])>1){
+      big=c[0]>c[1]?0:1;
+      for(i=MBNet.members.length-1;i>=0;i--)if(teamOf(MBNet.members[i].id)===big){MBNet.teams[MBNet.members[i].id]=1-big;break}
+      if(i<0)break;c[big]--;c[1-big]++;moved=true;
+    }
+    if(moved){vsTell();emit('net:vs',{})}
+    return moved;
+  },
+  /** The values the lobby offers for each versus option. */
+  vsOptions:function(){return JSON.parse(JSON.stringify(VS_OPT))},
   /** Host only: stop the running game and bring everyone back to the lobby. */
   end:function(reason){if(MBNet.isHost&&MBNet.state==='playing')raw('E'+(reason||'ended'))},
   kick:function(id){if(MBNet.isHost)raw('K'+id)},
   canHost:function(){return !!bridge()||served()},
   code:{encode:codeEncode,decode:codeDecode,pretty:codePretty,parse:parseTarget}
 };
+/* ---- versus options and teams ---- */
+var VS_OPT={format:['ffa','teams'],floor:[11,31,51,101,151],wins:[2,3,5],time:[60,90,120]},VS_DEF={format:'ffa',floor:51,wins:3,time:90};
+function vsClean(o,base){
+  var r={},k;base=base||VS_DEF;o=o&&typeof o==='object'?o:{};
+  for(k in VS_OPT)r[k]=VS_OPT[k].indexOf(o[k])>=0?o[k]:VS_OPT[k].indexOf(base[k])>=0?base[k]:VS_DEF[k];
+  return r;
+}
+function vsStored(){var o=null;try{o=JSON.parse(store.get('mpvs','null'))}catch(e){}return vsClean(o)}
+function teamOf(id){return MBNet.teams[id]===1?1:0}
+function teamCount(){var c=[0,0];MBNet.members.forEach(function(m){c[teamOf(m.id)]++});return c}
+/* host: everything about the versus set-up in one message, to everyone or to one member */
+function vsTell(to){
+  if(!MBNet.isHost)return;
+  var tm={};MBNet.members.forEach(function(m){tm[m.id]=teamOf(m.id)});MBNet.teams=tm;
+  MBNet.send({t:'lb:o',v:MBNet.vs,tm:tm},to);
+}
+function vsWire(){
+  MBNet.on('lb:o',function(msg,from){ // host -> members: the options and the sides
+    if(MBNet.isHost||from!==MBNet.hostId)return;
+    MBNet.vs=vsClean(msg.v,MBNet.vs);
+    var tm={},k,src=msg.tm&&typeof msg.tm==='object'?msg.tm:{};for(k in src)if(Object.prototype.hasOwnProperty.call(src,k))tm[k]=src[k]===1?1:0;
+    MBNet.teams=tm;emit('net:vs',{});
+  });
+  MBNet.on('lb:t',function(msg,from){ // member -> host: "put me on that side"
+    if(!MBNet.isHost||MBNet.state!=='lobby')return;
+    var m=member(from),team=msg.team===1?1:0;if(!m||m.ready||MBNet.teams[from]===team)return;
+    MBNet.teams[from]=team;vsTell();emit('net:vs',{});
+  });
+  MBNet.on('lb:q',function(msg,from){if(MBNet.isHost&&member(from))vsTell(from)}); // member -> host: "what are the options?"
+}
 function byteLen(s){try{return new TextEncoder().encode(s).length}catch(e){return s.length*3}}
 function raw(s){if(ws&&ws.readyState===1)try{ws.send(s);return true}catch(e){}return false}
 function member(id){for(var i=0;i<MBNet.members.length;i++)if(MBNet.members[i].id===id)return MBNet.members[i];return null}
@@ -225,7 +301,10 @@ function receive(data){
     MBNet.id=ev.id;MBNet.hostId=ev.hostId;MBNet.isHost=ev.id===ev.hostId;
     MBNet.members=(ev.members||[]).map(function(m){return {id:m.id,name:m.name,ready:!!m.ready,isHost:!!m.isHost}});
     describeRoom(ev.room||{});
+    MBNet.teams={};
+    if(MBNet.isHost){MBNet.vs=vsStored();MBNet.teams[MBNet.id]=0}
     setState(ev.room&&ev.room.state==='playing'?'playing':'lobby');
+    if(!MBNet.isHost)MBNet.send({t:'lb:q'},MBNet.hostId);
     if(pending&&pending.want==='welcome'){var p=pending;pending=null;p.resolve(ev)}
     emit('net:host',{id:MBNet.hostId});
     return;
@@ -238,9 +317,16 @@ function receive(data){
       if(pending){var pe=pending;pending=null;var err=new Error(ev.msg||'The server refused.');err.code=ev.code;pe.reject(err)}
       else emit('net:error',{code:ev.code,msg:ev.msg});
       break;
-    case 'join':if(!member(ev.id)){MBNet.members.push({id:ev.id,name:ev.name,ready:false,isHost:false});emit('net:join',{id:ev.id,name:ev.name})}break;
+    case 'join':
+      if(!member(ev.id)){
+        MBNet.members.push({id:ev.id,name:ev.name,ready:false,isHost:false});
+        // the host seats a newcomer on the smaller side and sends everyone the set-up as it now is (the newcomer learns the options from it)
+        if(MBNet.isHost){var tc=teamCount();tc[teamOf(ev.id)]--;MBNet.teams[ev.id]=tc[1]<tc[0]?1:0;vsTell()}
+        emit('net:join',{id:ev.id,name:ev.name});
+      }
+      break;
     case 'leave':
-      m=member(ev.id);if(m){MBNet.members.splice(MBNet.members.indexOf(m),1);emit('net:leave',{id:ev.id,name:m.name,why:ev.why})}
+      m=member(ev.id);if(m){MBNet.members.splice(MBNet.members.indexOf(m),1);delete MBNet.teams[ev.id];emit('net:leave',{id:ev.id,name:m.name,why:ev.why})}
       break;
     case 'ready':m=member(ev.id);if(m){m.ready=!!ev.ready;emit('net:ready',{id:ev.id,ready:m.ready})}break;
     case 'name':m=member(ev.id);if(m){m.name=ev.name;emit('net:name',{id:ev.id,name:ev.name})}break;
@@ -260,11 +346,15 @@ function describeRoom(r){
   MBNet.room={code:ip?codeEncode(ip,port)||'':'',mode:r.mode||'coop',url:ip?'http://'+ip+':'+port+'/':'',id:r.code||'',address:ip?ip+':'+port:'',ips:ips.slice(),port:port,single:!!s.single};
 }
 function begin(ev){
-  var members=(ev.members||[]).map(function(m){return {id:m.id,name:m.name}});
+  var versus=ev.mode==='versus',V=MBNet.vs||VS_DEF,teams=versus&&V.format==='teams';
+  // versus: every member carries a side: 0 or 1 with teams, its own place in the list when everyone fights alone
+  var members=(ev.members||[]).map(function(m,i){var o={id:m.id,name:m.name};if(versus)o.team=teams?teamOf(m.id):i;return o});
   if(ev.hostId)MBNet.hostId=ev.hostId;
   setState('playing');
   var cfg={mode:ev.mode||'coop',members:members,hostId:MBNet.hostId,myId:MBNet.id,seed:ev.seed};
-  emit('net:start',{mode:cfg.mode,members:members,seed:cfg.seed,hostId:cfg.hostId,myId:cfg.myId});
+  if(versus)cfg.vs={format:V.format,floor:V.floor,wins:V.wins,time:V.time};
+  var note={mode:cfg.mode,members:members,seed:cfg.seed,hostId:cfg.hostId,myId:cfg.myId};if(versus)note.vs=cfg.vs;
+  emit('net:start',note);
   var mp=win.MB&&win.MB.mp;
   if(mp&&typeof mp.begin==='function'){
     try{mp.begin(cfg)}catch(e){try{console.error('MBNet: MB.mp.begin failed',e)}catch(_){}emit('net:error',{code:'begin',msg:'The game could not start on this device.'})}
@@ -286,7 +376,7 @@ function finish(reason,closeSocket){
   if(pending&&(closeSocket||reason==='')){var p=pending;pending=null;p.reject(new Error('Cancelled.'))}
   stopPing();closedWhy='';
   if(was==='off'){stopLocal();return}
-  MBNet.members=[];MBNet.id='';MBNet.hostId='';MBNet.isHost=false;
+  MBNet.members=[];MBNet.id='';MBNet.hostId='';MBNet.isHost=false;MBNet.teams={};
   setState('off');
   stopLocal();
   if(reason==='')return;
@@ -308,6 +398,7 @@ function startPing(){
 }
 function stopPing(){if(pingT){clearInterval(pingT);pingT=0}}
 try{win.addEventListener('pagehide',function(){if(MBNet.state!=='off')finish('left',true)})}catch(e){}
+MBNet.vs=vsStored();vsWire();
 win.MBNet=MBNet;
 
 /* ================================================================ lobby screens ================================================================
@@ -355,11 +446,11 @@ function ensureLayer(){
 function render(name,build,v){
   if(!ensureLayer())return;
   clearInterval(roomsTimer);roomsTimer=0;
-  var keep=screen===name?panel.scrollTop:0,act=doc.activeElement,actKey=screen===name&&act&&panel.contains(act)?act.getAttribute('data-k'):null,sel=actKey&&act.tagName==='INPUT'?[act.selectionStart,act.selectionEnd]:null;
-  screen=name;view=v||{};panel.textContent='';
+  var keep=screen===name?panel.scrollTop:0,keepL=screen===name?layer.scrollTop:0,act=doc.activeElement,actKey=screen===name&&act&&panel.contains(act)?act.getAttribute('data-k'):null,sel=actKey&&act.tagName==='INPUT'?[act.selectionStart,act.selectionEnd]:null;
+  screen=name;view=v||{};panel.textContent='';panel.classList.remove('vs');
   var focus=build(panel);
   if(layer.hidden){layer.hidden=false;var ov=$('ov');if(ov)try{ov.inert=true}catch(e){}}
-  panel.scrollTop=keep;
+  panel.scrollTop=keep;layer.scrollTop=keepL;
   var again=actKey&&panel.querySelector('[data-k="'+actKey+'"]');
   try{(again||focus||panel).focus({preventScroll:true});if(again&&sel)again.setSelectionRange(sel[0],sel[1])}catch(e){}
 }
@@ -381,10 +472,54 @@ function nameField(onchange){
 function typedName(){var i=$('mbnName'),n=i?cleanName(i.value):'';if(n)store.set('mpname',n);return n||MBNet.name()||'Player'}
 function msgLine(text,bad){return h('p',{class:'mbx-msg'+(bad?' bad':''),id:'mbnMsg',role:'status',text:text||''})}
 function say(text,bad){var m=$('mbnMsg');if(m){m.textContent=text||'';m.className='mbx-msg'+(bad?' bad':'')}}
-function modes(){
-  return h('div',{class:'mbn-modes',role:'group','aria-label':'Mode'},
-    h('span',{class:'mbn-mode on',text:'Co-op'}),
-    h('span',{class:'mbn-mode off','aria-disabled':'true'},'Versus',h('small',{text:'coming soon'})));
+/* Versus is offered only when the game on this device can play it: MB.mp.versus, or an MB.mp.vs slot (null between matches) */
+function vsOk(){var mp=MB.mp;return !!(mp&&typeof mp.begin==='function'&&(mp.versus===true||'vs' in mp))}
+var wantMode=store.get('mpmode','coop')==='versus'?'versus':'coop';
+/* Co-op | Versus. pick: fn(mode) makes them buttons; without it they only show which one is on. */
+function modes(cur,pick){
+  var ok=vsOk();
+  function chip(mode,label){
+    var on=cur===mode,off=mode==='versus'&&!ok;
+    if(!pick||off)return h('span',{class:'mbn-mode'+(on?' on':'')+(off?' off':''),'aria-disabled':off?'true':null},label,off?h('small',{text:'not in this build'}):null);
+    return btn(label,function(){pick(mode)},false,{class:'mbn-mode'+(on?' on':''),'aria-pressed':on?'true':'false','data-k':'mode-'+mode});
+  }
+  return h('div',{class:'mbn-modes',role:'group','aria-label':'Mode'},chip('coop','Co-op'),chip('versus','Versus'));
+}
+/* ---- versus: words and colours ---- */
+var VS_LAB={format:'Format',floor:'Hero level',wins:'Rounds to win',time:'Round time'};
+function vsWord(k,v){return k==='format'?(v==='teams'?'Teams':'Free-for-all'):k==='floor'?'Floor '+v:k==='wins'?'First to '+v:v+' s'}
+var TEAM_NAME=['Team 1','Team 2'],TEAM_COL=['#4fd8ff','#ff9f1a'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
+function hex(c){if(typeof c==='number'&&c>=0)c='#'+('000000'+Math.floor(c).toString(16)).slice(-6);return typeof c==='string'&&/^#[0-9a-f]{3,8}$/i.test(c)?c:''}
+/* the colours the arena uses, so that the lobby, the HUD and the rings round the heroes agree: the renderer's own when it offers them, else the game's member colours */
+function teamColor(t){
+  var R=MB.renderer,mp=MB.mp||{},c='';t=t?1:0;
+  try{if(R&&typeof R.teamColor==='function')c=hex(R.teamColor(t));if(!c&&mp.teamColors)c=hex(mp.teamColors[t])}catch(e){}
+  return c||TEAM_COL[t];
+}
+function memberColor(i){
+  var R=MB.renderer,mp=MB.mp||{},c='';i=Math.max(0,i|0);
+  try{if(R&&typeof R.memberColor==='function')c=hex(R.memberColor(i));if(!c&&mp.colors)c=hex(mp.colors[i%mp.colors.length])}catch(e){}
+  return c||MEMBER_COL[i%MEMBER_COL.length];
+}
+/* one option of the versus set-up: the host gets a row of buttons, everyone else reads the choice */
+function optRow(k,canEdit){
+  var V=MBNet.vs,box=h('div',{class:'mbn-seg',role:'group','aria-label':VS_LAB[k]});
+  VS_OPT[k].forEach(function(v){
+    var on=V[k]===v,label=k==='format'?vsWord(k,v):k==='floor'?String(v):k==='wins'?String(v):v+' s';
+    if(canEdit)box.appendChild(btn(label,function(){var p={};p[k]=v;MBNet.setVs(p)},false,{'aria-pressed':on?'true':'false','data-k':'vs-'+k+'-'+v,'aria-label':vsWord(k,v)}));
+    else if(on)box.appendChild(h('b',{class:'mbn-val',text:vsWord(k,v)}));
+  });
+  return h('div',{class:'mbn-opt'},h('span',{class:'lab',text:VS_LAB[k]}),box);
+}
+function memberRow(m,col){
+  var tags=[];
+  if(m.isHost)tags.push(h('span',{class:'lab mbn-tag host',text:'Host'}));
+  else tags.push(h('span',{class:'lab mbn-tag'+(m.ready?' ok':''),text:m.ready?'Ready':'Not ready'}));
+  var row=h('div',{class:'mbn-li'+(m.id===MBNet.id?' me':'')+(col?' col':'')},
+    h('span',{class:'mbn-name',text:m.name+(m.id===MBNet.id?' (you)':'')}),tags,
+    MBNet.isHost&&!m.isHost?btn('Remove',function(){MBNet.kick(m.id)},false,{class:'mbn-x','data-k':'kick-'+m.id,'aria-label':'Remove '+m.name}):null);
+  if(col)row.style.setProperty('--tc',col);
+  return row;
 }
 function fail(e){busy=false;var t=e&&e.message||'That did not work.';if(screen==='menu'||screen==='join')say(t,true);else showMenu(t)}
 function go(promise,label){
@@ -398,13 +533,14 @@ function showMenu(message){
   render('menu',function(p){
     var first=null,list=null;
     p.appendChild(h('div',{class:'mbn-head'},head('Local network','Multiplayer')));
-    p.appendChild(h('div',{class:'mbn-row'},nameField(),modes()));
+    if(wantMode==='versus'&&!vsOk())wantMode='coop';
+    p.appendChild(h('div',{class:'mbn-row'},nameField(),modes(wantMode,function(m){typedName();wantMode=m;store.set('mpmode',m);showMenu()})));
     var actions=h('div',{class:'btns'});
     if(isServed){
-      actions.appendChild(first=btn('Create a room',function(){go(MBNet.host({name:typedName()}),'Creating the room…')},true));
+      actions.appendChild(first=btn('Create a room',function(){go(MBNet.host({name:typedName(),mode:wantMode}),'Creating the room…')},true,{'data-k':'create'}));
       actions.appendChild(btn('Join another host',function(){showJoin()}));
     }else{
-      if(canLocal)actions.appendChild(first=btn('Host on this phone',function(){go(MBNet.host({name:typedName(),server:'local'}),'Starting the game server…')},true));
+      if(canLocal)actions.appendChild(first=btn('Host on this phone',function(){go(MBNet.host({name:typedName(),server:'local',mode:wantMode}),'Starting the game server…')},true,{'data-k':'create'}));
       actions.appendChild(btn('Join a game',function(){showJoin()},!canLocal));
       if(!first)first=actions.firstChild;
     }
@@ -480,7 +616,7 @@ function showLobby(){
   render('lobby',function(p){
     var R=MBNet.room,me=member(MBNet.id)||{},others=MBNet.members.filter(function(m){return !m.isHost}),waiting=others.filter(function(m){return !m.ready}).length;
     var hostM=member(MBNet.hostId)||{};
-    p.appendChild(h('div',{class:'mbn-head'},head((R.mode==='versus'?'Versus':'Co-op')+' · '+MBNet.members.length+' of '+MAX_MEMBERS,MBNet.isHost?'Your room':(hostM.name||'Host')+'’s room')));
+    p.appendChild(h('div',{class:'mbn-head'},head((R.mode==='versus'?'Versus · '+vsWord('format',MBNet.vs.format):'Co-op')+' · '+MBNet.members.length+' of '+MAX_MEMBERS,MBNet.isHost?'Your room':(hostM.name||'Host')+'’s room')));
     var how=h('div',{class:'mbn-how'});
     if(R.code){
       how.appendChild(h('span',{class:'lab',text:'Join code'}));
@@ -489,22 +625,46 @@ function showLobby(){
       how.appendChild(h('span',{class:'mbn-url',text:R.url.replace(/\/$/,'')}));
       if(R.ips&&R.ips.length>1)how.appendChild(h('span',{class:'dim mbn-alt',text:'Other addresses of the host: '+R.ips.filter(function(ip){return R.address.indexOf(ip+':')!==0}).map(function(ip){return ip+':'+R.port}).join(', ')}));
     }else how.appendChild(h('p',{class:'dim',text:'The host has no local network address yet. Connect it to Wi-Fi, or turn on its hotspot, so that others can join.'}));
+    var versus=R.mode==='versus',V=MBNet.vs,teams=versus&&V.format==='teams',block=MBNet.isHost?MBNet.startBlock():'';
+    panel.classList.toggle('vs',versus);
+    if(MBNet.isHost)p.appendChild(modes(R.mode,function(m){notice='';MBNet.setMode(m)}));
     var list=h('div',{class:'mbn-list mbn-members','aria-label':'Players'});
-    MBNet.members.forEach(function(m){
-      var tags=[];
-      if(m.isHost)tags.push(h('span',{class:'lab mbn-tag host',text:'Host'}));
-      else tags.push(h('span',{class:'lab mbn-tag'+(m.ready?' ok':''),text:m.ready?'Ready':'Not ready'}));
-      list.appendChild(h('div',{class:'mbn-li'+(m.id===MBNet.id?' me':'')},
-        h('span',{class:'mbn-name',text:m.name+(m.id===MBNet.id?' (you)':'')}),tags,
-        MBNet.isHost&&!m.isHost?btn('Remove',function(){MBNet.kick(m.id)},false,{class:'mbn-x','data-k':'kick-'+m.id,'aria-label':'Remove '+m.name}):null));
-    });
-    p.appendChild(h('div',{class:'mbn-cols'},how,list));
-    var status=notice||(MBNet.isHost?(MBNet.members.length<2?'Waiting for players. You can also start alone.':waiting?'Waiting for '+waiting+(waiting>1?' players':' player')+' to be ready.':'Everyone is ready.')
-      :me.ready?'Waiting for the host to start.':'Press Ready when you are set.');
+    if(!versus){
+      MBNet.members.forEach(function(m){list.appendChild(memberRow(m))});
+      p.appendChild(h('div',{class:'mbn-cols'},how,list));
+    }else{
+      var opts=h('div',{class:'mbn-opts','aria-label':'Versus options'});
+      ['format','floor','wins','time'].forEach(function(k){opts.appendChild(optRow(k,MBNet.isHost))});
+      if(!MBNet.isHost)opts.appendChild(h('p',{class:'dim',text:'The host sets these. Everyone fights with a seasoned hero of that floor, chosen when the match starts.'}));
+      p.appendChild(h('div',{class:'mbn-cols'},how,opts));
+      if(teams){
+        var cols=h('div',{class:'mbn-teams'}),mine=teamOf(MBNet.id);
+        [0,1].forEach(function(t){
+          var its=MBNet.members.filter(function(m){return teamOf(m.id)===t}),col=h('section',{class:'mbn-team'+(t===mine?' mine':''),'aria-label':TEAM_NAME[t]});
+          col.style.setProperty('--tc',teamColor(t));
+          var hd=h('div',{class:'mbn-th'},h('b',{text:TEAM_NAME[t]}),h('span',{class:'lab',text:its.length+(its.length===1?' player':' players')}));
+          // the way across is a button on the other side; a member who has pressed Ready stays put until they take it back
+          if(t!==mine)hd.appendChild(btn('Join',function(){notice='';MBNet.setTeam(t)},false,{'data-k':'team-join','aria-label':'Join '+TEAM_NAME[t],disabled:!MBNet.isHost&&!!me.ready,title:!MBNet.isHost&&me.ready?'Press Not ready to change team':null}));
+          else hd.appendChild(h('span',{class:'lab mbn-tag mbn-yours',text:'Your team'}));
+          col.appendChild(hd);
+          var l=h('div',{class:'mbn-list'});its.forEach(function(m){l.appendChild(memberRow(m))});
+          if(!its.length)l.appendChild(h('p',{class:'dim',text:'Nobody yet.'}));
+          col.appendChild(l);cols.appendChild(col);
+        });
+        p.appendChild(cols);
+      }else{
+        list.classList.add('mbn-ffa');
+        MBNet.members.forEach(function(m,i){list.appendChild(memberRow(m,memberColor(i)))});
+        p.appendChild(list);
+      }
+    }
+    var status=notice||(MBNet.isHost?(block?block:MBNet.members.length<2?'Waiting for players. You can also start alone.':waiting?'Waiting for '+waiting+(waiting>1?' players':' player')+' to be ready.':'Everyone is ready.')
+      :me.ready?'Waiting for the host to start.':teams?'Pick your team, then press Ready.':'Press Ready when you are set.');
     p.appendChild(msgLine(status,!!notice));
     var btns=h('div',{class:'btns'}),first;
-    if(MBNet.isHost)btns.appendChild(first=btn('Start',function(){notice='';MBNet.start()},true,{disabled:waiting>0,'data-k':'start'}));
+    if(MBNet.isHost)btns.appendChild(first=btn('Start',function(){notice='';MBNet.start()},true,{disabled:waiting>0||!!block,'data-k':'start'}));
     else btns.appendChild(first=btn(me.ready?'Not ready':'Ready',function(){notice='';MBNet.setReady(!me.ready)},!me.ready,{'data-k':'ready','aria-pressed':me.ready?'true':'false'}));
+    if(MBNet.isHost&&teams){var tc=teamCount();btns.appendChild(btn('Balance teams',function(){notice='';MBNet.balance()},false,{'data-k':'balance',disabled:Math.abs(tc[0]-tc[1])<2}))}
     btns.appendChild(btn('Leave',function(){notice='';MBNet.leave();showMenu()},false,{'data-k':'leave'}));
     p.appendChild(btns);
     return touch()?p:first;
@@ -526,7 +686,7 @@ var WHY={
 };
 
 // keep the open screen in step with the room
-['net:join','net:leave','net:ready','net:name','net:mode'].forEach(function(t){MBNet.on(t,function(){if(screen==='lobby'&&MBNet.state==='lobby')showLobby()})});
+['net:join','net:leave','net:ready','net:name','net:mode','net:vs'].forEach(function(t){MBNet.on(t,function(){if(screen==='lobby'&&MBNet.state==='lobby')showLobby()})});
 MBNet.on('net:start',function(){notice='';hideLayer()});
 MBNet.on('net:error',function(e){
   if(e.code==='nogame'||e.code==='begin'){notice=e.msg;if(MBNet.isHost)MBNet.end('no-game');else if(MBNet.state==='playing'&&e.code==='begin')MBNet.leave()}
@@ -540,6 +700,96 @@ MBNet.on('net:end',function(e){
   var w=WHY[e.reason]||['The session ended','The multiplayer session is over.'];
   showNotice(w[0],w[1]);
 });
+
+/* ================================================================ versus: the match HUD ================================================================
+   A strip over the top middle of the arena, drawn from MB.mp.vs (the game's own account of the match) while a versus match runs:
+   the round, the clock, and what each side or each player has won. It takes no touches and is rebuilt only when the cast changes. */
+var vh=null,vhKey='',vhRaf=0,vhBad=false,vhSay='',vhT={};
+function vsNow(){var mp=MB.mp,v=mp&&mp.on?mp.vs:null;return v&&typeof v==='object'?v:null}
+function vhMake(){
+  var stage=doc.querySelector('.stage');if(!stage)return false;
+  vh=h('div',{id:'vsHud',hidden:true,role:'group','aria-label':'Versus score'});
+  stage.appendChild(vh);return true;
+}
+function vhOff(){
+  if(vh&&!vh.hidden)vh.hidden=true;
+  var w=doc.querySelector('.wrap');if(w&&w.classList.contains('vs-on'))w.classList.remove('vs-on');
+  vhSay='';
+}
+function txt(el,s){if(el&&el.textContent!==s)el.textContent=s}
+function cls(el,name,on){if(el&&el.classList.contains(name)!==!!on)el.classList.toggle(name,!!on)}
+function clock(t){t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+('0'+t%60).slice(-2)}
+function pips(n){var b=h('span',{class:'vsh-pips','aria-hidden':'true'}),i;for(i=0;i<n;i++)b.appendChild(h('i'));return b}
+function vhBuild(v,score,teams){
+  vh.textContent='';vhT={sides:[],chips:{}};
+  var mid=h('div',{class:'vsh-mid'},vhT.round=h('span',{class:'vsh-round'}),vhT.time=h('b',{class:'vsh-time'}),vhT.note=h('span',{class:'vsh-note'}));
+  vhT.live=h('span',{class:'mbt-sr',role:'status','aria-live':'polite'});
+  var wins=Math.max(1,Math.min(9,v.wins|0)),myId=MB.mp.myId,idx={};
+  (MB.mp.members||[]).forEach(function(m,i){idx[m.id]=i});
+  if(teams){
+    [0,1].forEach(function(t){
+      var men=h('span',{class:'vsh-men','aria-hidden':'true'}),side=h('div',{class:'vsh-side '+(t?'b':'a')+(v.myTeam===t?' mine':'')}),o={el:side,men:{},pips:null,sr:null};
+      side.style.setProperty('--tc',teamColor(t));
+      score.forEach(function(e){if((e.team?1:0)===t){var d=h('i',{class:e.id===myId?'me':null});o.men[e.id]=d;men.appendChild(d)}});
+      side.appendChild(h('span',{class:'vsh-tn',text:TEAM_NAME[t]+(v.myTeam===t?' · you':'')}));
+      side.appendChild(o.pips=pips(wins));side.appendChild(men);side.appendChild(o.sr=h('span',{class:'mbt-sr'}));
+      vhT.sides.push(o);
+    });
+    vh.appendChild(vhT.sides[0].el);vh.appendChild(mid);vh.appendChild(vhT.sides[1].el);
+  }else{
+    var chips=h('div',{class:'vsh-chips'});
+    score.forEach(function(e,i){
+      var c=h('span',{class:'vsh-chip'+(e.id===myId?' me':'')}),o={el:c,n:null};
+      c.style.setProperty('--tc',memberColor(idx[e.id]!=null?idx[e.id]:typeof e.team==='number'?e.team:i));
+      c.appendChild(h('span',{class:'vsh-nm',text:String(e.name==null?'':e.name)}));c.appendChild(o.n=h('b',{class:'vsh-n'}));
+      vhT.chips[e.id]=o;chips.appendChild(c);
+    });
+    vh.appendChild(mid);vh.appendChild(chips);
+  }
+  vh.appendChild(vhT.live);
+  vh.className=teams?'vs-teams':'vs-ffa n'+Math.min(8,score.length);
+}
+function vhDraw(v){
+  if(!vh&&!vhMake())return;
+  var score=Array.isArray(v.score)?v.score:[],teams=v.format==='teams',ph=String(v.phase||''),t=+v.t||0,wins=v.wins|0;
+  var key=(teams?'T':'F')+wins+'|'+v.myTeam+'|'+score.map(function(e){return e.id+':'+e.name+':'+e.team}).join(',');
+  if(key!==vhKey){vhKey=key;vhBuild(v,score,teams)}
+  var w=doc.querySelector('.wrap');if(w&&!w.classList.contains('vs-on'))w.classList.add('vs-on');
+  // nothing to show while everyone is choosing a hero, and the results screen says it all
+  var show=ph!=='pick'&&ph!=='results'&&score.length>0;
+  if(vh.hidden===show)vh.hidden=!show;
+  if(!show)return;
+  var urgent=ph==='sudden'||(ph==='fight'&&t<=10);
+  cls(vh,'urgent',urgent);cls(vh,'ph-count',ph==='countdown');cls(vh,'ph-sudden',ph==='sudden');cls(vh,'ph-over',ph==='over');
+  txt(vhT.round,'Round '+Math.max(1,v.round|0)+' · first to '+wins);
+  txt(vhT.time,ph==='countdown'?String(Math.max(1,Math.ceil(t))):ph==='sudden'?'Sudden death':ph==='over'?'Round over':clock(t));
+  txt(vhT.note,ph==='countdown'?'Get ready':ph==='sudden'?'The ring is closing':ph==='over'?'':urgent?'Last seconds':'');
+  var say=ph==='countdown'?'Round '+Math.max(1,v.round|0)+'. Get ready.':ph==='sudden'?'Sudden death. The ring is closing.':ph==='over'?'Round over.':ph==='fight'&&urgent?'Ten seconds left.':'';
+  if(say!==vhSay){vhSay=say;if(say)txt(vhT.live,say)}
+  var i,j,e,o,won,best=0;
+  if(teams){
+    for(i=0;i<2;i++){
+      o=vhT.sides[i];won=0;var up=0,all=0;
+      for(j=0;j<score.length;j++){e=score[j];if((e.team?1:0)!==i)continue;won=Math.max(won,e.rounds|0);all++;if(!e.down)up++;cls(o.men[e.id],'down',e.down)}
+      for(j=0;j<o.pips.children.length;j++)cls(o.pips.children[j],'on',j<won);
+      cls(o.el,'out',all>0&&!up);
+      txt(o.sr,won+' of '+wins+' rounds, '+up+' of '+all+' standing');
+    }
+  }else{
+    for(j=0;j<score.length;j++)best=Math.max(best,score[j].rounds|0);
+    for(j=0;j<score.length;j++){e=score[j];o=vhT.chips[e.id];if(!o)continue;txt(o.n,String(e.rounds|0));cls(o.el,'down',e.down);cls(o.el,'lead',best>0&&(e.rounds|0)===best)}
+  }
+}
+function vhTick(){
+  vhRaf=0;
+  var v=vhBad?null:vsNow();
+  if(!v){vhOff();return}
+  try{vhDraw(v)}catch(e){vhBad=true;vhOff();try{console.warn('net: the versus HUD stopped',e)}catch(_){}return}
+  vhRaf=win.requestAnimationFrame(vhTick);
+}
+// asleep until a versus match is on: a slow look, then every frame while it lasts
+setInterval(function(){if(!vhRaf&&!vhBad&&vsNow())vhTick()},250);
+MBNet.on('net:end',function(){vhBad=false});
 
 /* ---- the way in: a Multiplayer button on the title screen ---- */
 function openLobby(backFn){

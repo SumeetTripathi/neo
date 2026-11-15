@@ -768,9 +768,11 @@ const obeamCore=new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog
   obeamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.power2,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
   obeamEdge=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.gold,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false});
 const fieldTex={};
-function fieldTexture(kind){
-  if(fieldTex[kind])return fieldTex[kind];
-  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':kind==='domain'?'150,96,255':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
+// foe = true (versus): the same marking in the foe palette, for a field an opponent laid
+function fieldTexture(kind,foe){
+  const key=foe?kind+'!':kind;
+  if(fieldTex[key])return fieldTex[key];
+  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=foe?(kind==='halo'?'255,120,70':kind==='rain'?'255,150,130':'255,52,84'):kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':kind==='domain'?'150,96,255':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
   g.translate(128,128);
   const gr=g.createRadialGradient(0,0,10,0,0,122);gr.addColorStop(0,rgba(.1));gr.addColorStop(.75,rgba(.2));gr.addColorStop(1,rgba(.42));
   g.fillStyle=gr;g.beginPath();g.arc(0,0,122,0,TAU);g.fill();g.strokeStyle=rgba(.95);g.lineWidth=3.5;g.beginPath();g.arc(0,0,121,0,TAU);g.stroke();
@@ -796,27 +798,45 @@ function fieldTexture(kind){
       g.strokeStyle=rgba(.95);g.lineWidth=2.4;g.beginPath();g.moveTo(0,0);g.lineTo(0,-22);g.stroke();g.beginPath();g.moveTo(-5,-6);g.lineTo(0,0);g.lineTo(5,-6);g.stroke();
       g.lineWidth=1.4;g.beginPath();g.moveTo(-4,-25);g.lineTo(0,-19);g.lineTo(4,-25);g.moveTo(-4,-21);g.lineTo(0,-15);g.lineTo(4,-21);g.stroke();g.restore()}
   }
-  return fieldTex[kind]=canvasTex(c,false);
+  if(foe){ // a hooked thorn at each quarter of the rim: an opponent's ground, whatever its kind
+    g.fillStyle=rgba(.95);for(let i=0;i<8;i++){g.save();g.rotate(i*TAU/8+.2);g.beginPath();g.moveTo(-9,121);g.lineTo(0,98);g.lineTo(9,121);g.closePath();g.fill();g.restore()}
+    g.strokeStyle=rgba(.6);g.lineWidth=2;g.setLineDash([10,8]);g.beginPath();g.arc(0,0,112,0,TAU);g.stroke();g.setLineDash([])}
+  return fieldTex[key]=canvasTex(c,false);
 }
 const fx=new THREE.Group();scene.add(fx);
 class Pool{constructor(make){this.make=make;this.items=[];this.n=0}
   begin(){this.n=0}
   get(){let o=this.items[this.n];if(!o){o=this.make();fx.add(o);this.items.push(o)}this.n++;o.visible=true;return o}
   end(){for(let i=this.n;i<this.items.length;i++)this.items[i].visible=false}}
-const mCore={e:basic(0xffe6dc),bolt:basic(0xf2ecff),orb:basic(0xfff6cf),bone:basic(0xcfc7b4),dark:basic(0x15121b),steel:basic(0xd5dce2),
+const fbeamCore=new THREE.MeshBasicMaterial({color:0xffe9e0,toneMapped:false,fog:false}),
+  fbeamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.foe,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
+  fbeamEdge=new THREE.MeshBasicMaterial({map:glowTex,color:0xff6a1e,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false});
+const mCore={e:basic(0xffe6dc),hot:basic(0xfff0d0),bolt:basic(0xf2ecff),orb:basic(0xfff6cf),bone:basic(0xcfc7b4),dark:basic(0x15121b),steel:basic(0xd5dce2),
   morsel:ST.toon(0xe0244a,{emissive:0x7a0a1c,steps:2}),pink:basic(0xffb3bf)};
 function trailOf(hex,len,w,op){const m=new THREE.Mesh(G.quad,flatGlowMat(hex,op));m.scale.set(len,1,w);m.position.x=-len*.42;m.renderOrder=5;return m}
 function orbMaker(coreMat,glowHex,glowK){return()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.sphere,coreMat),halo=new THREE.Sprite(glowMat(glowHex,1)),hot=new THREE.Sprite(glowMat(0xffffff,.7)),pool=new THREE.Mesh(G.quad,flatGlowMat(glowHex,.5)),trail=trailOf(glowHex,glowK*2.3,glowK*.6,.75);
   halo.scale.setScalar(glowK*1.25);hot.scale.setScalar(glowK*.45);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(glowK*1.9);g.add(core,halo,hot,pool,trail);g.userData.core=core;g.userData.trail=trail;return g}}
+function skullMaker(hex,eyeMat){return()=>{const g=new THREE.Group(),h=new THREE.Mesh(G.sphere,mCore.bone),jaw=new THREE.Mesh(G.box,mCore.bone),halo=new THREE.Sprite(glowMat(hex,.85)),pool=new THREE.Mesh(G.quad,flatGlowMat(hex,.38));
+    jaw.scale.set(1.1,.6,.9);jaw.position.set(0,-.75,.35);g.add(h,jaw);
+    for(const s of[-1,1]){const e=new THREE.Mesh(G.sphere,eyeMat);e.scale.setScalar(.27);e.position.set(s*.38,.12,.82);g.add(e)}
+    const sc=new THREE.Group(),trail=trailOf(hex,9,2.6,.7);sc.add(g);halo.scale.setScalar(5.2);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(7);sc.add(halo,pool,trail);sc.userData.core=g;sc.userData.trail=trail;return sc}}
+function arrowMaker(shaftMat,tipMat,hex,op){return()=>{const g=new THREE.Group(),s=new THREE.Mesh(G.shaft,shaftMat),t=new THREE.Mesh(G.tip,tipMat),halo=new THREE.Sprite(glowMat(hex,op)),trail=new THREE.Mesh(G.quad,flatGlowMat(hex,op+.1));halo.scale.setScalar(18);trail.scale.set(5,1,46);trail.position.z=-24;trail.renderOrder=5;s.castShadow=true;g.add(s,t,halo,trail);g.userData.trail=trail;return g}}
 const pools={
   shot:new Pool(orbMaker(mCore.e,PAL.foe,6.4)),
   bolt:new Pool(orbMaker(mCore.bolt,PAL.power,7)),
   orb:new Pool(orbMaker(mCore.orb,0xffc64a,7)),
-  skull:new Pool(()=>{const g=new THREE.Group(),h=new THREE.Mesh(G.sphere,mCore.bone),jaw=new THREE.Mesh(G.box,mCore.bone),halo=new THREE.Sprite(glowMat(0x58e04a,.85)),pool=new THREE.Mesh(G.quad,flatGlowMat(0x58e04a,.38));
-    jaw.scale.set(1.1,.6,.9);jaw.position.set(0,-.75,.35);g.add(h,jaw);
-    for(const s of[-1,1]){const e=new THREE.Mesh(G.sphere,mCore.dark);e.scale.setScalar(.27);e.position.set(s*.38,.12,.82);g.add(e)}
-    const sc=new THREE.Group(),trail=trailOf(0x58e04a,9,2.6,.7);sc.add(g);halo.scale.setScalar(5.2);pool.position.y=-SHOT_Y+.5;pool.scale.setScalar(7);sc.add(halo,pool,trail);sc.userData.core=g;sc.userData.trail=trail;return sc}),
-  arrow:new Pool(()=>{const g=new THREE.Group(),s=new THREE.Mesh(G.shaft,mCore.bone),t=new THREE.Mesh(G.tip,mCore.steel),halo=new THREE.Sprite(glowMat(PAL.power2,.5)),trail=new THREE.Mesh(G.quad,flatGlowMat(PAL.power2,.6));halo.scale.setScalar(18);trail.scale.set(5,1,46);trail.position.z=-24;trail.renderOrder=5;s.castShadow=true;g.add(s,t,halo,trail);g.userData.trail=trail;return g}),
+  skull:new Pool(skullMaker(0x58e04a,mCore.dark)),
+  arrow:new Pool(arrowMaker(mCore.bone,mCore.steel,PAL.power2,.5)),
+  // versus: the same four bodies as an opponent throws them, in the foe palette (nothing is built until one flies)
+  fbolt:new Pool(orbMaker(mCore.e,PAL.foe,7.4)),
+  forb:new Pool(orbMaker(mCore.hot,0xff5a1e,7.8)),
+  fskull:new Pool(skullMaker(PAL.foe,mCore.e)),
+  farrow:new Pool(arrowMaker(mCore.dark,mCore.e,PAL.foe,.75)),
+  fobeam:new Pool(()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.box,fbeamCore),glow=new THREE.Mesh(G.quad,fbeamGlow),edge=new THREE.Mesh(G.quad,fbeamEdge);
+    glow.position.y=-SHOT_Y+.8;glow.renderOrder=3;edge.position.y=-SHOT_Y+1;edge.renderOrder=3;core.renderOrder=5;g.add(core,glow,edge);g.userData={core,glow,edge};return g}),
+  // versus: the ring and the pool of colour under the local hero, and the pool of colour under every other fighter (each has its own material)
+  vmark:new Pool(()=>{const m=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:idTexH,transparent:true,opacity:.92,depthWrite:false,toneMapped:false,fog:false})));m.position.y=1;m.renderOrder=2;return m}),
+  vglow:new Pool(()=>{const m=noLine(new THREE.Mesh(G.quad,flatGlowMat(0xffffff,.3)));m.position.y=.58;m.renderOrder=1;return m}),
   morsel:new Pool(()=>{const g=new THREE.Group(),m=new THREE.Mesh(new THREE.IcosahedronGeometry(7.5,1),mCore.morsel),hi=new THREE.Mesh(G.sphere,mCore.pink),pool=new THREE.Mesh(G.quad,flatGlowMat(0xff2a4c,.34));
     hi.scale.setScalar(2.3);hi.position.set(-2.4,4.2,3.6);m.castShadow=true;const b=new THREE.Group();b.add(m,hi);pool.scale.setScalar(46);pool.position.y=.5;g.add(b,pool);g.userData.bob=b;return g}),
   zone:new Pool(()=>{const g=new THREE.Group(),disc=new THREE.Mesh(G.disc,new THREE.MeshBasicMaterial({color:0xc41f3c,transparent:true,opacity:.2,depthWrite:false,toneMapped:false})),
@@ -1206,17 +1226,28 @@ function frameWant(sight){
   const P=MB.P;
   if(!P){want.x=W/2;want.z=H/2-4;want.zoom=sight?.72:.58;return}
   if(!sight){const k=Math.min(1.75,fogR/FOG);want.x=W/2+(P.x-W/2)*(k>1?.66:.8);want.z=H/2+(P.y-H/2)*(k>1?.66:.8)-4;want.zoom=.48*k;return}
-  bb.x0=bb.x1=P.x;bb.z0=bb.z1=P.y;bb.h=0;grow(P.x,P.y,46,66);
+  // the anchor: the hero; in versus, while the hero is down, whoever is being watched (or the middle of the fighters still standing)
+  let ax=P.x,ay=P.y,rx=430,rz=300;
+  if(VS.on&&SPEC.on){ax=SPEC.x;ay=SPEC.y;if(!SPEC.rm){rx=1e4;rz=1e4}}
+  bb.x0=bb.x1=ax;bb.z0=bb.z1=ay;bb.h=0;grow(ax,ay,46,66);
   const B=MB.boss,mons=MB.mons,zs=MB.zones;
   if(B&&B.hp>0&&!B.hidden)grow(B.x,B.y,B.r+16,B.r*2.5+(B.lift||0)*LIFT);
-  else for(let i=0;i<mons.length;i++){const m=mons[i];if(m.hidden||m.decoy)continue;const dx=m.x-P.x,dy=m.y-P.y;if(dx*dx+dy*dy<340*340)grow(m.x,m.y,m.r+8,m.r*2.2)}
-  for(let i=0;i<zs.length;i++){const z=zs[i];if(z.mine)continue;const dx=z.x-P.x,dy=z.y-P.y,lim=z.r+300;if(dx*dx+dy*dy<lim*lim)grow(z.x,z.y,z.r+4,0)}
+  else for(let i=0;i<mons.length;i++){const m=mons[i];if(m.hidden||m.decoy)continue;const dx=m.x-ax,dy=m.y-ay;if(dx*dx+dy*dy<340*340)grow(m.x,m.y,m.r+8,m.r*2.2)}
+  for(let i=0;i<zs.length;i++){const z=zs[i];if(z.mine&&z.foe!==true)continue;const dx=z.x-ax,dy=z.y-ay,lim=z.r+300;if(dx*dx+dy*dy<lim*lim)grow(z.x,z.y,z.r+4,0)}
   if(TR.obj)grow(TR.ox,TR.oy,TR.or+26,74); // the thing being guarded stays in view while the hero is anywhere near it
+  // versus: every opponent still standing counts as the boss does (those past the reach below sit at the edge, or get an edge badge);
+  // a spectator's view takes in everyone near the one being watched, or every fighter left when it is watching the fight as a whole
+  if(VS.on)for(let i=0;i<rems.length;i++){const rm=rems[i];if(!rm.vis||rm.dead)continue;
+    if(SPEC.on){if(SPEC.rm){if(rm===SPEC.rm)continue;const dx=rm.P.x-ax,dy=rm.P.y-ay;if(dx*dx+dy*dy>380*380)continue}}
+    else if(!rm.foe)continue;
+    grow(rm.P.x,rm.P.y,40,70)}
+  if(VS.on&&VS.ringOn&&!SPEC.on){ // the way back into the ring stays in view
+    const dx=VS.rx-ax,dy=VS.ry-ay,d=Math.hypot(dx,dy);if(d>VS.rr-40&&d>1){const k=Math.max(0,(VS.rr-60))/d;grow(VS.rx-dx*k,VS.ry-dy*k,30,0)}}
   // never chase something across the whole arena: past this reach it may sit at the edge of the view
-  {const rx=430,rz=300;if(bb.x0<P.x-rx)bb.x0=P.x-rx;if(bb.x1>P.x+rx)bb.x1=P.x+rx;if(bb.z0<P.y-rz)bb.z0=P.y-rz;if(bb.z1>P.y+rz)bb.z1=P.y+rz}
+  {if(bb.x0<ax-rx)bb.x0=ax-rx;if(bb.x1>ax+rx)bb.x1=ax+rx;if(bb.z0<ay-rz)bb.z0=ay-rz;if(bb.z1>ay+rz)bb.z1=ay+rz}
   if(bb.x0<0)bb.x0=0;if(bb.x1>W)bb.x1=W;if(bb.z0<0)bb.z0=0;if(bb.z1>H)bb.z1=H;
   // lean a third of the way from the player to the middle of the group
-  const fx=P.x+((bb.x0+bb.x1)/2-P.x)*.6,fz=P.y+((bb.z0+bb.z1)/2-P.y)*.6,base=viewW&&viewW<640?.5:.58;
+  const fx=ax+((bb.x0+bb.x1)/2-ax)*.6,fz=ay+((bb.z0+bb.z1)/2-ay)*.6,base=viewW&&viewW<640?.5:.58;
   for(let z=base;;z+=.05){
     if(z>=1){want.x=W/2;want.z=H/2-4;want.zoom=1;return}
     const f=(z-base)/(1-base),fol=.62*(1-f*f);
@@ -1258,7 +1289,7 @@ function spaced(px){if(hasSpacing===null)hasSpacing='letterSpacing' in ctx;if(ha
 function slant(x,y,rot,sx,sy){ctx.translate(x,y);if(rot)ctx.rotate(rot);ctx.transform(sx,0,-.2*sy,sy,0,0)}
 function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.strokeStyle=CSS.ink;ctx.strokeText(txt,x,y);ctx.fillStyle=fill;ctx.fillText(txt,x,y)}
 // a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
-function petBar(a,MM,idCss){
+function petBar(a,MM,idCss,foe){
   const W=OV.w,H=OV.h;
   if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
   let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
@@ -1266,6 +1297,9 @@ function petBar(a,MM,idCss){
   if(idCss&&(sp.x<-12||sp.x>W+12||sp.y>H+12))return; // another member's pet out of frame: no bar pinned to the edge
   // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
   const beast=a.owner==='beast',q=Math.max(0,Math.min(1,a.hp/a.maxHp)),bw=Math.max(34,Math.min(64,(a.r||16)*1.7)),bx=Math.max(18,Math.min(W-bw-6,sp.x-bw/2)),by=Math.max(hudBottom()+7,sp.y-8);
+  if(foe){ // versus, an opponent's creature: a slanted bar filled with the owner's colour, no friendly pip
+    ctx.beginPath();ctx.moveTo(bx-1,by-2);ctx.lineTo(bx+bw+4,by-2);ctx.lineTo(bx+bw+1,by+7);ctx.lineTo(bx-4,by+7);ctx.closePath();ctx.fillStyle='rgba(8,8,12,.88)';ctx.fill();
+    ctx.fillStyle='#2a0c14';ctx.fillRect(bx,by,bw,5);ctx.fillStyle=idCss;ctx.fillRect(bx,by,bw*q,5);ctx.lineWidth=1;ctx.strokeStyle=CSS.foe;ctx.stroke();return}
   ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
   ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
   ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
@@ -1361,6 +1395,7 @@ function drawOverlay(sight){
       ctx.fill()}
     const bh=30*e;ctx.fillStyle='rgba(5,4,12,.96)';ctx.fillRect(0,0,W,bh);ctx.fillRect(0,H-bh,W,bh);
     ctx.fillStyle=sight?(death?CSS.power2:CSS.foe):'#ddd';ctx.globalAlpha=e;ctx.fillRect(0,bh,W,1.5);ctx.fillRect(0,H-bh-1.5,W,1.5);ctx.globalAlpha=1}
+  if(VS.on)vsOverlay(sight);
   // level banner: a slanted dark band that cuts in from the left, thin accent lines, the title sliding in against it
   if(S.banner>0&&S.mode==='play'&&S.L){
     const L=S.L,age=2.8-S.banner,tin=easeOut(clamp01(age/.32)),out=clamp01(S.banner/.4),a=Math.min(1,tin*1.2)*out,sl=28,y0=Math.round(H*.34),y1=y0+134,xr=W*tin+sl,ac=tint(CSS.power),ac2=tint(CSS.power2);
@@ -1447,7 +1482,7 @@ const RANK_K={'':0,E:.22,D:.38,C:.54,B:.7,A:.85,S:1};
 // the apex tier: which path a hero walks ('dominion' | 'order' | null), read from the object its model reads (the game, or a member's view);
 // R.testApex forces the local hero's. The motes that rise off a hero take the path's colours [base rgb, hot rgb].
 function apexPath(B){let a=B===MB?R.testApex:null;if(!a){a=B.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=B.S&&B.S.apex}return a==='dominion'||a==='order'?a:null}
-const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5]};
+const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5]},FOE_COL=[1,.16,.3,1,.72,.62];
 if(typeof MB.on==='function')try{
   MB.on('bossdead',()=>{if(!alive)return;const x=FX.bx,z=FX.bz;drama('death',x,z,1.25);flashAt(x,34,z,60,330,0xffffff,.42,1);burstAt(x,34,z,90,420,PAL.power2,.38);crackAt(x,z,90,PAL.power,3.4)});
   MB.on('levelstart',()=>{clearFx();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
@@ -1460,19 +1495,19 @@ function heroFx(F,P,cls,dt,sight,low,T){
   if(atk>F.prevAtk+.04){
     const ang=P.swing===undefined?P.face:P.swing,melee=MB.melee(cls);
     if(melee){const o=T.slash.spawn(cls==='assassin'?.16:.22),u=o.userData;F.dir=-F.dir;u.ang=ang;u.dir=F.dir;u.arc=cls==='assassin'?1.1:cls==='tank'?1.3:1.6;u.reach=cls==='tank'?58:cls?64:50;
-      o.position.set(P.x,cls?30:26,P.y);u.a.material.color.setHex(cls?PAL.power:0xcfd0e6);u.b.material.color.setHex(cls?PAL.power2:0xffffff);upSlash(o,0)}
-    else if(!low){const hex=cls==='healer'?PAL.holy:cls==='necro'?PAL.necro:cls==='ranger'?PAL.power2:PAL.power;flashAt(P.x+Math.cos(ang)*20,36,P.y+Math.sin(ang)*20,16,58,hex,.13,.95,T.flash)}
+      o.position.set(P.x,cls?30:26,P.y);u.a.material.color.setHex(F.foe?PAL.foe:cls?PAL.power:0xcfd0e6);u.b.material.color.setHex(F.foe?PAL.foe2:cls?PAL.power2:0xffffff);upSlash(o,0)}
+    else if(!low){const hex=F.foe?PAL.foe:cls==='healer'?PAL.holy:cls==='necro'?PAL.necro:cls==='ranger'?PAL.power2:PAL.power;flashAt(P.x+Math.cos(ang)*20,36,P.y+Math.sin(ang)*20,16,58,hex,.13,.95,T.flash)}
   }
   F.prevAtk=atk;
   // afterimages: a trail of ghosts on a dash, a streak and ghosts along a blink
   const dx=P.x-F.px,dy=P.y-F.py,jump=dx*dx+dy*dy;
   if(!low&&sight){
-    if(P.dashT>0){F.ghostT-=dt;if(F.ghostT<=0){F.ghostT=.034;const o=T.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.36;o.material.color.setHex(PAL.power)}}
+    if(P.dashT>0){F.ghostT-=dt;if(F.ghostT<=0){F.ghostT=.034;const o=T.ghost.spawn(.26);o.position.set(P.x,0,P.y);o.rotation.set(.3,Math.PI/2-P.face,0,'YXZ');o.userData.k=.36;o.material.color.setHex(F.foe?PAL.foe:PAL.power)}}
     else{F.ghostT=0;
       if(jump>80*80&&jump<260*260&&cls==='mage'){const len=Math.sqrt(jump),a=Math.atan2(dy,dx);
-        for(let i=0;i<4;i++){const o=T.ghost.spawn(.3+i*.05),q=i/4;o.position.set(F.px+dx*q,0,F.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.2+.1*i;o.material.color.setHex(i%2?PAL.power2:PAL.power)}
-        const s=T.streak.spawn(.3),u=s.userData;s.position.set(F.px+dx/2,22,F.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;upStreak(s,0);
-        flashAt(P.x,34,P.y,24,96,PAL.power2,.2,.9,T.flash)}}
+        for(let i=0;i<4;i++){const o=T.ghost.spawn(.3+i*.05),q=i/4;o.position.set(F.px+dx*q,0,F.py+dy*q);o.rotation.set(.22,Math.PI/2-a,0,'YXZ');o.userData.k=.2+.1*i;o.material.color.setHex(F.foe?(i%2?PAL.foe2:PAL.foe):i%2?PAL.power2:PAL.power)}
+        const s=T.streak.spawn(.3),u=s.userData;s.position.set(F.px+dx/2,22,F.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;if(T===TFR)s.material.color.setHex(F.foe?PAL.foe:PAL.power);upStreak(s,0);
+        flashAt(P.x,34,P.y,24,96,F.foe?PAL.foe2:PAL.power2,.2,.9,T.flash)}}
   }
   F.px=P.x;F.py=P.y;
 }
@@ -1495,10 +1530,10 @@ function syncFx(dt,sight){
   // slams: a telegraphed blast going off, or a heavy shockwave, cracks the floor for a while
   {const zs=MB.zones;
     for(let i=0;i<prevZones.length;i++){const z=prevZones[i];if(zs.indexOf(z)>=0||!(z.t>=z.dur*.92)||!play)continue;
-      if(sight){crackAt(z.x,z.y,z.r*.9,z.mine?PAL.power:PAL.foe,low?1.6:2.6);if(!low)flashAt(z.x,10,z.y,z.r*.8,z.r*2.6,z.mine?PAL.power2:0xffd9a0,.16,.8)}}
+      const zm=z.mine&&z.foe!==true;if(sight){crackAt(z.x,z.y,z.r*.9,zm?PAL.power:PAL.foe,low?1.6:2.6);if(!low)flashAt(z.x,10,z.y,z.r*.8,z.r*2.6,zm?PAL.power2:0xffd9a0,.16,.8)}}
     prevZones.length=0;for(let i=0;i<zs.length;i++)prevZones.push(zs[i]);
     const rs=MB.rings;
-    if(sight&&!low)for(let i=0;i<rs.length;i++){const r=rs[i];if(!r.fx||r.r<118||r.under||prevRings.indexOf(r)>=0)continue;crackAt(r.x,r.y,(r.r-70)*.9,PAL.gold,2.2)}
+    if(sight&&!low)for(let i=0;i<rs.length;i++){const r=rs[i];if(!r.fx||r.r<118||r.under||prevRings.indexOf(r)>=0)continue;crackAt(r.x,r.y,(r.r-70)*.9,r.foe===true?PAL.foe:PAL.gold,2.2)}
     prevRings.length=0;for(let i=0;i<rs.length;i++)prevRings.push(rs[i])}
   // hits: every new damage number is an event; the big ones flash and throw speed lines
   {const fl=MB.floats;
@@ -1533,18 +1568,18 @@ function syncFx(dt,sight){
 function drawPshot(p,i,x,y,t,low,pool){
   const r=p.r||5,o=pool.get(),vx=p.vx||0,vy=p.vy||0;o.position.set(x,SHOT_Y,y);
   if(o.userData.trail)o.userData.trail.visible=!low;
-  if(pool===pools.arrow)o.rotation.y=Math.PI/2-Math.atan2(vy,vx);
-  else if(pool===pools.skull){const a=Math.atan2(vy,vx);o.scale.setScalar(r*1.25);o.rotation.y=0;o.userData.trail.rotation.y=-a;o.userData.trail.position.set(-Math.cos(a)*3.8,0,-Math.sin(a)*3.8);o.userData.core.rotation.y=Math.PI/2-a;o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
+  if(pool===pools.arrow||pool===pools.farrow)o.rotation.y=Math.PI/2-Math.atan2(vy,vx);
+  else if(pool===pools.skull||pool===pools.fskull){const a=Math.atan2(vy,vx);o.scale.setScalar(r*1.25);o.rotation.y=0;o.userData.trail.rotation.y=-a;o.userData.trail.position.set(-Math.cos(a)*3.8,0,-Math.sin(a)*3.8);o.userData.core.rotation.y=Math.PI/2-a;o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
   else{o.scale.setScalar(Math.max(4.5,r));o.rotation.y=-Math.atan2(vy,vx);o.userData.core.scale.setScalar(.8)}
 }
 // an order hero's sweeping beam: P.beam = {a, len, w, on}, from the hero outward
-function heroBeam(P,t){const b=P&&P.beam;if(!b||typeof b!=='object'||b.on===false)return;const a=num(b.a,0),len=Math.max(1,num(b.len,300)),w=Math.max(4,num(b.w,16)),o=pools.obeam.get(),u=o.userData,fl=1+.14*Math.sin(t*53);
+function heroBeam(P,t,foe){const b=P&&P.beam;if(!b||typeof b!=='object'||b.on===false)return;const a=num(b.a,0),len=Math.max(1,num(b.len,300)),w=Math.max(4,num(b.w,16)),o=(foe?pools.fobeam:pools.obeam).get(),u=o.userData,fl=1+.14*Math.sin(t*53);
   o.position.set(P.x+Math.cos(a)*len/2,SHOT_Y+8,P.y+Math.sin(a)*len/2);o.rotation.y=-a;
   u.core.scale.set(len,w*.22*fl,w*.5*fl);u.glow.position.y=-SHOT_Y-7.2;u.edge.position.y=-SHOT_Y-7;u.glow.scale.set(len+w*3,1,w*5*fl);u.edge.scale.set(len+w*5,1,w*9)}
-// a pet's beam is the same shape as a monster's, in friendly blue
-function allyBeams(allies,t){
+// a pet's beam is the same shape as a monster's, in friendly blue (an opponent's pet in versus: the monsters' own red)
+function allyBeams(allies,t,foe){
   for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue;
-    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j];if(!ry)continue;const o=pools.pbeam.get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12,a=+ry.a||0;
+    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j];if(!ry)continue;const o=(foe?pools.beam:pools.pbeam).get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12,a=+ry.a||0;
       o.position.set(m.x+Math.cos(a)*len/2,SHOT_Y,m.y+Math.sin(a)*len/2);o.rotation.y=-a;
       u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
       if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
@@ -1568,8 +1603,8 @@ const cssOf=h=>'#'+('00000'+h.toString(16)).slice(-6);
 function memberHex(i){i=i|0;const mp=MB.mp,c=mp&&mp.colors&&mp.colors[i];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);return ID_HEX[((i%8)+8)%8]}
 function memberColor(i){return cssOf(memberHex(i))}
 const rems=[],remById=new Map(),echoAll=[];
-let TFR=null,auraR=null,idTexH=null,idTexA=null,remStamp=0,PART_IX=null;
-const PK={bolt:1,orb:1,skull:1,arrow:1},CLS_OK={fighter:1,tank:1,assassin:1,mage:1,ranger:1,healer:1,necro:1},WORD_RE=/^[a-z]{1,24}$/,NOLOOK={};
+let TFR=null,auraR=null,idTexH=null,idTexA=null,idTexHF=null,idTexAF=null,remStamp=0,PART_IX=null;
+const PK={bolt:1,orb:1,skull:1,arrow:1},FPK={bolt:'fbolt',orb:'forb',skull:'fskull',arrow:'farrow'},CLS_OK={fighter:1,tank:1,assassin:1,mage:1,ranger:1,healer:1,necro:1},WORD_RE=/^[a-z]{1,24}$/,NOLOOK={};
 const NAME_RE=/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff9-\ufffb]/g;
 const num=(v,d)=>typeof v==='number'&&v===v&&v!==Infinity&&v!==-Infinity?v:d;
 function cleanName(n,i){let s='';try{s=typeof n==='string'?n:n==null?'':''+n}catch(e){s=''}
@@ -1593,6 +1628,16 @@ function remSetup(){
     g.globalAlpha=.55;g.strokeStyle='#fff';g.lineWidth=h*.022;g.beginPath();g.arc(0,0,h*.62,0,TAU);g.stroke()});
   // ally: a thin ring in two halves with a bead on each gap
   idTexA=fxTex(128,(g,h)=>{ring(g,h,h*.86,h*.06,2,.16,.45);g.fillStyle='#fff';for(const a of[0,Math.PI]){g.beginPath();g.arc(Math.cos(a)*h*.86,Math.sin(a)*h*.86,h*.055,0,TAU);g.fill()}});
+  // versus, an opponent: a heavier ring broken in four with a fang driven inward through each gap and the facing notch; nothing on it is round
+  const fang=(g,h,r0,r1,w,ink)=>{for(let pass=0;pass<2;pass++){g.fillStyle=pass?'#fff':'rgba(0,0,0,'+ink+')';const e=pass?0:h*.035;
+    g.beginPath();g.moveTo(r0+e,-w-e);g.lineTo(r1-e*1.6,0);g.lineTo(r0+e,w+e);g.closePath();g.fill()}};
+  idTexHF=fxTex(128,(g,h)=>{ring(g,h,h*.8,h*.12,4,.3,.6);
+    for(let i=1;i<4;i++){g.save();g.rotate(i*TAU/4);if(i)fang(g,h,h*.9,h*.5,h*.12,.6);g.restore()}
+    g.fillStyle='rgba(0,0,0,.6)';g.beginPath();g.moveTo(h*.995,0);g.lineTo(h*.7,h*.2);g.lineTo(h*.7,-h*.2);g.closePath();g.fill();
+    g.fillStyle='#fff';g.beginPath();g.moveTo(h*.96,0);g.lineTo(h*.74,h*.14);g.lineTo(h*.74,-h*.14);g.closePath();g.fill();
+    g.globalAlpha=.7;g.strokeStyle='#fff';g.lineWidth=h*.03;g.setLineDash([h*.09,h*.07]);g.beginPath();g.arc(0,0,h*.58,0,TAU);g.stroke();g.setLineDash([])});
+  // an opponent's creature: a thin ring of six thorns
+  idTexAF=fxTex(128,(g,h)=>{ring(g,h,h*.78,h*.07,6,.12,.5);for(let i=0;i<6;i++){g.save();g.rotate(i*TAU/6);fang(g,h,h*.8,h*.99,h*.1,.5);g.restore()}});
 }
 const newSm=()=>({init:false,x:0,y:0,w:0,l:0,fx:0,fy:0,fw:0,fl:0,tx:0,ty:0,tw:0,tl:0,T:0,el:0,since:0,iv:.083});
 // ease a position (and a walk phase and a lift) from one snapshot to the next. A new target starts a straight run from where the thing is drawn
@@ -1617,19 +1662,19 @@ function remNew(id){
   const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0,auraR:0};
   const S={adv:null,rank:'',level:0,mode:'play',t:0,cls:null,paused:false,apex:null},sk0={unlocked:true,ready:false};
   // the view: everything the models ask the game about their owner, answered for this member
-  const V={S,P,remote:true,apex:null,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
+  const V={S,P,remote:true,foe:false,apex:null,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
     has(p){if(!PART_IX){PART_IX={};const a=MB.PARTS||[];for(let i=0;i<a.length;i++)PART_IX[a[i]&&a[i].id||a[i]]=i}const i=PART_IX[p];return i===undefined?true:i<V.parts},
     cls(){return S.cls},pw(i){const a=V.pwA;return !!(a&&a[i-1])},rank(){return S.rank},
     get mons(){return MB.mons},get allies(){return rm.allyList},get boss(){return MB.boss}};
-  const rm={id,idx:0,i:0,stamp:0,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false},
+  const rm={id,idx:0,i:0,stamp:0,foe:false,foeTex:false,team:-1,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false,foe:false},
     allyMap:new Map(),allyList:[],allyRecs:new Map(),aStamp:0,echo:[],eStamp:0,psRef:null,psX:NaN,psN:0,psAge:0,
     name:'',initial:'?',nameW:0,nameAt:-9,rawName:undefined,nameI:-1,dead:false,fall:0,vis:false,rankK:0,apexC:null,
     mat:null,matA:null,mark:null,marks:null,disc:null,beacon:null,hex:-1,css:'#ffffff',soft:'#ffffff'};
   return rm;
 }
 const MARKS=48;
-function remColour(rm,idx){
-  const hex=memberHex(idx);if(rm.hex===hex)return;
+function remColour(rm,hex){
+  if(rm.hex===hex)return;
   rm.hex=hex;rm.css=cssOf(hex);rm.soft='#'+_col.setHex(hex).lerp(_c0.setHex(0xffffff),.45).getHexString();
   if(!rm.mat){
     const mk=tex=>new THREE.MeshBasicMaterial({map:tex,color:hex,transparent:true,opacity:.92,depthWrite:false,toneMapped:false,fog:false});
@@ -1650,17 +1695,18 @@ function remDrop(rm){
 function sameBody(q,a){const s=a.s&&typeof a.s==='object'?a.s:NOLOOK;
   return q.kind===a.kind&&q.ai===a.ai&&q.owner===a.owner&&q.pet===!!a.pet&&q.minion===!!a.minion&&q.trophy===!!a.trophy&&q.col===s.col&&q.eyes===s.eyes&&q.legs===s.legs&&q.spikes===s.spikes}
 function remAllies(rm,src,dt){
-  const list=rm.allyList,recs=rm.allyRecs,st=++rm.aStamp;let n=0;
+  const list=rm.allyList,recs=rm.allyRecs,st=++rm.aStamp,foe=rm.foe;let n=0;
   for(let i=0;i<src.length&&n<96;i++){
     const a=src[i];if(!a||typeof a!=='object'||num(a.x,null)===null||num(a.y,null)===null)continue;
     let key=a.nid;if(key==null||typeof key==='object'||key!==key)key=-1-i;
     let q=recs.get(key);
     if(q&&q.stamp===st){key=-1001-i;q=recs.get(key)} // the same nid twice in one list: the second goes by its place
-    if(!q||!sameBody(q,a)){const s=a.s&&typeof a.s==='object'?a.s:NOLOOK;
-      q={pe:{},sm:newSm(),stamp:0,kind:a.kind,ai:a.ai,owner:a.owner,pet:!!a.pet,minion:!!a.minion,trophy:!!a.trophy,col:s.col,eyes:s.eyes,legs:s.legs,spikes:s.spikes};recs.set(key,q)}
+    if(!q||q.foe!==foe||!sameBody(q,a)){const s=a.s&&typeof a.s==='object'?a.s:NOLOOK;
+      q={pe:{},sm:newSm(),stamp:0,foe,kind:a.kind,ai:a.ai,owner:a.owner,pet:!!a.pet,minion:!!a.minion,trophy:!!a.trophy,col:s.col,eyes:s.eyes,legs:s.legs,spikes:s.spikes};recs.set(key,q)}
     q.stamp=st;const pe=q.pe;
     for(const k in a)pe[k]=a[k];
     for(const k in pe)if(!(k in a))pe[k]=undefined;
+    if(foe)pe.foe=true; // versus: the models build an opponent's creature without the friendly ground mark, lights and eyes
     chase(q.sm,a.x,a.y,num(a.walk,0),num(a.lift,0),dt,170);
     pe.x=q.sm.x;pe.y=q.sm.y;pe.lift=q.sm.l;if(typeof a.walk==='number')pe.walk=q.sm.w;
     if(typeof pe.r!=='number'||!(pe.r>0))pe.r=pe.s&&pe.s.r>0?+pe.s.r:pe.kind==='thrall'||pe.kind==='wolf'?10:16;
@@ -1677,7 +1723,7 @@ function remEchoes(rm,src,dt){
     const life=num(e.life,-1);let pe=null;
     for(let j=0;j<mine.length;j++){const q=mine[j];if(q.stamp===st)continue;
       if(e.nid!=null?q.nid===e.nid:(q.ai===e.ai&&q.x===e.x&&q.y===e.y&&!(life>q.raw+.05))){pe=q;break}}
-    if(!pe){pe={ai:e.ai,s:e.s,x:e.x,y:e.y,ang:e.ang,life:life<0?undefined:life,max:e.max,owner:e.owner,col:e.col,seed:e.seed,nid:e.nid,raw:life,stamp:0};mine.push(pe)}
+    if(!pe){pe={ai:e.ai,s:e.s,x:e.x,y:e.y,ang:e.ang,life:life<0?undefined:life,max:e.max,owner:e.owner,col:rm.foe?CSS.foe:e.col,seed:e.seed,nid:e.nid,raw:life,stamp:0};mine.push(pe)}
     else if(life!==pe.raw){pe.raw=life;if(life>=0)pe.life=life}
     else if(typeof pe.life==='number')pe.life=Math.max(0,pe.life-dt);
     pe.stamp=st;n++;
@@ -1701,7 +1747,9 @@ function syncRemotes(list,dt,sight){
     const id=r.id==null?'#'+i:r.id;let rm=remById.get(id);
     if(!rm){rm=remNew(id);remById.set(id,rm);rems.push(rm)}
     if(rm.stamp===st)continue;rm.stamp=st;rm.i=i;
-    const slot=num(r.idx,num(r.slot,null));remColour(rm,slot===null?i:slot|0);
+    const slot=num(r.idx,num(r.slot,null)),foe=r.foe===true,team=num(r.team,-1);rm.foe=foe;rm.team=team;rm.idx=slot===null?i:slot|0;
+    remColour(rm,VS.on?vsHex(rm.idx,team):memberHex(rm.idx));
+    if(foe!==rm.foeTex){rm.foeTex=foe;rm.mat.map=foe?idTexHF:idTexH;rm.matA.map=foe?idTexAF:idTexA;rm.fx.foe=foe;rm.V.foe=foe;rm.apexC=0}
     if(r.name!==rm.rawName||i!==rm.nameI){rm.rawName=r.name;rm.nameI=i;rm.name=cleanName(r.name,slot===null?i+1:slot|0);rm.initial=Array.from(rm.name)[0].toUpperCase();rm.nameAt=-9}
     // who they are
     const L=r.look&&typeof r.look==='object'?r.look:NOLOOK,V=rm.V,S=V.S,P=rm.P,dead=!!r.dead;
@@ -1716,7 +1764,7 @@ function syncRemotes(list,dt,sight){
     P.face=num(sp.face,P.face);P.swing=num(sp.swing,P.face);P.moving=!!sp.moving&&!dead;
     P.maxHp=Math.max(1,num(sp.maxHp,P.maxHp));P.hp=Math.max(0,Math.min(P.maxHp,num(sp.hp,P.hp)));P.shield=sp.shield===true?1:num(sp.shield,0);P.skCd=num(sp.skCd,0);
     // the order aura: the radius the member sends (P.auraR, or look.auraR), else our own when we walk the same path, else a plain default
-    P.beam=!dead&&sp.beam&&typeof sp.beam==='object'?sp.beam:null;P.ascT=num(sp.ascT,0);if(P.beam&&!r.away)heroBeam(P,t);
+    P.beam=!dead&&sp.beam&&typeof sp.beam==='object'?sp.beam:null;P.ascT=num(sp.ascT,0);if(P.beam&&!r.away)heroBeam(P,t,foe);
     P.auraR=S.apex==='order'&&!dead?Math.max(0,Math.min(400,num(sp.auraR,num(L.auraR,LP&&LP.auraR>0?LP.auraR:96)))):0;
     P.atk=runTimer(tm,'atk','ratk',sp.atk,dt);P.dashT=runTimer(tm,'dashT','rdashT',sp.dashT,dt);P.inv=runTimer(tm,'inv','rinv',sp.inv,dt);
     if(dead){P.atk=P.dashT=P.inv=tm.atk=tm.dashT=tm.inv=0}
@@ -1740,35 +1788,37 @@ function syncRemotes(list,dt,sight){
     remAllies(rm,!away&&Array.isArray(r.allies)?r.allies:NONE,dt);
     syncMap(rm.allyMap,rm.allyList,'ally',dt,phAlly,phAllyUpdate,true,V);
     const al=rm.allyList;
-    allyBeams(al,t);
+    allyBeams(al,t,foe);
     if(sight&&!hide&&!dead)for(let j=0;j<al.length;j++){const a=al[j];if(a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
-      const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4+i));o.rotation.y=t*.8+i;o.material.opacity=.5+.15*Math.sin(t*4+i);break}
+      const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4+i));o.rotation.y=t*.8+i;o.material.opacity=.5+.15*Math.sin(t*4+i);o.material.color.setHex(foe?PAL.foe:PAL.holy);break}
     // identity marks: the notched ring under the hero, a thin ring under every ally
     const mk=rm.mark,pulse=dead?1+.1*Math.sin(t*5+i):1;
-    mk.visible=!hide;mk.position.x=P.x;mk.position.z=P.y;mk.scale.setScalar(74*pulse);mk.rotation.y=dead?t*.7:g.rotation.y-Math.PI/2;rm.mat.opacity=dead?.5+.3*Math.sin(t*5+i):.92;
+    mk.visible=!hide;mk.position.x=P.x;mk.position.z=P.y;mk.scale.setScalar((foe?90:74)*pulse);mk.rotation.y=dead?t*.7:g.rotation.y-Math.PI/2;rm.mat.opacity=dead?.5+.3*Math.sin(t*5+i):.92;
+    // versus: a pool of the fighter's colour on the floor under the ring (brighter under an opponent), so the colour carries at any size
+    if(VS.on&&!hide&&!dead&&sight){const o=pools.vglow.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(foe?150+8*Math.sin(t*3+i):118);o.material.color.setHex(rm.hex);o.material.opacity=foe?.5:.3}
     {const im=rm.marks;let n=0;
       for(let j=0;j<al.length&&n<MARKS;j++){const a=al[j];if(a.hidden||a.dead||a.hp<=0)continue;
         const r0=a.r||12,rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
-        markAt(im,n++,a.x,a.y,rad*2.33,t*(j%2?.5:-.5)+j)}
+        markAt(im,n++,a.x,a.y,rad*(foe?2.7:2.33),t*(j%2?.5:-.5)+j)}
       im.count=n;im.visible=n>0;if(n)im.instanceMatrix.needsUpdate=true}
     const bc=rm.beacon;bc.visible=f>.05&&!hide;if(bc.visible){bc.position.set(P.x,46,P.y);bc.scale.set(26+4*Math.sin(t*3+i),150,1);bc.material.opacity=(.62+.14*Math.sin(t*3+i))*f}
     // their shots: drawn where the last snapshot put them, carried on along their flight until the next one
     {const ps=!away&&Array.isArray(r.pshots)?r.pshots:NONE,p0=ps.length?ps[0]:null,x0=p0?p0.x:NaN;
       if(ps!==rm.psRef||x0!==rm.psX||ps.length!==rm.psN){rm.psRef=ps;rm.psX=x0;rm.psN=ps.length;rm.psAge=0}else rm.psAge=Math.min(.3,rm.psAge+dt);
       for(let j=0;j<ps.length&&j<160;j++){const p=ps[j];if(!p||num(p.x,null)===null||num(p.y,null)===null)continue;
-        drawPshot(p,j,p.x+num(p.vx,0)*rm.psAge,p.y+num(p.vy,0)*rm.psAge,t,low,pools[PK[p.kind]===1?p.kind:'bolt'])}}
+        drawPshot(p,j,p.x+num(p.vx,0)*rm.psAge,p.y+num(p.vy,0)*rm.psAge,t,low,pools[foe?FPK[p.kind]||'fbolt':PK[p.kind]===1?p.kind:'bolt'])}}
     remEchoes(rm,!away&&Array.isArray(r.echoes)?r.echoes:NONE,dt);
     // power rising off them, as it does off the local hero
     {let k=0;const ap=S.apex;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=ap||(rk&&rk[0]==='X')?1.25:rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
       rm.rankK+=(k-rm.rankK)*Math.min(1,dt*2);const rk=rm.rankK,d=rm.disc,c=FX.clock;
-      d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(ap==='order'?PAL.power2:PAL.power)}
+      d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(foe?PAL.foe:ap==='order'?PAL.power2:PAL.power)}
         d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3+i));d.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5+i))*(ap==='dominion'?.45:1)}}
   }
   // members who have left
   for(let i=rems.length-1;i>=0;i--){const rm=rems[i];if(rm.stamp!==st){remDrop(rm);remById.delete(rm.id);rems.splice(i,1)}}
   // one cloud of rising motes for all of them
   {const pos=auraR.pos,col=auraR.col,size=auraR.size,c=FX.clock;let k=0;
-    for(let m=0;m<rems.length;m++){const rm=rems[m],rk=rm.rankK,P=rm.P,n=rk<.02||!rm.vis?0:Math.min(48,Math.round((low?3:8)+(low?9:40)*rk)),AC=APEX_COL[rm.V.S.apex||''];
+    for(let m=0;m<rems.length;m++){const rm=rems[m],rk=rm.rankK,P=rm.P,n=rk<.02||!rm.vis?0:Math.min(48,Math.round((low?3:8)+(low?9:40)*rk)),AC=rm.foe?FOE_COL:APEX_COL[rm.V.S.apex||''];
       for(let i=0;i<n&&k<384;i++,k++){const a=i*2.399+c*(.5+i%3*.22)+m,rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk)+m*9)%(54+34*rk),q=h/(54+34*rk);
         pos[k*3]=P.x+Math.cos(a)*rad;pos[k*3+1]=3+h;pos[k*3+2]=P.y+Math.sin(a)*rad*.8;
         const hot=i%4===0,o=hot?3:0;col[k*4]=AC[o];col[k*4+1]=AC[o+1];col[k*4+2]=AC[o+2];col[k*4+3]=Math.sin(q*Math.PI)*(.5+.4*Math.min(1,rk));size[k]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}}
@@ -1793,11 +1843,11 @@ function padBoxes(){
 function remoteOverlay(MM,sight){
   const W=OV.w,H=OV.h;
   const top=hudBottom(),now=MB.S.t;
-  for(let m=0;m<rems.length;m++){const al=rems[m].allyList,css=rems[m].css;for(let i=0;i<al.length;i++)petBar(al[i],MM,css)}
+  for(let m=0;m<rems.length;m++){const al=rems[m].allyList,css=rems[m].css,foe=rems[m].foe;for(let i=0;i<al.length;i++)petBar(al[i],MM,css,foe)}
   ctx.save();ctx.textBaseline='alphabetic';ctx.lineJoin='round';
   for(let m=0;m<rems.length;m++){
     const rm=rems[m];if(!rm.vis)continue;
-    const P=rm.P,css=rm.css,soft=rm.soft,dead=rm.dead;
+    const P=rm.P,css=rm.css,soft=rm.soft,dead=rm.dead,foe=rm.foe;
     v3.set(P.x,dead?26:76,P.y).project(camera);
     let nx=v3.x,ny=v3.y;const behind=v3.z>1;if(behind){nx=-nx;ny=-ny}
     const px=(nx*.5+.5)*W,py=(.5-ny*.5)*H;
@@ -1806,6 +1856,15 @@ function remoteOverlay(MM,sight){
       ctx.textAlign='center';ctx.font=TAG_FONT;ctx.globalAlpha=dead?.75:1;
       if(now-rm.nameAt>2||now<rm.nameAt){rm.nameAt=now;rm.nameW=ctx.measureText(rm.name).width} // measured now and then (the page's font may arrive late)
       const hw=Math.max(27,Math.min(60,rm.nameW/2))+4,bw=46,by=Math.max(top+19,Math.min(H-8,py-5)),x=Math.max(hw,Math.min(W-hw,px)),bx=x-bw/2;
+      if(foe&&!dead){ // an opponent: the name in their colour under a chevron that points down at them, the bar slanted and filled with the colour
+        const q=Math.max(0,Math.min(1,P.hp/P.maxHp)),fw=58,fx0=x-fw/2,bob=1.5*Math.sin(now*5+m);
+        ctx.lineWidth=3.5;ctx.strokeStyle=CSS.ink;ctx.strokeText(rm.name,x,by-7,120);ctx.fillStyle=css;ctx.fillText(rm.name,x,by-7,120);
+        ctx.beginPath();ctx.moveTo(x-8,by-30+bob);ctx.lineTo(x+8,by-30+bob);ctx.lineTo(x,by-21+bob);ctx.closePath();ctx.lineWidth=3;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.fillStyle=css;ctx.fill();
+        ctx.beginPath();ctx.moveTo(fx0-1,by-3);ctx.lineTo(fx0+fw+5,by-3);ctx.lineTo(fx0+fw+1,by+7);ctx.lineTo(fx0-5,by+7);ctx.closePath();ctx.fillStyle='rgba(8,8,12,.9)';ctx.fill();
+        ctx.fillStyle='#2a0c14';ctx.fillRect(fx0,by-.5,fw,5);ctx.fillStyle=css;ctx.fillRect(fx0,by-.5,fw*q,5);
+        ctx.fillStyle='rgba(8,8,12,.75)';for(let j=1;j<4;j++)ctx.fillRect(fx0+fw*j/4-.5,by-.5,1,5);
+        ctx.lineWidth=1.2;ctx.strokeStyle=CSS.foe;ctx.stroke();
+        ctx.globalAlpha=1;continue}
       ctx.lineWidth=3.5;ctx.strokeStyle=CSS.ink;ctx.strokeText(rm.name,x,by-5,120);ctx.fillStyle=dead?CSS.dim:soft;ctx.fillText(rm.name,x,by-5,120);
       if(dead){ctx.font=TAG_FONT_S;spaced(1.5);ctx.lineWidth=3;ctx.strokeText('DOWN',x,by+7);ctx.fillStyle=CSS.foe;ctx.fillText('DOWN',x,by+7);spaced(0)}
       else{const q=Math.max(0,Math.min(1,P.hp/P.maxHp));
@@ -1813,14 +1872,23 @@ function remoteOverlay(MM,sight){
         ctx.fillStyle=q<.3?CSS.foe:CSS.bone;ctx.fillRect(bx,by,bw*q,4);
         ctx.strokeStyle=css;ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,7)}
       ctx.globalAlpha=1;
-    }else{
+    }else if(!VS.on||(VS.teams?!foe:true)){
       // out of frame: a badge on the edge of the view, on the line from the middle of the screen to where they are
+      // (versus: every opponent in a free-for-all, team-mates only in a team match)
       const cx=W/2,cy=H/2,x0=26,x1=W-26,y0=Math.max(26,top+24),y1=H-26;let dx=px-cx,dy=py-cy;
       if(Math.abs(dx)<.01&&Math.abs(dy)<.01)dy=1;
       let k=1e9;if(dx>0)k=Math.min(k,(x1-cx)/dx);else if(dx<0)k=Math.min(k,(x0-cx)/dx);if(dy>0)k=Math.min(k,(y1-cy)/dy);else if(dy<0)k=Math.min(k,(y0-cy)/dy);
       let ex=cx+dx*k;const ey=cy+dy*k,a=Math.atan2(dy,dx),q=dead?0:Math.max(0,Math.min(1,P.hp/P.maxHp));
       padBoxes();for(let j=0;j<2;j++){const b=padBox[j];if(b.on&&ex>b.x0-22&&ex<b.x1+22&&ey>b.y0-16&&ey<b.y1+16)ex=(b.x0+b.x1)/2<cx?Math.min(cx,b.x1+24):Math.max(cx,b.x0-24)}
       ctx.save();ctx.translate(ex,ey);ctx.globalAlpha=.95;
+      if(foe){ // an opponent out of frame: a diamond, filled from the bottom with what health they have left
+        ctx.rotate(a);ctx.beginPath();ctx.moveTo(27,0);ctx.lineTo(16,-8);ctx.lineTo(16,8);ctx.closePath();ctx.fillStyle=css;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.rotate(-a);
+        ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(15,0);ctx.lineTo(0,15);ctx.lineTo(-15,0);ctx.closePath();ctx.fillStyle='rgba(11,10,22,.92)';ctx.fill();
+        if(q>0){ctx.save();ctx.clip();ctx.globalAlpha=.5;ctx.fillStyle=css;ctx.fillRect(-15,15-30*q,30,30*q);ctx.restore()}
+        ctx.lineWidth=2.5;ctx.strokeStyle=css;ctx.stroke();
+        if(dead){ctx.strokeStyle=CSS.foe;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-4.5,-4.5);ctx.lineTo(4.5,4.5);ctx.moveTo(4.5,-4.5);ctx.lineTo(-4.5,4.5);ctx.stroke()}
+        else{ctx.font=TAG_FONT;ctx.textAlign='center';ctx.lineWidth=3;ctx.strokeStyle=CSS.ink;ctx.strokeText(rm.initial,0,5,18);ctx.fillStyle='#ffffff';ctx.fillText(rm.initial,0,5,18)}
+        ctx.restore();continue}
       ctx.rotate(a);ctx.beginPath();ctx.moveTo(22,0);ctx.lineTo(12,-7);ctx.lineTo(12,7);ctx.closePath();ctx.fillStyle=css;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.rotate(-a);
       ctx.beginPath();ctx.arc(0,0,12,0,TAU);ctx.fillStyle='rgba(11,10,22,.9)';ctx.fill();
       ctx.lineWidth=3;ctx.strokeStyle='rgba(255,255,255,.14)';ctx.stroke();
@@ -1983,6 +2051,214 @@ function trialOverlay(sight){
   }
 }
 
+/* ---------- versus (round 9): MB.mp.vs = null | {format:'ffa'|'teams', floor, wins, time, round, phase:'pick'|'countdown'|'fight'|'sudden'|'over'|'results',
+     t, ring:null|{x,y,r}, score:[{id,name,team,rounds,kills,dmg,down}], myTeam}; R.testVs (same shape) wins when set. remote.foe / remote.team say who is who.
+   Who is who: every fighter has ONE colour. Teams: the two team colours (TEAM_HEX: azure and amber, or MB.mp.teamColors / vs.teamColors when the page
+   sets them); free-for-all: the member colour by idx, as in co-op. The colour says WHOSE, the shape says FRIEND OR FOE: a friend keeps the smooth broken ring,
+   the plain name and the white health bar of co-op; an opponent stands on a heavier ring of fangs over a pool of their colour, under a slanted bar filled
+   with their colour and a chevron pointing down at them; their creatures stand on thorn rings (the friendly rune circles, collars' lights and green eyes are
+   not built), and everything they throw, lay down or sweep is drawn in the foe palette (crimson and ember), whatever their own colour is.
+   None of this exists until a versus session is seen, and none of it runs in single-player or co-op. ---------- */
+const TEAM_HEX=[0x2f9dff,0xffb21e];
+const VS={on:false,v:null,teams:false,my:-1,mine:-1,phase:'',prev:'',pt:0,clock:0,ringOn:false,rx:W/2,ry:H/2,rr:0,out:0,
+  resOn:false,resBig:'',resSub:'',resTop:'',resCss:'#ffffff',resMine:0,cdN:-1};
+const SPEC={on:false,id:null,rm:null,x:W/2,y:H/2,name:'',css:'#ffffff',n:0};
+const specList=[],vsRounds=new Map();
+function vsOf(){const v=R.testVs||(MB.mp&&MB.mp.vs);return v&&typeof v==='object'?v:null}
+function teamHex(t){const mp=MB.mp,v=VS.v,l=(v&&v.teamColors)||(mp&&mp.teamColors),c=l&&l[t];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);return TEAM_HEX[t===1?1:0]}
+// a fighter's colour: the team's in a team match, the member's own otherwise
+function vsHex(idx,team){return VS.on&&VS.teams&&(team===0||team===1)?teamHex(team):memberHex(idx)}
+function vsKey(e){return VS.teams?num(e.team,-1):e.id}
+// who took the round (or the match): the session's own word when it gives one (vs.winner: a team number, a member id, or null / -1 / 'draw'),
+// else whoever's count of rounds went up, else whoever is still standing
+function vsResult(v,ph){
+  const sc=Array.isArray(v.score)?v.score:NONE,teams=VS.teams,mp=MB.mp,myId=v.myId!==undefined?v.myId:mp?mp.myId:undefined;
+  let wk,known=false;
+  if('winner' in v&&v.winner!==undefined){const w=v.winner;known=true;wk=w===null||w===-1||w==='draw'?null:typeof w==='object'?vsKey(w):w}
+  if(!known&&ph==='results'){let best=-1,tie=false;const tot=new Map();
+    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e),n=teams?Math.max(tot.get(k)||0,num(e.rounds,0)):num(e.rounds,0);tot.set(k,n)}
+    for(const[k,n]of tot){if(n>best){best=n;wk=k;tie=false}else if(n===best)tie=true}
+    known=true;if(tie||best<0)wk=null}
+  if(!known){let n=0,k0;
+    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e),was=vsRounds.get(e.id);if(was!==undefined&&num(e.rounds,0)>was&&k!==k0){k0=k;n++}}
+    if(n===1){wk=k0;known=true}
+    else{n=0;k0=undefined;for(let i=0;i<sc.length;i++){const e=sc[i];if(!e||e.down)continue;const k=vsKey(e);if(k!==k0){k0=k;n++}}
+      wk=n===1?k0:null;known=true}}
+  const match=ph==='results';let mine=0,who='',hex=0xf2ecff,tally='';
+  if(wk===null||wk===undefined){VS.resBig='DRAW';VS.resCss=CSS.bone;VS.resMine=0}
+  else if(teams){mine=VS.my<0?0:wk===VS.my?1:-1;who=mine>0?'YOUR TEAM':mine<0?'ENEMY TEAM':'TEAM '+((wk|0)+1);hex=teamHex(wk|0);
+    let a=0,b=0;for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;if(e.team===0)a=Math.max(a,num(e.rounds,0));else if(e.team===1)b=Math.max(b,num(e.rounds,0))}
+    tally=VS.my===1?b+' – '+a:a+' – '+b}
+  else{let e=null,at=0;for(let i=0;i<sc.length;i++)if(sc[i]&&sc[i].id===wk){e=sc[i];at=i;break}
+    const me=!!e&&(e.me===true||(myId!==undefined&&e.id===myId));mine=me?1:VS.mine>=0?-1:0;
+    who=me?'YOU':cleanName(e?e.name:wk,at).toUpperCase();
+    const rm=remById.get(wk);hex=me&&VS.mine>=0?VS.mine:rm?rm.hex:memberHex(e&&typeof e.idx==='number'?e.idx:at);
+    if(e)tally=num(e.rounds,0)+' / '+Math.max(1,num(v.wins,1))}
+  if(who){VS.resCss=cssOf(hex);VS.resMine=mine;
+    VS.resBig=match?(mine>0?'VICTORY':mine<0?'DEFEAT':who+(who==='YOU'?' WIN':' WINS')):who+(who==='YOU'?' WIN':' WINS')}
+  VS.resTop=match?'MATCH OVER':'ROUND '+Math.max(1,num(v.round,1)|0);
+  VS.resSub=match?(who?(mine?who+(who==='YOU'?' TAKE':' TAKES')+' THE MATCH':'TAKES THE MATCH'):'NOBODY TAKES THE MATCH')+(tally?'   '+tally:''):(tally?(teams?'ROUNDS  '+tally:'ROUNDS  '+tally):'');
+  VS.resOn=true;
+}
+function specAlive(rm){return rm.vis&&!rm.dead&&rm.sm.init}
+// who a downed hero may watch: living team-mates in a team match; with none of those (and in free-for-all), every fighter still standing
+function specCands(){
+  specList.length=0;let mates=false;
+  if(VS.teams&&VS.my>=0)for(let i=0;i<rems.length;i++){const rm=rems[i];if(specAlive(rm)&&!rm.foe)specList.push(rm)}
+  if(specList.length)mates=true;else for(let i=0;i<rems.length;i++){const rm=rems[i];if(specAlive(rm))specList.push(rm)}
+  return mates;
+}
+// MB.renderer.spectate(next): next = true / 1 / undefined: the next one to watch; -1: the one before; false / 0 / null: back to the default.
+// Returns {id, name} of the fighter now followed, or null (watching the fight as a whole, or not spectating at all).
+function spectate(next){
+  if(!VS.on||!SPEC.on)return null;
+  const mates=specCands(),n=specList.length;
+  if(next===false||next===0||next===null||!n)SPEC.id=null;
+  else{let at=-1;for(let i=0;i<n;i++)if(specList[i].id===SPEC.id){at=i;break}
+    // the stops: [the whole fight] (not in a team match while a team-mate stands), then each one in turn
+    const stops=mates?n:n+1,cur=mates?(at<0?0:at):at+1,nx=((cur+(next===-1?-1:1))%stops+stops)%stops,i=mates?nx:nx-1;
+    SPEC.id=i<0?null:specList[i].id}
+  specPick(mates);
+  return SPEC.rm?{id:SPEC.rm.id,name:SPEC.rm.name}:null;
+}
+function specPick(mates){
+  let rm=null;const n=specList.length;
+  if(SPEC.id!==null){for(let i=0;i<n;i++)if(specList[i].id===SPEC.id){rm=specList[i];break}if(!rm)SPEC.id=null}
+  if(!rm&&mates)rm=specList[0];
+  SPEC.rm=rm;SPEC.n=n;
+  if(rm){SPEC.x=rm.P.x;SPEC.y=rm.P.y;SPEC.name=rm.name;SPEC.css=rm.css}
+  else if(n){let x=0,y=0;for(let i=0;i<n;i++){x+=specList[i].P.x;y+=specList[i].P.y}SPEC.x=x/n;SPEC.y=y/n;SPEC.name='';SPEC.css=CSS.bone}
+  else{const P=MB.P;SPEC.x=P?P.x:W/2;SPEC.y=P?P.y:H/2;SPEC.name='';SPEC.css=CSS.bone}
+}
+function vsFrame(dt){
+  const v=vsOf();
+  if(!v){if(VS.on){VS.on=false;VS.v=null;VS.phase=VS.prev='';VS.ringOn=false;VS.resOn=false;VS.out=0;SPEC.on=false;SPEC.id=null;SPEC.rm=null;vsRounds.clear()}return}
+  const mp=MB.mp,P=MB.P;
+  VS.on=true;VS.v=v;VS.teams=v.format==='teams';VS.my=num(v.myTeam,-1);VS.clock+=dt;
+  VS.mine=VS.teams?(VS.my===0||VS.my===1?teamHex(VS.my):-1):mp&&typeof mp.myIdx==='number'?memberHex(mp.myIdx):num(v.myIdx,null)!==null?memberHex(v.myIdx):-1;
+  const ph=typeof v.phase==='string'?v.phase:'';
+  if(ph!==VS.phase){VS.prev=VS.phase;VS.phase=ph;VS.pt=0;VS.resOn=false;if(ph==='over'||ph==='results')vsResult(v,ph)}else VS.pt+=dt;
+  if(ph!=='over'&&ph!=='results'){const sc=Array.isArray(v.score)?v.score:NONE;for(let i=0;i<sc.length&&i<16;i++){const e=sc[i];if(e)vsRounds.set(e.id,num(e.rounds,0))}}
+  // the closing ring
+  const rg=v.ring&&typeof v.ring==='object'&&num(v.ring.x,null)!==null&&num(v.ring.y,null)!==null&&num(v.ring.r,-1)>=0?v.ring:null;
+  VS.ringOn=!!rg;if(rg){VS.rx=rg.x;VS.ry=rg.y;VS.rr=rg.r}
+  {let out=0;if(rg&&P&&!P.down&&MB.S.mode==='play'&&(ph==='sudden'||ph==='fight')){const dx=P.x-rg.x,dy=P.y-rg.y;if(dx*dx+dy*dy>rg.r*rg.r)out=1}
+    VS.out+=(out-VS.out)*Math.min(1,dt*(out?8:5))}
+  // down: watch the others
+  const down=!!P&&(P.down===true||(mp&&mp.down===true))&&MB.S.mode==='play'&&ph!=='pick'&&ph!=='results';
+  if(down){SPEC.on=true;specPick(specCands())}else if(SPEC.on){SPEC.on=false;SPEC.id=null;SPEC.rm=null}
+}
+/* the closing ring: a wall of fire standing on a white-hot line, the floor outside it burnt dark and red, a cool pale band just inside it.
+   One group, built the first time a ring is seen; a new radius only moves and scales it. */
+let RG=null;
+function ringTexture(seed,tall){ // flame tongues, tiling sideways; white-hot at the foot, ember, then crimson thinning to nothing
+  const c=mkCanvas(512,128),g=c.getContext('2d'),rnd=rng(seed);
+  const gr=g.createLinearGradient(0,128,0,0);gr.addColorStop(0,'rgba(255,244,214,1)');gr.addColorStop(.08,'rgba(255,196,96,.95)');gr.addColorStop(.3,'rgba(255,104,36,.7)');gr.addColorStop(.62,'rgba(255,40,70,.34)');gr.addColorStop(1,'rgba(200,20,70,0)');
+  g.fillStyle=gr;g.fillRect(0,0,512,128);g.globalCompositeOperation='destination-out';
+  for(let x=0;x<512;x+=tall?16:11){const h=(tall?44:20)+rnd()*(tall?70:60),w=(tall?15:10)+rnd()*6,j=rnd()*8-4;
+    for(const ox of[0,512,-512]){g.beginPath();g.moveTo(x+ox-w,0);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+j*1.6,h);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+w,0);g.closePath();g.fill()}}
+  const t=new THREE.CanvasTexture(c);t.wrapS=THREE.RepeatWrapping;return t;
+}
+function ringSetup(){
+  if(RG)return;
+  const g=new THREE.Group();g.visible=false;scene.add(g);
+  const add=(tex,op)=>new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,fog:false});
+  const t1=ringTexture(71,true),t2=ringTexture(113,false),wallGeo=new THREE.CylinderGeometry(1,1,1,160,1,true).translate(0,.5,0);
+  const m1=add(t1,.9),m2=add(t2,.8),w1=noLine(new THREE.Mesh(wallGeo,m1)),w2=noLine(new THREE.Mesh(wallGeo,m2));w1.renderOrder=w2.renderOrder=5;
+  // the floor: everything outside is burnt (a wide dark ring and a red wash over it), a hot line where the wall stands, a pale band on the safe side
+  const outGeo=new THREE.RingGeometry(1,80,128,1).rotateX(-Math.PI/2),inGeo=new THREE.RingGeometry(.9,1,128,1).rotateX(-Math.PI/2),lineGeo=new THREE.RingGeometry(.985,1.012,160,1).rotateX(-Math.PI/2),
+    hotGeo=new THREE.RingGeometry(1,1.16,128,1).rotateX(-Math.PI/2);
+  const burnM=new THREE.MeshBasicMaterial({color:0x0a0206,transparent:true,opacity:.62,depthWrite:false,fog:false,toneMapped:false}),
+    washM=new THREE.MeshBasicMaterial({color:0xff1c3c,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false}),
+    hotM=new THREE.MeshBasicMaterial({color:0xff5a1e,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false}),
+    lineM=new THREE.MeshBasicMaterial({color:0xfff4d6,transparent:true,opacity:1,depthWrite:false,fog:false,toneMapped:false}),
+    safeM=new THREE.MeshBasicMaterial({color:0xc4f4ff,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+  const burn=noLine(new THREE.Mesh(outGeo,burnM)),wash=noLine(new THREE.Mesh(outGeo,washM)),hot=noLine(new THREE.Mesh(hotGeo,hotM)),line=noLine(new THREE.Mesh(lineGeo,lineM)),safe=noLine(new THREE.Mesh(inGeo,safeM));
+  burn.position.y=.5;wash.position.y=.54;hot.position.y=.74;safe.position.y=.7;line.position.y=.8;burn.renderOrder=1;wash.renderOrder=1;hot.renderOrder=2;safe.renderOrder=2;line.renderOrder=3;
+  for(const m of[w1,w2,burn,wash,hot,line,safe]){m.frustumCulled=false;g.add(m)}
+  // sparks climbing off the wall (high graphics)
+  const pts=makePoints(128);pts.mat.blending=THREE.AdditiveBlending;pts.mat.uniforms.uScale.value=bitsP.mat.uniforms.uScale.value;pointSets.push(pts);
+  RG={g,w1,w2,m1,m2,t1,t2,burn,wash,hot,line,safe,burnM,washM,hotM,lineM,safeM,pts,r:-1,show:0,geos:[wallGeo,outGeo,inGeo,lineGeo,hotGeo]};
+}
+function syncRing(dt,sight){
+  const on=VS.on&&VS.ringOn&&MB.S.mode==='play';
+  if(!RG){if(!on)return;ringSetup()}
+  const G0=RG,t=VS.clock,low=Q.low;
+  G0.show+=((on?1:0)-G0.show)*Math.min(1,dt*(on?4:6));
+  if(G0.show<.01&&!on){if(G0.g.visible){G0.g.visible=false;G0.pts.geo.setDrawRange(0,0)}return}
+  const r=Math.max(1,VS.rr),a=G0.show,sd=VS.phase==='sudden'?1:.8;
+  G0.g.visible=true;G0.g.position.set(VS.rx,0,VS.ry);
+  if(r!==G0.r){G0.r=r;const n=Math.max(6,Math.round(TAU*r/150));G0.t1.repeat.x=n;G0.t2.repeat.x=Math.max(8,Math.round(n*1.7))}
+  const h=(low?70:92)*a,fl=1+.06*Math.sin(t*9)+.04*Math.sin(t*23.7);
+  G0.w1.scale.set(r,h*fl,r);G0.w2.scale.set(r*1.004,h*.55*(2-fl),r*1.004);G0.w2.visible=!low;
+  G0.t1.offset.x=t*.045;G0.t2.offset.x=-t*.11;
+  G0.m1.opacity=.86*a*sd;G0.m2.opacity=.8*a*sd;
+  G0.burn.scale.set(r,1,r);G0.wash.scale.set(r,1,r);G0.hot.scale.set(r,1,r);G0.line.scale.set(r,1,r);G0.safe.scale.set(r,1,r);
+  G0.burnM.opacity=.62*a;G0.washM.opacity=(.13+.05*Math.sin(t*2.6))*a;G0.hotM.opacity=(.5+.14*Math.sin(t*7))*a;G0.lineM.opacity=a;G0.safeM.opacity=(.16+.05*Math.sin(t*2))*a;
+  G0.safe.visible=r>46;
+  // sparks
+  {const P0=G0.pts,n=low||!sight?0:Math.min(128,Math.max(24,Math.round(r*.4))),pos=P0.pos,col=P0.col,size=P0.size;
+    for(let i=0;i<n;i++){const an=i*2.399+t*.05*(i%2?1:-1),life=(t*(.5+i%5*.11)+i*.37)%1,rr=r+(i%3)*5+life*10,hot=i%4===0;
+      pos[i*3]=VS.rx+Math.cos(an)*rr;pos[i*3+1]=6+life*(90+i%7*10);pos[i*3+2]=VS.ry+Math.sin(an)*rr;
+      col[i*4]=1;col[i*4+1]=hot?.9:.42;col[i*4+2]=hot?.6:.16;col[i*4+3]=Math.sin(life*Math.PI)*.9*a;size[i]=(hot?2.2:3)+(i%3)*.6}
+    P0.geo.setDrawRange(0,n);if(n){P0.geo.attributes.position.needsUpdate=true;P0.geo.attributes.aCol.needsUpdate=true;P0.geo.attributes.aSize.needsUpdate=true}}
+}
+// a word across the middle of the view: a dark slanted band, a small line over it, the word, a line under it. k = 0..1 how far in it is
+function vsBand(top,big,sub,css,a,slide,y0,size){
+  const W=OV.w,H=OV.h,s=Math.min(1,W/760),bh=(size*1.5+(top?26:0)+(sub?30:0))*s,y1=y0+bh,sl=24;
+  ctx.save();ctx.globalAlpha=a;
+  ctx.beginPath();ctx.moveTo(-sl,y0);ctx.lineTo(W+sl*2,y0);ctx.lineTo(W+sl,y1);ctx.lineTo(-sl*2,y1);ctx.closePath();ctx.fillStyle='rgba(8,7,18,.86)';ctx.fill();
+  ctx.fillStyle=css;ctx.fillRect(0,y0-4,W,2);ctx.fillRect(0,y1+2,W,2);
+  let y=y0+(top?26*s:8*s);
+  if(top){ctx.font='700 '+Math.round(16*s)+'px '+FONT;spaced(4);ctx.fillStyle=CSS.gold;ctx.fillText(top,W/2-slide*.5,y);spaced(0)}
+  y+=size*s*1.02;
+  ctx.save();slant(W/2+slide,y,0,.9,1);ctx.font='700 '+Math.round(size*s)+'px '+FONT;spaced(1.5);
+  const tw=ctx.measureText(big).width,fit=tw>W*.92?W*.92/tw:1;if(fit<1)ctx.scale(fit,1);
+  ctx.globalAlpha=a*.6;ctx.fillStyle=CSS.ink;ctx.fillText(big,3.5,4);ctx.globalAlpha=a;inked(big,0,0,css,Math.max(3,size*s*.09));spaced(0);ctx.restore();
+  if(sub){y+=24*s;ctx.font='600 '+Math.round(17*s)+'px '+FONT;spaced(2.5);const sw=ctx.measureText(sub).width,f2=sw>W*.92?W*.92/sw:1;
+    ctx.save();ctx.translate(W/2-slide*.4,y);if(f2<1)ctx.scale(f2,1);ctx.fillStyle=CSS.dim;ctx.fillText(sub,0,0);ctx.restore();spaced(0)}
+  ctx.restore();
+}
+function vsOverlay(sight){
+  const v=VS.v;if(!v)return;
+  const W=OV.w,H=OV.h,ph=VS.phase,pt=VS.pt,t=VS.clock,s=Math.min(1,W/760),top=hudBottom(),play=MB.S.mode==='play';
+  ctx.save();ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.lineJoin='round';
+  // outside the ring: the edges burn and a word says so, with a chevron toward the way back
+  if(VS.out>.02&&play){const a=VS.out,pu=.7+.3*Math.sin(t*9),e=18+8*pu;
+    ctx.globalCompositeOperation='lighter';ctx.fillStyle='rgba(255,45,85,'+(.3*a*pu)+')';ctx.fillRect(0,0,W,e);ctx.fillRect(0,H-e,W,e);ctx.fillRect(0,0,e,H);ctx.fillRect(W-e,0,e,H);ctx.globalCompositeOperation='source-over';
+    const P=MB.P;if(P){toScreen(P.x,40,P.y);const hx=sp.x,hy=sp.y;toScreen(VS.rx,0,VS.ry);let dx=sp.x-hx,dy=sp.y-hy;const d=Math.hypot(dx,dy)||1;dx/=d;dy/=d;
+      const cx=Math.max(40,Math.min(W-40,hx+dx*70)),cy=Math.max(top+40,Math.min(H-40,hy+dy*70)),an=Math.atan2(dy,dx),bob=4*Math.sin(t*8);
+      ctx.save();ctx.globalAlpha=a;ctx.translate(cx+dx*bob,cy+dy*bob);ctx.rotate(an);
+      for(let i=0;i<2;i++){ctx.beginPath();ctx.moveTo(-8+i*13,-12);ctx.lineTo(6+i*13,0);ctx.lineTo(-8+i*13,12);ctx.lineWidth=7;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.lineWidth=3.5;ctx.strokeStyle=i?CSS.bone:CSS.foe;ctx.stroke()}
+      ctx.restore()}
+    ctx.globalAlpha=a;ctx.font='700 '+Math.round(22*s)+'px '+FONT;spaced(4);inked('OUTSIDE THE RING',W/2,Math.max(top+34,H*.17),pu>.85?CSS.bone:CSS.foe,5);spaced(0);ctx.globalAlpha=1}
+  // spectating: who (or what) is being watched
+  if(SPEC.on&&play&&ph!=='over'){const y=H-Math.max(58,H*.1);
+    ctx.font='700 '+Math.round(13*s)+'px '+FONT;spaced(5);inked('SPECTATING',W/2,y,CSS.dim,4);spaced(0);
+    ctx.font='700 '+Math.round(24*s)+'px '+FONT;spaced(1.5);inked(SPEC.rm?SPEC.name.toUpperCase():'THE FIGHT',W/2,y+26*s,SPEC.rm?SPEC.css:CSS.bone,5);spaced(0);
+    if(SPEC.n>1||(SPEC.n===1&&SPEC.rm&&!(VS.teams&&!SPEC.rm.foe))){const w=64*s;ctx.fillStyle=SPEC.css;ctx.globalAlpha=.9;
+      for(const k of[-1,1]){ctx.beginPath();ctx.moveTo(W/2+k*(w+40*s),y+16*s);ctx.lineTo(W/2+k*(w+30*s),y+9*s);ctx.lineTo(W/2+k*(w+30*s),y+23*s);ctx.closePath();ctx.fill()}ctx.globalAlpha=1}}
+  if(ph==='countdown'){
+    const tl=num(v.t,0);
+    if(tl>0){const n=Math.min(9,Math.ceil(tl)),f=clamp01(n-tl),pop=calm?1:1.55-.55*easeOut(clamp01(f*5)),a=clamp01(f*8)*clamp01((1-f)*5),cy=H*.44,size=170*s;
+      ctx.font='700 '+Math.round(17*s)+'px '+FONT;spaced(5);inked('ROUND '+Math.max(1,num(v.round,1)|0),W/2,cy-size*.62,CSS.gold,4);spaced(0);
+      ctx.save();ctx.globalAlpha=a;slant(W/2,cy+size*.3,0,pop*.9,pop);ctx.font='700 '+Math.round(size)+'px '+FONT;
+      ctx.fillStyle=VS.mine>=0?cssOf(VS.mine):CSS.power;ctx.globalAlpha=a*.7;ctx.fillText(''+n,5,5);ctx.globalAlpha=a;inked(''+n,0,0,CSS.bone,Math.max(5,size*.07));ctx.restore();
+      const w=num(v.wins,0);if(w>0){ctx.font='600 '+Math.round(15*s)+'px '+FONT;spaced(3);inked((VS.teams?'TEAMS':'FREE-FOR-ALL')+'   ·   FIRST TO '+w,W/2,cy+size*.56,CSS.dim,3.5);spaced(0)}}
+  }else if(ph==='fight'&&VS.prev==='countdown'&&pt<1.1){
+    const q=pt/1.1,pop=calm?1:1.5-.5*easeOut(clamp01(q*5)),a=clamp01(q*10)*clamp01((1-q)*3.4),size=120*s;
+    ctx.save();ctx.globalAlpha=a;slant(W/2,H*.44+size*.3,-.03,pop*.9,pop);ctx.font='700 '+Math.round(size)+'px '+FONT;spaced(3);
+    ctx.fillStyle=CSS.foe;ctx.globalAlpha=a*.7;ctx.fillText('FIGHT',5,5);ctx.globalAlpha=a;inked('FIGHT',0,0,CSS.bone,Math.max(5,size*.07));spaced(0);ctx.restore();
+  }else if(ph==='sudden'&&pt<2.6){
+    const q=pt/2.6,tin=easeOut(clamp01(pt/.3)),out=clamp01((2.6-pt)/.4);
+    vsBand('TIME IS UP','SUDDEN DEATH','THE RING IS CLOSING',CSS.foe,Math.min(1,tin*1.2)*out,(1-tin)*90+(1-out)*-60,Math.round(H*.3),70);
+  }else if((ph==='over'||(ph==='results'&&play))&&VS.resOn){
+    const tin=easeOut(clamp01(pt/.34)),big=VS.resBig,css=ph==='results'?(VS.resMine>0?CSS.gold:VS.resMine<0?CSS.foe:VS.resCss):VS.resCss;
+    vsBand(VS.resTop,big,VS.resSub,css,Math.min(1,tin*1.2),(1-tin)*90,Math.round(H*(ph==='results'?.26:.3)),ph==='results'?84:66);
+  }
+  ctx.restore();
+}
+
 /* ---------- graphics quality, switched live ---------- */
 function applyQuality(){
   const low=isLow(),tier=tierNow(),ultra=tier==='ultra';Q.low=low;Q.ultra=ultra;Q.tier=tier;
@@ -2014,6 +2290,7 @@ function draw(dt){
   const S=MB.S,P=MB.P,t=S.t,trial=trialOf(),dark=!!trial&&MB.has('sight')&&HCAP(trial)==='dark',sight=MB.has('sight')&&!dark;
   fogR=dark?Math.max(FOG,Math.min(520,trial.sight>0?+trial.sight:MB.sightR>0?+MB.sightR:FOG*1.85)):FOG;seeing=sight;
   if(tierNow()!==Q.tier)applyQuality();
+  if(VS.on||R.testVs||(MB.mp&&MB.mp.vs))vsFrame(dt);
   resize();syncEnv();
   if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.22) brightness(1.06)';
     ST.uRim.value.setHex(sight?PAL.rim:0xffffff).multiplyScalar(sight?.55:.8)}
@@ -2070,6 +2347,9 @@ function draw(dt){
       const f=FX.fall+=((P.down?1:0)-FX.fall)*Math.min(1,dt*(P.down?5:9)),g=playerRec.g;if(!P.down&&f<.004)FX.fall=0;
       g.rotation.order='YXZ';layDown(g,P,FX.fall)}
     if(low){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70,1,56)}
+    if(VS.on&&VS.mine>=0&&S.mode==='play'){ // versus: our own ring, in our own (or our team's) colour
+      remSetup();const o=pools.vmark.get(),dn=!!P.down;o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(74);o.rotation.y=dn?t*.7:playerRec.g.rotation.y-Math.PI/2;o.material.color.setHex(VS.mine);o.material.opacity=dn?.5+.3*Math.sin(t*5):.92;
+      if(!dn&&sight){const q=pools.vglow.get();q.position.x=P.x;q.position.z=P.y;q.scale.setScalar(118);q.material.color.setHex(VS.mine);q.material.opacity=.3}}
   }else if(playerRec)playerRec.g.visible=false;
   syncMap(monMap,MB.mons,'monster',dt,phMonster,phMonsterUpdate,sight);
   const allies=R.testAllies||MB.allies||NONE;
@@ -2087,13 +2367,13 @@ function draw(dt){
   for(let i=0;i<ps.length;i++){const p=ps[i];drawPshot(p,i,p.x,p.y,t,low,pools[p.kind]||pools.bolt)}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
-  {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'||f.kind==='domain'?f.kind:'other');
+  {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'||f.kind==='domain'?f.kind:'other',f.foe===true);
     if(f.kind==='domain'){const d=pools.dark.get();d.position.x=f.x;d.position.z=f.y;d.scale.setScalar(f.r*(1+.02*Math.sin(t*2+i)));d.material.opacity=.5*Math.max(0,Math.min(1,f.t*4,(f.dur-f.t)*2))}
     if(m.map!==tex)m.map=tex;o.position.x=f.x;o.position.z=f.y;o.scale.setScalar(f.r*2.1);o.rotation.y=f.kind==='rain'?0:t*(f.kind==='frost'?.22:-.3);
     m.opacity=Math.max(0,Math.min(1,f.t*5,(f.dur-f.t)*2.5))*(.8+.14*Math.sin(t*5+i))}}
   if(sight&&MB.has('touch')){const zs=MB.zones;
     for(let i=0;i<zs.length;i++){const z=zs[i],q=Math.min(1,z.t/z.dur),o=pools.zone.get(),u=o.userData;o.position.set(z.x,0,z.y);
-      u.disc.material.color.setHex(z.mine?0x5a48ff:0xd0143c);u.rim.material.color.setHex(z.mine?PAL.power2:0xffc04a);
+      const zm=z.mine&&z.foe!==true;u.disc.material.color.setHex(zm?0x5a48ff:0xd0143c);u.rim.material.color.setHex(zm?PAL.power2:0xffc04a);
       u.disc.scale.setScalar(z.r);u.rim.scale.setScalar(z.r);u.grow.scale.setScalar(Math.max(.01,z.r*q));u.disc.material.opacity=.16+.4*q+(q>.8?.12*Math.sin(t*40):0)}}
   {const ms=MB.mons;for(let i=0;i<ms.length;i++){const m=ms[i],b=m.beam;if(!b||m.hidden||!b.rays)continue;
     for(let j=0;j<b.rays.length;j++){const ry=b.rays[j],o=pools.beam.get(),u=o.userData,len=Math.max(1,ry.len),w=b.w||12;
@@ -2103,13 +2383,14 @@ function draw(dt){
       else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}}
   // the guardian's ward, while it is ready to take a blow: a thin gold ring at the healer's feet
   if(P&&sight)for(let i=0;i<allies.length;i++){const a=allies[i];if(!a||a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
-    const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4));o.rotation.y=t*.8;o.material.opacity=.5+.15*Math.sin(t*4);break}
+    const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4));o.rotation.y=t*.8;o.material.opacity=.5+.15*Math.sin(t*4);o.material.color.setHex(PAL.holy);break}
   allyBeams(allies,t);if(P&&P.beam)heroBeam(P,t);
-  {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=(z.mine?pools.pbomb:pools.bomb).get();
+  {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=(z.mine&&z.foe!==true?pools.pbomb:pools.bomb).get();
     o.position.set(z.sx+(z.x-z.sx)*q,12+Math.sin(q*Math.PI)*(70+z.dur*40),z.sy+(z.y-z.sy)*q);o.rotation.x=t*7+i}}
   if(sight){const rs=MB.rings,hear=MB.has('hearing');
     for(let i=0;i<rs.length;i++){const r=rs[i];if(!r.fx&&!(r.under&&hear))continue;
-      const q=1-r.life/r.max,o=pools.ring.get();o.position.x=r.x;o.position.z=r.y;o.scale.setScalar(6+r.r*easeOut(q));o.material.opacity=Math.max(0,(1-q)*(1-q)*.95)}}
+      const q=1-r.life/r.max,o=pools.ring.get();o.position.x=r.x;o.position.z=r.y;o.scale.setScalar(6+r.r*easeOut(q));o.material.opacity=Math.max(0,(1-q)*(1-q)*.95);o.material.color.setHex(r.foe===true?PAL.foe:0xffd27a)}}
+  if(VS.on||RG)syncRing(dt,sight);
   for(const k2 in pools)pools[k2].end();
 
   // particles
@@ -2164,5 +2445,5 @@ resize();placeCamera(W/2,H/2,fitD);
 R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;
 // frame(): what is being drawn right now: CSS box, pixel ratio and backing size of #gl, the overlay's backing size and unit, the tier, MSAA
 R.frame=()=>({css:[FR.w,FR.h],pr:FR.pr,gl:[FR.bw,FR.bh],pixels:FR.bw*FR.bh,overlay:[OV.bw,OV.bh],unit:OV.u,tier:Q.tier,msaa:aaMade,shadow:Q.low?0:sun.shadow.mapSize.x,aniso:maxAniso});
-Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
+Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
 })();
