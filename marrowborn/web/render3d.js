@@ -200,6 +200,9 @@ try{
   if(!renderer.getContext())throw new Error('no context');
 }catch(e){console.warn('Marrowborn: WebGL unavailable, staying 2D');return}
 
+// what the hero can see: fogR is the radius of the lit circle while there is no sight (FOG in the crypt; wider when an ordeal brings the dark
+// back), seeing mirrors the frame's sight flag for the overlay helpers
+let fogR=FOG,seeing=true;
 const calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TILT=52*Math.PI/180,LIFT=46,SHOT_Y=17;
 // Colour: plain linear tone mapping (ACES bleached the class and monster colours toward white) and moderate lights; the floor textures are lifted instead.
@@ -267,19 +270,20 @@ const G={
 };
 
 /* ---------- textures ---------- */
-function floorTexture(theme,hue,area,low){
-  const TW=low?1024:2048,TH=TW/2,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue);
+function floorTexture(theme,hue,area,low,bi){
+  bi=bi|0;const far=area==='far',TW=low?1024:2048,TH=TW/2,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue+bi*53);
   g.scale(TW/W,TH/H);
   const crypt=theme==='crypt',court=area==='court';
   // base colour [h,s,l], slab colour fn, share of ground that is paved
-  const A={crypt:[[hue,14,5],1],pass:[[hue,20,13],.74],ash:[[20,14,8],.46],fen:[[140,24,10],.5],peaks:[[215,18,17],.6],court:[[285,25,5],1],dark:[[340,34,4],.84]}[area]||[[hue,20,13],.74];
+  const A={crypt:[[hue,14,5],1],pass:[[hue,20,13],.74],ash:[[20,14,8],.46],fen:[[140,24,10],.5],peaks:[[215,18,17],.6],court:[[285,25,5],1],dark:[[340,34,4],.84],
+    far:[[hue,16+bi%3*7,5+(bi*5)%8],[.62,.88,1,.74][bi%4]]}[area]||[[hue,20,13],.74];
   const eh=A[0][0];
   g.fillStyle=hsl(A[0][0],A[0][1],A[0][2]);g.fillRect(0,0,W,H);
   if(!crypt&&!court){ // bare earth showing between the slabs
     for(let i=0;i<520;i++){const x=rnd()*W,y=rnd()*H,r=8+rnd()*34,l=rnd();g.fillStyle=l<.5?hsl(eh+rnd()*30-15,22,A[0][2]+4+rnd()*7,.25):'rgba(0,0,0,.14)';g.beginPath();g.arc(x,y,r,0,TAU);g.fill()}
     for(let i=0;i<1500;i++){g.fillStyle=hsl(eh+rnd()*40-20,28,A[0][2]+9+rnd()*14,.55);g.fillRect(rnd()*W,rnd()*H,1+rnd()*1.6,2+rnd()*3.5)}
   }
-  const slabCol=v=>crypt?hsl(232+v*16-8,9+v*5,21+v*9):area==='ash'?hsl(24,3+v*4,17+v*9):area==='fen'?hsl(135+v*30,9+v*9,20+v*9):area==='peaks'?hsl(215,8+v*6,27+v*10):area==='dark'?hsl(340,9+v*9,13+v*7):hsl(v<.5?hue:35,2+v*5,24+v*10);
+  const slabCol=v=>crypt?hsl(232+v*16-8,9+v*5,21+v*9):area==='ash'?hsl(24,3+v*4,17+v*9):area==='fen'?hsl(135+v*30,9+v*9,20+v*9):area==='peaks'?hsl(215,8+v*6,27+v*10):area==='dark'?hsl(340,9+v*9,13+v*7):far?hsl(hue+v*24-12,7+v*9+bi%2*5,15+(bi*3)%4*3+v*9):hsl(v<.5?hue:35,2+v*5,24+v*10);
   if(court){
     // polished chequer, a gold inlay and a runner up the middle
     const T=60;
@@ -343,6 +347,23 @@ function floorTexture(theme,hue,area,low){
     for(let i=0;i<16;i++){let x=rnd()*W,y=rnd()*H,a=rnd()*TAU;g.beginPath();g.moveTo(x,y);for(let s=0;s<7;s++){a+=rnd()*1.2-.6;x+=Math.cos(a)*(14+rnd()*22);y+=Math.sin(a)*(14+rnd()*22);g.lineTo(x,y)}
       g.strokeStyle='rgba(255,30,80,.07)';g.lineWidth=7;g.stroke();g.strokeStyle='rgba(235,60,100,.42)';g.lineWidth=.9;g.stroke()}
     for(let i=0;i<12;i++)blob(rnd()*W,rnd()*H,40+rnd()*60,'rgba(0,0,0,.55)');
+  }else if(far){
+    // a band past floor 50: one of four markings, drawn in the band's second colour
+    const ah=(hue+140+bi*47)%360,pat=bi%4;
+    if(pat===0){ // veins of light running through the stone
+      for(let i=0;i<14;i++){let x=rnd()*W,y=rnd()*H,a=rnd()*TAU;g.beginPath();g.moveTo(x,y);for(let s=0;s<8;s++){a+=rnd()*1.1-.55;x+=Math.cos(a)*(16+rnd()*24);y+=Math.sin(a)*(16+rnd()*24);g.lineTo(x,y)}
+        g.strokeStyle=hsl(ah,90,55,.08);g.lineWidth=7;g.stroke();g.strokeStyle=hsl(ah,80,62,.45);g.lineWidth=.9;g.stroke()}
+    }else if(pat===1){ // great rings cut into the floor, one inside the next
+      g.save();g.translate(W/2,H/2);for(let i=0;i<6;i++){const r=70+i*74;g.strokeStyle='rgba(0,0,0,.45)';g.lineWidth=i%2?2:4;g.beginPath();g.arc(0,0,r,0,TAU);g.stroke();g.strokeStyle=hsl(ah,60,60,.16);g.lineWidth=1.2;g.setLineDash([18+i*4,10]);g.beginPath();g.arc(0,0,r+4,0,TAU);g.stroke();g.setLineDash([])}
+      for(let i=0;i<16;i++){const a=i/16*TAU;g.strokeStyle='rgba(0,0,0,.35)';g.lineWidth=1.6;g.beginPath();g.moveTo(Math.cos(a)*70,Math.sin(a)*70);g.lineTo(Math.cos(a)*440,Math.sin(a)*440);g.stroke()}g.restore();
+    }else if(pat===2){ // long slanted bands, as if the floor were laid in strips
+      for(let i=-6;i<16;i++){const x=i*86+rnd()*20;g.beginPath();g.moveTo(x,0);g.lineTo(x+44,0);g.lineTo(x+44+H*.5,H);g.lineTo(x+H*.5,H);g.closePath();g.fillStyle=i%2?'rgba(0,0,0,.2)':hsl(ah,40,50,.06);g.fill()}
+      for(let i=0;i<40;i++)blob(rnd()*W,rnd()*H,10+rnd()*24,hsl(ah,70,50,.12));
+    }else{ // a scatter of small cold lights set in the slabs
+      for(let i=0;i<90;i++){const x=rnd()*W,y=rnd()*H;blob(x,y,7+rnd()*10,hsl(ah,90,55,.16));g.fillStyle=hsl(ah,80,78,.85);g.save();g.translate(x,y);g.rotate(Math.PI/4);g.fillRect(-1.3,-1.3,2.6,2.6);g.restore()}
+      for(let i=0;i<10;i++)blob(rnd()*W,rnd()*H,50+rnd()*70,'rgba(0,0,0,.4)');
+    }
+    for(let i=0;i<8;i++)blob(rnd()*W,rnd()*H,60+rnd()*80,hsl(hue,50,40,.07));
   }
   // bones and rubble
   const bone='rgba(231,223,205,.5)';g.strokeStyle=g.fillStyle=bone;g.lineCap='round';
@@ -413,11 +434,12 @@ function runeTexture(R0){ // [colour, half-size in world units, [[radius,width].
   return new THREE.CanvasTexture(c);
 }
 function buildEnv(key,low){
-  const crypt=key==='crypt',hue=crypt?208:+key.slice(1)||0,area=crypt?'crypt':AREA_BY_HUE[hue]||'pass';
+  const crypt=key==='crypt',km=crypt?null:/^h(-?[\d.]+)(?:b(\d+))?$/.exec(key),hue=crypt?208:km?+km[1]||0:+key.slice(1)||0,far=!!(km&&km[2]!==undefined),bi=far?+km[2]:0,area=crypt?'crypt':far?'far':AREA_BY_HUE[hue]||'pass';
+  let lightHue=hue;
   const root=new THREE.Group(),E={key,low,crypt,area,hue,root,flames:[],lit:[],ticks:[],crystals:[],glowOnly:[],rune:null,runeM:null,fire:crypt,
     sun:new THREE.Color(0xe6e9f2),sunI:.66,hemiI:.36,lightI:1.6,lightD:400,fogFar:1300,mote:[1,.9,.68],moteMode:'drift',moteN:low?0:40};
-  const rnd=rng(77+hue),dn=n=>low?Math.ceil(n*.5):n;
-  const ftex=floorTexture(crypt?'crypt':'out',hue,area,low);
+  const rnd=rng(77+hue+bi*131),dn=n=>low?Math.ceil(n*.5):n;
+  const ftex=floorTexture(crypt?'crypt':'out',hue,area,low,bi);
   const floor=noLine(new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),ST.toonRaw(0xffffff,{map:ftex,rim:false})));
   floor.material.color.setScalar(crypt?FLOOR_GAIN*.9:area==='peaks'?FLOOR_GAIN*.72:area==='court'?FLOOR_GAIN*1.15:FLOOR_GAIN);
   floor.position.set(W/2,0,H/2);floor.receiveShadow=true;root.add(floor);
@@ -563,6 +585,61 @@ function buildEnv(key,low){
       for(let i=0;i<hot.count;i++){const p=outside(rnd,50,true),s=2+rnd()*4,south=p.z>H-40;put(hot,i,p.x,south?-120+rnd()*90:-40+rnd()*240,p.z,s*.5,s*1.8,s*.5,rnd()*3,rnd()*3,rnd()*3)}
       grp.add(im,hot);root.add(grp);sets.push(grp)}
     E.ticks.push(t=>{for(let i=0;i<3;i++){sets[i].position.y=Math.sin(t*.35+i*2.1)*16;sets[i].position.x=Math.sin(t*.11+i*1.3)*12}const k=.55+.25*Math.sin(t*1.3);hotM.color.setHSL(345/360,.95,k)});
+  }else if(far){
+    // a band past floor 50, put together from the band's index and its two colours: what the arena stands on, what rings it, what looms
+    // beyond the wall and what hangs in the air all turn over at different rates, so no two bands in a long climb repeat
+    const ah=lightHue=(hue+140+bi*47)%360,gm=bi%3,pa=(bi>>1)%4,pb=(bi+(bi>>2))%3,H1=hue/360;
+    scene.background.setHSL(H1,.5,.016+(bi%4)*.007);
+    E.sun.copy(hslColor(hue,.5,.86));E.sunI=.56+(bi%3)*.05;E.hemiI=.28+(bi%2)*.05;E.lightI=2.4+(bi%3)*.5;E.lightD=470;E.fogFar=[1500,2300,1000,1900][bi%4];
+    {const mc=hslColor(ah,.8,.7);E.mote=[mc.r,mc.g,mc.b];E.moteMode=['drift','rise','fall'][(bi+1)%3];E.moteN=low?10:36+(bi%3)*10}
+    const rockM=std(hslColor(hue,.14,.11),{flatShading:true,roughness:.95}),hotM=basic(hslColor(ah,.9,.6)),glowAh=hslColor(ah,.9,.55).getHex();
+    if(gm===0){ // a raft of stone over nothing
+      const under=slab(-18,W+18,-70,-.3,-18,H+18,rockM);under.castShadow=false;root.add(under);
+      const nJ=dn(36),jag=inst(new THREE.ConeGeometry(1,1,5).translate(0,.5,0),rockM,nJ,true);
+      for(let i=0;i<nJ;i++){const s=i<nJ*.6,x=s?rnd()*W:(rnd()<.5?-10:W+10),z=s?H+6+rnd()*10:rnd()*H,w=14+rnd()*22;put(jag,i,x,-64,z,w,40+rnd()*110,w,Math.PI,rnd()*3,0)}root.add(jag);
+    }else if(gm===1){ // solid ground running out into the dark
+      ground(hslColor(hue,.22,.045));rocks(dn(50),hslColor(hue,.1,.15));
+    }else{ // a shelf in a still, faintly lit sea
+      const sea=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(ah,.55,.07),{rim:false,k:.9,emissive:hslColor(ah,.8,.025)})));sea.position.set(W/2,-5,H/2);sea.receiveShadow=true;root.add(sea);
+      const bank=slab(-26,W+26,-10,-.25,-26,H+26,rockM);bank.castShadow=false;root.add(bank);
+      const nG=dn(16),gl=flatGlowMat(glowAh,.16),gq=inst(G.quad,gl,nG,true);for(let i=0;i<nG;i++){const p=outside(rnd,60,true),s=120+rnd()*240;put(gq,i,p.x,-4.6,p.z,s,1,s*.5)}root.add(gq);
+      E.ticks.push(t=>{gl.opacity=.12+.06*Math.sin(t*.8)});
+    }
+    {const wc=hslColor(hue,.18,.5+(bi%3)*.1).getHex(),gap=[.25,.6,.42,.7][(bi+1)%4],tall=bi%2?[18,52]:[10,30];blockWall(wc,gap,tall,[tall[0]-2,tall[1]-8],[5,10])}
+    const out=(pad)=>{const p=outside(rnd,pad,false);if(gm===0&&p.z>H)p.z=-60-rnd()*400;return p},y0=gm===0?-60:gm===2?-5:0;
+    if(pa===0){ // a forest of leaning spires
+      const n=dn(60),im=inst(new THREE.CylinderGeometry(.06,1,1,5).translate(0,.5,0),rockM,n);
+      for(let i=0;i<n;i++){const p=out(70),h=90+rnd()*190,w=7+rnd()*11;put(im,i,p.x,y0,p.z,w,h,w,(rnd()-.5)*.4,rnd()*3,(rnd()-.5)*.4)}root.add(im);
+    }else if(pa===1){ // a colonnade that fell: drums standing and lying
+      const n=dn(34),cm=std(hslColor(hue,.1,.3),{flatShading:true}),im=inst(new THREE.CylinderGeometry(1,1,1,9).translate(0,.5,0),cm,n),caps=inst(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),cm,n);
+      for(let i=0;i<n;i++){const p=out(60),lying=rnd()<.3,h=lying?50+rnd()*50:60+rnd()*130,w=11+rnd()*6;
+        put(im,i,p.x,y0+(lying?w:0),p.z,w,h,w,lying?Math.PI/2:(rnd()-.5)*.12,rnd()*3,0);put(caps,i,p.x,lying?-200:y0+h,p.z,w*2.5,7,w*2.5,0,rnd()*3,0)}root.add(im,caps);
+    }else if(pa===2){ // the ribs of something vast, arching in from every side but the south
+      const boneM=std(0xcfc6b2,{flatShading:true}),ribG=new THREE.TorusGeometry(1,.05,6,14,Math.PI*.55),n=low?10:16,ribs=inst(ribG,boneM,n);let k=0;
+      for(let i=0;i<7&&k<n;i++){const x=60+i*140+(rnd()-.5)*30,R0=120+rnd()*50;put(ribs,k++,x,y0-4,-40+R0,R0,R0*1.15,R0*1.5,0,Math.PI/2+(rnd()-.5)*.14,0)}
+      for(let i=0;k<n;i++){const e=i%2,z=90+(i>>1)*110+(rnd()-.5)*24,R0=90+rnd()*36;put(ribs,k++,e?W+50-R0:R0-50,y0-4,z,R0,R0*1.1,R0*1.5,0,e?0:Math.PI,0)}root.add(ribs);
+    }else{ // standing slabs, tall and thin, each a little out of true
+      const n=dn(30),im=inst(new THREE.BoxGeometry(1,1,1).translate(0,.5,0),rockM,n),seam=inst(G.box,hotM,n,true);
+      for(let i=0;i<n;i++){const p=out(80),h=110+rnd()*210,w=26+rnd()*30,ry=rnd()*3,rx=(rnd()-.5)*.16;put(im,i,p.x,y0,p.z,w,h,9+rnd()*8,rx,ry,(rnd()-.5)*.16);put(seam,i,p.x,y0+h*.55,p.z,1.6,h*.5,12+rnd()*8,rx,ry,0)}root.add(im,seam);
+    }
+    if(pb===0){ // splinters of the world adrift around the floor
+      const shardM=std(hslColor(hue,.25,.12),{emissive:hslColor(ah,.9,.07),flatShading:true,k:.8}),oct=new THREE.OctahedronGeometry(1,0),sets=[];
+      for(let q=0;q<3;q++){const n=dn(18),im=inst(oct,shardM,n,true),hot=inst(oct,hotM,dn(7),true),grp=new THREE.Group();
+        for(let i=0;i<n;i++){const p=outside(rnd,70,true),s=8+rnd()*rnd()*44,south=p.z>H-40;put(im,i,p.x,south?-150+rnd()*110:-60+rnd()*290,p.z,s*.55,s*1.7,s*.55,rnd()*3,rnd()*3,rnd()*3)}
+        for(let i=0;i<hot.count;i++){const p=outside(rnd,50,true),s=2+rnd()*4,south=p.z>H-40;put(hot,i,p.x,south?-120+rnd()*90:-30+rnd()*240,p.z,s*.5,s*1.8,s*.5,rnd()*3,rnd()*3,rnd()*3)}
+        grp.add(im,hot);root.add(grp);sets.push(grp)}
+      E.ticks.push(t=>{for(let i=0;i<3;i++){sets[i].position.y=Math.sin(t*.35+i*2.1)*16;sets[i].position.x=Math.sin(t*.11+i*1.3)*12}});
+    }else if(pb===1){ // clusters of crystal growing out of the ground, lit from inside
+      const n=dn(22),per=4,im=inst(new THREE.ConeGeometry(1,1,5).translate(0,.5,0),hotM,n*per,true),pool=flatGlowMat(glowAh,.3),pq=inst(G.quad,pool,n,true);
+      for(let i=0;i<n;i++){const p=out(30);for(let j=0;j<per;j++){const h=14+rnd()*40,w=3+rnd()*5;put(im,i*per+j,p.x+(rnd()-.5)*22,y0,p.z+(rnd()-.5)*22,w,h,w,(rnd()-.5)*.7,rnd()*3,(rnd()-.5)*.7)}put(pq,i,p.x,y0+.5,p.z,150,1,110)}
+      root.add(im,pq);
+    }else{ // lamps on thin iron stalks, swaying
+      const n=dn(26),pole=inst(new THREE.CylinderGeometry(.5,1,1,4).translate(0,.5,0),std(0x1c1a22,{flatShading:true}),n),bulbs=inst(G.sphere,hotM,n,true),pts=[];
+      for(let i=0;i<n;i++){const p=out(26),h=46+rnd()*90;put(pole,i,p.x,y0,p.z,1.6,h,1.6);put(bulbs,i,p.x,y0+h+4,p.z,4.2,5.4,4.2);pts.push(p.x,y0+h+4,p.z)}
+      root.add(pole,bulbs);
+      if(!low){const hz=flatGlowMat(glowAh,.22),hq=inst(G.quad,hz,n,true);for(let i=0;i<n;i++)put(hq,i,pts[i*3],y0+.6,pts[i*3+2],120,1,90);root.add(hq)}
+    }
+    E.ticks.push(t=>{const k=.5+.2*Math.sin(t*1.3);hotM.color.setHSL(ah/360,.92,k)});
   }else{
     // the pass: a ruined boundary wall of loose blocks, open ground beyond, standing stones in the mist
     scene.background.copy(hslColor(hue,.3,.035));ground(hslColor(hue,.2,.045));
@@ -580,8 +657,8 @@ function buildEnv(key,low){
   // corner lights, one kind per place
   const iron=std(0x24222a,{roughness:.6,metalness:.5}),stone=std(crypt?0x55545f:hslColor(hue,.1,.3),{flatShading:true,roughness:1});
   const FL={crypt:[0xff8a3a,0xffe2a0,0xff9448],ash:[0xff6a22,0xffd890,0xff8a40],peaks:[0x6fb4ff,0xe4f2ff,0x9cc8ff],court:[0xb264ff,0xf0dcff,0xc08cff]}[area];
-  const flameCol=FL?FL[0]:hslColor(hue,.85,.6).getHex(),coreCol=FL?FL[1]:hslColor(hue,.7,.82).getHex();
-  E.lightColor=FL?new THREE.Color(FL[2]):hslColor(hue,.3,.72);
+  const flameCol=FL?FL[0]:hslColor(lightHue,.85,.6).getHex(),coreCol=FL?FL[1]:hslColor(lightHue,.7,.82).getHex();
+  E.lightColor=FL?new THREE.Color(FL[2]):hslColor(lightHue,far?.45:.3,.72);
   CORNERS.forEach(([x,z],i)=>{
     const g=new THREE.Group();g.position.set(x,0,z);
     let topY;
@@ -638,10 +715,32 @@ function disposeEnv(E){
     for(const m of ms){if(m.map&&m.map!==glowTex)m.map.dispose();m.dispose()}
   });
 }
-let env=null,envLevel=-1;
+let env=null,envLevel=-1,envBand=null;
+// Which band of the tower a floor past 50 lies in, when that band is one of the invented ones (it starts past floor 50 and is not the Endless Dark
+// itself): {idx, hue}, else null and the place is drawn by its hue as it always was. Read from MB.tower.bands (S.L.band names or numbers the band),
+// or from a bare numeric S.L.band; R.testBand = {idx, hue} forces one.
+const _band={idx:0,hue:0};
+function bandOf(n){
+  const tb=R.testBand;if(tb&&typeof tb==='object'){_band.idx=Math.max(0,tb.idx|0);_band.hue=Math.round(num(tb.hue,200));return _band}
+  let L=null,tw=null;try{L=MB.S.L;tw=MB.tower}catch(e){}
+  const lb=L?L.band:undefined,bands=tw&&Array.isArray(tw.bands)?tw.bands:null;
+  if(bands){
+    const fl=n+1,nm=typeof lb==='string'?lb:lb&&typeof lb==='object'&&typeof lb.name==='string'?lb.name:null;let hit=-1;
+    for(let i=0;i<bands.length;i++){const b=bands[i];if(b&&fl>=b.from&&fl<=b.to){hit=i;break}}
+    if(hit<0&&typeof lb==='number'&&bands[lb])hit=lb;
+    if(hit<0&&nm)for(let i=0;i<bands.length;i++)if(bands[i]&&bands[i].name===nm){hit=i;break}
+    if(hit<0)return null;
+    const b=bands[hit],hue=Math.round(num(b.hue,num(L&&L.hue,200)));
+    if(!(b.from>50)||(hue===340&&/endless dark/i.test(b.name||'')))return null;
+    _band.idx=hit;_band.hue=hue;return _band;
+  }
+  if(typeof lb==='number'&&lb>=5&&lb===Math.floor(lb)){_band.idx=lb;_band.hue=Math.round(num(L&&L.hue,MB.levelDef(n).hue));return _band}
+  return null;
+}
 function syncEnv(){
-  const n=MB.S.level,low=isLow();if(env&&n===envLevel&&env.low===low)return;envLevel=n;
-  const key=n<8?'crypt':'h'+MB.levelDef(n).hue;
+  const n=MB.S.level,low=isLow(),tb=R.testBand||null;if(env&&n===envLevel&&env.low===low&&tb===envBand)return;envLevel=n;envBand=tb;
+  let key=n<8?'crypt':'h'+MB.levelDef(n).hue;
+  if(n>=50||R.testBand){const b=bandOf(n);if(b)key='h'+b.hue+'b'+b.idx}
   if(env&&env.key===key&&env.low===low)return;
   if(env)disposeEnv(env);
   env=buildEnv(key,low);
@@ -831,7 +930,7 @@ function syncObstacles(dt,sight){
     const o=list[i];if(!o)continue;let rec=obsMap.get(o);
     if(!rec||rec.u.r!==(o.r||20)){if(rec)obsRoot.remove(rec.g);rec=makeObstacle(o);obsMap.set(o,rec)}
     rec.stamp=stamp;const u=rec.u,g=rec.g;g.position.set(o.x,0,o.y);
-    let near=true;if(!sight&&P){const dx=o.x-P.x,dy=o.y-P.y,lim=FOG+u.r+8;near=dx*dx+dy*dy<lim*lim}
+    let near=true;if(!sight&&P){const dx=o.x-P.x,dy=o.y-P.y,lim=fogR+u.r+8;near=dx*dx+dy*dy<lim*lim}
     g.visible=near;
     u.up+=((o.on?1:o.warn&&u.kind==='spikes'?.3:0)-u.up)*Math.min(1,dt*(o.on?22:7));
     if(u.kind==='pillar'){
@@ -925,10 +1024,10 @@ function updateEnt(rec,name,e,dt,phMake,phUpdate){
 let playerRec=null,stamp=0;
 const monMap=new Map(),allyMap=new Map();
 // Allies that carry a monster spec (bound or tamed pets and whatever they raise) are drawn with the monster bodies; the model reads pet/owner and builds the friendly variant.
-const isPet=e=>!!(e&&(e.pet||e.owner==='necro'||e.owner==='beast')&&(e.s||e.ai));
+const isPet=e=>!!(e&&(e.pet||e.shade||e.kind==='shade'||e.owner==='necro'||e.owner==='beast')&&(e.s||e.ai));
 // Trophies that stand in the arena (a mage's familiar, a healer's guardian) have their own friendly models. An ally of a kind this file has
 // never heard of is drawn the same way (as a plain wisp), so nothing friendly can ever come out looking like a hostile monster or throw.
-const isTrophy=e=>!!(e&&(e.kind==='familiar'||e.kind==='guardian'||(e.trophy&&e.kind!=='pet')));
+const isTrophy=e=>!!(e&&(e.kind==='familiar'||e.kind==='guardian'||(e.trophy&&e.kind!=='pet'&&e.kind!=='shade')));
 const allyModel=e=>isTrophy(e)?'trophy':isPet(e)?'monster':e.kind==='thrall'||e.kind==='wolf'?'ally':'trophy';
 const dying=[]; // pets that left the list in the middle of a fight: they fade out where they stood
 let dyingLevel=-1;
@@ -943,7 +1042,7 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight,V){
       rec=tro?makeEnt('trophy',e,phTrophy,V):pet?makeEnt('monster',e,phMonster,V):makeEnt(name,e,phMake,V);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec)}
     rec.stamp=stamp;
     let hide=!!e.hidden||(rec.pet&&(e.dead||e.hp<=0));
-    if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=FOG+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
+    if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=fogR+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
     rec.g.position.set(e.x,(e.lift||0)*LIFT,e.y);rec.g.visible=!hide;
     if(rec.pet){
       if(e.dead||e.hp<=0){if(!rec.gone){rec.gone=true;startFade(rec)}continue} // still listed but dead: its ghost is already fading
@@ -951,7 +1050,7 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight,V){
     }else if(rec.tro)updateEnt(rec,'trophy',e,dt,phTrophy,phTrophyUpdate);
     else updateEnt(rec,name,e,dt,phMake,phUpdate);
     if(hide)rec.g.visible=false;
-    else if(Q.low&&!rec.tro){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
+    else if(Q.low&&!rec.tro&&e.kind!=='shade'){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
   }
   if(map.size>list.length||(map.size&&!list.length))for(const[e,rec]of map)if(rec.stamp!==stamp){
     map.delete(e);
@@ -1063,12 +1162,13 @@ const want={x:W/2,z:H/2,zoom:.72};
 function frameWant(sight){
   const P=MB.P;
   if(!P){want.x=W/2;want.z=H/2-4;want.zoom=sight?.72:.58;return}
-  if(!sight){want.x=W/2+(P.x-W/2)*.8;want.z=H/2+(P.y-H/2)*.8-4;want.zoom=.48;return}
+  if(!sight){const k=Math.min(1.75,fogR/FOG);want.x=W/2+(P.x-W/2)*(k>1?.66:.8);want.z=H/2+(P.y-H/2)*(k>1?.66:.8)-4;want.zoom=.48*k;return}
   bb.x0=bb.x1=P.x;bb.z0=bb.z1=P.y;bb.h=0;grow(P.x,P.y,46,66);
   const B=MB.boss,mons=MB.mons,zs=MB.zones;
   if(B&&B.hp>0&&!B.hidden)grow(B.x,B.y,B.r+16,B.r*2.5+(B.lift||0)*LIFT);
   else for(let i=0;i<mons.length;i++){const m=mons[i];if(m.hidden||m.decoy)continue;const dx=m.x-P.x,dy=m.y-P.y;if(dx*dx+dy*dy<340*340)grow(m.x,m.y,m.r+8,m.r*2.2)}
   for(let i=0;i<zs.length;i++){const z=zs[i];if(z.mine)continue;const dx=z.x-P.x,dy=z.y-P.y,lim=z.r+300;if(dx*dx+dy*dy<lim*lim)grow(z.x,z.y,z.r+4,0)}
+  if(TR.obj)grow(TR.ox,TR.oy,TR.or+26,74); // the thing being guarded stays in view while the hero is anywhere near it
   // never chase something across the whole arena: past this reach it may sit at the edge of the view
   {const rx=430,rz=300;if(bb.x0<P.x-rx)bb.x0=P.x-rx;if(bb.x1>P.x+rx)bb.x1=P.x+rx;if(bb.z0<P.y-rz)bb.z0=P.y-rz;if(bb.z1>P.y+rz)bb.z1=P.y+rz}
   if(bb.x0<0)bb.x0=0;if(bb.x1>W)bb.x1=W;if(bb.z0<0)bb.z0=0;if(bb.z1>H)bb.z1=H;
@@ -1104,7 +1204,10 @@ let vig=null;
 function vignette(){if(!vig){vig=ctx.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*.98);vig.addColorStop(0,'rgba(6,4,18,0)');vig.addColorStop(.6,'rgba(6,4,18,.3)');vig.addColorStop(1,'rgba(5,3,16,.8)')}return vig}
 // overlay text helpers: condensed, slightly slanted, inked
 const CSS={ink:'#0b0a16',bone:'#f2ecff',gold:'#f0b848',power:'#8b4dff',power2:'#c4f4ff',foe:'#ff2d55',dim:'#a9a4c8'};
-const tint=c=>MB.has('sight')?c:MB.col(c);
+// colours on the overlay lose their hue with the eyes: the game's own grey before there are eyes, a grey worked out here when an ordeal takes them away again
+const greys=new Map();
+function greyOf(c){let v=greys.get(c);if(v)return v;const q=cssRGB(c),l=Math.round(Math.min(255,(q[0]*.3+q[1]*.59+q[2]*.11)*255*1.08));v='rgb('+l+','+l+','+(l+6>255?255:l+6)+')';if(greys.size>200)greys.clear();greys.set(c,v);return v}
+const tint=c=>seeing?c:MB.has('sight')?greyOf(c):MB.col(c);
 const clamp01=v=>v<0?0:v>1?1:v;
 let hasSpacing=null;
 function spaced(px){if(hasSpacing===null)hasSpacing='letterSpacing' in ctx;if(hasSpacing)ctx.letterSpacing=px+'px'}
@@ -1133,7 +1236,7 @@ function drawOverlay(sight){
   ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
   if(!sight&&P){
     // no eyes: everything past arm's reach is black
-    const e=groundEllipse(P.x,P.y,FOG*1.04),k=e.ry/e.rx;
+    const e=groundEllipse(P.x,P.y,fogR*1.04),k=e.ry/e.rx;
     ctx.save();ctx.translate(e.cx,e.cy-10);ctx.scale(1,k);
     const g=ctx.createRadialGradient(0,0,e.rx*.36,0,0,e.rx);
     g.addColorStop(0,'rgba(5,4,8,0)');g.addColorStop(.3,'rgba(5,4,8,.12)');g.addColorStop(.62,'rgba(5,4,8,.55)');g.addColorStop(.85,'rgba(5,4,8,.9)');g.addColorStop(1,'rgba(5,4,8,.985)');
@@ -1151,7 +1254,7 @@ function drawOverlay(sight){
     ctx.globalAlpha=1;
     // ...and the feet know where the floor ends or bites
     const obs=R.testObstacles||MB.obstacles;
-    if(obs)for(let i=0;i<obs.length;i++){const o=obs[i];if(!o||o.kind==='pillar')continue;const dx=o.x-P.x,dy=o.y-P.y,lim=FOG+o.r;if(dx*dx+dy*dy>lim*lim)continue;
+    if(obs)for(let i=0;i<obs.length;i++){const o=obs[i];if(!o||o.kind==='pillar')continue;const dx=o.x-P.x,dy=o.y-P.y,lim=fogR+o.r;if(dx*dx+dy*dy>lim*lim)continue;
       const el=groundEllipse(o.x,o.y,o.r);ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx,el.ry,0,0,TAU);
       if(o.kind==='pit'){ctx.setLineDash([7,6]);ctx.strokeStyle='rgba(231,223,205,.75)';ctx.lineWidth=2;ctx.stroke();ctx.setLineDash([])}
       else if(o.on){ctx.fillStyle='rgba(214,120,40,.1)';ctx.fill();ctx.strokeStyle='#d6a544';ctx.lineWidth=2.5;ctx.stroke()}
@@ -1163,6 +1266,7 @@ function drawOverlay(sight){
         ctx.beginPath();ctx.ellipse(el.cx,el.cy,el.rx*q,el.ry*q,0,0,TAU);ctx.strokeStyle='rgba(231,223,205,.8)';ctx.stroke()}}
   }
   else if(sight){ctx.fillStyle=vignette();ctx.fillRect(0,0,W,H)}
+  if(TR.on)trialOverlay(sight);
   // damage numbers: bold and tilted, bigger and hotter with the size of the hit; words get a small caps tag with an accent line
   const floats=MB.floats;
   if(floats.length){ctx.textAlign='center';ctx.textBaseline='alphabetic';
@@ -1181,8 +1285,8 @@ function drawOverlay(sight){
       }else{
         const t2=txt.toUpperCase(),in1=easeOut(clamp01(age/.16));
         slant(sp.x+(1-in1)*-26,sp.y,0,.92,1);ctx.font='700 17px '+FONT;spaced(2);
-        const w=ctx.measureText(t2).width;inked(t2,0,0,sight?f.c:MB.col(f.c),4);spaced(0);
-        ctx.fillStyle=sight?f.c:MB.col(f.c);ctx.fillRect(-w/2*in1,5,w*in1,1.5);
+        const w=ctx.measureText(t2).width;inked(t2,0,0,tint(f.c),4);spaced(0);
+        ctx.fillStyle=tint(f.c);ctx.fillRect(-w/2*in1,5,w*in1,1.5);
       }
       ctx.restore()}
     ctx.globalAlpha=1}
@@ -1221,7 +1325,7 @@ function drawOverlay(sight){
     const run=(age*.55)%1.4-.2;ctx.fillStyle=ac2;ctx.fillRect(W*run,y0-5,90,2);ctx.fillRect(W*(1-run)-90,y1+3,90,2);
     const tl=easeOut(clamp01((age-.1)/.36)),ox=(1-tl)*90+(1-out)*-60;
     ctx.globalAlpha=a*tl;ctx.textAlign='center';ctx.textBaseline='alphabetic';
-    ctx.font='700 15px '+FONT;spaced(4);ctx.fillStyle=tint(CSS.gold);ctx.fillText(('LEVEL '+(S.level+1)+'  //  '+L.spec.name).toUpperCase(),W/2-ox*.5,y0+30);spaced(0);
+    ctx.font='700 15px '+FONT;spaced(4);ctx.fillStyle=tint(CSS.gold);ctx.fillText(((MB.tower?'FLOOR ':'LEVEL ')+(S.level+1)+'  //  '+L.spec.name).toUpperCase(),W/2-ox*.5,y0+30);spaced(0);
     ctx.save();slant(W/2+ox,y0+86,0,.88,1);ctx.font='700 60px '+FONT;spaced(1.5);const tt=(''+L.title).toUpperCase(),tw=ctx.measureText(tt).width,fit=tw>W*.98?W*.98/tw:1;if(fit<1)ctx.scale(fit,1);
     ctx.fillStyle=ac;ctx.globalAlpha=a*tl*.7;ctx.fillText(tt,3.5,3.5);ctx.globalAlpha=a*tl;ctx.fillStyle=CSS.bone;ctx.fillText(tt,0,0);spaced(0);ctx.restore();
     ctx.fillStyle=ac2;ctx.fillRect(W/2-110*tl,y0+99,220*tl,1.5);
@@ -1266,7 +1370,7 @@ const TF={
   crack:new Timed(7,()=>{const g=new THREE.Group(),d=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:crackTex,color:0x06050e,transparent:true,depthWrite:false,fog:false,toneMapped:false})),h=new THREE.Mesh(G.quad,addMat(crackTex,PAL.foe));
     d.position.y=.42;h.position.y=.5;d.renderOrder=1;h.renderOrder=2;g.add(d,h);g.userData.d=d;g.userData.h=h;return g}),
 };
-const FX={fall:0,prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0};
+const FX={fall:0,prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0,apex:null};
 const born=new WeakMap(),prevZones=[],prevRings=[];
 // Damage numbers that land on the same spot within half a second are shown as ONE number (the running total, with a small hit count), led by
 // the newest float of the group; the older ones are not drawn. Numbers that cannot merge (a heavy hit, another colour) are stacked upward.
@@ -1295,6 +1399,10 @@ function crackAt(x,z,r,hex,life){const o=TF.crack.spawn(life||2.6),u=o.userData;
 function clearFx(){for(const k in TF)TF[k].clear();if(TFR)for(const k in TFR)TFR[k].clear()}
 function drama(kind,x,z,len){if(calm)return;FX.drama=FX.dramaMax=len;FX.kind=kind;FX.bx=x;FX.bz=z}
 const RANK_K={'':0,E:.22,D:.38,C:.54,B:.7,A:.85,S:1};
+// the apex tier: which path a hero walks ('dominion' | 'order' | null), read from the object its model reads (the game, or a member's view);
+// R.testApex forces the local hero's. The motes that rise off a hero take the path's colours [base rgb, hot rgb].
+function apexPath(B){let a=B===MB?R.testApex:null;if(!a){a=B.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=B.S&&B.S.apex}return a==='dominion'||a==='order'?a:null}
+const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5]};
 if(typeof MB.on==='function')try{
   MB.on('bossdead',()=>{if(!alive)return;const x=FX.bx,z=FX.bz;drama('death',x,z,1.25);flashAt(x,34,z,60,330,0xffffff,.42,1);burstAt(x,34,z,90,420,PAL.power2,.38);crackAt(x,z,90,PAL.power,3.4)});
   MB.on('levelstart',()=>{clearFx();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
@@ -1364,15 +1472,16 @@ function syncFx(dt,sight){
   TF.slash.run(fdt,upSlash);TF.ghost.run(fdt,upGhost);TF.streak.run(fdt,upStreak);TF.flash.run(fdt,upFlash);TF.burst.run(fdt,upFlash);TF.crack.run(fdt,upCrack);
   if(TFR){TFR.slash.run(fdt,upSlash);TFR.ghost.run(fdt,upGhost);TFR.streak.run(fdt,upStreak);TFR.flash.run(fdt,upFlash)}
   // power rising off the hero: more of it with every rank
-  {let k=0;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=r&&r[0]==='S'?1:RANK_K[r]||.12}
-    FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK;
-    const n=rk<.02||!P?0:Math.round((low?3:8)+(low?9:40)*rk),pos=auraP.pos,col=auraP.col,size=auraP.size,c=FX.clock;
+  {let k=0;const ap=cls?apexPath(MB):null;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=ap?1.25:r&&r[0]==='S'?1:RANK_K[r]||.12}
+    FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK,AC=APEX_COL[ap||''];
+    const n=rk<.02||!P?0:Math.min(48,Math.round((low?3:8)+(low?9:40)*rk)),pos=auraP.pos,col=auraP.col,size=auraP.size,c=FX.clock;
     for(let i=0;i<n;i++){const a=i*2.399+c*(.5+i%3*.22),rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk))%(54+34*rk),q=h/(54+34*rk);
       pos[i*3]=P.x+Math.cos(a)*rad;pos[i*3+1]=3+h;pos[i*3+2]=P.y+Math.sin(a)*rad*.8;
-      const hot=i%4===0;col[i*4]=hot?.77:.55;col[i*4+1]=hot?.96:.3;col[i*4+2]=1;col[i*4+3]=Math.sin(q*Math.PI)*(.5+.4*rk);size[i]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}
+      const hot=i%4===0,o=hot?3:0;col[i*4]=AC[o];col[i*4+1]=AC[o+1];col[i*4+2]=AC[o+2];col[i*4+3]=Math.sin(q*Math.PI)*(.5+.4*Math.min(1,rk));size[i]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}
     auraP.geo.setDrawRange(0,n);
     if(n){auraP.geo.attributes.position.needsUpdate=true;auraP.geo.attributes.aCol.needsUpdate=true;auraP.geo.attributes.aSize.needsUpdate=true}
-    auraDisc.visible=rk>.02&&!!P;if(auraDisc.visible){auraDisc.position.x=P.x;auraDisc.position.z=P.y;auraDisc.scale.setScalar(64+52*rk+4*Math.sin(c*3));auraDisc.material.opacity=.1+.2*rk+.03*Math.sin(c*5)}}
+    auraDisc.visible=rk>.02&&!!P;if(auraDisc.visible){if(ap!==FX.apex){FX.apex=ap;auraDisc.material.color.setHex(ap==='order'?PAL.power2:PAL.power)}
+      auraDisc.position.x=P.x;auraDisc.position.z=P.y;auraDisc.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3));auraDisc.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5))*(ap==='dominion'?.45:1)}}
 }
 
 // one of our side's projectiles (pool = which body: bolt, orb, skull, arrow), drawn at x,y
@@ -1456,16 +1565,16 @@ function runTimer(tm,k,rk,raw,dt){let v=tm[k]-dt;if(v<0)v=0;raw=num(raw,0);if(ra
   if(raw!==tm[rk]){tm[rk]=raw;if(raw>v+.045||raw<v-.08)v=raw}
   return tm[k]=v}
 function remNew(id){
-  const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0};
-  const S={adv:null,rank:'',level:0,mode:'play',t:0,cls:null,paused:false},sk0={unlocked:true,ready:false};
+  const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0,auraR:0};
+  const S={adv:null,rank:'',level:0,mode:'play',t:0,cls:null,paused:false,apex:null},sk0={unlocked:true,ready:false};
   // the view: everything the models ask the game about their owner, answered for this member
-  const V={S,P,remote:true,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
+  const V={S,P,remote:true,apex:null,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
     has(p){if(!PART_IX){PART_IX={};const a=MB.PARTS||[];for(let i=0;i<a.length;i++)PART_IX[a[i]&&a[i].id||a[i]]=i}const i=PART_IX[p];return i===undefined?true:i<V.parts},
     cls(){return S.cls},pw(i){const a=V.pwA;return !!(a&&a[i-1])},rank(){return S.rank},
     get mons(){return MB.mons},get allies(){return rm.allyList},get boss(){return MB.boss}};
   const rm={id,idx:0,i:0,stamp:0,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false},
     allyMap:new Map(),allyList:[],allyRecs:new Map(),aStamp:0,echo:[],eStamp:0,psRef:null,psX:NaN,psN:0,psAge:0,
-    name:'',initial:'?',nameW:0,nameAt:-9,rawName:undefined,nameI:-1,dead:false,fall:0,vis:false,rankK:0,
+    name:'',initial:'?',nameW:0,nameAt:-9,rawName:undefined,nameI:-1,dead:false,fall:0,vis:false,rankK:0,apexC:null,
     mat:null,matA:null,mark:null,marks:null,disc:null,beacon:null,hex:-1,css:'#ffffff',soft:'#ffffff'};
   return rm;
 }
@@ -1550,18 +1659,21 @@ function syncRemotes(list,dt,sight){
     S.cls=typeof L.cls==='string'&&CLS_OK[L.cls]===1?L.cls:null;S.adv=S.cls&&typeof L.adv==='string'&&WORD_RE.test(L.adv)?L.adv:null;
     S.rank=typeof L.rank==='string'&&L.rank.length<6?L.rank:'';S.level=num(L.level,S0.level);S.mode=S0.mode;S.t=t;
     V.parts=typeof L.parts==='number'?L.parts:7;V.pwA=Array.isArray(L.pw)?L.pw:null;
+    S.apex=V.apex=S.cls&&(L.apex==='dominion'||L.apex==='order')?L.apex:null;
     // where they are and what they are doing
     const sp=r.P&&typeof r.P==='object'?r.P:NOLOOK,tm=rm.tm;
     if(num(sp.x,null)!==null&&num(sp.y,null)!==null)chase(rm.sm,sp.x,sp.y,num(sp.walk,0),0,dt,130);
     if(rm.sm.init){P.x=rm.sm.x;P.y=rm.sm.y;P.walk=rm.sm.w}
     P.face=num(sp.face,P.face);P.swing=num(sp.swing,P.face);P.moving=!!sp.moving&&!dead;
     P.maxHp=Math.max(1,num(sp.maxHp,P.maxHp));P.hp=Math.max(0,Math.min(P.maxHp,num(sp.hp,P.hp)));P.shield=sp.shield===true?1:num(sp.shield,0);P.skCd=num(sp.skCd,0);
+    // the order aura: the radius the member sends (P.auraR, or look.auraR), else our own when we walk the same path, else a plain default
+    P.auraR=S.apex==='order'&&!dead?Math.max(0,Math.min(400,num(sp.auraR,num(L.auraR,LP&&LP.auraR>0?LP.auraR:96)))):0;
     P.atk=runTimer(tm,'atk','ratk',sp.atk,dt);P.dashT=runTimer(tm,'dashT','rdashT',sp.dashT,dt);P.inv=runTimer(tm,'inv','rinv',sp.inv,dt);
     if(dead){P.atk=P.dashT=P.inv=tm.atk=tm.dashT=tm.inv=0}
     V.sk0.ready=!dead&&(L.skill0Ready===undefined?V.pw(2)&&P.skCd<=0:!!L.skill0Ready);
     rm.dead=dead;rm.fall+=((dead?1:0)-rm.fall)*Math.min(1,dt*(dead?5:9));
     const away=!!r.away;let hide=!rm.sm.init||away;
-    if(!hide&&!sight&&LP){const dx=P.x-LP.x,dy=P.y-LP.y,lim=FOG+22;if(dx*dx+dy*dy>lim*lim)hide=true}
+    if(!hide&&!sight&&LP){const dx=P.x-LP.x,dy=P.y-LP.y,lim=fogR+22;if(dx*dx+dy*dy>lim*lim)hide=true}
     rm.vis=!hide;
     // the hero
     if(!rm.rec)rm.rec=makeEnt('player',P,phPlayer,V);
@@ -1597,18 +1709,19 @@ function syncRemotes(list,dt,sight){
         drawPshot(p,j,p.x+num(p.vx,0)*rm.psAge,p.y+num(p.vy,0)*rm.psAge,t,low,pools[PK[p.kind]===1?p.kind:'bolt'])}}
     remEchoes(rm,!away&&Array.isArray(r.echoes)?r.echoes:NONE,dt);
     // power rising off them, as it does off the local hero
-    {let k=0;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
+    {let k=0;const ap=S.apex;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=ap?1.25:rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
       rm.rankK+=(k-rm.rankK)*Math.min(1,dt*2);const rk=rm.rankK,d=rm.disc,c=FX.clock;
-      d.visible=rk>.02&&!hide;if(d.visible){d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*rk+4*Math.sin(c*3+i));d.material.opacity=.1+.2*rk+.03*Math.sin(c*5+i)}}
+      d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(ap==='order'?PAL.power2:PAL.power)}
+        d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3+i));d.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5+i))*(ap==='dominion'?.45:1)}}
   }
   // members who have left
   for(let i=rems.length-1;i>=0;i--){const rm=rems[i];if(rm.stamp!==st){remDrop(rm);remById.delete(rm.id);rems.splice(i,1)}}
   // one cloud of rising motes for all of them
   {const pos=auraR.pos,col=auraR.col,size=auraR.size,c=FX.clock;let k=0;
-    for(let m=0;m<rems.length;m++){const rm=rems[m],rk=rm.rankK,P=rm.P,n=rk<.02||!rm.vis?0:Math.round((low?3:8)+(low?9:40)*rk);
+    for(let m=0;m<rems.length;m++){const rm=rems[m],rk=rm.rankK,P=rm.P,n=rk<.02||!rm.vis?0:Math.min(48,Math.round((low?3:8)+(low?9:40)*rk)),AC=APEX_COL[rm.V.S.apex||''];
       for(let i=0;i<n&&k<384;i++,k++){const a=i*2.399+c*(.5+i%3*.22)+m,rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk)+m*9)%(54+34*rk),q=h/(54+34*rk);
         pos[k*3]=P.x+Math.cos(a)*rad;pos[k*3+1]=3+h;pos[k*3+2]=P.y+Math.sin(a)*rad*.8;
-        const hot=i%4===0;col[k*4]=hot?.77:.55;col[k*4+1]=hot?.96:.3;col[k*4+2]=1;col[k*4+3]=Math.sin(q*Math.PI)*(.5+.4*rk);size[k]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}}
+        const hot=i%4===0,o=hot?3:0;col[k*4]=AC[o];col[k*4+1]=AC[o+1];col[k*4+2]=AC[o+2];col[k*4+3]=Math.sin(q*Math.PI)*(.5+.4*Math.min(1,rk));size[k]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}}
     auraR.geo.setDrawRange(0,k);
     if(k){auraR.geo.attributes.position.needsUpdate=true;auraR.geo.attributes.aCol.needsUpdate=true;auraR.geo.attributes.aSize.needsUpdate=true}}
 }
@@ -1667,6 +1780,152 @@ function remoteOverlay(MM,sight){
   }
   ctx.restore();
 }
+/* ---------- trials (round 8): MB.trial = null | {kind:'survive'|'guard'|'race'|'ordeal'|'cross', rule, t, dur, goal, progress, handicap, failed,
+     obj: null | {x,y,r,hp,maxHp}}; R.testTrial (same shape) wins when set. Nothing here exists until the first trial is seen.
+   guard   : the objective is a marrow-lamp: a low plinth, a cage of five ribs and a heart of marrow-light burning inside it. Its health is a ring
+             on the floor around it (gold, amber, then crimson) and a small bar over it; it gutters as it is hurt and stands dark and splayed
+             open when it breaks. A thin inner ring counts the time or the kills still to go.
+   survive : a track of light just inside the walls fills clockwise as the time is served.
+   race    : the same track starts full and burns away; it turns crimson and beats in the last quarter.
+   ordeal  : the screen's edge takes a tint by handicap (drained violet-grey for no mana, sick green for no summons, dull red for halved healing,
+             hot streaks for swift monsters); 'the dark returns' is the crypt's own no-sight treatment at a wider radius (see draw()). ---------- */
+const TR={on:false,kind:'',obj:false,ox:0,oy:0,or:20,g:null,hp:1,hpShow:1,hit:0,dead:0,frac:0,edge:null,cap:'',capA:0,fail:0,t:0,q:1};
+const HC_RE=[[/dark|blind|sight|eyes/i,'dark'],[/mana|dry|drain/i,'mana'],[/pet|familiar|summon|alone|deploy/i,'pets'],[/heal|mend|wound/i,'heal'],[/swift|fast|haste|quick/i,'swift']];
+const hcCache=new Map();
+function HCAP(tr){const h=tr&&tr.handicap;if(!h||typeof h!=='string')return '';let v=hcCache.get(h);if(v!==undefined)return v;v='other';for(let i=0;i<HC_RE.length;i++)if(HC_RE[i][0].test(h)){v=HC_RE[i][1];break}if(hcCache.size>40)hcCache.clear();hcCache.set(h,v);return v}
+const HC_COL={mana:[108,96,170],pets:[70,150,96],heal:[170,52,60],swift:[255,70,60],other:[214,165,68]};
+function trialOf(){const tr=R.testTrial||MB.trial;return tr&&typeof tr==='object'&&MB.S.mode==='play'?tr:null}
+const SEGS=96,PER_IN=WALL+9;
+function trialSetup(){
+  if(TR.g)return;
+  const g=TR.g=new THREE.Group();g.visible=false;scene.add(g);
+  // the track inside the walls: SEGS short bars, clockwise from the middle of the north wall; the lit copy draws only the first `count`
+  const trackM=new THREE.MeshBasicMaterial({color:0x8a86b0,transparent:true,opacity:.22,depthWrite:false,toneMapped:false,fog:false}),
+    litM=new THREE.MeshBasicMaterial({color:PAL.power2,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
+    hazeM=flatGlowMat(PAL.power2,.16);
+  const track=noLine(new THREE.InstancedMesh(G.quad,trackM,SEGS)),lit=noLine(new THREE.InstancedMesh(G.quad,litM,SEGS)),haze=noLine(new THREE.InstancedMesh(G.quad,hazeM,SEGS));
+  const x0=PER_IN,x1=W-PER_IN,z0=PER_IN,z1=H-PER_IN,w=x1-x0,h=z1-z0,per=2*(w+h),step=per/SEGS;
+  for(let i=0;i<SEGS;i++){let d=((i+.5)*step+w/2)%per,x,z,hor;
+    if(d<w){x=x0+d;z=z0;hor=true}else if(d<w+h){x=x1;z=z0+d-w;hor=false}else if(d<2*w+h){x=x1-(d-w-h);z=z1;hor=true}else{x=x0;z=z1-(d-2*w-h);hor=false}
+    put(track,i,x,.66,z,hor?step-3:4,1,hor?4:step-3);put(haze,i,x,.6,z,hor?step+10:34,1,hor?34:step+10)}
+  lit.instanceMatrix=track.instanceMatrix;lit.count=0;haze.count=0;
+  for(const m of[track,lit,haze]){m.frustumCulled=false;m.renderOrder=2}
+  const head=new THREE.Sprite(glowMat(0xffffff,.9));head.scale.setScalar(46);head.position.y=4;
+  const edge=new THREE.Group();edge.add(track,haze,lit,head);g.add(edge);
+  TR.edge={g:edge,track,lit,haze,head,trackM,litM,hazeM,x0,x1,z0,z1,w,h,per};
+  // the marrow-lamp
+  const o=new THREE.Group(),body=new THREE.Group(),stone=std(0x6a6876,{flatShading:true}),boneM=ST.toon(PAL.bone),boneD=ST.toon(0x8f8676),dead=ST.toon(0x3a3640);
+  const plinth=new THREE.Mesh(mergeGeos([new THREE.CylinderGeometry(15,18,5,7).translate(0,2.5,0),new THREE.CylinderGeometry(11,13,4,7).translate(0,7,0)]),stone);plinth.castShadow=plinth.receiveShadow=true;body.add(plinth);
+  const ribG=mergeGeos([new THREE.TorusGeometry(15,1.45,5,9,1.9).rotateZ(-.42).translate(-18.5,9,0),new THREE.ConeGeometry(1.5,5,5).rotateZ(1.05).translate(-5.2,31.4,0),new THREE.SphereGeometry(2.3,6,5).translate(-12,9,0)]);
+  const ribs=[];for(let i=0;i<5;i++){const piv=new THREE.Group(),r=new THREE.Mesh(ribG,i%2?boneD:boneM);r.castShadow=true;piv.rotation.y=i*TAU/5+.3;piv.add(r);body.add(piv);ribs.push(r)}
+  const spine=new THREE.Mesh(mergeGeos([0,1,2].map(i=>new THREE.SphereGeometry(2.6-i*.4,6,5).scale(1,.7,1).translate(0,10.5+i*2.8,0))),boneD);spine.castShadow=true;body.add(spine);
+  const coreM=basic(0xfff0c2),core=noLine(new THREE.Mesh(new THREE.OctahedronGeometry(1,0),coreM));core.position.y=26;
+  const shellM=new THREE.MeshBasicMaterial({color:PAL.gold,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),shell=noLine(new THREE.Mesh(G.sphere,shellM));shell.position.y=26;
+  const halo=new THREE.Sprite(glowMat(PAL.gold,.8));halo.position.y=27;
+  const pool=noLine(new THREE.Mesh(G.quad,flatGlowMat(PAL.gold,.3)));pool.position.y=.6;pool.renderOrder=1;
+  body.add(core,shell,halo);
+  // floor rings: the reach of the thing itself, its health (drawn up to a fraction through the geometry's draw range), and the count
+  const ringGeo=()=>new THREE.RingGeometry(.9,1,72,1,Math.PI/2,-TAU).rotateX(-Math.PI/2);
+  const fm=(hex,op,add)=>new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:op,depthWrite:false,toneMapped:false,fog:false,side:THREE.DoubleSide,blending:add?THREE.AdditiveBlending:THREE.NormalBlending});
+  const hpBack=noLine(new THREE.Mesh(G.ring,fm(0x0a0814,.6))),hpGeo=ringGeo(),hpM=fm(PAL.gold,.95),hpRing=noLine(new THREE.Mesh(hpGeo,hpM));
+  const cntGeo=new THREE.RingGeometry(.93,1,72,1,Math.PI/2,-TAU).rotateX(-Math.PI/2),cntM=fm(PAL.power2,.8,true),cnt=noLine(new THREE.Mesh(cntGeo,cntM));
+  const reachM=fm(PAL.gold,.5),reach=noLine(new THREE.Mesh(G.rim,reachM));
+  hpBack.position.y=.62;hpRing.position.y=.7;cnt.position.y=.72;reach.position.y=.66;for(const m of[hpBack,hpRing,cnt,reach])m.renderOrder=2;
+  o.add(body,pool,hpBack,hpRing,cnt,reach);ST.outline(body,{thickness:1.1});g.add(o);
+  TR.lamp={o,body,ribs,boneM,boneD,dead,core,coreM,shell,shellM,halo,pool,hpBack,hpRing,hpGeo,hpM,cnt,cntGeo,cntM,reach,reachM,broke:false};
+}
+const _hc=new THREE.Color();
+function syncTrial(tr,dt,sight){
+  if(!tr){if(TR.on){TR.on=false;TR.obj=false;TR.cap='';if(TR.g)TR.g.visible=false}return}
+  trialSetup();
+  const t=MB.S.t,P=MB.P,E=TR.edge,Lm=TR.lamp,kind=tr.kind,low=Q.low;
+  if(!TR.on||kind!==TR.kind){TR.on=true;TR.kind=kind;TR.hpShow=1;TR.hit=0;TR.dead=0;TR.fail=0;Lm.broke=false}
+  TR.g.visible=true;TR.t=num(tr.t,0);TR.cap=HCAP(tr);
+  TR.fail+=((tr.failed?1:0)-TR.fail)*Math.min(1,dt*6);
+  const dur=num(tr.dur,0),goal=num(tr.goal,0),frac=dur>0?clamp01(TR.t/dur):goal>0?clamp01(num(tr.progress,0)/goal):-1;TR.frac=frac;
+  // the track at the walls: survive fills, race burns down
+  const edgeOn=(kind==='survive'||kind==='race')&&frac>=0&&sight;E.g.visible=edgeOn;
+  if(edgeOn){
+    const race=kind==='race',q=race?1-frac:frac,n=Math.max(0,Math.min(SEGS,Math.round(q*SEGS))),hot=race&&q<.25,beat=hot?.6+.4*Math.sin(t*12):1,f=TR.fail;TR.q=q;
+    E.lit.count=n;E.haze.count=low?0:n;
+    if(race)_hc.setHex(hot?PAL.foe:PAL.gold);else _hc.setHex(PAL.power2).lerp(_c0.setHex(PAL.gold),q>.9?(q-.9)*10:0);
+    if(f>.01)_hc.lerp(_c0.setHex(PAL.foe),f);
+    E.litM.color.copy(_hc);E.litM.opacity=(.72+.14*Math.sin(t*3))*beat;E.hazeM.color.copy(_hc);E.hazeM.opacity=(.12+.04*Math.sin(t*3))*beat;
+    E.trackM.opacity=.2+.25*f;
+    // a bright bead rides the front of it
+    const d=(q*E.per+E.w/2)%E.per,h=E.head;let x,z;
+    if(d<E.w){x=E.x0+d;z=E.z0}else if(d<E.w+E.h){x=E.x1;z=E.z0+d-E.w}else if(d<2*E.w+E.h){x=E.x1-(d-E.w-E.h);z=E.z1}else{x=E.x0;z=E.z1-(d-2*E.w-E.h)}
+    h.visible=q>.004&&q<.996;h.position.x=x;h.position.z=z;h.material.color.copy(_hc);h.scale.setScalar((hot?58:44)+6*Math.sin(t*9));
+  }
+  // the thing to protect
+  const ob=tr.obj&&typeof tr.obj==='object'&&num(tr.obj.x,null)!==null&&num(tr.obj.y,null)!==null?tr.obj:null;
+  TR.obj=!!ob;Lm.o.visible=!!ob;
+  if(ob){
+    const r=Math.max(10,num(ob.r,22)),maxHp=Math.max(1,num(ob.maxHp,1)),hp=clamp01(num(ob.hp,maxHp)/maxHp),k=Math.max(.8,Math.min(1.9,r/22));
+    TR.ox=ob.x;TR.oy=ob.y;TR.or=r;
+    if(hp<TR.hp-1e-4&&TR.hp<=1){TR.hit=1;if(sight)flashAt(ob.x,24*k,ob.y,20,90,hp<.25?PAL.foe:0xffe0a0,.16,.9)}
+    TR.hp=hp;TR.hit=Math.max(0,TR.hit-dt*4);TR.hpShow+=(hp-TR.hpShow)*Math.min(1,dt*9);
+    const brk=hp<=0;TR.dead+=((brk?1:0)-TR.dead)*Math.min(1,dt*5);
+    let near=true;if(!sight&&P){const dx=ob.x-P.x,dy=ob.y-P.y,lim=fogR+r;near=dx*dx+dy*dy<lim*lim}
+    Lm.o.visible=near;Lm.o.position.set(ob.x,0,ob.y);
+    const hitK=TR.hit,dk=TR.dead;
+    Lm.body.scale.setScalar(k);Lm.body.position.x=hitK*Math.sin(t*70)*1.6;Lm.body.rotation.y=.2;
+    if(brk!==Lm.broke){Lm.broke=brk;for(let i=0;i<5;i++)Lm.ribs[i].material=brk?Lm.dead:i%2?Lm.boneD:Lm.boneM;if(brk&&sight){burstAt(ob.x,24,ob.y,60,260,PAL.foe,.3);crackAt(ob.x,ob.y,r*1.6,PAL.foe,3)}}
+    for(let i=0;i<5;i++){const rb=Lm.ribs[i];rb.rotation.z=dk*(.5+.12*i)+hitK*.08*Math.sin(t*50+i);rb.position.y=-dk*2}
+    // the heart of it: steadier and gold when whole, small and red and guttering when nearly out
+    const low25=hp<.25,flick=1+(low25?.22:.07)*Math.sin(t*(low25?23:7))+.05*Math.sin(t*31),sz=(4.2+5.2*hp)*flick*(1-dk);
+    _hc.setHex(hp>.5?0xffe6a0:hp>.25?0xffa040:0xff4a3c);if(hitK>0)_hc.lerp(_c0.setHex(0xffffff),hitK*.7);
+    Lm.core.visible=Lm.shell.visible=Lm.halo.visible=sz>.3;
+    Lm.core.scale.set(sz*.62,sz*1.25,sz*.62);Lm.core.rotation.y=t*1.8;Lm.core.position.y=26+Math.sin(t*2.2)*1.1;Lm.coreM.color.copy(_hc).lerp(_c0.setHex(0xffffff),.45);
+    Lm.shell.scale.setScalar(sz*1.5);Lm.shell.position.y=Lm.core.position.y;Lm.shellM.color.copy(_hc);Lm.shellM.opacity=.3+.12*Math.sin(t*5);
+    Lm.halo.material.color.copy(_hc);Lm.halo.scale.setScalar((40+60*hp)*flick);Lm.halo.position.y=Lm.core.position.y;
+    Lm.pool.visible=!brk&&sight;Lm.pool.material.color.copy(_hc);Lm.pool.material.opacity=(.14+.2*hp)*flick;Lm.pool.scale.set((r+60)*2.6,1,(r+60)*2.1);
+    // rings
+    const R1=r+17,sh=TR.hpShow;
+    Lm.hpBack.scale.setScalar(R1+1.2);Lm.hpRing.scale.setScalar(R1);
+    Lm.hpGeo.setDrawRange(0,Math.round(72*clamp01(sh))*6);
+    _hc.setHex(hp>.5?PAL.gold:hp>.25?0xff9a2a:PAL.foe);if(hitK>0)_hc.lerp(_c0.setHex(0xffffff),hitK);Lm.hpM.color.copy(_hc);Lm.hpM.opacity=low25&&!brk?.7+.3*Math.sin(t*14):.95;
+    Lm.reach.scale.setScalar(r+3);Lm.reach.rotation.y=t*.25;Lm.reachM.opacity=brk?.15:.32+.12*Math.sin(t*2.4);Lm.reachM.color.copy(_hc);
+    Lm.cnt.visible=frac>=0&&!brk;if(Lm.cnt.visible){Lm.cnt.scale.setScalar(R1-5.5);Lm.cntGeo.setDrawRange(0,Math.round(72*frac)*6)}
+    if(low&&near){const b=pools.blob.get();b.position.set(ob.x,.55,ob.y);b.scale.set(r*4.6,1,r*3.8)}
+  }else{TR.hp=1;TR.hpShow=1}
+}
+const capGrad=new Map();
+function capGradient(key,c){let g=capGrad.get(key);if(!g){g=ctx.createRadialGradient(W/2,H/2,H*.34,W/2,H/2,H*.98);const p='rgba('+c[0]+','+c[1]+','+c[2]+',';g.addColorStop(0,p+'0)');g.addColorStop(.55,p+'.1)');g.addColorStop(1,p+'.5)');capGrad.set(key,g)}return g}
+function trialOverlay(sight){
+  const S=MB.S,t=S.t,cap=TR.cap,top=hudBottom();
+  // an ordeal's handicap: the edge of the view takes its colour, and two thin lines hold it top and bottom
+  if(cap&&cap!=='dark'){const c=HC_COL[cap]||HC_COL.other,pu=.82+.18*Math.sin(t*1.7),css='rgb('+c[0]+','+c[1]+','+c[2]+')';
+    ctx.save();ctx.globalAlpha=pu;ctx.fillStyle=capGradient(cap,c);ctx.fillRect(0,0,W,H);
+    ctx.globalAlpha=.55*pu;ctx.fillStyle=tint(css);ctx.fillRect(0,top+2,W,2);ctx.fillRect(0,H-4,W,2);
+    if(cap==='mana'){ // the colour is draining away: thin threads slide down off the top edge
+      ctx.globalAlpha=.3;for(let i=0;i<14;i++){const x=(i*73.7+17)%W,l=20+(i*37%40),y=((t*18+i*53)%(l+90))-l;ctx.fillRect(x,top+4+y*.4,1.5,l*.5)}}
+    else if(cap==='swift'&&!Q.low&&!calm){ // speed lines along both sides
+      ctx.globalAlpha=.34;for(let i=0;i<10;i++){const y=(i*61.3+((t*520+i*97)%H))%H,l=40+(i*29%50),s=i%2;ctx.beginPath();ctx.moveTo(s?W:0,y);ctx.lineTo(s?W-l:l,y-3);ctx.lineTo(s?W:0,y-6);ctx.closePath();ctx.fill()}}
+    else if(cap==='pets'){ // an empty circle at each lower corner where a companion would stand
+      ctx.globalAlpha=.4*pu;ctx.strokeStyle=tint(css);ctx.lineWidth=1.5;ctx.setLineDash([5,7]);for(const x of[34,W-34]){ctx.beginPath();ctx.ellipse(x,H-26,22,9,0,0,TAU);ctx.stroke()}ctx.setLineDash([])}
+    else if(cap==='heal'){ // the edge beats, slow and shallow
+      const b=Math.max(0,Math.sin(t*2.2));ctx.globalAlpha=.2*b*b;ctx.fillRect(0,0,W,7);ctx.fillRect(0,H-7,W,7);ctx.fillRect(0,0,7,H);ctx.fillRect(W-7,0,7,H)}
+    ctx.restore()}
+  // failing: the edges go red for a moment
+  if(TR.fail>.02){ctx.fillStyle='rgba(255,45,85,'+(.22*TR.fail)+')';ctx.fillRect(0,0,W,H)}
+  // the lamp: a bar over it, a small shield of light for a pip, and the word for the first seconds
+  if(TR.obj&&TR.lamp.o.visible){
+    const k=Math.max(.8,Math.min(1.9,TR.or/22));toScreen(TR.ox,46*k+10,TR.oy);if(!sp.ok)return;
+    const hp=TR.hpShow,bw=74,bx=Math.max(20,Math.min(W-bw-8,sp.x-bw/2)),by=Math.max(top+20,Math.min(H-14,sp.y-8)),brk=TR.hp<=0,col=brk?CSS.dim:TR.hp>.5?CSS.gold:TR.hp>.25?'#ff9a2a':CSS.foe;
+    ctx.save();
+    ctx.fillStyle='rgba(8,8,12,.85)';ctx.beginPath();ctx.moveTo(bx-3,by-3);ctx.lineTo(bx+bw+6,by-3);ctx.lineTo(bx+bw+3,by+9);ctx.lineTo(bx-6,by+9);ctx.closePath();ctx.fill();
+    ctx.fillStyle='#231d14';ctx.fillRect(bx,by,bw,6);ctx.fillStyle=TR.hit>.05?'#ffffff':tint(col);ctx.fillRect(bx,by,bw*clamp01(hp),6);
+    ctx.fillStyle='rgba(8,8,12,.7)';for(let i=1;i<4;i++)ctx.fillRect(bx+bw*i/4-.5,by,1,6);
+    ctx.strokeStyle=tint(col);ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,9);
+    const px=bx-13,py=by+3;ctx.beginPath();ctx.moveTo(px-6,py-7);ctx.lineTo(px+6,py-7);ctx.lineTo(px+6,py+1);ctx.lineTo(px,py+8);ctx.lineTo(px-6,py+1);ctx.closePath();ctx.fillStyle='rgba(11,10,22,.92)';ctx.fill();ctx.strokeStyle=tint(col);ctx.lineWidth=1.6;ctx.stroke();
+    ctx.fillStyle=tint(col);ctx.beginPath();ctx.moveTo(px,py-3.5);ctx.lineTo(px+2.6,py);ctx.lineTo(px,py+3.5);ctx.lineTo(px-2.6,py);ctx.closePath();ctx.fill();
+    const tag=brk?'BROKEN':TR.t<4.5||TR.hit>.05||(TR.hp<.25&&Math.sin(t*6)>0)?'PROTECT':'';
+    if(tag){ctx.globalAlpha=brk?1:TR.t<4.5?clamp01((4.5-TR.t)*2)*clamp01(TR.t*4)||1:1;ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.font='700 13px '+FONT;spaced(3);inked(tag,bx+bw/2+1.5,by-8,tint(brk?CSS.foe:col),3.5);spaced(0)}
+    ctx.restore();
+  }
+}
+
 /* ---------- graphics quality, switched live ---------- */
 function applyQuality(){
   const low=isLow();Q.low=low;
@@ -1682,7 +1941,8 @@ if(typeof MB.on==='function')try{MB.on('settings',()=>{if(alive&&isLow()!==Q.low
 let lastSight=null,alive=true;
 function draw(dt){
   if(!alive)return;
-  const S=MB.S,P=MB.P,sight=MB.has('sight'),t=S.t;
+  const S=MB.S,P=MB.P,t=S.t,trial=trialOf(),dark=!!trial&&MB.has('sight')&&HCAP(trial)==='dark',sight=MB.has('sight')&&!dark;
+  fogR=dark?Math.max(FOG,Math.min(520,num(trial.sight,num(trial.sightR,num(MB.sightR,FOG*1.85))))):FOG;seeing=sight;
   if(isLow()!==Q.low)applyQuality();
   resize();syncEnv();
   if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.22) brightness(1.06)';
@@ -1706,7 +1966,7 @@ function draw(dt){
   if(!sight){
     hemi.color.setHex(0xaab0c0);hemi.groundColor.setHex(0x1c1c22);hemi.intensity=.3;
     sun.color.setHex(0xffffff);sun.intensity=.5;
-    points[0].color.setHex(0xffffff);points[0].intensity=.8;points[0].distance=FOG*2.4;points[0].position.set(P?P.x:W/2,140,(P?P.y:H/2)+34);
+    points[0].color.setHex(0xffffff);points[0].intensity=.8;points[0].distance=fogR*2.4;points[0].position.set(P?P.x:W/2,140,(P?P.y:H/2)+34);
     for(let i=1;i<4;i++)points[i].intensity=0;
   }else{
     hemi.color.copy(env.sky);hemi.groundColor.copy(env.gnd);
@@ -1730,6 +1990,7 @@ function draw(dt){
   stamp++;
   for(const k2 in pools)pools[k2].begin();
   syncObstacles(dt,sight);
+  if(trial||TR.on)syncTrial(trial,dt,sight);
   if(P){
     if(!playerRec)playerRec=makeEnt('player',P,phPlayer);
     playerRec.g.position.set(P.x,0,P.y);playerRec.g.visible=true;
@@ -1828,5 +2089,5 @@ glc.style.transition='filter 1.2s';
 glc.hidden=false;
 resize();placeCamera(W/2,H/2,fitD);
 if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(MB.has('sight'));camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
 })();

@@ -111,7 +111,7 @@ var MBNet={
   host:function(opts){
     opts=opts||{};
     var where=opts.server||(served()?servedAddr():bridge()?'local':null);
-    if(!where)return Promise.reject(new Error('There is nothing to host on here. Run the Marrowborn server on a computer, or host from the Android app.'));
+    if(!where)return Promise.reject(new Error('There is nothing to host on here. Run the Ashes to Apex server on a computer, or host from the Android app.'));
     if(where==='local'){
       var b=bridge(),r;
       if(!b)return Promise.reject(new Error('This device cannot host a game.'));
@@ -147,7 +147,7 @@ var MBNet={
     var t=target?parseTarget(target):served()?servedAddr():null;
     if(!t)return Promise.reject(new Error('No server.'));
     if(typeof fetch!=='function')return Promise.reject(new Error('unsupported'));
-    return fetch('http://'+t+'/api/info',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){if(!j||j.name!=='marrowborn')throw new Error('not a Marrowborn server');var r=j.rooms||[];r.single=!!(j.server&&j.server.single);return r});
+    return fetch('http://'+t+'/api/info',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){if(!j||j.name!=='marrowborn')throw new Error('not an Ashes to Apex server');var r=j.rooms||[];r.single=!!(j.server&&j.server.single);return r});
   },
   setReady:function(v){raw('R'+(v?1:0));var me=member(MBNet.id);if(me&&me.ready!==!!v){me.ready=!!v;emit('net:ready',{id:MBNet.id,ready:!!v})}},
   setName:function(n){n=cleanName(n);if(!n)return;store.set('mpname',n);var me=member(MBNet.id);if(me&&me.name!==n){me.name=n;raw('N'+encodeURIComponent(n));emit('net:name',{id:MBNet.id,name:n})}},
@@ -419,10 +419,10 @@ function showMenu(message){
             if(rooms.single&&!first.hidden){first.hidden=true;sub.textContent='The game hosted on this device';var j=list.querySelector('button');if(doc.activeElement===doc.body&&j)try{j.focus({preventScroll:true})}catch(e){}}
             roomRows(list,rooms,function(r){go(MBNet.join(null,{name:typedName(),room:r.code}),'Joining…')},rooms.single);
           },
-          function(){if(screen==='menu'){list.textContent='';list.appendChild(h('p',{class:'dim',text:'This page was not opened from a Marrowborn server. Use "Join another host".'}))}});
+          function(){if(screen==='menu'){list.textContent='';list.appendChild(h('p',{class:'dim',text:'This page was not opened from an Ashes to Apex server. Use "Join another host".'}))}});
       };
       fill();roomsTimer=setInterval(fill,2500);
-    }else if(!canLocal)p.appendChild(h('p',{class:'dim mbx-center',text:'To host a game, run the Marrowborn server on a computer, or host from the Android app. This device can join either.'}));
+    }else if(!canLocal)p.appendChild(h('p',{class:'dim mbx-center',text:'To host a game, run the Ashes to Apex server on a computer, or host from the Android app. This device can join either.'}));
     p.appendChild(msgLine(message,!!message));
     p.appendChild(actions);
     return touch()?p:first;

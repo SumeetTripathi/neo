@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no"><style>body{margin:0}[hidden]{display:none!important}*{-webkit-tap-highlight-color:transparent}</style>
-<title>Marrowborn</title>
+<title>Ashes to Apex</title>
 
 <meta name="theme-color" content="#070912">
 <!-- installable from a browser (Add to Home Screen on iOS, Install in Chrome and Edge); harmless inside the app -->
@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Marrowborn">
+<meta name="apple-mobile-web-app-title" content="Ashes to Apex">
 <meta name="format-detection" content="telephone=no">
 <style>
 /* Fonts: Rajdhani (display, labels, numbers) and Barlow (text). Both SIL Open Font License 1.1, latin subset, bundled for offline use. */
@@ -30,6 +30,7 @@
   --pet-necro:#7fd66b; --pet-beast:#8fd3ff; --warn:#ff8497;
   --power:#8b4dff; --power-hi:#b89cff; --power2:#c4f4ff; --foe:#ff2d55; --gold:#f0b848;
   --mana:#5cd9ff; --mana2:#8f6bff;
+  --trial:#ff9950; --apex-dom:#c77dff; --apex-ord:#ffe7a3;
   --text:#d3d6ea; --line:#313a63; --plate:rgba(16,20,42,.92); --panel:rgba(9,11,24,.94);
   --r-common:#b9b2c6; --r-rare:#6ea3e0; --r-epic:#b88cff; --r-legendary:#f0b848;
   --display:"Rajdhani","Oswald","Barlow Condensed","Roboto Condensed","Arial Narrow",sans-serif;
@@ -428,9 +429,211 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .mbn-code{font-size:1.9rem}.mbn-code.long{font-size:1.6rem}.mbn-how{padding:5px 12px 6px}.mbn-members .mbn-li{min-height:34px}.mbn-url{font-size:1rem}
   .mbn-panel .mbx-msg{min-height:1.2em;font-size:.86rem}
 }
+/* ---- tower.js: the map of the climb (#mbt, a layer like #mbn), the seasoned-climb steps, the glimpse between floors (.mbt-peek) and the trial HUD (.trialHud).
+   Colours: --trial = ember, for trial floors and their HUD; --bh / --bf = a band's own colour and wash, set inline from MB.tower.bands; --k = a floor kind's colour.
+   .mbt-tiles = the four figures, .mbt-cols = tower beside next floors, .mbt-col = the scrolling tower, .mbt-band = one band (.here .done .far), .mbt-rail = how much of it is climbed,
+   .mbt-cp = a checkpoint (.open / .shut; a button when a climb can start there), .mbt-strip/.mbt-fl = the next ten floors, .mbt-about = the line about the chosen one ---- */
+#mbt{grid-area:1/1;position:relative;z-index:3;display:grid;place-items:center;padding:16px;box-sizing:border-box;min-width:0;min-height:0;overflow:auto;
+  background:radial-gradient(90% 70% at 50% 0,rgba(139,77,255,.14),transparent 70%),var(--ink)}
+.mbt-panel{max-width:800px;gap:10px}
+.mbt-head{display:flex;flex-direction:column;align-items:center;gap:8px}
+.mbt-ic{display:inline-grid;place-items:center;width:24px;height:24px;flex:none;color:var(--k,var(--power-hi))}
+.mbt-ic svg{display:block;width:100%;height:100%}
+.k-root{--k:var(--flesh)}.k-fight{--k:var(--power-hi)}.k-survive,.k-guard,.k-race,.k-ordeal,.k-cross{--k:var(--trial)}.k-guardian{--k:var(--foe)}
+.mbt-tiles{grid-template-columns:repeat(4,minmax(0,1fr))}
+.mbt-tiles b{font-size:1.6rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbt-tiles small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbt-tiles .mbt-t-now b{color:var(--power2)}.mbt-tiles .mbt-t-best b{color:var(--gold)}
+.mbt-tiles .mbt-t-band b{font-size:1.15rem;line-height:1.48;text-transform:uppercase}
+.mbt-cols{display:grid;grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:12px 20px;align-items:start}
+.mbt-cols>section{min-width:0;display:flex;flex-direction:column;gap:6px}
+.mbt-h{font-family:var(--display);font-size:.76rem;font-weight:600;letter-spacing:.13em;text-transform:uppercase;color:var(--power2);margin:0;padding-left:10px;box-shadow:inset 3px 0 0 var(--power)}
+.mbt-col{display:flex;flex-direction:column;gap:4px;max-height:344px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:2px 4px 2px 0;outline:0}
+.mbt-col:focus-visible{box-shadow:0 0 0 2px var(--power2)}
+.mbt-band{--bh:var(--power-hi);--bf:rgba(139,77,255,.15);position:relative;flex:none;margin-inline:calc(var(--i,0)*5px);padding:6px 10px 7px 22px;min-width:0;
+  background:linear-gradient(100deg,var(--bf),transparent 78%),rgba(17,22,46,.92);box-shadow:inset 0 0 0 1px var(--line);
+  clip-path:polygon(0 0,calc(100% - 9px) 0,100% 9px,100% 100%,9px 100%,0 calc(100% - 9px))}
+.mbt-band.here{box-shadow:inset 0 0 0 1px var(--bh),inset 0 0 22px var(--bf)}
+.mbt-band.far{opacity:.72}
+.mbt-rail{position:absolute;left:8px;top:8px;bottom:8px;width:5px;clip-path:polygon(0 3px,100% 0,100% calc(100% - 3px),0 100%);
+  background:linear-gradient(to top,var(--power2) calc(var(--pc,0)*100%),transparent 0),linear-gradient(to top,var(--bh) calc(var(--pb,0)*100%),var(--stone-2) 0)}
+.mbt-bhead{display:flex;flex-wrap:wrap;align-items:baseline;gap:1px 10px}
+.mbt-bn{font-family:var(--display);font-weight:700;font-size:1.1rem;line-height:1.15;letter-spacing:.05em;text-transform:uppercase;color:var(--bh);min-width:0;overflow-wrap:anywhere}
+.mbt-br{font-size:.72rem;letter-spacing:.12em;white-space:nowrap}
+.mbt-tags{display:flex;flex-wrap:wrap;gap:4px;margin-left:auto}
+.mbt-tag{font-family:var(--display);font-weight:700;font-size:.72rem;line-height:1.35;letter-spacing:.1em;text-transform:uppercase;white-space:nowrap;padding:1px 9px;font-variant-numeric:tabular-nums;clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%)}
+.mbt-tag.you{background:var(--power2);color:var(--ink)}
+.mbt-tag.best{background:rgba(240,184,72,.2);color:var(--gold)}
+.mbt-cprow{display:flex;align-items:center;gap:4px 10px;margin-top:4px;min-width:0}
+.mbt-cprow>.lab{font-size:.66rem;letter-spacing:.12em;flex:none}
+.mbt-cps{display:flex;flex-wrap:wrap;gap:5px;min-width:0}
+.mbt-cp,.mbt-cols button.mbt-cp{box-sizing:border-box;display:inline-grid;place-items:center;min-width:42px;height:26px;min-height:0;padding:0 11px;font-family:var(--display);font-weight:700;font-size:.92rem;line-height:1;letter-spacing:.04em;font-variant-numeric:tabular-nums;
+  clip-path:polygon(9px 0,calc(100% - 9px) 0,100% 50%,calc(100% - 9px) 100%,9px 100%,0 50%);box-shadow:none;background:var(--stone-2);color:var(--ash)}
+.mbt-cp.shut{opacity:.5;background:repeating-linear-gradient(-60deg,var(--stone-2) 0 3px,rgba(39,46,77,.35) 3px 6px)}
+.mbt-cp.open{background:rgba(240,184,72,.24);color:var(--gold)}
+.mbt-cols button.mbt-cp.open{height:32px;min-width:50px;background:linear-gradient(100deg,#5f2bd6,#8b4dff 55%,#a273ff);color:#fff}
+.mbt-cols button.mbt-cp:focus-visible{background:var(--power2);color:var(--ink);box-shadow:none}
+.mbt-strip{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}
+.mbt-strip button.mbt-fl{--c:7px;--e:var(--line);--f:rgba(17,22,46,.94);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;min-width:0;min-height:62px;padding:5px 1px 4px;letter-spacing:0;text-transform:none}
+.mbt-fl b{font-family:var(--display);font-weight:700;font-size:1.05rem;line-height:1;font-variant-numeric:tabular-nums;color:var(--bone)}
+.mbt-fl small{font-family:var(--display);font-weight:600;font-size:.6rem;line-height:1.1;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbt-strip button.mbt-fl.k-guardian{--e:rgba(255,45,85,.6);--f:linear-gradient(160deg,rgba(255,45,85,.24),rgba(17,22,46,.94) 70%)}
+.mbt-strip button.mbt-fl.k-survive,.mbt-strip button.mbt-fl.k-guard,.mbt-strip button.mbt-fl.k-race,.mbt-strip button.mbt-fl.k-ordeal,.mbt-strip button.mbt-fl.k-cross{--e:rgba(255,153,80,.45)}
+.mbt-strip button.mbt-fl[aria-pressed="true"]{--e:var(--k);box-shadow:inset 0 0 0 2px var(--k);filter:brightness(1.15)}
+.mbt-strip button.mbt-fl:focus-visible{box-shadow:inset 0 0 0 2px var(--power2),inset 0 0 14px rgba(196,244,255,.45)}
+.mbx-panel .mbt-about{font-size:.9rem;line-height:1.4;min-height:4.2em;color:var(--text)}
+.mbt-about b{display:block;font-family:var(--display);font-weight:700;font-size:.9rem;letter-spacing:.1em;text-transform:uppercase;color:var(--power2)}
+.mbx-panel .mbt-note{font-size:.88rem;line-height:1.4;color:var(--ash);text-align:center}
+.mbt-next .mbt-note{text-align:left;border-top:1px solid var(--stone-2);padding-top:8px}
+.mbx-panel .mbt-co{text-align:left;color:var(--text);padding:7px 14px;background:rgba(17,22,46,.9);box-shadow:inset 3px 0 0 var(--power2)}
+.mbt-co b,.mbt-warn b{font-family:var(--display);font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.mbt-co b{color:var(--power2)}
+.mbt-test{display:flex;justify-content:center}
+/* the steps of a seasoned start */
+.mbt-trail{display:flex;flex-wrap:wrap;justify-content:center;gap:5px}
+.mbt-trail span{font-family:var(--display);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;color:var(--bone);padding:2px 12px;background:rgba(139,77,255,.3);clip-path:polygon(7px 0,100% 0,calc(100% - 7px) 100%,0 100%);font-variant-numeric:tabular-nums}
+.mbt-trail.big span{font-size:1.05rem;padding:4px 16px}
+.mbt-trail span:first-child{background:var(--power2);color:var(--ink);font-weight:700}
+.mbt-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:7px;max-height:min(46vh,330px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:2px 6px 2px 0}
+.mbt-pick button.mbt-cpb{--c:8px;--e:var(--bh);--f:linear-gradient(110deg,var(--bf),rgba(17,22,46,.94) 75%);display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;min-width:0;min-height:50px;padding:6px 10px 6px 14px;letter-spacing:0;text-transform:none}
+.mbt-cpb b{font-family:var(--display);font-weight:700;font-size:1.12rem;line-height:1.05;letter-spacing:.04em;text-transform:uppercase;font-variant-numeric:tabular-nums}
+.mbt-cpb small{font-family:var(--display);font-weight:600;font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bh);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mbt-cards{max-height:min(52vh,380px);overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:2px 6px 2px 0;box-sizing:border-box}
+.mbt-cards.two{grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr))}
+.mbt-cards button[aria-pressed="true"],.mbt-pick button[aria-pressed="true"]{--e:var(--power2);box-shadow:inset 0 0 0 2px var(--power2)}
+.mbx-panel .mbt-warn{padding:9px 14px;background:rgba(255,45,85,.1);box-shadow:inset 3px 0 0 var(--foe);color:var(--text)}
+.mbt-warn b{color:var(--warn)}
+.mbt-kit{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(250px,100%),1fr));gap:0 22px;margin:0;font-size:.88rem}
+.mbt-kit div{display:flex;gap:10px;align-items:baseline;padding:3px 0;border-bottom:1px solid var(--stone-2);min-width:0}
+.mbt-kit dt{flex:0 0 86px;font-size:.72rem}.mbt-kit dd{margin:0;min-width:0;color:var(--text);overflow-wrap:anywhere}
+.mbt-testing b{color:var(--gold);font-family:var(--display);letter-spacing:.06em;text-transform:uppercase}
+.mbt-panel button.mbt-mini{--c:5px;min-height:30px;padding:2px 12px;font-size:.8rem;margin-left:6px;vertical-align:middle}
+.mbt-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.stage:has(#mbt:not([hidden])) #mbHint.on{opacity:0}
+
+/* ---- the apex tier. game.js builds the choice cards (.apexCard with .apexDominion or .apexOrder) and the ledger chip (.chipApex); tower.js reuses the cards in its start steps.
+   Dominion: a dark ground under a jagged crown line. Order: a pale ground lit from above, under a broken ring. ---- */
+.cards button.apexCard{--c:14px;padding:20px 15px 15px 20px;gap:6px;overflow:hidden}
+.cards button.apexCard b{font-size:1.5rem;letter-spacing:.06em}
+.cards button.apexCard::before{content:"";position:absolute;pointer-events:none}
+.cards button.apexDominion{--e:var(--apex-dom);--f:radial-gradient(130% 90% at 50% 118%,rgba(120,40,190,.5),transparent 62%),linear-gradient(#150a26,#07040e)}
+.cards button.apexDominion b{color:#ecdcff}
+.cards button.apexDominion small{color:var(--apex-dom)}
+.cards button.apexDominion::before{left:0;right:0;top:0;height:9px;background:var(--apex-dom);opacity:.85;
+  clip-path:polygon(0 0,100% 0,100% 100%,94% 30%,88% 100%,82% 30%,76% 100%,70% 30%,64% 100%,58% 30%,52% 100%,46% 30%,40% 100%,34% 30%,28% 100%,22% 30%,16% 100%,10% 30%,4% 100%,0 30%)}
+.cards button.apexOrder{--e:var(--apex-ord);--f:radial-gradient(120% 80% at 50% -22%,rgba(255,231,163,.4),transparent 64%),linear-gradient(#1b2036,#10142a)}
+.cards button.apexOrder b{color:#fff8e2}
+.cards button.apexOrder small{color:var(--apex-ord)}
+.cards button.apexOrder::before{right:-26px;top:-26px;width:84px;height:84px;border-radius:50%;border:3px solid var(--apex-ord);border-left-color:transparent;border-bottom-color:rgba(159,232,255,.55);opacity:.6;transform:rotate(-18deg)}
+.cards button.apexCard:hover,.cards button.apexCard:focus-visible{filter:brightness(1.2)}
+.ledger li.chipApex,.chipApex{--e:var(--power2);--f:linear-gradient(100deg,rgba(139,77,255,.6),rgba(196,244,255,.24));color:#fff;opacity:1;font-weight:700}
+.ledger li.chipApex.apexDominion,.chipApex.apexDominion{--e:var(--apex-dom);--f:linear-gradient(100deg,#07040e,#2c1150);color:#ecdcff}
+.ledger li.chipApex.apexOrder,.chipApex.apexOrder{--e:var(--apex-ord);--f:linear-gradient(100deg,rgba(255,231,163,.34),rgba(159,232,255,.16));color:#fff8e2}
+
+/* the two doors after a crossroads floor (#ovPanel.doorPanel, button.doorCard[data-door]): each card is a doorway, its arch drawn in the corner; trial reward screens (#ovPanel.trialPanel) take the ember accent */
+.cards button.doorCard{--c:14px;--e:rgba(255,153,80,.7);--f:linear-gradient(180deg,rgba(255,153,80,.16),rgba(17,22,46,.94) 58%);padding:14px 58px 14px 18px;overflow:hidden}
+.cards button.doorCard small{color:var(--trial)}
+.cards button.doorCard::before{content:"";position:absolute;pointer-events:none;right:14px;top:14px;width:26px;height:40px;border:2px solid var(--trial);border-bottom:0;border-radius:14px 14px 0 0;opacity:.75;
+  background:linear-gradient(var(--trial),var(--trial)) 50% 100%/2px 62% no-repeat}
+.cards button.doorCard[data-door="wrath"]{--e:rgba(255,45,85,.75)}.cards button.doorCard[data-door="wrath"]::before{border-color:var(--foe)}
+.cards button.doorCard:hover::before,.cards button.doorCard:focus-visible::before{opacity:1}
+.panel.trialPanel .kick,.panel.doorPanel .kick{color:#ffd9b8;background:linear-gradient(90deg,rgba(255,153,80,.12),rgba(255,153,80,.4),rgba(255,153,80,.12))}
+.panel.trialPanel h2::after,.panel.doorPanel h2::after{background:var(--trial)}
+.panel.apexPanel h2::after{background:linear-gradient(90deg,var(--apex-dom),var(--apex-ord));width:120px}
+/* ---- the trial HUD: a slanted band over the top edge of the arena (under the floating vitals on a phone held sideways). It never takes a touch.
+   .k-<kind>, .s-start .s-clear .s-fail = the moment, .urgent = little time or little relic left, .done = the trial is over and only the outcome shows ---- */
+.trialHud{--k:var(--trial);grid-area:1/1;position:relative;z-index:2;align-self:start;justify-self:center;margin:10px 10px 0;box-sizing:border-box;max-width:min(620px,calc(100% - 20px));pointer-events:none;
+  display:flex;flex-wrap:wrap;align-items:center;gap:3px 14px;padding:6px 26px 7px 14px;color:var(--text);
+  background:linear-gradient(90deg,rgba(46,24,10,.95),rgba(9,11,24,.93) 70%);box-shadow:inset 4px 0 0 var(--k);clip-path:polygon(0 0,100% 0,calc(100% - 14px) 100%,0 100%)}
+.th-ico{display:grid;flex:none}.th-ico .mbt-ic{width:28px;height:28px;color:var(--k)}
+.th-text{display:flex;flex-direction:column;flex:1 1 210px;min-width:0}
+.th-top{display:flex;align-items:baseline;gap:9px}
+.th-kind{font-family:var(--display);font-weight:700;font-size:1.02rem;line-height:1.1;letter-spacing:.1em;text-transform:uppercase;color:var(--bone)}
+.th-state{font-family:var(--display);font-weight:700;font-size:.7rem;letter-spacing:.18em;text-transform:uppercase;color:var(--k)}
+.th-rule{font-size:.86rem;line-height:1.3;text-wrap:pretty}
+.th-meters{display:flex;flex-direction:column;align-items:flex-end;gap:2px;flex:none}
+.th-m{display:flex;align-items:center;gap:7px}
+.th-m .lab{font-size:.66rem;letter-spacing:.14em}
+.th-bar{display:block;width:92px;height:7px;background:var(--stone-2);transform:skewX(-24deg);flex:none}
+.th-bar i{display:block;height:100%;width:0;background:var(--k)}
+.th-m b{font-family:var(--display);font-weight:700;font-size:1.05rem;line-height:1;letter-spacing:.03em;color:var(--bone);font-variant-numeric:tabular-nums;min-width:2.7em;text-align:right;white-space:nowrap}
+.th-cap{font-family:var(--display);font-weight:700;font-size:.74rem;line-height:1.4;letter-spacing:.12em;text-transform:uppercase;color:var(--ink);background:var(--k);padding:1px 10px;white-space:nowrap;clip-path:polygon(6px 0,100% 0,calc(100% - 6px) 100%,0 100%)}
+.th-obj .th-bar i{background:var(--power2)}
+.th-obj.low .th-bar i{background:var(--foe)}.th-obj.low b{color:var(--warn)}
+.trialHud.urgent .th-time b{color:var(--warn)}
+.trialHud.urgent .th-time .th-bar i{background:var(--foe)}
+.trialHud.urgent{animation:mbUrgent .7s ease-in-out infinite}
+.trialHud.s-start{animation:mbIn .25s ease-out both,mbTrial 1.2s .1s ease-out both}
+.trialHud.s-clear{--k:var(--power2);background:linear-gradient(90deg,rgba(18,52,66,.95),rgba(9,11,24,.93) 70%)}
+.trialHud.s-clear .th-state{color:var(--ink);background:var(--power2);padding:0 9px;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+.trialHud.s-fail{--k:var(--foe);background:linear-gradient(90deg,rgba(72,10,26,.95),rgba(9,11,24,.93) 70%)}
+.trialHud.s-fail .th-state{color:#fff;background:var(--foe);padding:0 9px;clip-path:polygon(5px 0,100% 0,calc(100% - 5px) 100%,0 100%)}
+.trialHud.done{animation:mbIn .2s ease-out both}
+@keyframes mbTrial{0%{filter:brightness(2)}100%{filter:none}}
+@keyframes mbUrgent{50%{box-shadow:inset 4px 0 0 var(--foe),inset 0 0 22px rgba(255,45,85,.5)}}
+.stage:has(#ov:not([hidden])) .trialHud,.stage:has(#mbx:not([hidden])) .trialHud,.stage:has(#mbn:not([hidden])) .trialHud{visibility:hidden}
+/* a hint would sit on the trial: it moves to the foot of the arena */
+.stage:has(.trialHud:not([hidden])) #mbHint{align-self:end;margin-bottom:12px}
+
+/* ---- the glimpse between floors: this floor and the next four, at the foot of the arena for a few seconds as a floor begins ---- */
+.mbt-peek{--bh:var(--power-hi);--bf:rgba(139,77,255,.15);grid-area:1/1;position:relative;z-index:2;align-self:end;justify-self:center;margin:0 10px 12px;box-sizing:border-box;max-width:calc(100% - 20px);pointer-events:none;
+  display:flex;align-items:center;gap:6px 16px;padding:5px 22px;background:linear-gradient(90deg,var(--bf),transparent),rgba(9,11,24,.92);box-shadow:inset 0 -2px 0 var(--bh);
+  clip-path:polygon(12px 0,100% 0,calc(100% - 12px) 100%,0 100%);opacity:0;transform:translateY(10px);transition:opacity .3s,transform .3s}
+.mbt-peek.on{opacity:1;transform:none}
+.mbt-pk{display:flex;align-items:center;gap:5px;min-width:0}
+.mbt-pk b{font-family:var(--display);font-weight:700;font-size:.9rem;line-height:1;letter-spacing:.06em;text-transform:uppercase;color:var(--ash);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mbt-pk .mbt-ic{width:18px;height:18px}
+.mbt-pk.now{display:grid;grid-template-columns:auto auto;gap:0 8px}
+.mbt-pk.now .mbt-ic{width:26px;height:26px;grid-row:1/3;align-self:center}
+.mbt-pk.now b{font-size:1.05rem;color:var(--bone);align-self:end}
+.mbt-pk.now small{font-family:var(--display);font-weight:600;font-size:.66rem;line-height:1.2;letter-spacing:.12em;text-transform:uppercase;color:var(--bh);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}
+.mbt-pkup{display:flex;align-items:center;gap:12px;padding-left:16px;box-shadow:inset 1px 0 0 var(--line)}
+.stage:has(#ov:not([hidden])) .mbt-peek,.stage:has(#mbx:not([hidden])) .mbt-peek,.stage:has(#mbn:not([hidden])) .mbt-peek,.stage:has(#mbt:not([hidden])) .mbt-peek,.stage:has(#mbHint.on) .mbt-peek{opacity:0}
+@media (prefers-reduced-motion:reduce){.trialHud,.trialHud.urgent,.trialHud.s-start,.trialHud.done{animation:none}.mbt-peek{transition:none;transform:none}
+  .trialHud.urgent{box-shadow:inset 4px 0 0 var(--foe),inset 0 0 0 1px var(--foe)}}
+@media (pointer:coarse){.mbt-cols button.mbt-cp.open{height:44px;min-width:56px}}
+@media (max-width:600px){
+  .mbt-cols{grid-template-columns:minmax(0,1fr)}.mbt-col{max-height:none;overflow:visible;padding-right:0}.mbt-band{margin-inline:calc(var(--i,0)*3px)}
+  .mbt-next{order:-1}.mbt-tiles{grid-template-columns:repeat(2,minmax(0,1fr))}.mbt-tiles b{font-size:1.4rem}.mbt-tiles .mbt-t-band b{font-size:1.05rem;line-height:1.4}
+  .mbx-panel .mbt-about{min-height:5.6em}
+  .mbt-pick,.mbt-cards{max-height:none;overflow:visible;padding-right:0}
+}
+@media (max-width:480px){
+  #mbt{padding:8px}
+  .trialHud{margin:4px 4px 0;max-width:calc(100% - 8px);padding:4px 18px 5px 10px;gap:1px 8px}
+  .th-ico .mbt-ic{width:22px;height:22px}.th-kind{font-size:.9rem}.th-state{font-size:.62rem}
+  .th-text{flex-basis:150px}.th-rule{font-size:.76rem;line-height:1.22;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .th-meters{flex-direction:row;flex-wrap:wrap;gap:1px 10px;flex:1 1 100%;padding-left:30px}.th-bar{width:54px;height:6px}.th-m b{font-size:.92rem;min-width:0}.th-m .lab{font-size:.6rem;letter-spacing:.08em}
+  .mbt-peek{margin-bottom:6px;padding:4px 16px;gap:4px 10px}.mbt-pkup{gap:8px;padding-left:10px}.mbt-pk.now small{max-width:110px}
+}
+@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
+  #mbt{padding:8px;width:100%;height:100%}
+  .stage:has(#mbt:not([hidden]))~.touch,.stage:has(#mbt:not([hidden]))~.vitals{visibility:hidden}
+  .mbt-panel{max-width:780px;gap:6px;max-height:100%;overflow-x:hidden;overflow-y:auto}
+  .mbt-panel>*{flex-shrink:0}
+  .mbt-head{flex-direction:row;justify-content:center;gap:14px}.mbt-head h2::after{display:none}
+  .mbt-tiles{grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}.mbt-tiles b{font-size:1.15rem}.mbt-tiles .mbt-t-band b{font-size:.95rem;line-height:1.2}.mbt-tiles small{font-size:.66rem}
+  .mbt-cols{grid-template-columns:minmax(0,1.08fr) minmax(0,1fr);gap:8px 16px}
+  .mbt-col{max-height:max(120px,calc(100vh - 222px));overflow-y:auto;padding-right:4px}.mbt-next .mbt-opt{display:none}.mbt-band{margin-inline:calc(var(--i,0)*4px)}
+  .mbt-strip button.mbt-fl{min-height:50px;padding:3px 1px 2px}.mbt-fl .mbt-ic{width:20px;height:20px}
+  .mbx-panel .mbt-about{font-size:.82rem;line-height:1.3;min-height:0}.mbx-panel .mbt-note{font-size:.8rem;line-height:1.3}
+  .mbt-pick{max-height:max(104px,calc(100vh - 200px));overflow-y:auto}.mbt-cards{max-height:max(110px,calc(100vh - 190px));overflow-y:auto}
+  .mbt-panel .cards button{padding:8px 10px 9px 15px}.mbt-panel .cards button.apexCard{padding:16px 12px 10px 16px}
+  .mbx-panel .mbt-warn{padding:6px 12px}
+  /* the trial sits under the floating vitals (tower.js measures them into --th-top), on the side away from the buttons */
+  .trialHud{justify-self:start;margin:var(--th-top,58px) 0 0 max(12px,env(safe-area-inset-left,0px));max-width:min(340px,46vw);padding:4px 20px 5px 10px;gap:1px 8px;background:linear-gradient(90deg,rgba(46,24,10,.86),rgba(9,11,24,.8) 70%)}
+  .mb-left .trialHud{justify-self:end;margin-left:0;margin-right:max(12px,env(safe-area-inset-right,0px))}
+  .th-ico .mbt-ic{width:22px;height:22px}.th-kind{font-size:.88rem}.th-state{font-size:.6rem}
+  .th-text{flex-basis:150px}.th-rule{font-size:.74rem;line-height:1.2;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+  .th-meters{flex-direction:row;flex-wrap:wrap;gap:1px 10px;flex:1 1 100%;padding-left:30px}.th-bar{width:50px;height:6px}.th-m b{font-size:.9rem;min-width:0}.th-m .lab{font-size:.58rem;letter-spacing:.08em}
+  .stage:has(.trialHud:not([hidden])) #mbHint{margin-bottom:10px}
+  .mbt-peek{margin-bottom:8px;max-width:calc(100% - 320px);padding:4px 16px;gap:4px 10px}.mbt-pkup{gap:8px;padding-left:10px}.mbt-pk.now small{max-width:120px}
+}
+@supports (height:100dvh){@media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
+  .mbt-col{max-height:max(120px,calc(100dvh - 222px))}.mbt-pick{max-height:max(104px,calc(100dvh - 200px))}.mbt-cards{max-height:max(110px,calc(100dvh - 190px))}}}
 /* ---- browsers other than the Android app: iPhone notch and home indicator, and the moving toolbar of mobile Safari ---- */
 @media (orientation:landscape) and (pointer:coarse) and (max-height:600px){
-  #ov,#mbx,#mbx.mbx-veil,#mbn{padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
+  #ov,#mbx,#mbx.mbx-veil,#mbn,#mbt{padding-left:max(8px,env(safe-area-inset-left,0px));padding-right:max(8px,env(safe-area-inset-right,0px));padding-bottom:max(8px,env(safe-area-inset-bottom,0px))}
 }
 @supports (height:100dvh){
   body{min-height:100dvh}
@@ -444,7 +647,7 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
 
 <main class="wrap">
   <header>
-    <h1>Marrowborn</h1>
+    <h1>Ashes to Apex</h1>
     <p id="lvl">A crypt. A pile of bones.</p>
   </header>
   <ul class="ledger" id="ledger" aria-label="Body parts recovered"></ul>
@@ -485,6 +688,7 @@ P.roundRect=function(x,y,w,h,r){if(w<0){x+=w;w=-w}if(h<0){y+=h;h=-h}r=typeof r==
 <script src="render3d.js"></script>
 <script src="extras.js"></script>
 <script src="net.js"></script>
+<script src="tower.js"></script>
 
 
 </html>

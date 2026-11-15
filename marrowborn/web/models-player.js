@@ -45,7 +45,7 @@ function dimOf(m){const i=INFO.get(m);return i?mat(i[0],Object.assign({},i[1]||{
 // its model and never shared with the style cache
 function slashMat(){const m=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});NOL.add(m);return m}
 // a flat see-through decal that darkens the floor (the dominion's ground): this file's own cache, never mutated
-function decal(hex,op){const k='d'+hex+'|'+op;let m=MATS[k];if(!m){m=MATS[k]=new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op,depthWrite:false,fog:false})}NOL.add(m);return m}
+function decal(hex,op){const k='d'+hex+'|'+op;let m=MATS[k];if(!m){m=MATS[k]=new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op,depthWrite:false,fog:false});m.color.convertSRGBToLinear()}NOL.add(m);return m}
 // which apex path the owner walks (null before floor 100). The local hero may be forced by the renderer's test hook.
 function apexOf(MB){let a=MB.renderer&&MB.renderer.testApex;if(!a){a=MB.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=MB.S&&MB.S.apex}return a==='dominion'||a==='order'?a:null}
 const _tc=new T.Color(),_tc2=new T.Color();
