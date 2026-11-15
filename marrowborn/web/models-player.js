@@ -55,7 +55,7 @@ function apexOf(MB){let a=MB.renderer&&MB.renderer.testApex;if(!a){a=MB.apex;if(
 const APX={
   beasts:{a:0x5fe07a,h:0xd8ffd0,g:0x3d2f1c,k:.55,e:0x16380f,ek:.3,cape:0x4a3822},
   frost:{a:0x8fd8ff,h:0xf2fbff,g:0x8fb4d6,k:.6,e:0x2f6aa8,ek:.35,cape:0xb9d6ea},
-  plague:{a:0xb7c61f,h:0xe8f08a,g:0x34361c,k:.62,e:0x2c3a06,ek:.35,cape:0x2a2c14},
+  plague:{a:0x9fc414,h:0xb878d8,g:0x34361c,k:.62,e:0x2c3a06,ek:.35,cape:0x2a2c14},
   flame:{a:0xff6a1e,h:0xffd27a,g:0x17100e,k:.72,e:0x8a2204,ek:.45,cape:0x1c0f0b},
   storm:{a:0xffe74a,h:0xfffbe0,g:0x222b48,k:.6,e:0x28387a,ek:.35,cape:0x1a2240},
   stone:{a:0xe0a84a,h:0xffe0a0,g:0x7d8088,k:.66,e:0,ek:0,cape:0x55565c},
@@ -484,11 +484,12 @@ const APEX_NEW={
     const Bn=mat(C.bone),Fur=mat(0x8a6a3c),FurD=mat(0x5a4426),G1=lit(A.a,1.5,0xd8ffd0),hy=headY(c);
     s.ahead.position.set(0,hy-2.6,-.6);
     for(const k of[-1,1]){
-      b.bone('ahead',Bn,k*3,0,0,k*8.5,7,-1.5,1.25,1.4,1.2);b.bone('ahead',Bn,k*8.5,7,-1.5,k*12.5,16,-.5,1.05,0,1);b.bone('ahead',Bn,k*12.5,16,-.5,k*10.5,24,.8,.85,0,0);
-      b.spike('ahead',Bn,k*10.5,24,.8,-k*.2,1,.2,5.5,.85);
-      b.spike('ahead',Bn,k*6,3.6,-.8,k*.25,.9,.9,7,.95);b.spike('ahead',Bn,k*9.5,9.5,-1.3,k*1,.7,.1,8.5,.95);
-      b.spike('ahead',Bn,k*12.4,15.5,-.6,k*1,.55,-.2,8,.9);b.spike('ahead',Bn,k*11.6,19.5,0,-k*.9,.9,0,6.5,.8);
-      b.fine=true;b.sp('ahead',G1,k*10.4,29.6,1.2,.9);b.sp('ahead',G1,k*18.4,19.6,-2,.8);b.sp('ahead',G1,k*16,14.6,-.4,.8);b.fine=false;
+      b.bone('ahead',Bn,k*3,0,0,k*9,7,-1.5,1.9,2,1.8);b.bone('ahead',Bn,k*9,7,-1.5,k*13.5,16,-.5,1.6,0,1.5);b.bone('ahead',Bn,k*13.5,16,-.5,k*11.5,25,.8,1.3,0,0);
+      b.spike('ahead',Bn,k*11.5,25,.8,-k*.2,1,.2,6.5,1.3);
+      b.spike('ahead',Bn,k*6,3.6,-.8,k*.25,.9,.9,8,1.4);b.spike('ahead',Bn,k*10,9.5,-1.3,k*1,.7,.1,10,1.4);
+      b.spike('ahead',Bn,k*13.4,15.5,-.6,k*1,.55,-.2,9.5,1.3);b.spike('ahead',Bn,k*12.6,20,0,-k*.9,.9,0,7.5,1.2);
+      b.fine=true;b.sp('ahead',G1,k*11.2,31.6,1.4,1.2);b.sp('ahead',G1,k*21,20.6,-2.3,1.1);b.sp('ahead',G1,k*17.6,15.4,-.2,1.1);b.fine=false;
+      
     }
     for(const[x,y,z,r]of[[0,19.2,-3,4.8],[5.6,18.6,-1.6,4.4],[-5.6,18.6,-1.6,4.4],[9.4,17.2,-.6,3.5],[-9.4,17.2,-.6,3.5],[3,18.4,2.2,2.6],[-3,18.4,2.2,2.6]])b.sp('aback',Fur,x,y,z,r,1,.72,1);
     for(let i=0;i<9;i++){const a=(i-4)*.36;b.spike('aback',i%2?FurD:Fur,Math.sin(a)*9.8,17.4,-2.6-Math.cos(a)*2.2,Math.sin(a)*.5,-1,-.5,5.5+(i%3),1.8,.6)}
@@ -523,17 +524,17 @@ const APEX_NEW={
   },
   // The Slow Rot: cracked bone piling up on one shoulder and weeping, sickly motes adrift, a blotched stain that bubbles
   plague(b,s,ud,c,A,gp,gp2,W){
-    const Bn=mat(0xcfc79a),BnD=mat(0x8f8a5c),Dk=mat(0x15120a),Pu=lit(A.a,1.5,0xe8f08a),Br=mat(0x6b3a7a,{emissive:0x3a1450,emissiveIntensity:.4}),Drip=lit(A.a,.9,0x8f9a18),hy=headY(c);
-    for(const[x,y,z,r]of[[9,18.5,-.5,4.4],[12.4,22.8,-1.8,3.8],[9.4,26.8,-2.8,3.2],[13.8,28,-1,2.4],[6,21.5,-3.4,2.7],[14.8,18,-1,2.5]])b.sp('aback',Bn,x,y,z,r,1,.92,1);
+    const Bn=mat(0xa89c6c),BnD=mat(0x6e6840),Dk=mat(0x15120a),Pu=lit(A.a,1.5,0xe8f08a),Br=mat(0x6b3a7a,{emissive:0x3a1450,emissiveIntensity:.4}),Drip=lit(A.a,.9,0x8f9a18),hy=headY(c);
+    for(const[x,y,z,r]of[[9,18.5,-.5,5.4],[13,23.4,-1.8,4.8],[9.6,28.6,-2.8,4.2],[15,30,-1,3.2],[5.6,22.5,-3.6,3.4],[16,18,-1,3.2],[11.5,33.5,-2.4,2.6]])b.sp('aback',Bn,x,y,z,r,1,.92,1);b.spike('aback',BnD,11.5,35,-2.4,.2,1,-.2,7,1.3);b.spike('aback',BnD,16,24,-1.6,1,.5,-.1,8,1.4);
     b.spike('aback',BnD,12.4,24,-1.8,.9,.8,-.2,7.5,1.2);b.spike('aback',BnD,9.4,28.6,-2.8,-.2,1,-.3,7,1.1);b.spike('aback',BnD,14.8,18,-1,1,.1,0,6,1);b.spike('aback',BnD,13.8,29,-1,.6,1,.2,5,.9);
     b.sp('aback',Bn,-6.5,13,-4,2.9);b.sp('aback',Bn,-8.8,15.6,-3.2,2.1);b.spike('aback',BnD,-8.8,16,-3.2,-.8,.8,-.4,5,.85);
     b.fine=true;
-    b.sp('aback',Dk,10.4,19,2.9,1.6,1,1,.5);b.sp('aback',Dk,14,23.2,.9,1.3,1,1,.6);b.sp('aback',Dk,10.2,27.4,-.4,1.1,1,1,.6);
-    b.sp('aback',Pu,7.2,20.8,2,1.4);b.sp('aback',Pu,14.8,21.2,.8,1.2);b.sp('aback',Pu,11,25.4,.9,1.3);b.sp('aback',Pu,8,29,-1.8,1);b.sp('aback',Pu,-7.4,13.8,-1.5,1);
-    b.sp('aback',Br,12,20,2,1.6,1,1,.6);b.sp('aback',Br,-5.6,16.8,3,2.2,1,.6,.5);b.sp('aback',Br,4.4,10,3.7,1.8,.8,1,.4);
+    b.sp('aback',Dk,10.4,18.6,4,2,1,1,.5);b.sp('aback',Dk,14.6,24,2.2,1.7,1,1,.6);b.sp('aback',Dk,10.2,29.4,.8,1.5,1,1,.6);
+    b.sp('aback',Pu,6.6,20.8,3.4,1.7);b.sp('aback',Pu,16.6,21.6,1.8,1.5);b.sp('aback',Pu,11.4,26.4,2.4,1.6);b.sp('aback',Pu,7.4,31,.4,1.3);b.sp('aback',Pu,16.4,31.4,.8,1.1);b.sp('aback',Pu,-7.4,13.8,-1.5,1);
+    b.sp('aback',Br,13,20.6,3.4,2,1,1,.6);b.sp('aback',Br,8,25,1.2,1.8,1,1,.6);b.sp('aback',Br,-5.6,16.8,3,2.2,1,.6,.5);b.sp('aback',Br,4.4,10,3.7,1.8,.8,1,.4);
     b.cy('aback',Drip,10.4,15.4,2.9,.35,.5,6);b.sp('aback',Drip,10.4,12.2,2.9,.85,1,1.3,1);b.cy('aback',Drip,14.8,18.4,.8,.3,.4,5);b.sp('aback',Drip,14.8,15.8,.8,.7);
     b.fine=false;
-    b.sp('aback',glow(A.a,.14),11,23.5,-1,9.5);
+    
     s.ahead.position.set(0,hy-3,0);b.sp('ahead',Bn,3.6,.6,1.2,2.5,1,.9,1);b.spike('ahead',BnD,4.4,1.6,.6,.6,1,-.2,6,.95);b.spike('ahead',BnD,2.2,2,0,.1,1,-.4,4,.75);b.fine=true;b.sp('ahead',Pu,4.8,.4,3.1,.85);b.fine=false;
     for(let i=0;i<5;i++){const a=i*2.4+.5,R=14+hr(i)*11,y=12+i*9.5;b.sp('aorb',glow(A.a,.8),Math.cos(a)*R,y,Math.sin(a)*R,1.3);b.sp('aorb',glow(A.a,.2),Math.cos(a)*R,y,Math.sin(a)*R,3)}
     for(let i=0;i<4;i++){const a=i*1.7+2,R=18+hr(i+20)*9,y=8+i*12;b.sp('aorb2',glow(A.h,.7),Math.cos(a)*R,y,Math.sin(a)*R,1);b.sp('aorb2',glow(0x6b3a7a,.5),Math.cos(a)*R,y,Math.sin(a)*R,2.2)}
@@ -571,16 +572,16 @@ const APEX_NEW={
   // The Split Sky: hair and two long streamers blown straight back, a shard of lightning hanging behind the shoulders, arcs crawling over the body,
   // a forked scorch that stutters on the floor
   storm(b,s,ud,c,A,gp,gp2,W){
-    const Y=lit(A.a,1.8,0xfffbe0),Yg=glow(A.a,.45),Wh=glow(0xfffbe0,.95),Sl=mat(0x2a3350,{emissive:0x28387a,emissiveIntensity:.4}),hy=headY(c);
+    const Y=lit(A.a,1.8,0xfffbe0),Yg=glow(A.a,.45),Wh=glow(0xfffbe0,.95),Sl=mat(0xc9d2f0,{emissive:0x6a78c8,emissiveIntensity:.35}),hy=headY(c);
     s.ahead.position.set(0,hy-2.8,-1);
     for(const[x,y,l,r]of[[0,2,15,2.1],[2.6,1.2,12,1.8],[-2.6,1.2,12,1.8],[1.3,-.6,10,1.6],[-1.3,-.6,10,1.6],[4.2,-.8,8,1.4],[-4.2,-.8,8,1.4]])b.spike('ahead',Y,x,y,-1,x*.05,.3,-1,l,r,.6);
     s.aback.position.set(0,17.6,-4.2);s.aback2.position.set(0,-1.6,-15);
-    for(const k of[-1,1]){b.bx('aback',Sl,k*4.6,-.8,-7.5,3,.6,15.4,.1,k*-.1,0);b.bx('aback2',Sl,k*5.6,-.4,-7,2.6,.5,14.5,-.04,k*-.12,0);b.spike('aback2',Sl,k*6.6,-.1,-14,k*.15,0,-1,6,1.3,.2);
-      b.fine=true;b.bx('aback',Y,k*4.6,-.4,-7.5,.7,.5,14.6,.1,k*-.1,0);b.bx('aback2',Y,k*5.6,-.05,-7,.6,.4,14,-.04,k*-.12,0);b.fine=false}
+    for(const k of[-1,1]){b.bx('aback',Sl,k*4.6,-.8,-7.5,2.2,.5,15.4,.1,k*-.1,0);b.bx('aback2',Sl,k*5.6,-.4,-7,1.7,.4,14.5,-.04,k*-.12,0);b.spike('aback2',Sl,k*6.4,-.1,-14,k*.15,0,-1,8,.9,.2);b.spike('aback2',Sl,k*7.2,-.1,-12,k*.5,0,-1,6,.7,.2);
+      b.fine=true;b.bx('aback',Y,k*4.6,-.4,-7.5,.6,.5,14.6,.1,k*-.1,0);b.bx('aback2',Y,k*5.6,-.1,-7,.5,.4,14,-.04,k*-.12,0);b.fine=false}
     b.fine=true;
-    const BOLT=[-3,66,3.4,54,-2.2,52.6,4.2,41,-.8,40,2.6,28];zig(b,'aorb',Y,BOLT,-11,2.3);b.spike('aorb',Y,2.6,28,-11,.15,-1,0,6,1.4);
+    const BOLT=[-5,90,4.4,76,-3.2,74.4,5.6,61,-1.4,59.6,3.4,46];zig(b,'aorb',Y,BOLT,-12,2.6);b.spike('aorb',Y,3.4,46,-12,.15,-1,0,7,1.7);
     for(const f of['foreL','foreR'])b.to(f,Y,0,-7,0,2.4,.36);
-    b.fine=false;zig(b,'aorb',Yg,BOLT,-11,5.6);
+    b.fine=false;zig(b,'aorb',glow(A.a,.28),BOLT,-9,5.6);
     const ARC=[[-4,47,2,43,-3,39,3,35],[5,45,-1,41,4,36],[-2,30,3,26,-3,21,2,17],[4,58,-2,55,3,51],[-3,14,2,10,-2,5],[3,33,-3,29,1,24]],AZ=[5.5,-6,5,3,4.5,-6.5],AX2=[0,2,-9,0,3,9];
     for(let i=0;i<6;i++){zig(b,'it'+i,Wh,ARC[i].map((v,j)=>j%2?v:v+AX2[i]),AZ[i],.75);zig(b,'it'+i,Yg,ARC[i].map((v,j)=>j%2?v:v+AX2[i]),AZ[i],2.4)}
     fdisc(b,'aground',decal(0x04050c,.42),0,0,31,.5,20);
@@ -670,7 +671,7 @@ function apexAnim(ud,s,P,t,dt,show,mb,dl,ab,yv){
   }else if(ap==='storm'){
     const hs=typeof P.haste==='number'&&P.haste>0?Math.min(1,P.haste):0;ud.hsK+=(hs-ud.hsK)*Math.min(1,dt*6);const h=ud.hsK;
     s.ahead.rotation.set(Math.sin(t*11)*.05*(1+h)+mb*.1,0,Math.sin(t*8.3)*.04);
-    s.aback.rotation.set(-.3+mb*.3+h*.18+dl*.2+Math.sin(t*9)*.07*(1+h),0,-yv);s.aback2.rotation.set(.12+Math.sin(t*9-1.2)*.2*(1+h*.6),0,-yv*.8);
+    s.aback.rotation.set(-.42+mb*.42+h*.18+dl*.2+Math.sin(t*9)*.07*(1+h),0,-yv);s.aback2.rotation.set(-.2+mb*.25+Math.sin(t*9-1.2)*.22*(1+h*.6),Math.sin(t*6.1)*.1,-yv*.8);
     s.aorb.visible=show&&flick(t,11,0)>.14;s.aorb.scale.x=flick(t,5,3)>.5?1:-1;s.aorb.position.y=Math.sin(t*2.2)*1.2;
     for(i=0;i<6;i++){const o=s['it'+i];o.visible=flick(t,14,i)<.3+.5*h;o.rotation.y=Math.floor(t*14)*2.4+i}
     w=flick(t,9,5)>.45;s.aground2.visible=w;s.awave2.visible=!w&&flick(t,9,6)>.25;

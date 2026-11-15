@@ -1508,7 +1508,7 @@ const RANK_K={'':0,E:.22,D:.38,C:.54,B:.7,A:.85,S:1};
 // R.testApex forces the local hero's. The motes that rise off a hero take the path's colours [base rgb, hot rgb].
 function apexPath(B){let a=B===MB?R.testApex:null;if(!a){a=B.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=B.S&&B.S.apex}return typeof a==='string'&&APEX_OK[a]===1?a:null}
 const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5],
-  beasts:[.37,.88,.48,.85,1,.82],frost:[.56,.85,1,.95,.98,1],plague:[.72,.78,.12,.42,.23,.48],flame:[1,.42,.12,1,.82,.48],storm:[1,.9,.29,1,.98,.88],stone:[.88,.66,.29,.66,.67,.71],blade:[.56,.63,1,.93,.95,1],tide:[.1,.83,.77,.85,1,.97]},FOE_COL=[1,.16,.3,1,.72,.62];
+  beasts:[.37,.88,.48,.85,1,.82],frost:[.56,.85,1,.95,.98,1],plague:[.6,.76,.1,.6,.35,.7],flame:[1,.42,.12,1,.82,.48],storm:[1,.9,.29,1,.98,.88],stone:[.88,.66,.29,.66,.67,.71],blade:[.56,.63,1,.93,.95,1],tide:[.1,.83,.77,.85,1,.97]},FOE_COL=[1,.16,.3,1,.72,.62];
 if(typeof MB.on==='function')try{
   MB.on('bossdead',()=>{if(!alive)return;const x=FX.bx,z=FX.bz;drama('death',x,z,1.25);flashAt(x,34,z,60,330,0xffffff,.42,1);burstAt(x,34,z,90,420,PAL.power2,.38);crackAt(x,z,90,PAL.power,3.4)});
   MB.on('levelstart',()=>{clearFx();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
@@ -1626,7 +1626,7 @@ function allyBeams(allies,t,foe){
    Trails: a Feral Vow hero leaves ghostly paw prints, a Last Pyre hero scorched footprints; a Split Sky hero stutters after-images as it runs.
    A frozen monster that thaws or dies bursts into shards. All of it is built on first use and costs nothing until then. */
 const APEX_OK={dominion:1,order:1,beasts:1,frost:1,plague:1,flame:1,storm:1,stone:1,blade:1,tide:1},APX_ALLY={packbeast:1,icewight:1,cinder:1};
-const APEX_HEX={dominion:PAL.power,order:PAL.power2,beasts:0x5fe07a,frost:0x8fd8ff,plague:0xb7c61f,flame:0xff6a1e,storm:0xffe74a,stone:0xe0a84a,blade:0x8fa0ff,tide:0x19d3c5};
+const APEX_HEX={dominion:PAL.power,order:PAL.power2,beasts:0x5fe07a,frost:0x8fd8ff,plague:0x9fc414,flame:0xff6a1e,storm:0xffe74a,stone:0xe0a84a,blade:0x8fa0ff,tide:0x19d3c5};
 const APEX_DISC={dominion:.45,plague:.5,stone:.45,flame:.7,beasts:.6,blade:.7};
 const ALLY_HEX={packbeast:0x5fe07a,icewight:0x8fd8ff,cinder:0xff6a1e};
 const hsh=i=>{const v=Math.sin(i*12.9898+7.3)*43758.5453;return v-Math.floor(v)};
@@ -1717,7 +1717,7 @@ function quakeTexture(glow){const k=glow?'g':'d';if(quakeTex[k])return quakeTex[
   return quakeTex[k]=canvasTex(c,false)}
 pools.wave=new Pool(()=>{const g=new THREE.Group(),tg=new THREE.TorusGeometry(1,.13,6,18,2.1).rotateZ(-1.05).rotateX(-Math.PI/2),
     floor=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:waveTexture(),color:0x19d3c5,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}))),
-    crest=noLine(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0x1fa8c8,transparent:true,opacity:.62,depthWrite:false,toneMapped:false,fog:false}))),
+    crest=noLine(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0x1fa8c8,transparent:true,opacity:.62,side:THREE.DoubleSide,depthWrite:false,toneMapped:false,fog:false}))),
     foam=noLine(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0xd8fff8,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false})));
   floor.position.y=.5;floor.renderOrder=1;crest.renderOrder=3;foam.renderOrder=4;g.add(floor,crest,foam);g.userData={floor,crest,foam};return g});
 pools.quake=new Pool(()=>{const g=new THREE.Group(),
@@ -1731,7 +1731,7 @@ function drawWave(f,i,t,low){
   u.floor.scale.set(r*1.7,1,r*2.3);u.floor.position.x=-r*.42;u.floor.material.color.setHex(foe?PAL.foe:0x19d3c5);u.floor.material.opacity=.9*k;
   const hy=Math.min(9,(16+r*.12)/(.13*r))*k*sw;
   u.crest.position.set(-r*.86,0,0);u.crest.scale.set(r,r*hy,r);u.crest.material.color.setHex(foe?0x8a1430:0x1fa8c8);u.crest.material.opacity=.62*k;
-  u.foam.visible=!low;if(!low){u.foam.position.set(-r*.84,(16+r*.12)*k*sw*.92,0);u.foam.scale.set(r,r*.9,r);u.foam.material.color.setHex(foe?PAL.foe2:0xd8fff8);u.foam.material.opacity=.8*k}
+  u.foam.visible=!low;if(!low){u.foam.position.set(-r*.84,(16+r*.12)*k*sw*.92,0);u.foam.scale.set(r*1.01,r*.2,r*1.01);u.foam.material.color.setHex(foe?PAL.foe2:0xd8fff8);u.foam.material.opacity=.8*k}
   if(!low&&k>.2){const s=imx('puff');for(let j=0;j<5;j++){const q=(t*1.4+j*.2+i*.37)%1,off=(j-2)*r*.36,bx=f.x+ca*(r*(.1-.12*Math.abs(j-2)))-sa*off,bz=f.y+sa*(r*(.1-.12*Math.abs(j-2)))+ca*off,sz=(3+r*.05)*(1-q*.6)*k;
     putI(s,bx+ca*q*10,6+q*(18+r*.1),bz+sa*q*10,sz,sz,sz,0,0,foe?0xffb0a0:0xd8fff8)}}
 }
