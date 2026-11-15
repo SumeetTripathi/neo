@@ -633,7 +633,7 @@ function showLobby(){
       MBNet.members.forEach(function(m){list.appendChild(memberRow(m))});
       p.appendChild(h('div',{class:'mbn-cols'},how,list));
     }else{
-      var opts=h('div',{class:'mbn-opts','aria-label':'Versus options'});
+      var opts=h('div',{class:'mbn-opts'+(MBNet.isHost?'':' ro'),'aria-label':'Versus options'});
       ['format','floor','wins','time'].forEach(function(k){opts.appendChild(optRow(k,MBNet.isHost))});
       if(!MBNet.isHost)opts.appendChild(h('p',{class:'dim',text:'The host sets these. Everyone fights with a seasoned hero of that floor, chosen when the match starts.'}));
       p.appendChild(h('div',{class:'mbn-cols'},how,opts));

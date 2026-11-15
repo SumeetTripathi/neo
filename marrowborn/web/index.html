@@ -495,6 +495,7 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 @media (pointer:coarse){.mbn-seg button,.mbn-th button{min-height:max(44px,calc(var(--u)*44))}}
 @media (max-width:600px){
   .mbn-opt{grid-template-columns:minmax(0,1fr);gap:1px;padding-bottom:calc(var(--u)*3)}.mbn-opt>.lab{font-size:.72rem}
+  .mbn-opts.ro{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:calc(var(--u)*2) calc(var(--u)*12)}.mbn-opts.ro .dim{grid-column:1/-1}.mbn-opts.ro .mbn-opt{min-height:0}
   .mbn-teams{gap:calc(var(--u)*8)}.mbn-team .mbn-li{flex-wrap:wrap;padding:calc(var(--u)*4) calc(var(--u)*4) calc(var(--u)*4) calc(var(--u)*10);gap:0 calc(var(--u)*8)}.mbn-team .mbn-name{flex:1 1 100%;font-size:1rem}.mbn-th{padding-left:calc(var(--u)*10)}.mbn-th b{font-size:1.05rem}.mbn-th button{padding-inline:calc(var(--u)*12)}
 }
 @media (max-height:600px){
