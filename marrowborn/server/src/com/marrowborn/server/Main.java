@@ -38,7 +38,7 @@ public final class Main {
         }
         Relay.Files files;
         try { files = web != null ? dirFiles(new File(web)) : jarFiles(); }
-        catch (IOException e) { System.err.println("Marrowborn: " + e.getMessage()); System.exit(1); return; }
+        catch (IOException e) { System.err.println("Ashes to Apex: " + e.getMessage()); System.exit(1); return; }
 
         Relay relay = null;
         // a given port is used exactly; otherwise 7777 (the one short join codes assume), the next few, then any free port
@@ -55,7 +55,7 @@ public final class Main {
 
         final String local = "http://localhost:" + relay.port() + "/";
         List<String> ips = Relay.localIps();
-        System.out.println("Marrowborn server " + VERSION);
+        System.out.println("Ashes to Apex server " + VERSION);
         System.out.println("  Play on this computer:        " + local);
         if (ips.isEmpty()) System.out.println("  No local network address found: other devices cannot join until this computer is on a network.");
         for (String ip : ips) System.out.println("  From other devices (same network): http://" + ip + ":" + relay.port() + "/     join code " + JoinCode.pretty(JoinCode.encode(ip, relay.port())));
@@ -74,7 +74,7 @@ public final class Main {
     }
 
     private static void usage() {
-        System.out.println("Marrowborn server " + VERSION + "\n"
+        System.out.println("Ashes to Apex server " + VERSION + "\n"
             + "  java -jar marrowborn-server.jar [port] [--web DIR] [--no-browser] [--no-window]\n"
             + "  port          listen on exactly this port (default: 7777, or the next free port)\n"
             + "  --web DIR     serve the game from DIR instead of the copy inside the jar\n"

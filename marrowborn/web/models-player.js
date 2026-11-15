@@ -3,6 +3,9 @@
 // when the stage/class/upgrade/rank key changes; update() only writes transforms and visibility.
 // Everything about WHO is drawn comes from the object handed to create()/update() (has, cls, pw, S {adv, rank, mode, t}, skills) and from P:
 // the local hero passes window.MB, another member's hero passes a small view object built from its look. Nothing here reads the global MB.
+// Apex tier (round 8): MB.apex {path} / MB.S.apex ('dominion' | 'order'; a remote's view carries the same) adds a second layer over any class
+// outfit: dominion = darkened gear, a hovering crown of bone, two slow orbits of bone shards and a dark spreading domain on the floor;
+// order = pale lit gear, a broken halo with blade-wings of light behind the shoulders and an aura disc on the floor sized by P.auraR.
 // Look: cel-shaded through window.MBStyle (toon / glow / outline) when the renderer provides it; without it the same
 // shapes are drawn with this file's own standard materials and no outlines.
 window.MBModels=window.MBModels||{};
@@ -41,6 +44,15 @@ function dimOf(m){const i=INFO.get(m);return i?mat(i[0],Object.assign({},i[1]||{
 // the one material this file animates (the melee arc fades): one per hero (several heroes can be on screen in multiplayer), owned by
 // its model and never shared with the style cache
 function slashMat(){const m=new T.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,side:T.DoubleSide});NOL.add(m);return m}
+// a flat see-through decal that darkens the floor (the dominion's ground): this file's own cache, never mutated
+function decal(hex,op){const k='d'+hex+'|'+op;let m=MATS[k];if(!m){m=MATS[k]=new T.MeshBasicMaterial({color:hex,transparent:true,opacity:op,depthWrite:false,fog:false})}NOL.add(m);return m}
+// which apex path the owner walks (null before floor 100). The local hero may be forced by the renderer's test hook.
+function apexOf(MB){let a=MB.renderer&&MB.renderer.testApex;if(!a){a=MB.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=MB.S&&MB.S.apex}return a==='dominion'||a==='order'?a:null}
+const _tc=new T.Color(),_tc2=new T.Color();
+// apex gear: the same cloth and plate, sunk toward black-violet (dominion) or lifted toward lit bone-white (order); cached variants, nothing mutated
+function apexTint(m,apex){const i=INFO.get(m);if(!i)return m;_tc.setHex(i[0]);
+  if(apex==='dominion'){_tc.lerp(_tc2.setHex(0x0d0a18),.62);return mat(_tc.getHex(),{emissive:0x2a1466,emissiveIntensity:.35})}
+  _tc.lerp(_tc2.setHex(0xf6f0e0),.56);const h=_tc.getHex();return mat(h,{emissive:h,emissiveIntensity:.3})}
 function pal(k,d){const S=window.MBStyle;return S&&S.palette&&typeof S.palette[k]==='number'?S.palette[k]:d}
 function ink(g,th){const S=window.MBStyle;if(S&&typeof S.outline==='function')try{S.outline(g,{thickness:th||1})}catch(e){}}
 const C={bone:0xece4d2,boneS:0xa89f90,dark:0x100e18,skin:0xc68863,skinD:0x8f5a40,hand:0xe2a783,gold:0xf0b848,steel:0x596078,steelL:0xc9d2e4,lea:0x4a3528,hair:0xe9e4da,hairS:0xb9b3c4,green:0x5cf07a};
@@ -98,7 +110,9 @@ const P_TREE=[['aura'],['ready'],['slash'],['rig'],['hips','rig'],['legL','hips'
   ['coatB','hips'],['coatL','hips'],['coatR','hips'],['torso','hips'],['heart','torso'],['lungs','torso'],
   ['head','torso'],['jaw','head'],['halo','head'],['band','head'],['armL','torso'],['foreL','armL'],['handL','foreL'],['wepL','handL'],['strA','wepL'],['strB','wepL'],
   ['armR','torso'],['foreR','armR'],['handR','foreR'],['wepR','handR'],['orb','wepR'],['spin','orb'],['shield','torso'],['shieldGlow','shield'],
-  ['cape','torso'],['cape2','cape'],['scarf','torso'],['scarf2','scarf']];
+  ['cape','torso'],['cape2','cape'],['scarf','torso'],['scarf2','scarf'],
+  // apex: dominion floor + its spreading wave, two shard orbits, the crown; order aura + its pulse, the halo behind the shoulders and its two wings
+  ['dom'],['domW'],['orbA'],['orbB'],['crown','head'],['oaura'],['oaura2','oaura'],['oauraW'],['nimbus','torso'],['nring','nimbus'],['wingL','nimbus'],['wingR','nimbus']];
 // a lean build about 6.4 heads tall: hip height, leg and arm segment lengths, shoulder and neck heights above the hips
 const HIP=30.5,UL=15,LL=15.5,UA=10.5,FA=9,SH=17.3,SX=7.5,NECK=20.2,HEADY=4.9;
 const WISPS=8;
@@ -208,7 +222,7 @@ function knife(b,slot,edge,gold){
   b.bx(slot,glow(INFO.get(edge)[1].emissive,.22),1.2,8.6,0,3.6,13,.3,0,0,-.16);
 }
 
-function buildHuman(b,s,ud,st,c,adv,tier){
+function buildHuman(b,s,ud,st,c,adv,tier,apex){
   const has=i=>!!(st&(1<<i)),touch=has(2),sight=has(3),hearing=has(4),smell=has(5),taste=has(6);
   const F=mat(C.skin),Fd=mat(C.skinD);
   const acc=c?(adv&&ACC2[adv])||ACC[c]:null,K=.8+tier*.09+(adv?.35:0),tr=c?lit(acc,K):null;   // trim burns brighter with upgrades and rank
@@ -222,6 +236,7 @@ function buildHuman(b,s,ud,st,c,adv,tier){
   else if(c==='healer'){o.torso=o.arm=o.fore=mat(0xe9e3d5);o.thigh=o.shin=mat(0xa79c88);o.foot=mat(0x8a6f40);o.coat=1}
   else if(c==='necro'){o.torso=o.arm=o.fore=mat(0x1c2725);o.thigh=o.shin=o.foot=mat(0x10161a);o.hair=0;o.hand=mat(0xd9cfb8);o.coat=1}
   else if(c==='ranger'){o.torso=o.arm=mat(0x2a4530);o.fore=o.shin=o.foot=lea;o.thigh=mat(0x3a2f2a);o.hair=0}
+  if(apex&&c)for(const k of['torso','arm','fore','thigh','shin','foot'])o[k]=apexTint(o[k],apex);
   ud.robe=!!o.coat;
   s.armL.position.set(SX,SH,0);s.armR.position.set(-SX,SH,0);
   // hips and legs
@@ -365,12 +380,73 @@ function buildHuman(b,s,ud,st,c,adv,tier){
     if(adv==='lich')for(let i=0;i<5;i++){const a=HP+(i-2)*.5;b.spike('head',tr,Math.cos(a)*5.4,8.2-Math.abs(i-2)*.5,Math.sin(a)*4.4-.6,Math.cos(a)*.25,1,0,4.6-Math.abs(i-2)*.6,.9)}
   }
   // ----- class upgrade: a mantle on the shoulders that falls into a long forked cape (short over a long coat) -----
-  if(adv&&c){const cm=mat(CAPE[adv]||0x8f1f30),short=!!o.coat,l1=short?8:13,l2=short?8:14;
+  if((adv||apex)&&c){const dom=apex==='dominion',cm=dom?mat(0x0c0a16,{emissive:0x24105a,emissiveIntensity:.4}):apex?lit(0xf4eedd,.35):mat(CAPE[adv]||0x8f1f30),short=!!o.coat,l1=short?8:13,l2=(short?8:14)+(apex?3:0);
     s.cape.position.set(0,17.7,-3.7);s.cape2.position.set(0,-l1,-.25);
     b.cy('cape',cm,0,-l1/2,-.3,6.3,7.6,l1,0,0,0,.14,8);b.cy('cape2',cm,0,-l2/2,0,7.6,8.6,l2,0,0,0,.14,8);
-    for(const x of[-5.6,-1.9,1.9,5.6])b.spike('cape2',cm,x,-l2+.3,0,x*.03,-1,0,short?3.6:5.4,2.4,.2);
+    for(const x of[-5.6,-1.9,1.9,5.6])b.spike('cape2',cm,x,-l2+.3,0,x*.03,-1,0,(short?3.6:5.4)+(dom?(x>0?4.5:2):0),2.4,.2);
     b.fine=true;b.bx('cape2',tr,0,-l2+.9,-.6,15.6,.7,.5);b.bx('cape',tr,0,-l1*.5,-1,.7,l1,.4);b.fine=false;
     b.sp('torso',cm,0,17.9,-2.4,1,7.6,1.7,3);b.co('torso',lit(acc,K+.4),5.4,17.8,2.2,1.1,2.4,PI,0,0,4);b.co('torso',lit(acc,K+.4),-5.4,17.8,2.2,1.1,2.4,PI,0,0,4)}
+}
+
+// a flat blade lying in a slot's XZ plane: base at (x,z), pointing along angle phi (0 = +x, positive turns toward -z), with a short tail behind it
+function blade(b,slot,m,x,z,phi,len,wid,th){const c=Math.cos(phi),sn=Math.sin(phi);
+  b.put(slot,m,gCone(4),x+c*len/2,0,z-sn*len/2,0,phi,-HP,th,len,wid);b.put(slot,m,gCone(4),x-c*len*.11,0,z+sn*len*.11,0,phi+PI,-HP,th,len*.22,wid)}
+// ----- the apex tier: what a hero past floor 100 wears over everything else -----
+function buildApex(b,s,ud,c,apex,tier){
+  const pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),W=ud.apexMat;
+  if(apex==='dominion'){
+    // the crown: a dark band that hovers over the head, ringed with upturned finger-bones of uneven height, one violet splinter turning above it
+    const Bd=mat(0x241d33),Bn=mat(C.bone),V=lit(pw,1.7,0xc9a8ff),cy=c==='mage'?12.4:c==='tank'?12:c==='healer'?11.6:11,cr=c==='mage'?5.3:6;
+    ud.crownY=cy;s.crown.position.set(0,cy,-.5);
+    b.to('crown',Bd,0,0,0,cr,.62,1);
+    const hs=[8.4,4.6,6.6,3.8,5.6,4.2,7.2];
+    for(let i=0;i<7;i++){const a=HP+.45+i*TAU/7,x=Math.cos(a)*cr,z=Math.sin(a)*cr,h=hs[i];
+      b.spike('crown',i%2?Bd:Bn,x,.1,z,Math.cos(a)*.3,1,Math.sin(a)*.3,h,1.15);b.sp('crown',i%2?Bn:Bd,x,.1,z,.95);
+      b.fine=true;b.spike('crown',V,x*1.04,h*.25,z*1.04,Math.cos(a)*.3,1,Math.sin(a)*.3,h*.52,.42);b.fine=false}
+    b.fine=true;b.co('crown',V,0,6.2,0,1,2.6,0,0,0,4);b.co('crown',V,0,3.9,0,1,2,PI,0,0,4);b.fine=false;b.sp('crown',glow(pw,.3),0,5.2,0,2.6);
+    // a yoke of vertebrae across the shoulders
+    for(let i=-3;i<=3;i++)b.sp('torso',i%2?Bd:Bn,i*2.5,18.4-Math.abs(i)*.42,-2.2-Math.abs(i)*.1,1.5,1.05,.8,1.05);
+    for(const k of[-1,1])b.spike('torso',Bn,k*8.6,17.6,-1.4,k*.9,.75,-.5,6.2,1.3);
+    // the orbit: shards of rib and bone carried round the body in two slow rings that lean against each other
+    s.orbA.position.set(0,33,0);s.orbB.position.set(0,17,0);
+    for(let i=0;i<4;i++){const a=i*TAU/4+.4,R=20+(i%2)*2.5,x=Math.cos(a)*R,z=Math.sin(a)*R,y=(i%2?3:-2),dx=-Math.sin(a)*.5,dz=Math.cos(a)*.5;
+      b.spike('orbA',Bn,x,y,z,dx,1,dz,6.5+i%2*2,1.25,.55);b.spike('orbA',Bn,x,y,z,-dx,-1,-dz,3.2,1.25,.55);
+      b.fine=true;b.spike('orbA',V,x*.95,y,z*.95,dx,1,dz,4.4,.4);b.fine=false;b.sp('orbA',glow(pw,.2),x,y+1.5,z,2.6)}
+    for(let i=0;i<3;i++){const a=i*TAU/3+1.3,R=25.5,x=Math.cos(a)*R,z=Math.sin(a)*R;
+      b.sp('orbB',Bd,x,0,z,1.9,1.1,.8,1.1);b.spike('orbB',Bn,x,0,z,Math.cos(a),.35,Math.sin(a),4.6,.95);b.spike('orbB',Bn,x,0,z,-Math.sin(a),.2,Math.cos(a),3.6,.8);b.spike('orbB',Bn,x,0,z,Math.sin(a),.2,-Math.cos(a),3.6,.8);
+      b.fine=true;b.sp('orbB',V,x,1.1,z,.7);b.fine=false}
+    // the domain: the floor goes dark under the hero in a jagged stain, edged in violet; a wave keeps spreading out of it
+    const D=decal(0x05030c,.56),D2=decal(0x05030c,.34);
+    b.put('dom',D,gRing(.01,32,0,TAU),0,.52,0,-HP,0,0,40,40,1);b.put('dom',D2,gRing(.01,32,0,TAU),0,.5,0,-HP,0,0,53,53,1);
+    for(let i=0;i<13;i++){const a=i*TAU/13+(i%3)*.11,L=58+(i*37%23);b.put('dom',D,gRing(.01,3,-.09,.18),0,.54,0,-HP,0,a,L,L,1)}
+    b.put('dom',glow(pw,.5),gRing(.955,40,0,TAU),0,.6,0,-HP,0,0,41,41,1);
+    for(let i=0;i<3;i++)b.put('dom',glow(pw,.3),gRing(.93,12,i*TAU/3,1.35),0,.62,0,-HP,0,0,29,29,1);
+    for(let i=0;i<5;i++){const a=i*TAU/5+.3;b.put('dom',glow(pw2,.42),gRing(.01,3,-.03,.06),0,.64,0,-HP,0,a,52,52,1)}
+    b.put('domW',W,gRing(.9,40,0,TAU),0,.66,0,-HP,0,0,1,1,1);
+  }else{
+    // the halo: a great ring of light broken in three, standing behind the shoulders, a thin gold circle inside it
+    const L=lit(pw2,1.6,0xffffff),Gd=lit(C.gold,1,0xffe9a8),R=13.5;
+    s.nimbus.position.set(0,18.5,-6);s.nimbus.rotation.set(HP-.1,0,0);
+    b.fine=true;
+    for(const[a0,len]of[[.25,1.75],[2.4,1.2],[4.05,1.85]])b.to('nring',L,0,0,0,R,.8,1,len,HP,0,a0);
+    b.to('nring',Gd,0,0,0,R-3.4,.34,1);
+    for(let i=0;i<6;i++){const a=i*TAU/6+.2;b.spike('nring',Gd,Math.cos(a)*(R-3.4),0,Math.sin(a)*(R-3.4),-Math.cos(a),0,-Math.sin(a),2.6,.55,.5)}
+    b.fine=false;
+    b.to('nring',glow(pw2,.16),0,0,0,R,2.5);
+    // blade-wings: three long splinters of light on each side, hanging in the air off the halo, longest on top
+    for(const[sl,k]of[['wingL',1],['wingR',-1]]){s[sl].position.set(k*8,0,-1);
+      const BL=[[1.02,25,2.6],[.56,20,2.3],[.1,14,2]];
+      for(let i=0;i<3;i++){const q=BL[i],phi=k>0?q[0]:PI-q[0],x=k*(7+i*1.2),z=-4+i*4.6;
+        b.fine=true;blade(b,sl,L,x,z,phi,q[1],q[2],.5);b.fine=false;blade(b,sl,glow(pw2,.2),x,z,phi,q[1]*1.12,q[2]*2.1,.3)}
+      b.fine=true;blade(b,sl,Gd,k*5.5,-1,k>0?.8:PI-.8,7,.9,.4);b.fine=false}
+    // a brow-mark of light and bright cuffs
+    b.fine=true;b.co('head',L,0,c==='tank'?10.6:9.6,c==='mage'?5.2:3.6,.9,2.6,0,0,0,4);for(const f of['foreL','foreR'])b.to(f,L,0,-7.2,0,2.5,.36);b.fine=false;
+    // the aura: a disc of radius 1 that update() scales to P.auraR; rim, faint fill, inward teeth, a broken gold ring turning inside, and a pulse
+    b.put('oaura',glow(pw2,.6),gRing(.972,56,0,TAU),0,.7,0,-HP,0,0,1,1,1);b.put('oaura',glow(pw2,.07),gRing(.01,40,0,TAU),0,.62,0,-HP,0,0,1,1,1);
+    for(let i=0;i<12;i++)b.put('oaura',glow(pw2,.5),gRing(.86,2,i*TAU/12-.02,.04),0,.72,0,-HP,0,0,1,1,1);
+    for(let i=0;i<4;i++)b.put('oaura2',glow(C.gold,.42),gRing(.955,14,i*HP+.2,1.05),0,.74,0,-HP,0,0,.72,.72,1);
+    b.put('oauraW',W,gRing(.93,48,0,TAU),0,.76,0,-HP,0,0,1,1,1);
+  }
 }
 
 function buildWeapon(b,s,ud,skin,c,adv,tier){
@@ -406,14 +482,15 @@ function buildWeapon(b,s,ud,skin,c,adv,tier){
 }
 
 function rebuildPlayer(g,MB){
-  const ud=g.userData,s=ud.s,S=MB.S,st=stageOf(MB),skin=!!(st&2),c=skin&&MB.cls()||null,adv=c&&S.adv||null,tier=c?tierOf(S):0;
+  const ud=g.userData,s=ud.s,S=MB.S,st=stageOf(MB),skin=!!(st&2),c=skin&&MB.cls()||null,adv=c&&S.adv||null,apex=c?apexOf(MB):null,tier=c?(apex?Math.max(8,tierOf(S)):tierOf(S)):0;
   clearSlots(s);
   for(const k in s){if(k!=='rig'&&k!=='hips'){s[k].position.set(0,0,0)}s[k].rotation.set(0,0,0);s[k].scale.set(1,1,1);s[k].visible=true}
   s.hips.position.set(0,HIP,0);s.legL.position.set(2.9,0,0);s.legR.position.set(-2.9,0,0);s.shinL.position.set(0,-UL,0);s.shinR.position.set(0,-UL,0);
   s.foreL.position.set(0,-UA,0);s.foreR.position.set(0,-UA,0);s.handL.position.set(0,-FA,0);s.handR.position.set(0,-FA,0);
-  ud.cls=c;ud.adv=adv;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.bowH=13;
+  ud.cls=c;ud.adv=adv;ud.apex=apex;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.bowH=13;
   const b=new Builder(s),pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone;
-  if(skin)buildHuman(b,s,ud,st,c,adv,tier);else buildSkeleton(b,s,!!(st&1));
+  if(skin)buildHuman(b,s,ud,st,c,adv,tier,apex);else buildSkeleton(b,s,!!(st&1));
+  if(apex){const W=ud.apexMat||(ud.apexMat=slashMat());W.color.setHex(apex==='dominion'?pal('power',0x8b4dff):pal('power2',0xc4f4ff));buildApex(b,s,ud,c,apex,tier)}
   buildWeapon(b,s,ud,skin,c,adv,tier);
   // ground effects: upgrade aura, skill-ready ring, melee slash arc
   if(adv){b.put('aura',glow(pw,.42),gRing(.9,8,0,TAU),0,.7,0,-HP,0,0,24,24,1);b.put('aura',glow(pw2,.4),gRing(.95,28,0,TAU),0,.7,0,-HP,0,0,28.5,28.5,1);b.put('aura',glow(pw,.1),gRing(.01,20,0,TAU),0,.6,0,-HP,0,0,21.6,21.6,1)}
@@ -426,7 +503,7 @@ function rebuildPlayer(g,MB){
   ud.shieldMeshes.length=0;ud.shieldOn=null;
   for(const m of s.shield.children)if(m.userData.part)ud.shieldMeshes.push(m,m.material,dimOf(m.material));
   // power wisps: more of them with an upgrade and with every rank
-  ud.nw=Math.min(WISPS,(adv?3:0)+Math.max(0,tier-1));
+  ud.nw=Math.min(WISPS,(adv?3:0)+Math.max(0,tier-1));ud.auraK=0;
   for(let i=0;i<WISPS;i++)ud.wisps[i].visible=false;
   ink(g,.75);
 }
@@ -439,7 +516,7 @@ const player={
   create(MB){
     const g=new T.Group();g.name='player';const s=mkSlots(g,P_TREE);
     g.userData={s,key:'',rot:null,mb:0,ab:0,k:1,dl:0,yv:0,atkDur:.16,lastAtk:0,cls:null,adv:null,skin:false,robe:false,wtype:'club',full:false,shieldMeshes:[],slashMat:slashMat(),shieldOn:null,
-      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13};
+      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13,apex:null,apexMat:null,crownY:11,auraK:0};
     // rising wisps of power: a fixed handful of shared-geometry meshes, placed in update()
     const wg=new T.Group();wg.name='wisps';g.add(wg);
     for(let i=0;i<WISPS;i++){const w=new T.Mesh(gCone(4),glow(i%3===2?pal('power2',0xc4f4ff):pal('power',0x8b4dff),i%3===2?.5:.6));w.castShadow=false;w.userData.noOutline=true;w.visible=false;wg.add(w);g.userData.wisps.push(w)}
@@ -448,7 +525,7 @@ const player={
   },
   update(g,P,MB,dt){
     const ud=g.userData,s=ud.s,S=MB.S,t=S.t||0;dt=dt||0;
-    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+tierOf(S);
+    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+tierOf(S)+'|'+(apexOf(MB)||'');
     if(key!==ud.key){ud.key=key;rebuildPlayer(g,MB)}
     const c=ud.cls,wt=ud.wtype,atk=P.atk>0,mel=wt!=='staff'&&wt!=='bow';
     // facing (and how fast it is turning, for the cloth)
@@ -523,6 +600,21 @@ const player={
     if(wt==='bow'){const H=ud.bowH,p=atk?(1-k)*9:0,L=Math.sqrt(H*H+p*p),a=Math.atan2(p,H);s.strA.scale.y=L;s.strB.scale.y=L;s.strA.rotation.x=a;s.strB.rotation.x=-a}
     if(c==='healer'){s.halo.position.y=ud.haloY+Math.sin(t*2)*.5;s.halo.rotation.set(HP-.35,0,t*.6)}
     if(ud.adv){s.aura.rotation.y=t*.6;const f=1+.05*Math.sin(t*3);s.aura.scale.set(f,1,f)}
+    // apex: the crown hovers and turns, the shards orbit, the domain breathes and throws its wave; or the halo turns, the wings fan and the aura pulses
+    if(ud.apex==='dominion'){
+      s.crown.position.y=ud.crownY+Math.sin(t*1.7)*.45;s.crown.rotation.set(-.06+s.head.rotation.x*-.5,t*.35,Math.sin(t*1.1)*.04);
+      s.orbA.rotation.set(.16*Math.sin(t*.31),t*.55,.2);s.orbA.position.y=33+Math.sin(t*.9)*1.2;s.orbB.rotation.set(-.14,-t*.4,.12*Math.sin(t*.43));
+      s.orbA.visible=s.orbB.visible=rig.visible;
+      const f=1+.04*Math.sin(t*1.9);s.dom.scale.set(f,1,f);s.dom.rotation.y=t*.07;
+      const q=(t*.42)%1,w=22+52*q;s.domW.scale.set(w,1,w);ud.apexMat.opacity=.5*(1-q)*(1-q);
+    }else if(ud.apex==='order'){
+      s.nimbus.position.y=18.5+Math.sin(t*1.6)*.5;s.nring.rotation.y=t*.3;
+      const open=.1*Math.sin(t*1.3)+ab*.3+dl*.45-mb*.12;s.wingL.rotation.y=open;s.wingR.rotation.y=-open;s.wingL.rotation.x=s.wingR.rotation.x=mb*.2+dl*.25;
+      const ar=+P.auraR||0,on=ar>4;ud.auraK+=((on?ar:0)-ud.auraK)*Math.min(1,dt*6+(ud.auraK?0:1));
+      const R=ud.auraK;s.oaura.visible=s.oauraW.visible=R>4;
+      if(R>4){const f=R*(1+.012*Math.sin(t*4));s.oaura.scale.set(f,1,f);s.oaura.rotation.y=t*.12;s.oaura2.rotation.y=-t*.5;
+        const q=(t*.7)%1,w=R*(.2+.8*q);s.oauraW.scale.set(w,1,w);ud.apexMat.opacity=.55*(1-q)}
+    }
     if(ud.nw){const W=ud.wisps,n=ud.nw;for(let i=0;i<n;i++){const w=W[i],q=(t*(.5+i*.03)+i*.37)%1,a=i*2.4+t*.5,r=9+2.5*Math.sin(i*1.7+t),f=Math.sin(q*PI);
         w.visible=rig.visible;w.position.set(Math.cos(a)*r,3+q*(44+ud.tier*2),Math.sin(a)*r);w.scale.set(1.5*f,(6+ud.tier*.6)*(.5+q),1.5*f)}}
     if(ud.shieldMeshes.length){const on=!!P.shield;
@@ -537,7 +629,7 @@ const player={
     if(sl.visible){ud.slashMat.opacity=(ud.full?.62:.8)*(1-k);const f=.82+.18*k;sl.scale.set(f,1,f)}
   },
   // a hero that leaves (another member in multiplayer): free what this one model owns. Cached materials and unit geometry are shared and stay.
-  dispose(g){const ud=g&&g.userData;if(!ud||!ud.s)return;clearSlots(ud.s);if(ud.slashMat){ud.slashMat.dispose();ud.slashMat=null}}
+  dispose(g){const ud=g&&g.userData;if(!ud||!ud.s)return;clearSlots(ud.s);if(ud.slashMat){ud.slashMat.dispose();ud.slashMat=null}if(ud.apexMat){ud.apexMat.dispose();ud.apexMat=null}}
 };
 
 /* ================= ALLIES ================= */

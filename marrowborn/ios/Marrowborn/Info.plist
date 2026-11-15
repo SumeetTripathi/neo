@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>Marrowborn</string>
+	<string>Ashes to Apex</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -42,7 +42,7 @@
 	</array>
 	<!-- Multiplayer joins a game hosted on the same Wi-Fi. iOS asks the player for permission the first time, with this text. -->
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>Marrowborn connects to other devices on your Wi-Fi to play multiplayer games hosted there.</string>
+	<string>Ashes to Apex connects to other devices on your Wi-Fi to play multiplayer games hosted there.</string>
 	<!-- Local hosts have no certificates, so the game reaches them over plain ws:// and http://.
 	     NSAllowsLocalNetworking permits that for IP addresses, .local names and unqualified names;
 	     NSAllowsArbitraryLoadsInWebContent covers what the web view itself loads. Nothing else is loosened. -->

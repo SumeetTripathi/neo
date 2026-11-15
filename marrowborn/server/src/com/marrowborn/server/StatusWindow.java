@@ -25,7 +25,7 @@ final class StatusWindow {
 
     static void show(final Relay relay, final String local, final List<String> ips) {
         SwingUtilities.invokeLater(new Runnable() { public void run() {
-            final JFrame f = new JFrame("Marrowborn server");
+            final JFrame f = new JFrame("Ashes to Apex server");
             f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
             final JTextArea t = new JTextArea(14, 52);
             t.setEditable(false);
@@ -41,7 +41,7 @@ final class StatusWindow {
             f.getContentPane().add(t, BorderLayout.CENTER);
             f.getContentPane().add(b, BorderLayout.SOUTH);
             final Runnable fill = new Runnable() { public void run() {
-                StringBuilder s = new StringBuilder("Marrowborn server " + Main.VERSION + "\n\nOn this computer:   " + local + "\n");
+                StringBuilder s = new StringBuilder("Ashes to Apex server " + Main.VERSION + "\n\nOn this computer:   " + local + "\n");
                 if (ips.isEmpty()) s.append("No local network address found.\n");
                 for (String ip : ips) s.append("On other devices:   http://").append(ip).append(':').append(relay.port()).append("/\n")
                     .append("Join code:          ").append(JoinCode.pretty(JoinCode.encode(ip, relay.port()))).append('\n');

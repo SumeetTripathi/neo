@@ -1,4 +1,4 @@
-# Marrowborn for iPhone and iPad (source only)
+# Ashes to Apex for iPhone and iPad (source only)
 
 This folder is an Xcode project that wraps the web game (`../web`) in a full-screen web view.
 
@@ -13,7 +13,7 @@ that step, haptics, and play without a server for single-player.
 ## What it can and cannot do
 
 - Single-player works offline from the files inside the app.
-- Multiplayer: it can **join** a game hosted by an Android phone or by the Marrowborn server on a computer (Multiplayer,
+- Multiplayer: it can **join** a game hosted by an Android phone or by the Ashes to Apex server on a computer (Multiplayer,
   Join a game, then the host's join code or address). It **cannot host**; the lobby hides that button here.
 - The first time it connects to a host, iOS asks for permission to find devices on the local network. Say yes; if it was
   refused, turn it on under Settings, Privacy & Security, Local Network.

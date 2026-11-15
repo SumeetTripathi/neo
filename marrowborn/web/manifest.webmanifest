@@ -1,6 +1,6 @@
 {
-  "name": "Marrowborn",
-  "short_name": "Marrowborn",
+  "name": "Ashes to Apex",
+  "short_name": "Ashes to Apex",
   "description": "A top-down arena game: win your body back one monster at a time, alone or with friends on the local network.",
   "start_url": "./index.html",
   "scope": "./",
