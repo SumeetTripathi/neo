@@ -344,10 +344,12 @@ let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],f
 let NEXTID=1;const nid=()=>NEXTID++;
 // Multiplayer (MB.mp; the code is in the multiplayer section near the end). Everything about it is off unless MP.on.
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
-const MP={on:false,role:'host',mode:'coop',remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],
+const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
   cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[]};
 let REM=null;
-const CL=()=>MP.on&&MP.role==='client';
+// VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
+let VS=null,VP=null,GEO=0;
+const CL=()=>MP.on&&MP.role==='client'&&!VS;
 // whom a monster fights: you; in multiplayer the nearest hero standing (the host decides)
 const foe=m=>MP.on?mpFoe(m):P;
 /* ---------- settings, events and run counters, shared with extras.js through MB ---------- */
@@ -404,7 +406,7 @@ const blowAt=(n,heavy)=>{if(n<8){const b=n<3?1:2;return heavy>0?Math.round(b*1.5
   return Math.max(1,Math.round(PHP(n)*SHARE[heavy>0?2:heavy<0?0:1]*(tenth(n)?(n>=109?APEXDMG:BOSSDMG):1)))};
 const blow=heavy=>blowAt(S.level,heavy);
 // healing scales with your health: f is a share of maximum health, never less than lo
-const healP=(f,lo=1)=>{let v=Math.max(lo,Math.round(f*P.maxHp));if(hcap('halfheal'))v=Math.max(1,Math.round(v/2));P.hp=Math.min(P.maxHp,P.hp+v);hud()};
+const healP=(f,lo=1)=>{let v=Math.max(lo,Math.round(f*P.maxHp));if(VS)v=vsHeal(f,lo);if(hcap('halfheal'))v=Math.max(1,Math.round(v/2));P.hp=Math.min(P.maxHp,P.hp+v);hud()};
 // rank climbs with the levels once you have a trade: E at level 9, S by level 50, then S+1, S+2... every ten levels
 const RANKS=[[50,'S'],[41,'A'],[32,'B'],[23,'C'],[15,'D'],[9,'E']];
 // an apex hero stands in a band of its own above S: X from floor 101, X+1 from 110, X+2 from 120...
@@ -782,6 +784,7 @@ function phaseShift(m){
 // a pet's blow is counted, and a vampiric pet feeds on it
 function petFed(got){PETS.dmg+=got;const a=byPet;if(a.pet&&a.mods.includes('vampiric')&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<4)&&(a.vSum||0)<a.maxHp*.16){const h=Math.min(a.maxHp-a.hp,a.maxHp*.02);a.hp+=h;a.vAt=S.t;a.vSum=(a.vSum||0)+h;puff(a,'#b8263d',8,120)}}
 function hurtM(m,d,quiet){
+  if(m.vs)return vsHit(m,d,quiet);
   if(CL())return mpHurtM(m,d,quiet);
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
@@ -836,8 +839,8 @@ function aim(pt,range,spd){
 }
 function pshot(a,spd,dmg,r,kind,pierce){pshots.push({x:P.x+Math.cos(a)*16,y:P.y-4+Math.sin(a)*16,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r,dmg,kind,pierce:pierce===true?99:pierce||0,hit:new Set(),sx:P.x,sy:P.y})}
 function shock(r,d){
-  rings.push({x:P.x,y:P.y,life:.4,max:.4,r,fx:true});if(MP.on)MP.rq.push([Math.round(P.x),Math.round(P.y),Math.round(r),40]);
-  for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<r+m.r)hurtM(m,d*dmgMul());
+  rings.push({x:P.x,y:P.y,life:.4,max:.4,r,fx:true});if(MP.on)MP.rq.push(VS?[Math.round(P.x),Math.round(P.y),Math.round(r),40,Math.round(d*dmgMul()*100)/100]:[Math.round(P.x),Math.round(P.y),Math.round(r),40]);
+  GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<r+m.r)hurtM(m,d*dmgMul());GEO--;
   clearShots(P,r+10);S.shake=.3;noise(.25,.4);sfx(70,.3,'square',.35,35);haptic(50);
 }
 function ally(kind,life){const a=rand()*TAU;return{nid:nid(),kind,x:P.x+Math.cos(a)*30,y:P.y+Math.sin(a)*30,r:kind==='wolf'?12:9,life:life||(kind==='wolf'||S.adv==='lich'?1e9:14),cd:0,walk:rand()*6}}
@@ -853,16 +856,17 @@ function strike(pt){
   let dmg=M[0]*D,amb=false,hitM=null;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0;amb=true}
   const twice=c==='assassin'&&pw(1);
   P.atk=.16;P.cd=M[1]*H;SND.swing(c);
-  for(const m of[...mons]){
+  if(VS)vsSwing(a,M[2],M[3],dmg,twice);
+  GEO++;for(const m of[...mons]){
     if(m.hidden||!mons.includes(m))continue;const d=dist(m,P);
     if(d<M[2]+m.r){const da=Math.atan2(Math.sin(angTo(P,m)-a),Math.cos(angTo(P,m)-a));
       if(Math.abs(da)<M[3]||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy)mPush(m,Math.cos(a)*26,Math.sin(a)*26);hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg*.6);if(!decoy&&(!hitM||m.boss))hitM=m;if(decoy)break}}
-  }
+  }GEO--;
   if(hitM&&c)troStrike(hitM,amb);
 }
 function field(kind,x,y,r,dur,every,dmg,slow){const f={kind,x,y,r,t:0,dur,every,tick:0,dmg,slow};clamp(f,10);fields.push(f)}
-function rush(a,dmg,stun){P.dashT=dmg?.24:.2;P.dx=Math.cos(a);P.dy=Math.sin(a);P.face=a;P.rushD=dmg;P.rushStun=stun;P.rushHit=dmg?new Set():null;P.inv=Math.max(P.inv,.4)}
-const debuff=(m,o,D)=>{const c=CL();if(c)mpQ(['db',m.id,o.slow||0,o.stun||0,o.dot?Math.round(o.dot*D*1000)/1000:0,o.mark||0]);
+function rush(a,dmg,stun){if(VS&&dmg)vsRush(a,dmg,stun);P.dashT=dmg?.24:.2;P.dx=Math.cos(a);P.dy=Math.sin(a);P.face=a;P.rushD=dmg;P.rushStun=stun;P.rushHit=dmg?new Set():null;P.inv=Math.max(P.inv,.4)}
+const debuff=(m,o,D)=>{if(m.vs)return vsDebuff(m,o,D);const c=CL();if(c)mpQ(['db',m.id,o.slow||0,o.stun||0,o.dot?Math.round(o.dot*D*1000)/1000:0,o.mark||0]);
   if(o.slow&&!c)m.slow=Math.max(m.slow||0,o.slow);if(o.stun&&!c)m.stun=m.boss?o.stun:o.stun*2;if(o.dot){if(!c){m.dotT=6;m.dotD=o.dot*D;m.dotK=.5;m.dotRem=null}puff(m,'#7fd66b',10,120)}if(o.mark){if(!c)m.markT=o.mark;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+40,fx:true});puff(m,'#b8263d',14,120)}};
 const pierceOf=g=>g==='pw3'?pw(3):g==='barb'?(S.adv==='sharpshooter'?99:S.b.spec):g;
 // one effect of a skill. x = {t: nearest monster or null, ta: angle to it, at: its position or a spot ahead, D: damage multiplier}
@@ -894,7 +898,7 @@ function cast(op,x){
   case'army':for(const al of allies)if(al.extra===1)puff(al,'#e7dfcd',6);allies=allies.filter(al=>al.extra!==1); // a new army replaces the old one, so the cap holds
     for(let k=0;k<4;k++){const al=ally('thrall',9);al.extra=1;allies.push(al);puff(al,'#7fd66b',6)}break;
   case'burst':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);S.shake=.25;noise(.25,.35,900,150);
-    for(const al of th){ring(al,70);puff(al,'#7fd66b',10,220);for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,al)<70+m.r)hurtM(m,2*D,true)}break}
+    for(const al of th){ring(al,70);if(VS)MP.rq[MP.rq.length-1][4]=Math.round(2*D*100)/100;puff(al,'#7fd66b',10,220);GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,al)<70+m.r)hurtM(m,2*D,true);GEO--}break}
   case'rollcall':rollCall();break;
   case'collect':collect(t,D);break;
   case'verdict':P.bmT=1;P.bmA=ta-.6;P.bmHit=new Set();noise(.9,.25,3000,6000);break;
@@ -947,10 +951,11 @@ function roomStep(dt){
 function playerStep(dt){
   const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
+  if(VS){if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
   P.moving=l>.15;const ox=P.x,oy=P.y;
   if(P.dashT>0){P.dashT-=dt;const v=P.rushHit?780:640;P.x+=P.dx*v*dt;P.y+=P.dy*v*dt;
-    if(P.rushHit){for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushStun)mStun(m,m.boss?P.rushStun*.7:P.rushStun*2);if(P.rushD)hurtM(m,P.rushD)}if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
+    if(P.rushHit){GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushStun)mStun(m,m.boss?P.rushStun*.7:P.rushStun*2);if(P.rushD)hurtM(m,P.rushD)}GEO--;if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
     if(rand()<.6)bits.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,c:has('skin')?'#c68863':'#e7dfcd',r:6})}
   else if(P.moving){P.x+=mx*spd*dt;P.y+=my*spd*dt;P.face=Math.atan2(my,mx);P.walk+=dt*11}
   clamp(P,14);if(obstacles.length)roomP();
@@ -959,7 +964,8 @@ function playerStep(dt){
   for(let i=0;i<13;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-dt);
   if(S.mode==='play')channels(dt);
   manaStep(dt);
-  const held=S.banner>1.5; // the monster stands frozen while the level banner is up, so you cannot hit it either
+  if(VS)vsInv(dt);
+  const held=S.banner>1.5||!!VS&&VP.hold; // the monster stands frozen while the level banner is up, so you cannot hit it either
   if(S.apex||P.auraR)apexStep(dt,held);
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
@@ -1102,7 +1108,7 @@ function petHit(m,d,a){if(!mons.includes(m))return;byPet=a||true;hurtM(m,d,true)
 function petShot(a,g,spd,dmg,r=4,pierce=0){pshots.push({x:a.x+Math.cos(g)*a.r*.8,y:a.y+Math.sin(g)*a.r*.8,vx:Math.cos(g)*spd,vy:Math.sin(g)*spd,r,dmg,kind:a.owner==='necro'?'skull':'bolt',pierce,hit:new Set(),sx:a.x,sy:a.y,pet:a})}
 function petBlast(a,at,r,dur,dmg){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,pet:a};clamp(z,10);zones.push(z);return z}
 // a pet's beam: everything it lies across is burned like a bolt, each monster at most once a second (as you are, by theirs)
-function beamHits(a,r){const ms=mons;for(const m of ms)if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r-4&&petTouch(a,m,'b'))petHit(m,a.du[1],a.par||a)}
+function beamHits(a,r){const ms=mons;GEO++;for(const m of ms)if(!m.hidden&&!m.decoy&&mons.includes(m)&&segDist(m,a.x,a.y,r.a,r.len)<a.beam.w+m.r-4&&petTouch(a,m,'b'))petHit(m,a.du[1],a.par||a);GEO--}
 // one pet can hurt one monster by touch (or by beam) once a second, the way your own second of grace works against them
 function petTouch(a,m,k){const T2=k?(a.touchB||(a.touchB=new Map())):a.touch,l=T2.get(m);if(l!==undefined&&S.t-l<1)return false;if(T2.size>40)T2.clear();T2.set(m,S.t);return true}
 function petRage(a){a.rage=true;a.flash=.3;rings.push({x:a.x,y:a.y,life:.6,max:.6,r:a.r+90,fx:true});puff(a,petCol(a),18,220);floats.push({x:a.x,y:a.y-a.r-18,txt:a.name+' rages',life:1.4,c:petCol(a)});sfx(110,.5,'sawtooth',.12,55)}
@@ -1153,11 +1159,12 @@ function modStep(m,dt){
 const MID={lunge:1,charge:1,dazed:1,leap:1,rise:1};
 function petStep(a,dt){
   a.moving=false;if(a.flash>0)a.flash-=dt;if(a.inv>0)a.inv-=dt;
+  if(a.vStun>0){a.vStun-=dt;return} // (versus: stunned by a hero)
   if(a.par&&!(a.par.life>0))a.life=0;
   if(a.helper){ // a trophy's helper: walks up and bites, for as long as it lasts
     a.life-=dt;if(a.life<=0){puff(a,'#e7dfcd',5);return}
     if(a.avT>0)a.avT-=dt;a.cd-=dt;const t=petTarget(a);
-    if(t){const g=angTo(a,t),d=dist(a,t);a.face=g;if(d>t.r+a.r)petMove(a,g+Math.sin(S.t*3+a.seed)*.4,190,dt,false,d);else if(a.cd<=0){a.cd=.7;petHit(t,a.dk,a.par||a)}}
+    if(t){const g=angTo(a,t),d=dist(a,t);a.face=g;if(d>t.r+a.r)petMove(a,g+Math.sin(S.t*3+a.seed)*.4,190,dt,false,d);else if(a.cd<=0){a.cd=.7;GEO++;petHit(t,a.dk,a.par||a);GEO--}}
     else{const to=a.par&&a.par.life>0?a.par:P,d=dist(a,to);if(d>(to.r||0)+a.r+44){const g=angTo(a,to);a.face=g;petMove(a,g,220,dt,false,d)}}
     return}
   if(a.life<=0){puff(a,col(a.s.col),6,120);return}
@@ -1183,7 +1190,7 @@ function petStep(a,dt){
     if(a.moving&&Math.hypot(a.x-ox,a.y-oy)<12*dt){if((a.stk=(a.stk||0)+dt)>.45){a.stk=0;a.avS=-(a.avS||1);a.avT=1.2;a.side*=-1}}else a.stk=0}
   if(a.moving){a.walk+=dt*12;if(Math.abs(a.x-ox)>.01)a.flip=a.x<ox}
   // its touch: a brush against a monster is a light blow, a charge or a lunge that connects is a heavy one
-  if(!a.hidden&&a.st!=='leap'&&a.st!=='dazed'&&S.mode==='play'){const ms=mons;for(const m of ms){if(m.hidden||m.decoy||dist(a,m)>=a.r+m.r-4||!mons.includes(m)||!petTouch(a,m))continue;petHit(m,a.du[a.st==='charge'||a.st==='lunge'?2:0],a.par||a)}}
+  if(!a.hidden&&a.st!=='leap'&&a.st!=='dazed'&&S.mode==='play'){const ms=mons;for(const m of ms){if(m.hidden||m.decoy||dist(a,m)>=a.r+m.r-4||!mons.includes(m)||!petTouch(a,m))continue;GEO++;petHit(m,a.du[a.st==='charge'||a.st==='lunge'?2:0],a.par||a);GEO--}}
 }
 // what a monster does to pets: its touch, its charge and its beam hurt them, as they would hurt you
 function monVsPets(m){
@@ -1210,7 +1217,7 @@ function fieldPets(mid){
 function reviveStep(dt){
   const F=PETS.fallen;if(!F.length)return;
   for(const e of F)if(e.revT>0)e.revT-=dt;
-  if(!PETS.auto||!P||S.mode!=='play'||P.down)return;
+  if(!PETS.auto||!P||S.mode!=='play'||P.down||VS)return; // (versus: the fallen stay down until the next round)
   const e=F[0];if(!e.down){F.shift();return}
   const c=reviveCost(e);if(e.revT>0||P.mana<c)return;
   const on=petOn(),i=on.indexOf(e);F.shift();if(i<0){e.down=false;return}
@@ -1481,9 +1488,10 @@ function apexStep(dt,held){
   if(P.ascT>0)P.ascT-=dt;
   P.auraR=P.ascT>0?ORDR*1.5:ORDR;
   if((P.auraK-=dt)<=0&&S.mode==='play'&&!held){P.auraK=.5;const d=ORDAURA*(P.ascT>0?2:1)*dmgMul();
-    for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<P.auraR+m.r){if(!m.boss)mSlow(m,.7);hurtM(m,d,true)}}
+    GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<P.auraR+m.r){if(!m.boss)mSlow(m,.7);hurtM(m,d,true)}GEO--}
   if(P.bmT>0){P.bmT-=dt;const a=P.bmA+=1.2*dt,len=rayLen(P.x,P.y,a);P.beam=P.beam||{a:0,len:0,w:14,on:true};P.beam.a=a;P.beam.len=len;P.swing=a;P.atk=Math.max(P.atk,.1);
-    if(S.mode==='play')for(const m of[...mons])if(!m.hidden&&!P.bmHit.has(m)&&mons.includes(m)&&segDist(m,P.x,P.y,a,len)<14+m.r){P.bmHit.add(m);puff(m,'#ffffff',10,200);hurtM(m,14*dmgMul())}
+    GEO++;if(S.mode==='play')for(const m of[...mons])if(!m.hidden&&!P.bmHit.has(m)&&mons.includes(m)&&segDist(m,P.x,P.y,a,len)<14+m.r){P.bmHit.add(m);puff(m,'#ffffff',10,200);hurtM(m,14*dmgMul())}GEO--;
+    if(VS)vsBeamBurn(a,len);
     for(const s of shots)if(!s.dead&&segDist(s,P.x,P.y,a,len)<22){s.dead=true;if(MP.on)mpShotHit(s)}
     if(P.bmT<=0)P.beam=null}
   else if(P.beam)P.beam=null;
@@ -1581,15 +1589,16 @@ function drawAura(q){if(!(q.auraR>0))return;const r=q.auraR*(1+.03*Math.sin(S.t*
 
 /* ---------- loop ---------- */
 function step(dt){
-  S.t+=dt;if(S.shake>0)S.shake-=dt;SIDE=null;T=P;
+  S.t+=dt;if(S.shake>0)S.shake-=dt;SIDE=null;T=P;GEO=0;
   for(const b of bits){b.x+=b.vx*dt;b.y+=b.vy*dt;b.vx*=.94;b.vy*=.94;b.life-=dt}bits=bits.filter(b=>b.life>0);
   for(const r of rings)r.life-=dt;rings=rings.filter(r=>r.life>0);
   for(const f of floats){f.y-=34*dt;f.life-=dt}floats=floats.filter(f=>f.life>0);
   if(echoes.length){for(const e of echoes)e.life-=dt;echoes=echoes.filter(e=>e.life>0)}
   if(S.mode==='clear'&&(S.clearT-=dt)<=0)return reward();
   if(S.mode!=='play'&&S.mode!=='clear')return;
+  if(VS)vsStep(dt);
   if(!P.down)playerStep(dt);
-  for(const p of pshots){p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL){p.dead=true;continue}
+  GEO++;for(const p of pshots){p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL){p.dead=true;continue}
     if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
@@ -1598,21 +1607,23 @@ function step(dt){
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
       if(!m.boss&&(!mons.includes(m)||m._gone))continue; // a shot that kills something small flies on, so a swarm cannot soak up every single bolt
-      if(p.pierce>0)p.pierce--;else{p.dead=true;break}}}
+      if(p.pierce>0)p.pierce--;else{p.dead=true;break}}}GEO--;
   pshots=pshots.filter(p=>!p.dead);
   if(S.banner>0)S.banner-=dt;
   if(S.mode!=='play'||S.banner>1.5)return;
+  if(VS&&VP.frozen)return; // (versus: nothing moves before the countdown is over)
   trophyTick(dt);if(PETS.fielded.length)petGrid();
   for(const a of allies){if(a.pet){petStep(a,dt);continue}if(a.shade){a.life-=dt;petStep(a,dt);continue}if(a.trophy){trophyStep(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
-    else if(t&&a.cd<=0){a.cd=.7;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(S.apex==='dominion'?DOMSUM:1),true);leech()}
+    else if(t&&a.cd<=0){a.cd=.7;GEO++;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(S.apex==='dominion'?DOMSUM:1),true);GEO--;leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
   if(PETS.fallen.length)reviveStep(dt);
   for(const f of fields){f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
     const fc=f.kind==='frost'?'#8fd3ff':f.kind==='halo'?'#ffe08a':f.kind==='domain'?'#a98bff':'#e7dfcd';for(let i=0;i<5;i++){const a=rand()*TAU,d=rand()*f.r;bits.push({x:f.x+Math.cos(a)*d,y:f.y+Math.sin(a)*d,vx:0,vy:f.kind==='rain'?60:-30,life:.5,max:.5,c:fc,r:2.5})}
-    if(!f.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.kind==='domain'){mMark(m,.7);if(!m.boss)mSlow(m,.8)}else if(f.slow)mSlow(m,.8);hurtM(m,f.dmg,true)}
+    GEO++;if(!f.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.kind==='domain'){mMark(m,.7);if(!m.boss)mSlow(m,.8)}else if(f.slow)mSlow(m,.8);hurtM(m,f.dmg,true)}GEO--;
+    if(f.foe){if(VS)vsField(f);continue}
     if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp&&!P.down)healP(.04)}}
   fields=fields.filter(f=>f.t<f.dur);
   if(S.mode!=='play')return;
@@ -1621,7 +1632,7 @@ function step(dt){
   const CLI=CL(); // a client's monsters are the host's: it only works out what they do to its own hero and pets
   if(!CLI&&S.wave&&!boss&&!mons.length&&(S.waveT-=dt)<=0){if(S.wave.n<S.wave.of){S.wave.n++;spawnWave()}else enterBoss()}
   if(!CLI&&act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&boss.ai!=='summoner'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5+(MP.on?mpPack():0)){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
-  if(CLI)mpMons(dt);else for(const m of[...mons]){
+  if(VS)vsFoes(dt);else if(CLI)mpMons(dt);else for(const m of[...mons]){
     if(S.mode!=='play')break;if(!mons.includes(m))continue; // the boss or the player died earlier in this loop
     m.moving=false;if(m.flash>0)m.flash-=dt;if(m.ward>0)m.ward-=dt;const ox=m.x,oy=m.y;
     if(m.markT>0)m.markT-=dt;
@@ -1647,7 +1658,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true});if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)mStun(m,m.boss?z.stun:z.stun*2);byPet=z.pet||null;hurtM(m,z.dmg,!!z.pet);byPet=null}}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)mStun(m,m.boss?z.stun:z.stun*2);byPet=z.pet||null;hurtM(m,z.dmg,!!z.pet);byPet=null}GEO--;if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24&&!P.down){f.dead=true;healP(.25,3);SND.pickup();haptic(15);if(MP.on)mpMorsel(f)}
   morsels=morsels.filter(f=>!f.dead);
@@ -1935,8 +1946,8 @@ function draw(){
   for(const f of fields){circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':f.kind==='domain'?'rgba(58,47,85,.45)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':f.kind==='domain'?'rgba(169,139,255,.7)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
   if(TR&&TR.obj)drawLamp2d(TR.obj);
   for(const f of morsels){circ(f.x,f.y+Math.sin(S.t*4)*2,8);ctx.fillStyle='#d1213f';ctx.fill();circ(f.x-2,f.y-3+Math.sin(S.t*4)*2,2.5);ctx.fillStyle='#ffb3bf';ctx.fill()}
-  for(const m of mons)drawMon(m);
-  drawBeams();
+  if(!VS){for(const m of mons)drawMon(m);
+  drawBeams()}else vsDraw2d(0);
   for(const s of shots){if(sight){circ(s.x,s.y,s.r+5);ctx.fillStyle='rgba(255,138,76,.28)';ctx.fill()}circ(s.x,s.y,s.r);ctx.fillStyle=col('#ff8a4c');ctx.fill();circ(s.x,s.y,s.r*.45);ctx.fillStyle='#fff';ctx.fill()}
   for(const a of allies)a.pet?drawPet(a):a.shade?drawShade(a):a.trophy?drawTrophy(a):drawAlly(a);
   if(echoes.length)drawEchoes();
@@ -1965,8 +1976,9 @@ function draw(){
     for(const z of zones){const k=z.t/z.dur;circ(z.x,z.y,z.r);ctx.fillStyle=z.mine?`rgba(143,211,255,${.1+.25*k})`:`rgba(184,38,61,${.12+.25*k})`;ctx.fill();ctx.strokeStyle=z.mine?'#8fd3ff':'#d6a544';ctx.lineWidth=2;ctx.stroke();circ(z.x,z.y,z.r*k);ctx.strokeStyle='rgba(231,223,205,.8)';ctx.stroke();
       if(z.sx!==undefined){const bx=z.sx+(z.x-z.sx)*k,by=z.sy+(z.y-z.sy)*k-Math.sin(k*Math.PI)*70;circ(bx,by,7);ctx.fillStyle='#22242b';ctx.fill();ctx.strokeStyle='#ff8a4c';ctx.lineWidth=2;ctx.stroke();ctx.lineWidth=2}}
     ctx.fillStyle='#d6a544';ctx.font='700 30px Spectral,Georgia,serif';ctx.textAlign='center';
-    for(const m of mons)if(m.st==='wind')ctx.fillText('!',m.x,m.y-m.r-12);
+    if(!VS)for(const m of mons)if(m.st==='wind')ctx.fillText('!',m.x,m.y-m.r-12);
   }
+  if(VS)vsDraw2d(1);
   if(S.banner>0&&S.mode==='play'){
     const L=S.L;ctx.globalAlpha=Math.min(1,S.banner/.6);ctx.textAlign='center';
     ctx.fillStyle='rgba(13,12,17,.72)';ctx.fillRect(0,196,W,150);
@@ -1984,6 +1996,7 @@ let lastScreen=null; // the last screen the game itself put up, so MB.api.hide()
 function show(o,foreign){
   if(!foreign)lastScreen=o;
   $('ovKick').textContent=o.kick||'';$('ovTitle').textContent=o.title||'';$('ovTitle').style.color=o.col||'';$('ovBody').textContent=o.body||'';$('ovBody').hidden=!o.body;$('ovKeys').textContent=o.keys||'';$('ovKeys').hidden=!o.keys;
+  if(o.extra||$('ovExtra'))ovExtra(o.extra);
   const cd=$('ovCards'),keep=o.list&&cd.classList.contains('list')?[cd.scrollTop,$('ovPanel').scrollTop]:null;cd.textContent='';cd.hidden=!o.cards;cd.className='cards'+(o.list?' list':''); // list: many compact rows that scroll (the pets screen); it keeps its place when it is drawn again
   (o.cards||[]).forEach(c=>{const e=document.createElement('button');e.type='button';
     for(const[tag,txt]of[['b',c.title],['small',c.sub],['span',c.body]]){const x=document.createElement(tag);x.textContent=txt;e.appendChild(x)}
@@ -2378,6 +2391,7 @@ addEventListener('keydown',e=>{
   const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];
   if((e.key==='Escape'||e.key==='p'||e.key==='P')&&!e.repeat&&(S.paused||S.mode==='play'||S.mode==='clear'||MP.on)){e.preventDefault();pause(!S.paused);return}
   if(e.key==='Enter'&&!$('ov').hidden&&!(e.target&&e.target.tagName==='BUTTON')){$('ovBtns').querySelector('button')?.click();return}
+  if(VS&&P&&P.down&&!e.repeat&&(k==='atk'||e.key==='Tab')&&S.mode==='play'){e.preventDefault();return vsSpectate()}
   if(!k||e.target.tagName==='BUTTON'&&k==='atk'&&!$('ov').hidden)return;
   if(S.mode==='play'||S.mode==='clear')e.preventDefault();
   if(S.paused)return;
@@ -2385,7 +2399,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];if(k)keys[k]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
-cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:((e.clientX-r.left)/(r.width||1)*V2.bw-V2.ox)/V2.k,y:((e.clientY-r.top)/(r.height||1)*V2.bh-V2.oy)/V2.k};e.preventDefault()});
+cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;if(VS&&P&&P.down)return vsSpectate();const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:((e.clientX-r.left)/(r.width||1)*V2.bw-V2.ox)/V2.k,y:((e.clientY-r.top)/(r.height||1)*V2.bh-V2.oy)/V2.k};e.preventDefault()});
 const pad=$('pad'),knob=$('knob');
 function padMove(e){const r=pad.getBoundingClientRect();let x=(e.clientX-r.left-r.width/2)/40,y=(e.clientY-r.top-r.height/2)/40;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}joy.x=x;joy.y=y;knob.style.transform=`translate(${x*34}px,${y*34}px)`}
 pad.addEventListener('pointerdown',e=>{pad.setPointerCapture(e.pointerId);padMove(e)});
@@ -2549,13 +2563,14 @@ function mpPartyY(){const h=mpHeroes();if(!h.length)return P.y;let y=0;for(const
 const mpHeroAt=i=>i===MP.myIdx?P:MP.byIdx[i]?MP.byIdx[i].P:null;
 /* --- what a client does to a monster goes to the host; alone, and on the host, it simply happens --- */
 function mpQ(op){MP.q.push(op)}
-function mSlow(m,v){if(CL())mpQ(['sl',m.id,v]);else m.slow=Math.max(m.slow||0,v)}
-function mStun(m,v){if(CL())mpQ(['st',m.id,v]);else m.stun=v}
-function mMark(m,v){if(CL())mpQ(['mk',m.id,v]);else m.markT=Math.max(m.markT||0,v)}
-function mPush(m,dx,dy){if(CL())return mpQ(['kb',m.id,Math.round(dx),Math.round(dy)]);m.x+=dx;m.y+=dy;clamp(m,m.r)}
-function mMove(m,x,y){if(CL())return mpQ(['mv',m.id,Math.round(x),Math.round(y)]);m.x=x;m.y=y;clamp(m,m.r);if(m.st==='charge'||m.st==='lunge'){m.st='dazed';m.t=.6}}
-function mVen(m,d,a){if(CL())return mpQ(['vn',m.id,Math.round(d*1000)/1000]);m.venT=3;m.venD=Math.max(m.venT>0&&m.venD||0,d);m.venK=.5;m.venBy=a;m.venRem=null}
+function mSlow(m,v){if(m.vs)return vsDebuff(m,{slow:v},1);if(CL())mpQ(['sl',m.id,v]);else m.slow=Math.max(m.slow||0,v)}
+function mStun(m,v){if(m.vs)return vsDebuff(m,{stun:v},1);if(CL())mpQ(['st',m.id,v]);else m.stun=v}
+function mMark(m,v){if(m.vs)return vsDebuff(m,{mark:v},1);if(CL())mpQ(['mk',m.id,v]);else m.markT=Math.max(m.markT||0,v)}
+function mPush(m,dx,dy){if(m.vs)return;if(CL())return mpQ(['kb',m.id,Math.round(dx),Math.round(dy)]);m.x+=dx;m.y+=dy;clamp(m,m.r)}
+function mMove(m,x,y){if(m.vs)return vsMove(m,x,y);if(CL())return mpQ(['mv',m.id,Math.round(x),Math.round(y)]);m.x=x;m.y=y;clamp(m,m.r);if(m.st==='charge'||m.st==='lunge'){m.st='dazed';m.t=.6}}
+function mVen(m,d,a){if(m.vs)return vsVen(m,d);if(CL())return mpQ(['vn',m.id,Math.round(d*1000)/1000]);m.venT=3;m.venD=Math.max(m.venT>0&&m.venD||0,d);m.venK=.5;m.venBy=a;m.venRem=null}
 function clearShots(c,r){
+  if(VS)return vsClear(c,r);
   if(MP.on){if(MP.role==='host'){for(const s of shots)if(dist(s,c)<=r)MP.sd.push(s.id)}else mpQ(['cl',Math.round(c.x),Math.round(c.y),Math.min(9999,Math.round(r))])}
   shots=shots.filter(s=>dist(s,c)>r)}
 function mpShotHit(s){if(MP.role==='host')MP.sd.push(s.id);else mpQ(['sx',s.id])}
@@ -2681,8 +2696,9 @@ function mpMons(dt){
   }
 }
 /* --- my hero, for the others --- */
-const mpLook=()=>({t:'lk',lv:S.level,cls:S.cls,adv:S.adv,ap:S.apex||0,rk:S.cls?rank():'',pw:[pw(1)?1:0,pw(2)?1:0,pw(3)?1:0]});
+const mpLook=()=>{const o={t:'lk',lv:S.level,cls:S.cls,adv:S.adv,ap:S.apex||0,rk:S.cls?rank():'',pw:[pw(1)?1:0,pw(2)?1:0,pw(3)?1:0]};if(VS)vsLook(o);return o};
 function mpAllyStatic(a){
+  if(VS)return vsAllyStatic(a);
   if(a.shade)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.max),32,'shade',0,0,0]; // one of the Owed: sent as a pet with flag 32; where a pet has its health, a shade has the seconds it has left
   if(a.pet)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.maxHp),(a.minion?1:0)|(a.lesser?2:0)|(a.helper?4:0)|(a.trophy?8:0)|(a.crown?16:0),a.owner,a.plv|0,a.mods&&a.mods.length?a.mods:0,a.perk||0];
   if(a.trophy)return[a.nid,a.kind==='familiar'?'f':'g',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,a.tm||1,a.owner,Math.round(a.seed*100)/100,a.s.r];
@@ -2692,11 +2708,11 @@ function mpAllyDyn(a){
   if(a.pet||a.shade){const d=[a.nid,x,y,(a.flip?1:0)|(a.moving?2:0)|(a.hidden?4:0)|(a.flash>0?8:0)|(a.ward>0?16:0)|(a.rage?32:0)|(a.inv>0?64:0),a.shade?hpR(Math.max(.1,a.life)):hpR(a.hp),STI[a.st]||0,Math.round((a.face||0)*100)||0,a.minion?0:Math.round((a.t||0)*10)||0,Math.round((a.lift||0)*100)||0,(a.phase||1)-1];
     while(d.length>6&&!d[d.length-1])d.pop();return d}
   if(a.trophy)return[a.nid,x,y,(a.flip?1:0)|(a.moving?2:0)|(a.flash>0?8:0)|(a.shield?256:0),STI[a.st]||0,Math.round((a.face||0)*100)||0,Math.round((a.t||0)*10)||0];
-  return[a.nid,x,y,a.flip?1:0]}
+  return VS?[a.nid,x,y,a.flip?1:0,hpR(a.hp||0)]:[a.nid,x,y,a.flip?1:0]}
 function mpSendMe(now,force){
   if(!P)return;MP.tick++;
-  const inLv=(S.mode==='play'||S.mode==='clear')&&!MP.away,away=!inLv;
-  const p=[Math.round(P.x),Math.round(P.y),Math.round(P.face*100)||0,(P.moving?1:0)|(P.inv>0?2:0)|(P.shield?16:0)|(P.down?32:0)|(away?64:0)|(SK[0].ready?128:0),Math.max(0,P.hp),P.maxHp,Math.round(P.swing*100)||0,
+  const inLv=(S.mode==='play'||S.mode==='clear')&&(!MP.away||!!VS),away=!inLv;
+  const p=[Math.round(P.x),Math.round(P.y),Math.round(P.face*100)||0,(P.moving?1:0)|(P.inv>0?2:0)|(P.shield?16:0)|(P.down?32:0)|(away?64:0)|(SK[0].ready?128:0),VS?hpR(P.hp):Math.max(0,P.hp),P.maxHp,Math.round(P.swing*100)||0,
     Math.round(Math.max(0,P.atk,MP.swung?.1:0)*100),Math.round(Math.max(0,P.dashT,MP.dashed?.1:0)*100)];MP.swung=MP.dashed=false;
   while(p.length>7&&!p[p.length-1])p.pop();
   const msg={t:'me',c:Math.round(now),p};let ev=false;
@@ -2705,13 +2721,14 @@ function mpSendMe(now,force){
     const n=allies.length,every=n<=6?1:n<=16?2:3;
     for(const a of allies)if(!a._sent){a._sent=true;(msg.an||(msg.an=[])).push(mpAllyStatic(a))}
     if(n||MP.hadAl){if(msg.an||!n||MP.tick%every===0){msg.a=allies.map(mpAllyDyn);for(const a of allies)if(a.beam&&a.pet)(msg.ab||(msg.ab={}))[a.nid]=beamOut(a.beam);MP.hadAl=n>0}ev=true}
-    if(P.beam){msg.bm=[Math.round(P.beam.a*100),Math.round(P.beam.len)];ev=true}else if(MP.hadBm){msg.bm=0;ev=true}MP.hadBm=!!P.beam; // the Verdict beam
-    for(const q of pshots)if(!q._sent){q._sent=true;(msg.s||(msg.s=[])).push([Math.round(q.x),Math.round(q.y),Math.round(q.vx),Math.round(q.vy),q.r,Math.max(0,PKIND.indexOf(q.kind)),Math.min(99,q.pierce|0)])}
+    if(P.beam){msg.bm=[Math.round(P.beam.a*100),Math.round(P.beam.len)];if(VS)msg.bm.push(Math.round(14*dmgMul()*100)/100);ev=true}else if(MP.hadBm){msg.bm=0;ev=true}MP.hadBm=!!P.beam; // the Verdict beam
+    for(const q of pshots)if(!q._sent){q._sent=true;(msg.s||(msg.s=[])).push(vsShotOut(q,[Math.round(q.x),Math.round(q.y),Math.round(q.vx),Math.round(q.vy),q.r,Math.max(0,PKIND.indexOf(q.kind)),Math.min(99,q.pierce|0)]))}
     for(const e of echoes)if(!e._sent){e._sent=true;(msg.e||(msg.e=[])).push([Math.round(e.x),Math.round(e.y),Math.round(e.ang*100)||0,e.k||e.ai,e.ai,e.s.col,e.s.r,e.s.crown?1:0,e.owner])}
-    for(const z of zones)if(z.mine&&!z.rem&&!z._sent){z._sent=true;const a=[Math.round(z.x),Math.round(z.y),z.r,Math.round(z.dur*100)];if(z.sx!==undefined)a.push(Math.round(z.sx),Math.round(z.sy));(msg.z||(msg.z=[])).push(a)}
-    for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;(msg.f||(msg.f=[])).push([Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)])}
+    for(const z of zones)if(z.mine&&!z.rem&&!z._sent){z._sent=true;const a=[Math.round(z.x),Math.round(z.y),z.r,Math.round(z.dur*100)];if(z.sx!==undefined)a.push(Math.round(z.sx),Math.round(z.sy));else if(VS)a.push(-1,-1);if(VS)a.push(Math.round(z.dmg*100)/100,z.stun||0);(msg.z||(msg.z=[])).push(a)}
+    for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;(msg.f||(msg.f=[])).push(VS?[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100),Math.round(f.dmg*100)/100,f.slow?1:0]:[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)])}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
-    if(msg.s||msg.e||msg.z||msg.f||msg.r)ev=true;
+    if(VS&&VP.ev.length){msg.v=VP.ev;VP.ev=[]}
+    if(msg.s||msg.e||msg.z||msg.f||msg.r||msg.v)ev=true;
   }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0;MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
   // nothing new to say: three times a second is enough
   const key=p.join();if(!ev&&!force&&key===MP.pKey&&now-MP.tSent<320)return;MP.pKey=key;MP.tSent=now;
@@ -2732,13 +2749,13 @@ function mpMkAlly(r,a){
     else{const f=k==='f'?'familiar':'guardian';
       o={nid,kind:f,trophy:true,ent:true,form:f,owner:own(CLASSES,a[8])?a[8]:'mage',s:{...base,ai,name,col:c,crown:0,r:Math.max(4,Math.min(60,+a[10]||rr))},ai,name,x:0,y:0,r:rr,tm:+a[7]||1,t:0,seed:+a[9]||0,face:0,st:'idle',stT:0,flash:0,life:1e9,hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false,moving:false,walk:0,flip:false,shield:false,rem:true}}}
   else o={nid,kind:k==='w'?'wolf':'thrall',x:0,y:0,r:+a[2]||9,walk:rand()*6,flip:false,moving:false,life:1e9,cd:0,rem:true};
-  o._new=true;r._al.set(nid,o)}
+  o._new=true;if(VS)vsAllyNew(r,o,a);r._al.set(nid,o)}
 function mpAllyIn(o,d,c){
   const x=d[1],y=d[2],f=d[3]|0;if(o._new){o._new=false;o.x=x;o.y=y}
   o.flip=!!(f&1);
   if(o.pet||o.shade){o.moving=!!(f&2);o.hidden=!!(f&4);o.flash=f&8?.1:0;o.ward=f&16?.2:0;o.rage=!!(f&32);o.inv=f&64?.2:0;if(o.shade)o.life=+d[4]||0;else o.hp=+d[4]||0;o.st=STN[d[5]]||'idle';o.face=(d[6]||0)/100;if(o.st==='charge'||o.st==='lunge')o.ang=o.face;if(!o.minion)o.t=(d[7]||0)/10;o.phase=(d[9]||0)+1;sPush(o,c,x,y,(d[8]||0)/100)}
   else if(o.trophy){o.moving=!!(f&2);o.flash=f&8?.1:0;o.shield=!!(f&256);o.st=STN[d[4]]||'idle';o.face=(d[5]||0)/100;o.t=(d[6]||0)/10;sPush(o,c,x,y,0)}
-  else{const s=o._s,n=s?s.length:0;o.moving=n?Math.abs(x-s[n-3])+Math.abs(y-s[n-2])>1:false;sPush(o,c,x,y,0)}}
+  else{const s=o._s,n=s?s.length:0;o.moving=n?Math.abs(x-s[n-3])+Math.abs(y-s[n-2])>1:false;if(d[4]!==undefined)o.hp=+d[4]||0;sPush(o,c,x,y,0)}}
 function mpOnMe(msg,from){
   const r=MP.rById.get(''+from);if(!r)return;const now=performance.now(),p=msg.p,c=+msg.c||0;clkIn(r._clk,c,now);
   if(Array.isArray(p)){const q=r.P,f=p[3]|0,aw=!!(f&64);
@@ -2751,20 +2768,21 @@ function mpOnMe(msg,from){
     if(r._al.size>out.length)for(const[k,o]of r._al)if(o._seen!==seen)r._al.delete(k);
     for(const o of out)if(o.pet){const b=msg.ab&&msg.ab[o.nid];if(b)beamIn(o,b);else if(o.beam)o.beam=null}}
   if(r.away)return;
-  if(msg.s)for(const a of msg.s)if(r.pshots.length<400)r.pshots.push({x:+a[0]||0,y:+a[1]||0,vx:+a[2]||0,vy:+a[3]||0,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0});
+  if(VS)vsOnMe(r,msg,now,c);else if(msg.s)for(const a of msg.s)if(r.pshots.length<400)r.pshots.push({x:+a[0]||0,y:+a[1]||0,vx:+a[2]||0,vy:+a[3]||0,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0});
   if(msg.e)for(const a of msg.e){const base=typeof a[3]==='string'&&own(SPEC,a[3])?SPEC[a[3]]:SPEC.crawler,ow=own(CLASSES,a[8])?a[8]:'mage';
     r.echoes.push({ai:AI[a[4]]?a[4]:'mite',s:{...base,ai:AI[a[4]]?a[4]:'mite',col:typeof a[5]==='string'&&/^#[0-9a-f]{6}$/i.test(a[5])?a[5]:base.col,r:Math.max(4,Math.min(60,+a[6]||base.r)),crown:a[7]?1:0},x:+a[0]||0,y:+a[1]||0,ang:(a[2]||0)/100,life:.6,max:.6,owner:ow,col:TCOL[ow]||'#b88cff'});if(r.echoes.length>10)r.echoes.shift()}
-  if(S.mode!=='play')return;
+  if(S.mode!=='play'||VS)return;
   // a teammate's blasts, fields and shockwaves are shown here as they are there; they do nothing here, except that hallowed ground mends whoever stands on it
   if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0};if(a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
   if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push({kind:FKIND[a[0]]||'rain',x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true});
   if(msg.r)for(const a of msg.r)if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true})}
 }
 function mpOnLook(msg,from){const r=MP.rById.get(''+from);if(!r)return;const k=r.look;k.level=Math.max(0,Math.min(9998,msg.lv|0));k.cls=own(CLASSES,msg.cls)?msg.cls:null;k.adv=k.cls&&CLASSES[k.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;k.apex=k.cls&&(msg.ap==='dominion'||msg.ap==='order')?msg.ap:null;r.P.auraR=k.apex==='order'?ORDR:0;k.rank=mpTxt(msg.rk,8);
-  const w=Array.isArray(msg.pw)?msg.pw:[];k.pw=[!!w[0],!!w[1],!!w[2]];MP.hudKey=''}
+  const w=Array.isArray(msg.pw)?msg.pw:[];k.pw=[!!w[0],!!w[1],!!w[2]];MP.hudKey='';if(VS)vsOnLook(r,msg)}
 function mpRemoteStep(r,dt,now){
   const q=r.P,rt=now-r._clk.off-MPDELAY;sAt(q,rt);if(q.atk>0)q.atk-=dt;if(q.dashT>0)q.dashT-=dt;if(q.moving)q.walk+=dt*11;if(q.beam&&now-q._bm>400)q.beam=null;
   for(const a of r.allies){sAt(a,rt);if(a.moving)a.walk+=dt*12;if(a.shade&&a.life>0)a.life-=dt}
+  if(VS)return vsRemote(r,dt,now);
   const ps=r.pshots;if(ps.length){let n=0;for(const p of ps){p.x+=p.vx*dt;p.y+=p.vy*dt;let dead=p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL||obstacles.length&&blocked(p);
     if(!dead)for(const m of mons)if(!m.hidden&&p._h!==m&&dist(m,p)<m.r+p.r+3){if(p.pierce>0){p.pierce--;p._h=m}else dead=true;break}
     if(!dead)ps[n++]=p}ps.length=n}
@@ -2846,7 +2864,7 @@ function mpLeft(id){
   MP.members.splice(i,1);MP.count=MP.members.length;MP.ready.delete(id);MP.rById.delete(id);MP.byIdx[m.idx]=null;
   const j=MP.remotes.findIndex(r=>r.id===id);if(j>=0)MP.remotes.splice(j,1);
   for(const x of mons)if(x.tgt&&x.tgt._mi===m.idx)x.tgt=null;
-  MP.toast=m.name+' left the game';MP.toastT=performance.now()+4000;MP.hudKey='';mpWait();mpGate();
+  MP.toast=m.name+' left the game';MP.toastT=performance.now()+4000;MP.hudKey='';if(VS)return vsLeft(m);mpWait();mpGate();
 }
 /* --- the menu (there is no pause in a shared fight), the party list, the saved character --- */
 function mpMenu(){
@@ -2855,10 +2873,12 @@ function mpMenu(){
 }
 function mpMenuClose(){
   if(!MP.menu)return;MP.menu=false;lastScreen=MP.under;MP.under=null;
+  if(VS)return vsScreen();
   if(MP.meReady&&MP.phase!=='run')return mpWait();
   if(S.mode==='play'||S.mode==='clear'||!lastScreen)$('ov').hidden=true;else show(lastScreen);
 }
 function mpMenuShow(){
+  if(VS)return vsMenuShow();
   const inLv=S.mode==='play'||S.mode==='clear',host=MP.role==='host',btns=[[inLv?'Back to the fight':'Back',mpMenuClose]];
   if(S.cls&&act2()&&learned().length>NSK)btns.push(['Skills',()=>loadout(mpMenuShow)]);
   if(S.cls&&form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(mpMenuShow)]);
@@ -2870,7 +2890,7 @@ function mpMenuShow(){
 }
 function mpLeave(){const N=window.MBNet;try{if(N&&typeof N.leave==='function')N.leave()}catch(e){}mpEnd('left')}
 function mpHidden(h){MP.away=!!h;if(MP.on&&P)mpSendMe(performance.now(),true)}
-function mpSave(n){try{localStorage.setItem('marrowborn.mp.run',JSON.stringify(snapshot(n)))}catch(e){}}
+function mpSave(n){if(VS)return;try{localStorage.setItem('marrowborn.mp.run',JSON.stringify(snapshot(n)))}catch(e){}}
 function mpSaved(){try{const r=checkSave(JSON.parse(localStorage.getItem('marrowborn.mp.run')||'null'));return r&&r.cls&&r.level>=8?r:null}catch(e){return null}}
 // the class choice of a co-op game: the character of your last co-op game can walk in again as it was
 function mpPickCards(){
@@ -2894,6 +2914,7 @@ function mpHudMake(){
 }
 function mpHud(now){
   const el=MP.hud;if(!el)return;if(now<MP.tHud)return;MP.tHud=now+200;
+  if(VS)return vsHud(el,now);
   if(MP.toast&&now>MP.toastT)MP.toast='';
   if(MP.meReady&&MP.phase!=='run'&&!MP.menu&&!MP.waitLate&&now-MP.gateT>6e4)mpWait(); // the minute is up: the host's screen gains its button
   const rows=[],gate=MP.phase!=='run',cn=(c,a)=>c&&CLASSES[c]?(a&&CLASSES[c].adv.find(x=>x[0]===a)||[0,CLASSES[c].name])[1]:'';
@@ -2912,6 +2933,7 @@ function mpFrame(dt){
   const now=performance.now();MP.lastF=now;
   if(P){if(P.atk>MP.atk0+.01)MP.swung=true;MP.atk0=P.atk;if(P.dashT>MP.dash0+.01)MP.dashed=true;MP.dash0=P.dashT}
   for(const r of MP.remotes)mpRemoteStep(r,dt,now);
+  if(VS)return vsFrame(dt,now);
   if(MP.role==='client'){if(S.mode==='play'){const rt=now-MP.hclk.off-MPDELAY;for(const m of mons)sAt(m,rt)}if(now>=MP.tQ){MP.tQ=now+50;mpFlush()}}
   else{if(now>=MP.tW){MP.tW=Math.max(now+20,MP.tW+1000/MPHZ);mpSendWorld(now)}mpFail(now)}
   if(now>=MP.tMe){MP.tMe=Math.max(now+20,MP.tMe+1000/MPHZ);mpSendMe(now)}
@@ -2928,7 +2950,7 @@ function mpDraw2d(pass){
       if(r.echoes.length)drawEchoes(r.echoes);continue}
     const P0=P,c0=S.cls,a0=S.adv,l0=S.level;DR=r;P=r.P;S.cls=r.look.cls;S.adv=r.look.adv;S.level=Math.max(8,r.look.level);
     try{drawPlayer()}finally{P=P0;S.cls=c0;S.adv=a0;S.level=l0;DR=null;ctx.globalAlpha=1}
-    const q=r.P,c=MP.colors[r.idx%MP.colors.length];ctx.textAlign='center';ctx.font='700 13px Rajdhani,"Barlow Condensed","Arial Narrow",sans-serif';ctx.fillStyle='#0d0c11';ctx.fillText(r.name,q.x+1,q.y-49);ctx.fillStyle=c;ctx.fillText(r.name,q.x,q.y-50);
+    const q=r.P,c=VS?VS.colors[r.idx]:MP.colors[r.idx%MP.colors.length];ctx.textAlign='center';ctx.font='700 13px Rajdhani,"Barlow Condensed","Arial Narrow",sans-serif';ctx.fillStyle='#0d0c11';ctx.fillText(r.name,q.x+1,q.y-49);ctx.fillStyle=c;ctx.fillText(r.name,q.x,q.y-50);
     if(!r.dead){ctx.fillStyle='rgba(13,12,17,.8)';ctx.fillRect(q.x-17,q.y-46,34,5);ctx.fillStyle=c;ctx.fillRect(q.x-16,q.y-45,32*Math.max(0,Math.min(1,q.hp/(q.maxHp||1))),3)}
   }
 }
@@ -2938,6 +2960,7 @@ let mpWired=false;
 function mpWire(){
   const N=window.MBNet;if(mpWired||!N||typeof N.on!=='function')return;mpWired=true;
   const H={w:mpOnWorld,me:mpOnMe,lk:mpOnLook,hit:mpOnHit,lv:mpOnLevel,rdy:mpOnReady,sync:()=>{if(MP.role==='host')MP.full=true},
+    vs:vsOnHost,vr:vsOnReady,vd:vsOnDown,vk:vsOnDirect,vh:vsOnHurt,vc:vsOnCreature,
     'net:leave':m=>mpLeft(m&&m.id),'net:host':m=>{if(MP.role!=='host'&&(!m||''+m.id!==MP.hostId||m.left))mpEnd('The host left the game.')},'net:end':m=>mpEnd(m&&typeof m.reason==='string'&&m.reason?m.reason:'ended')};
   for(const k in H)try{N.on(k,(m,from)=>{if(!MP.on)return;try{H[k](m||{},from)}catch(e){console.error('Ashes to Apex multiplayer: "'+k+'" failed',e)}})}catch(e){}
 }
@@ -2955,13 +2978,12 @@ function mpBegin(cfg){
   // a co-op run begins at the class choice, whole, and never touches the single-player save
   beginTok++;S.paused=false;const pb=$('pauseB');if(pb){pb.setAttribute('aria-pressed','false');pb.textContent='Menu'}S.stop=0;S.wave=null;
   mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];morsels=[];echoes=[];TSRC=[];obstacles=[];boss=null;
-  newRun();stReset();chooseClass();freshBody();hud();$('bossName').textContent='—';
-  if(cfg.mode&&cfg.mode!=='coop'){MP.toast='This version plays co-op only';MP.toastT=performance.now()+6000} // versus is the next phase: MP.mode, remote.team and the per-member attribution of hits (REM) are where it will hook in
+  if(cfg.mode==='versus')vsBegin(cfg);else{newRun();stReset();chooseClass();freshBody();hud()}$('bossName').textContent='—';
   mpHudMake();if(!MP.timer)MP.timer=setInterval(mpBack,250);
   mpSendMe(performance.now(),true);emit('mp',{on:true});return true;
 }
 function mpEnd(reason){
-  if(!MP.on)return false;MP.on=false;MP.menu=false;MP.down=false;MP.away=false;MP.meReady=false;MP.phase='pick';REM=null;DR=null;
+  if(!MP.on)return false;const wasVs=VS;if(VS)vsEnd();MP.on=false;MP.menu=false;MP.down=false;MP.away=false;MP.meReady=false;MP.phase='pick';REM=null;DR=null;
   if(MP.timer){clearInterval(MP.timer);MP.timer=0}if(MP.hud){MP.hud.remove();MP.hud=null}
   MP.remotes.length=0;MP.rById.clear();MP.byIdx.length=0;MP.members=[];MP.count=1;MP.cnt=1;MP.ready.clear();MP.mons.clear();MP.q=[];MP.qd.clear();MP.heroes.length=0;
   const pb=$('pauseB');if(pb)pb.textContent='Pause';S.stop=0;
@@ -2970,16 +2992,550 @@ function mpEnd(reason){
   applyRun(r,saved);title(saved);emit('mp',{on:false});
   // net.js gives a short code for why it ended; anything else is shown as it is
   const why={'host-left':'The host left the game.',disconnected:'The connection to the game was lost.',kicked:'You were removed from the game.',ended:'The host ended the game.'};
-  if(typeof reason==='string'&&reason&&reason!=='left')show({kick:'Co-op',title:'The game is over',body:why[reason]||mpTxt(reason,200),btns:[['Back to the title',titleShow]]},true);
+  if(typeof reason==='string'&&reason&&reason!=='left'&&!(wasVs&&reason==='ended'))show({kick:wasVs?'Versus':'Co-op',title:'The game is over',body:why[reason]||mpTxt(reason,200),btns:[['Back to the title',titleShow]]},true);
   return true;
 }
 MP.begin=mpBegin;MP.end=mpEnd;
 
+/* ---------- versus: hero against hero over the same relay (MB.mp.vs). Everything here is off unless VS ---------- */
+// cfg: {mode:'versus', vs:{format:'ffa'|'teams', floor, wins, time}, members:[{id,name,team}], hostId, myId}. Everyone fights with a seasoned hero of the same floor (seasonedRun), never saved anywhere.
+// Flow: pick (class, upgrade past floor 50, apex path past 100) -> countdown 3 s -> fight (time) -> sudden (a ring closes on the centre) -> over (scoreboard, a few seconds) -> the next round ... -> results -> the lobby.
+// The host runs the clock, the phases, the score and the round results (it trusts the 'I am down' reports). Nothing else is the host's.
+//
+// Who decides a hit: THE VICTIM. Each member simulates its own hero and its own creatures, and tests them against what the hostile members replicate:
+//   bolts (me.s, with their damage), melee swings and lunges (me.v: origin, angle, reach, arc), shockwaves (me.r with a damage), blasts (me.z), fields (me.f), the ring of light and the Verdict beam (lk.au, me.bm),
+//   and their creatures: a pet's touch, charge and beam, a thrall's bite (the creature's blows come with it: an[13], lk.tb).
+//   Time: a hostile hero and its creatures are drawn MPDELAY (100 ms) in the past, between two samples, exactly as remote bodies are in co-op. Everything that hero does is resolved in that same delayed picture:
+//   a swing, a lunge or a shockwave is tested when the drawn hero reaches the moment it happened (sender's clock + MPDELAY), against where MY hero stands at that moment. A bolt is not held back: it flies from where
+//   it was loosed, in real time, as a teammate's bolts do in co-op (holding it back as well would put a quarter of a second between an aim and its result). Blasts and fields are telegraphed and start when they arrive.
+//   So what you see is what can hit you, and a dash, a blink or any invulnerability of yours counts at the moment of the test. The attacker pays for the delay: what it aims at is 100 ms and the network's delay old.
+//   To make up for that the stand-in of a hostile hero (what auto-aim, skills and pets aim at) is put VSK.lead seconds ahead of the drawn hero along its motion.
+//   On the attacker's screen its own bolts stop at what they seem to hit (a guess for the eye only).
+//   Attacks without a shape (a blow on "the nearest", chain lightning, a drain, marks, poisons, stuns, pulls, a trophy's bite) are sent to the victim as they are ('vk'), and the victim applies them unless it cannot be hurt just then.
+// How it is wired into the game: the hostile heroes and creatures stand in `mons` as stand-ins (m.vs), so aiming, skills, pets, familiars and trophies find them with the code they always used. hurtM and the m* helpers
+//   hand a stand-in to this section: inside GEO (an attack with a shape) nothing is sent, the victim works it out; outside GEO it becomes a 'vk' op. MB.mons is empty in versus: the stand-ins are not for drawing.
+//
+// THE conversion: a blow of raw damage D (the number a monster would take) costs a hero  D / GREF(n) x PHP(n) x VSK.K  health (n: the match's floor), times the attacker's and the victim's class factor (VSK.cls, all 1 unless tuned),
+//   halved by a stone skin, half again as much on a marked hero, and never more than VSK.cap of the victim's health in one blow. Creatures' blows on heroes go through the same rule.
+//   Creature against creature, and hero against creature: the raw number comes off the creature's health as it is (the pets' own scale), times VSK.cre.
+// Versus-only rules (VRULES says them on the pick screen): healing at VSK.heal; no more than VSK.inv seconds untouchable at a stretch (then VSK.invRest seconds in which nothing protects); a stun or a slow lasts VSK.cc at most
+//   and then none takes hold for VSK.ccImm; fallen pets stay down for the round; thralls and wolves have health (VSK.thr / VSK.wolf of GREF); a blow that was shrugged off or blocked gives no further protection but itself.
+//
+// Messages:
+//  vs  host -> all: {t,k:'go',n} round n starts | {t,k:'s',ph,n,tl (seconds left x10),w (winner team or -1),sc:[[rounds,kills,dmg,flags 1 down 2 left]...]} four times a second and at once on a change | {t,k:'bye'} back to the lobby
+//  vr  member -> all: {t,ok:1,cls,adv,ap} my fighter is chosen | {t,ok:0} I am choosing again
+//  vd  member -> all: {t,by,n} I am down in round n (by: member index, -1 the ring)
+//  vk  attacker -> the victim's owner: {t,n,l:[op...]}: ['d',member,nid (0 the hero),raw] | ['db',member,nid,slow,stun,dot per tick,mark] | ['vn',member,nid,raw per tick] | ['mv',member,nid,x,y]
+//  vh  victim -> all, 6 Hz at most: {t,l:[[by,health lost,nid]...]} for the score and the attacker's numbers
+//  vc  owner -> all: {t,by,k,ai,x,y,r,nm} one of my creatures died (the Tithe rises from it for the member that killed it)
+//  me  in versus also: v:[['s',x,y,angle x100,reach,arc x100,raw] a swing | ['r',x,y,angle x100,length,raw,stun] a lunge], r:[[x,y,r,life,raw]] a shockwave that hurts, s:[...,raw,flags (1 explodes 2 slows 4 stuns 8 doubles past
+//      200 px 16 burns around 32 a creature's),boom raw,slow,stun], z:[x,y,r,dur,sx|-1,sy|-1,raw,stun], f:[...,raw per tick,slows], bm:[angle,length,raw], an: a pet's row ends with its three blows, a thrall's with its health
+//  lk  in versus also: au:[radius,raw per tick] the ring of light, tb: a thrall's bite (raw)
+const VFLOORS=[11,31,51,101,151],VNONE=[];
+const VSK={K:1.5,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:1,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,
+  cls:{fighter:[1,1],tank:[1,1],assassin:[1,1],mage:[1,1],ranger:[1,1],healer:[1,1],necro:[1,1]},dev:false};
+// VCLS: the class factors [what its blows on heroes are multiplied by, what the blows it takes are multiplied by] per hero level, found with the versus bots (r9-sim/tune.js)
+const VCLS={};
+const VRULES=['Every blow is scaled to a hero\'s health, and no single blow takes more than '+Math.round(VSK.cap*100)+'% of it.',
+  'Healing and lifesteal work at half strength.',
+  'Nothing keeps you untouchable for more than '+VSK.inv+' seconds at a stretch.',
+  'A stun or a slow lasts '+VSK.cc+' second at most. After it, none takes hold for '+VSK.ccImm+' seconds.',
+  'A pet that falls stays down until the next round. Thralls and wolves can be killed.',
+  'How many fight for you is limited by your mana and by nothing else.',
+  'Trophies and their echoes strike heroes. The Owed rise from enemy creatures that die, not from heroes.',
+  'When the clock runs out, a ring of fire closes on the centre: sudden death.'];
+const vsLive=()=>VS.phase==='fight'||VS.phase==='sudden';
+const vsHead=()=>'Versus · '+(VS.format==='teams'?'teams':'free-for-all')+' · heroes of floor '+VS.floor+' · first to '+VS.wins+(VS.wins>1?' rounds':' round')+' · '+VS.time+' s a round';
+const vsSide=team=>{const t=VS.teams.find(x=>x.team===team);return t?t.name:'Nobody'};
+const vsFighter=s=>{const c=s.cls&&CLASSES[s.cls];if(!c)return'';return(s.adv&&(c.adv.find(a=>a[0]===s.adv)||[0,c.name])[1]||c.name)+(s.apex&&APEX[s.apex]?' · '+APEX[s.apex].title:'')};
+function vsTeams(){const T=[];for(const s of VS.score){let t=T.find(x=>x.team===s.team);if(!t)T.push(t={team:s.team,name:VS.format==='teams'?'Team '+'AB'[s.team]:s.name,rounds:0,alive:0,n:0});t.rounds=Math.max(t.rounds,s.rounds);if(!s.left){t.n++;if(!s.down)t.alive++}}VS.teams=T;return T}
+// the stand-in of a hostile hero among the monsters: what the hero's own attacks, pets and trophies aim at
+const vsProxy=r=>({vs:true,hero:true,own:r,nid:0,id:'h'+r.idx,kind:'hero',s:{name:r.name,col:'#e7dfcd',r:11,eyes:2},ai:'mite',x:W/2,y:H/2,r:11,hp:1,maxHp:1,boss:true,st:'idle',t:1,n:0,flash:0,ring:0,hidden:false,lift:0,mods:[],ward:0,beam:null,vx:0,vy:0,decoy:false,seed:0});
+/* --- begin and end --- */
+function vsBegin(cfg){
+  const o=cfg.vs&&typeof cfg.vs==='object'?cfg.vs:{},teams=o.format==='teams',fl=Math.floor(+o.floor)||11;let floor=11;for(const f of VFLOORS)if(fl>=f)floor=f;
+  const wins=Math.max(1,Math.min(9,Math.floor(+o.wins)||3)),time=Math.max(5,Math.min(600,+o.time||90)),cm=Array.isArray(cfg.members)?cfg.members:[];
+  MP.mode='versus';
+  if(!VSK.dev){const T=VCLS[floor]||{};for(const c in VSK.cls)VSK.cls[c]=(T[c]||[1,1]).slice()} // the class factors of this hero level (dev: a test has set its own)
+  for(const m of MP.members){const s=cm.find(x=>x&&''+x.id===m.id)||{};m.team=teams?(s.team===0||s.team===1?s.team:m.idx%2):m.idx}
+  const me=MP.members.find(m=>m.id===MP.myId),n=floor-1;
+  VS=MP.vs={format:teams?'teams':'ffa',floor,wins,time,round:0,phase:'pick',t:VSK.pick,ring:null,
+    score:MP.members.map(m=>({id:m.id,name:m.name,team:m.team,idx:m.idx,rounds:0,kills:0,dmg:0,down:false,left:false,cls:null,adv:null,apex:null})),
+    myTeam:me.team,myIdx:me.idx,winner:null,teams:[],colors:MP.members.map(m=>teams?MP.teamColors[m.team]:MP.colors[m.idx%MP.colors.length]),teamColors:MP.teamColors,rules:VRULES};
+  VP={n,k:PHP(n)/GREF(n),pick:null,ready:new Set(),mine:false,hold:true,frozen:true,scr:'',q:[],ev:[],dm:new Map(),tVh:0,tVs:0,tFl:0,sid:1,invRun:0,invBlk:0,ringK:0,last:-1,lastT:-9,lastTeam:-1,t0:performance.now(),late:false,forced:false,final:false,fl:0,hudT:0,hurtT:0};
+  for(const r of MP.remotes){const m=MP.members.find(x=>x.id===r.id);r.team=m.team;r.foe=m.team!==me.team;r._ev=[];r.hx=r.foe?vsProxy(r):null}
+  vsTeams();
+  if(!$('vsCss')){const st=document.createElement('style');st.id='vsCss';st.textContent=`
+:where(#ovExtra){margin:.4em 0}:where(.vsScroll){overflow-x:auto}
+:where(.vsTable){border-collapse:collapse;margin:.4em auto;font-size:.9rem}:where(.vsTable td,.vsTable th){padding:.2em .8em;text-align:left;border-bottom:1px solid var(--stone-2,#333)}
+:where(.vsTable .num){text-align:right;font-variant-numeric:tabular-nums}:where(.vsTable td.nm){border-left:3px solid var(--c,#fff)}:where(.vsTable tr.down td,.vsTable tr.left td){opacity:.6}:where(.vsTable tr.win td.nm,.vsTable tr.me td.nm){font-weight:700}
+:where(.vsRules){text-align:left;font-size:.85rem;margin:.4em auto;max-width:46em;padding-left:1.2em}`;document.head.appendChild(st)}
+  newRun();stReset();S.level=n;S.mode='reward';freshBody();hud();$('lvl').textContent='Versus · heroes of floor '+floor;
+  vsPick();emit('vs',{phase:'pick',round:0});
+}
+function vsEnd(){
+  const el=$('ovExtra');if(el){el.textContent='';el.hidden=true}
+  for(const r of MP.remotes){r.hx=null;r._ev=null}
+  VS=null;VP=null;MP.vs=null;MP.mode='coop';mons=[];GEO=0;emit('vs',{phase:'end',round:0});
+}
+/* --- screens: the pick, the wait, between rounds, the results, the menu --- */
+// what show() puts under the body for a versus screen: {rules:[...]} and/or {table:{head:[[text,num]...],rows:[{cls,c,cells:[...]}]}}
+function ovExtra(x){
+  let el=$('ovExtra');if(!el){if(!x)return;el=document.createElement('div');el.id='ovExtra';$('ovBody').after(el)}
+  el.textContent='';el.hidden=!x;if(!x)return;
+  if(x.rules){const ul=document.createElement('ul');ul.className='vsRules';for(const t of x.rules){const li=document.createElement('li');li.textContent=t;ul.appendChild(li)}el.appendChild(ul)}
+  if(x.table){const wrap=document.createElement('div'),tb=document.createElement('table'),th=document.createElement('thead'),hr=document.createElement('tr'),body=document.createElement('tbody');wrap.className='vsScroll';tb.className='vsTable';
+    for(const[t,num]of x.table.head){const c=document.createElement('th');c.textContent=t;if(num)c.className='num';hr.appendChild(c)}th.appendChild(hr);tb.appendChild(th);
+    for(const r of x.table.rows){const tr=document.createElement('tr');if(r.cls)tr.className=r.cls;if(r.c)tr.style.setProperty('--c',r.c);r.cells.forEach((v,i)=>{const c=document.createElement('td');c.textContent=v;c.className=!i?'nm':x.table.head[i]&&x.table.head[i][1]?'num':'';tr.appendChild(c)});body.appendChild(tr)}
+    tb.appendChild(body);wrap.appendChild(tb);el.appendChild(wrap)}
+}
+function vsTable(kind){
+  const teams=VS.format==='teams',rows=VS.score.slice().sort((a,b)=>kind==='pick'?a.team-b.team||a.idx-b.idx:b.rounds-a.rounds||a.team-b.team||b.kills-a.kills||b.dmg-a.dmg);
+  const cl=s=>(s.idx===VS.myIdx?'me ':'')+(s.left?'left ':s.down&&kind!=='pick'?'down ':'')+(kind!=='pick'&&VS.winner===s.team?'win':'');
+  if(kind==='pick')return{head:[['Player'],...(teams?[['Side']]:[]),['Fighter'],['']],rows:rows.map(s=>({cls:cl(s),c:VS.colors[s.idx],cells:[s.name,...(teams?[vsSide(s.team)]:[]),vsFighter(s)||'—',s.left?'Left':VP.ready.has(s.id)?'Ready':'Choosing']}))};
+  return{head:[['Player'],...(teams?[['Side']]:[]),['Fighter'],['Rounds',1],['Kills',1],['Damage',1]],rows:rows.map(s=>({cls:cl(s),c:VS.colors[s.idx],cells:[s.name+(s.left?' (left)':''),...(teams?[vsSide(s.team)]:[]),vsFighter(s)||'—',s.rounds,s.kills,num(s.dmg)]}))};
+}
+function vsPick(){
+  S.mode='reward';VP.scr='pick';const N=VS.floor;
+  show({wide:true,cls:'vsPanel vsPick',kick:vsHead(),title:'Choose your fighter',
+    body:'Everyone fights with a seasoned hero of floor '+N+': the boons, equipment and skills a climb to that floor brings, the same for all'+(N>100?', with the class upgrade and an apex path of your choice':N>50?', with the class upgrade of your choice':'')+'. Nothing here touches your own climb.',
+    extra:{rules:VRULES},
+    cards:Object.entries(CLASSES).map(([id,c])=>{const i=seasonedInfo(N,{cls:id})||{skills:[],pets:[]};return{title:c.name,sub:c.gear,body:c.text.split('. ')[0]+'. Skills: '+i.skills.join(', ')+'.'+(i.pets.length?' Takes along: '+i.pets.slice(0,4).join(', ')+'.':''),cls:'vsCard',data:{cls:id},
+      fn:()=>{VP.pick={cls:id};vsPickAdv()}}})});
+}
+function vsPickAdv(){
+  if(VS.floor<=50)return vsPickApex();const c=CLASSES[VP.pick.cls];VP.scr='pick';
+  show({wide:true,cls:'vsPanel vsPick',kick:vsHead()+' · '+c.name,title:'Choose your path',cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,cls:'vsCard',data:{adv:id},fn:()=>{VP.pick.adv=id;vsPickApex()}})),btns:[['Back',vsPick]]});
+}
+function vsPickApex(){
+  if(VS.floor<=100)return vsPicked();VP.scr='pick';
+  show({wide:true,cls:'vsPanel vsPick apexPanel',kick:vsHead(),title:'Choose what you become',cards:['dominion','order'].map(id=>{const A=APEX[id];return{title:A.name,sub:A.title+' · '+A.sub,body:A.text,cls:'apexCard apex'+cap1(id),data:{apex:id},fn:()=>{VP.pick.apex=id;vsPicked()}}}),btns:[['Back',vsPick]]});
+}
+// the seasoned hero of the match's floor, as startAt would make it, and nothing stored
+function vsHero(){
+  const N=VS.floor,n=N-1,r=seasonedRun(N,VP.pick);newRun();applyRun(r,n);S.level=n;stReset();PETS.auto=false;
+  const R=PETS.roster;PETS.active=[];
+  if(R.length){if(resvForm()){const M=manaMax()*(form()==='pet'?.5:1),ord=R.map((e,i)=>i).sort((a,b)=>petRank(R[b])-petRank(R[a]));let sum=0;for(const i of ord){const c=petCost(R[i]);if(sum+c<=M){PETS.active.push(i);sum+=c}}}else PETS.active=[0]}
+  S.mode='reward';freshBody();hud();const s=VS.score[VS.myIdx];s.cls=S.cls;s.adv=S.adv;s.apex=S.apex;
+}
+function vsPicked(quiet){
+  vsHero();VP.mine=true;VP.ready.add(MP.myId);pref('vs.pick',JSON.stringify(VP.pick));
+  nsend({t:'vr',ok:1,cls:S.cls,adv:S.adv,ap:S.apex||0});mpSendMe(performance.now(),true);
+  if(!quiet){vsWait();vsHostGate()}
+}
+// no choice made in time: the fighter of your last match, or a Fighter
+function vsAuto(quiet){
+  let p=null;try{p=JSON.parse(localStorage.getItem('marrowborn.vs.pick')||'null')}catch(e){}
+  VP.pick=p&&typeof p==='object'&&typeof p.cls==='string'&&own(CLASSES,p.cls)?{cls:p.cls,adv:p.adv,apex:p.apex}:{cls:'fighter'};MP.menu=false;vsPicked(quiet);
+}
+function vsUnready(){if(!VS||VS.phase!=='pick')return;VP.mine=false;VP.ready.delete(MP.myId);nsend({t:'vr',ok:0});vsPick()}
+function vsWait(){
+  if(!VS||VS.phase!=='pick'||!VP.mine||MP.menu)return;VP.scr='wait';
+  const wait=VS.score.filter(s=>!s.left&&!VP.ready.has(s.id)),n=wait.length,host=MP.role==='host',late=performance.now()-VP.t0>(VSK.pick+8)*1000;VP.late=late;
+  const btns=[['Change my fighter',vsUnready]];if(form())btns.push([cap1(tw().pl),()=>petsScreen(vsWait)]);if(learned().length>NSK)btns.push(['Skills',()=>loadout(vsWait)]);if(host&&late&&n)btns.push(['Start now',vsHostStart]);
+  show({wide:true,cls:'vsPanel vsPick',kick:vsHead(),title:n?'Waiting for '+n+(n>1?' players':' player'):'Starting',body:'You fight as '+an(vsFighter(VS.score[VS.myIdx]))+'. The first round starts when everyone has chosen; whoever has not chosen in time gets the fighter of their last match.',extra:{table:vsTable('pick')},btns});
+}
+function vsRoundOver(){
+  MP.menu=false;const w=VS.winner,won=w===VS.myTeam;
+  show({soft:true,wide:true,cls:'vsPanel vsRound '+(won?'vsWin':'vsLose'),kick:'Round '+VS.round+' · first to '+VS.wins,title:w>=0?vsSide(w)+(VS.format==='teams'?' take':' takes')+' the round':'Nobody takes the round',body:VP.final?'':'The next round starts in a moment. Everyone is restored.',extra:{table:vsTable('score')}});
+}
+function vsResults(){
+  MP.menu=false;S.mode='reward';const w=VS.winner,won=w===VS.myTeam,host=MP.role==='host';
+  show({wide:true,cls:'vsPanel vsResults '+(won?'vsWin':'vsLose'),kick:'Versus · the match is over · '+VS.round+(VS.round===1?' round':' rounds'),title:won?'Victory':w>=0?vsSide(w)+(VS.format==='teams'?' win':' wins'):'No winner',
+    body:(w>=0&&!won?'You fought as '+an(vsFighter(VS.score[VS.myIdx])||'fighter')+'. ':'')+(host?'Take everyone back to the lobby when you are ready: the room stays open.':'The host takes everyone back to the lobby.'),extra:{table:vsTable('score')},
+    btns:host?[['Back to the lobby',vsLobby]]:[['Leave the room',()=>show({cls:'vsPanel',kick:'Versus',title:'Leave the room?',body:'The host is about to take everyone back to the lobby.',btns:[['Stay',vsResults],['Leave',mpLeave]]},true)]]});
+}
+function vsLobby(){const N=window.MBNet;if(N&&typeof N.end==='function'){try{N.end('ended')}catch(e){}}else nsend({t:'vs',k:'bye'});if(MP.on)mpEnd('ended')}
+// the screen the match needs right now (after the menu closes)
+function vsScreen(){
+  if(!VS)return;const ph=VS.phase;
+  if(ph==='pick')return VP.mine?vsWait():vsPick();if(ph==='results')return vsResults();if(ph==='over')return vsRoundOver();$('ov').hidden=true;
+}
+function vsMenuShow(){
+  const inLv=S.mode==='play',host=MP.role==='host',btns=[[inLv?'Back to the fight':'Back',mpMenuClose]];
+  if(S.cls&&learned().length>NSK)btns.push(['Skills',()=>loadout(mpMenuShow)]);
+  if(S.cls&&form())btns.push([cap1(tw().pl),()=>petsScreen(mpMenuShow)]);
+  if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',mpMenuShow)]);
+  btns.push(['Leave the match',()=>show({mpMenu:true,cls:'vsPanel',kick:'Versus',title:'Leave the match?',body:host?'You are the host. If you leave, the match ends for everyone.':'Leaving forfeits: you are out of the match, and a side left empty loses it.',btns:[['Stay',mpMenuShow],['Leave',mpLeave]]},true)]);
+  show({mpMenu:true,soft:inLv,cls:'vsPanel',kick:vsHead(),title:inLv?'The fight goes on':'Versus',body:(inLv?'There is no pause in a match. ':'')+(VS.round?'Round '+VS.round+'. ':'')+VS.teams.map(t=>t.name+' '+t.rounds).join(' · ')+'.',keys:matchMedia('(pointer:coarse)').matches?'':'Esc closes this.',btns},true);
+}
+function vsHud(el,now){
+  if(MP.toast&&now>MP.toastT)MP.toast='';const own=!$('vsHud'); // the page has a versus HUD of its own (#vsHud): then only the line of news is shown here
+  const cn=s=>s.cls&&CLASSES[s.cls]?(s.adv&&CLASSES[s.cls].adv.find(x=>x[0]===s.adv)||[0,CLASSES[s.cls].name])[1]:'',rows=[],ph=VS.phase,tt=Math.max(0,Math.ceil(VS.t));
+  if(own)for(const s of VS.score){const q=s.idx===VS.myIdx?P:MP.byIdx[s.idx]&&MP.byIdx[s.idx].P;rows.push([s.idx,s.name,s.left?'Left':s.down&&ph!=='pick'?'Down':cn(s),q&&q.maxHp&&!s.left&&!s.down?Math.max(0,Math.ceil(q.hp/q.maxHp*20)):0,s.left||s.down&&ph!=='pick'?'down':'',s.rounds])}
+  const note=MP.toast||MP.note||(!own?'':ph==='pick'?'Choosing fighters':ph==='results'?'The match is over':'Round '+VS.round+' · '+(ph==='countdown'?'starts in '+tt:ph==='sudden'?'sudden death':ph==='over'?'over':Math.floor(tt/60)+':'+('0'+tt%60).slice(-2))),key=JSON.stringify(rows)+note;
+  if(key===MP.hudKey)return;MP.hudKey=key;el.textContent='';
+  for(const[idx,name,cl,hp,c2,rd]of rows){const row=document.createElement('span'),n=document.createElement('span'),c=document.createElement('span'),b=document.createElement('span'),f=document.createElement('i');
+    row.className='row'+(c2?' '+c2:'');row.style.setProperty('--c',VS.colors[idx]);n.className='nm';n.textContent=name+' · '+rd;c.className='cl';c.textContent=cl;b.className='bar';f.style.width=hp*5+'%';b.appendChild(f);row.append(n,c,b);el.appendChild(row)}
+  if(note){const p=document.createElement('span');p.className='note';p.textContent=note;el.appendChild(p)}
+}
+// down: a key or a tap moves the spectator's eye to the next fighter (the renderer's part)
+function vsSpectate(){const R=MB.renderer;try{if(R&&R.ok&&typeof R.spectate==='function'){const t=R.spectate();MP.toast=t&&t.name?'Watching '+mpName(t.name):'Watching the fight';MP.toastT=performance.now()+2000}}catch(e){}}
+/* --- a round on every member --- */
+function vsSpawn(){
+  const live=VS.score.filter(s=>!s.left),me=VS.myIdx;
+  if(VS.format==='teams'){const mates=live.filter(s=>s.team===VS.myTeam),i=Math.max(0,mates.findIndex(s=>s.idx===me)),k=mates.length,side=(VS.myTeam+VS.round)%2;P.x=side?W-150:150;P.y=H/2+(i-(k-1)/2)*Math.min(110,380/k)}
+  else{const k=Math.max(1,live.length),i=Math.max(0,live.findIndex(s=>s.idx===me)),a=TAU*i/k+VS.round*.9+Math.PI;P.x=W/2+Math.cos(a)*330;P.y=H/2+Math.sin(a)*185}
+  clamp(P,14);collide(P,14,true);P.safeX=P.x;P.safeY=P.y;P.face=P.swing=Math.atan2(H/2-P.y,W/2-P.x);
+}
+function vsRoundStart(n){
+  if(!VP.mine)vsAuto(true);
+  const lv=VP.n,D=levelDef(lv);
+  VS.round=n;VS.phase='countdown';VS.t=VSK.count;VS.ring=null;VS.winner=null;for(const s of VS.score)s.down=s.left;vsTeams();
+  VP.q=[];VP.ev=[];VP.dm.clear();VP.invRun=VP.invBlk=0;VP.last=-1;VP.lastT=-9;VP.lastTeam=-1;VP.final=false;VP.fl=0;VP.hold=VP.frozen=true;VP.scr='';
+  MP.menu=false;MP.note='';beginTok++;eqSync();S.level=lv;S.mode='play';S.banner=0;S.shake=0;S.stop=0;S.paused=false;
+  S.L={title:'Versus',hint:'',kind:'crawler',spec:SPEC.crawler,name:'Round '+n,hue:D.hue,waves:0,mods:[],room:2,floorKind:'versus',band:D.band,bandName:D.bandName,handicap:null,door:null};
+  TR=null;DOORS=null;FALLEN.length=0;PG.clear();
+  mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];TSRC=[];boss=null;S.wave=null;
+  obstacles=buildRoom(lv,2);freshBody();vsSpawn();P.down=false;MP.down=false;
+  if(S.adv==='beastmaster')allies.push(ally('wolf'));
+  PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
+  if(S.note){floats.push({x:P.x,y:P.y-70,txt:S.note,life:4.5,c:'#6fe3ff'});S.note=''}
+  for(const r of MP.remotes){r.pshots.length=0;r.echoes.length=0;r._ev.length=0;r.dead=false;r._bmH=null}
+  ST.levelTime=0;SND.levelStart();$('ov').hidden=true;lastScreen=null;hud();$('lvl').textContent='Versus · round '+n+(S.rank?' · Rank '+S.rank:'');$('bossName').textContent='—';
+  MP.hadAl=false;MP.pKey='';MP.rq.length=0;MP.hudKey='';mpSendMe(performance.now(),true);
+  emit('levelstart',{level:lv,L:S.L});emit('vs',{phase:'countdown',round:n});
+}
+// a phase has begun (the host decided; a client was told)
+function vsPhase(){
+  const ph=VS.phase;MP.hudKey='';
+  if(ph==='fight'){floats.push({x:W/2,y:H/2-70,txt:'Fight',life:1.2,c:'#ff5b6e'});sfx(196,.5,'sawtooth',.2,392);haptic(40)}
+  else if(ph==='sudden'){VP.ringK=1;floats.push({x:W/2,y:H/2-70,txt:'Sudden death',life:2,c:'#ff5b6e'});SND.roar();haptic([40,30,90])}
+  else if(ph==='over'){vsTeams();vsRoundOver();if(VS.winner===VS.myTeam)chime();else SND.dead()}
+  else if(ph==='results'){vsTeams();vsResults()}
+  emit('vs',{phase:ph,round:VS.round});
+}
+/* --- the host: clock, phases, score, results --- */
+function vsHostGate(){if(MP.role!=='host'||VS.phase!=='pick')return;for(const s of VS.score)if(!s.left&&!VP.ready.has(s.id))return;vsHostStart()}
+function vsHostStart(){if(!VS||MP.role!=='host'||VS.phase!=='pick'&&VS.phase!=='over')return;const n=VS.round+1;nsend({t:'vs',k:'go',n});vsRoundStart(n);VP.tVs=0}
+function vsSendState(){nsend({t:'vs',k:'s',ph:VS.phase,n:VS.round,tl:Math.round(VS.t*10),w:VS.winner===null?-2:VS.winner,sc:VS.score.map(s=>[s.rounds,s.kills,Math.round(s.dmg),(s.down?1:0)|(s.left?2:0)])})}
+function vsHostTo(ph,t){VS.phase=ph;VS.t=t;vsPhase();vsSendState()}
+function vsHostDown(idx,by){
+  const s=VS.score[idx];if(!s||s.down||!vsLive()&&VS.phase!=='countdown')return;s.down=true;VP.lastTeam=s.team;
+  const k=VS.score[by];if(k&&by!==idx&&k.team!==s.team)k.kills++;
+  vsHostCheck();vsSendState();
+}
+function vsHostCheck(){
+  if(!vsLive())return;const alive=vsTeams().filter(t=>t.alive>0);if(alive.length>1)return;
+  vsHostEnd(alive.length?alive[0].team:VP.lastTeam); // nobody stands: the side that fell last takes it
+}
+function vsHostEnd(w){
+  let top=0;for(const s of VS.score){if(s.team===w)s.rounds++;top=Math.max(top,s.rounds)}
+  VS.winner=w;VP.final=top>=VS.wins;vsHostTo('over',VSK.over);
+}
+function vsHostResults(w){if(VS.phase==='results')return;if(w!==undefined)VS.winner=w;else{let b=null;for(const t of vsTeams())if(!b||t.rounds>b.rounds)b=t;VS.winner=b?b.team:-1}vsHostTo('results',0)}
+function vsHostStep(dt,now){
+  const ph=VS.phase;
+  if(ph==='pick'){if(!VP.forced&&now-VP.t0>(VSK.pick+20)*1000){VP.forced=true;vsHostStart()}return}
+  if(ph==='results'){if(now>=VP.tVs){VP.tVs=now+1000;vsSendState()}return}
+  if(ph==='countdown'){if(VS.t<=0)vsHostTo('fight',VS.time)}
+  else if(ph==='fight'){if(VS.t<=0)vsHostTo('sudden',VSK.ringT)}
+  else if(ph==='sudden'){if(VS.t<=-8){let best=-1,bh=-1;for(const s of VS.score){if(s.down||s.left)continue;const q=s.idx===VS.myIdx?P:MP.byIdx[s.idx]&&MP.byIdx[s.idx].P,f=q?q.hp/(q.maxHp||1):0;if(f>bh){bh=f;best=s.team}}vsHostEnd(best)}} // (cannot happen while the ring works: a last guard against a round that will not end)
+  else if(ph==='over'){if(VS.t<=0){if(VP.final)vsHostResults();else vsHostStart()}}
+  if(vsLive())vsHostCheck();
+  if(VS&&now>=VP.tVs){VP.tVs=now+250;vsSendState()}
+}
+function vsOnHost(msg,from){
+  if(!VS||MP.role==='host'||from!==undefined&&from!==null&&''+from!==MP.hostId)return;
+  if(msg.k==='bye')return mpEnd('ended');
+  if(msg.k==='go')return vsRoundStart(Math.max(1,msg.n|0));
+  if(msg.k!=='s')return;
+  if(Array.isArray(msg.sc))msg.sc.forEach((a,i)=>{const s=VS.score[i];if(!s||!Array.isArray(a))return;s.rounds=a[0]|0;s.kills=a[1]|0;s.dmg=+a[2]||0;s.down=!!(a[3]&1);s.left=!!(a[3]&2)});
+  const ph=['pick','countdown','fight','sudden','over','results'].includes(msg.ph)?msg.ph:VS.phase,t=(+msg.tl||0)/10;
+  VS.winner=msg.w===-2?null:msg.w|0;
+  if(ph!=='pick'&&ph!=='results'&&(msg.n|0)!==VS.round)return; // (a round I have not been started into: its 'go' comes first)
+  if(ph!==VS.phase){VS.phase=ph;VS.t=t;vsPhase()}else if(Math.abs(VS.t-t)>.35)VS.t=t;
+  MP.hudKey='';
+}
+function vsOnReady(msg,from){
+  if(!VS)return;const s=VS.score.find(x=>x.id===''+from);if(!s||s.left)return;
+  if(msg.ok){VP.ready.add(s.id);s.cls=own(CLASSES,msg.cls)?msg.cls:null;s.adv=s.cls&&CLASSES[s.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;s.apex=s.cls&&(msg.ap==='dominion'||msg.ap==='order')?msg.ap:null}else VP.ready.delete(s.id);
+  MP.hudKey='';if(VS.phase==='pick'){if(VP.scr==='wait'&&!MP.menu)vsWait();vsHostGate()}
+}
+function vsOnDown(msg,from){
+  if(!VS)return;const r=MP.rById.get(''+from);if(!r||(msg.n|0)!==VS.round)return;r.dead=r.P.down=true;
+  const k=VS.score[msg.by|0];MP.toast=(msg.by>=0&&k?k.name+' downed '+r.name:r.name+' fell to the ring');MP.toastT=performance.now()+3500;MP.hudKey='';
+  if(MP.role==='host')vsHostDown(r.idx,msg.by|0);else{const s=VS.score[r.idx];if(s)s.down=true}
+}
+function vsLeft(m){
+  const s=VS.score[m.idx];if(s){s.left=true;s.down=true}VP.ready.delete(m.id);vsTeams();MP.toast=m.name+' left the match';
+  if(MP.role==='host'){const T=VS.teams.filter(t=>t.n>0);
+    if(VS.phase!=='results'&&T.length<=1)return vsHostResults(T.length?T[0].team:-1); // a side left empty loses the match
+    if(VS.phase==='pick')vsHostGate();else{vsHostCheck();vsSendState()}}
+  if(VS.phase==='pick'&&VP.scr==='wait'&&!MP.menu)vsWait();
+}
+/* --- my hero and my creatures: what hurts them --- */
+const vsHeal=(f,lo)=>Math.max(.1,Math.round(Math.max(lo,f*P.maxHp)*VSK.heal*10)/10);
+const vsCanHurt=a=>a.life>0&&a.hp>0&&(a.pet?!a.helper&&!a.trophy&&!a.hidden&&a.st!=='leap':a.kind==='thrall'||a.kind==='wolf');
+const vsDm=(by,nid,got)=>{if(!(got>0))return;const k=by+'|'+nid;VP.dm.set(k,(VP.dm.get(k)||0)+got)};
+// raw: the damage a monster would have taken. pure: a poison's tick or the like, which nothing blocks. True when the blow landed (also when it was blocked).
+function vsHurt(raw,by,src,pure){
+  if(!VS||!P||P.down||S.mode!=='play'||!vsLive()||!(raw>0))return false;
+  const A=VS.score[by],ac=A&&A.cls&&VSK.cls[A.cls]?VSK.cls[A.cls][0]:1,mc=VSK.cls[S.cls]?VSK.cls[S.cls][1]:1;
+  let d=raw*VP.k*VSK.K*ac*mc;
+  if(!pure){
+    if(P.inv>0)return false;
+    if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
+    if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null}
+    if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return true}
+    if(rand()*100<Math.min(40,eqv('guard'))){if(S.t-VP.hurtT>.3){VP.hurtT=S.t;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward()}return true}
+    if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return true}
+    {const G=d<=.2*P.maxHp&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return true}}
+  }
+  if(P.stoneT>0)d/=2;if(P.vMark>0)d*=1.5;
+  d=Math.max(.01,Math.min(d,VSK.cap*P.maxHp));
+  const got=Math.max(0,Math.min(d,P.hp));P.hp-=d;ST.dmgTaken+=got;vsDm(by,0,got);if(window.__mb&&window.__mb.dmgBy)window.__mb.dmgBy[src]=(window.__mb.dmgBy[src]||0)+got;if(by>=0){VP.last=by;VP.lastT=S.t}
+  VP.fl+=d;VP.hud=true;S.shake=Math.max(S.shake,.12);if(S.t-VP.hurtT>.25){VP.hurtT=S.t;puff(P,'#b8263d',6);SND.hurt();haptic(40)}
+  if(P.hp<=0){
+    if(S.adv==='saint'&&!P.saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2)*VSK.heal;P.inv=VSK.inv;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
+    else vsDown(by>=0?by:S.t-VP.lastT<5?VP.last:-1)}
+  return true;
+}
+// what holds a hero: a stun or a slow (short, then none for a while), a poison or a fire (dot: per half second, 6 s; ven: 3 s), a mark
+function vsCC(o,by){
+  if(!P||P.down||P.inv>0||!vsLive())return;
+  if((o.stun>0||o.slow>0)&&!(P.vImm>0)){if(o.stun>0)P.vStun=Math.min(VSK.cc,o.stun);if(o.slow>0)P.vSlow=Math.min(VSK.cc,o.slow);P.vImm=VSK.cc+VSK.ccImm;floats.push({x:P.x,y:P.y-58,txt:o.stun>0?'Stunned':'Slowed',life:.9,c:'#8fd3ff'})}
+  if(o.dot>0){P.vDotT=6;P.vDotD=o.dot;P.vDotK=.5;P.vDotBy=by;puff(P,'#7fd66b',10,120)}
+  if(o.ven>0){P.vDotD=Math.max(P.vDotT>0&&P.vDotD||0,o.ven);P.vDotT=Math.max(P.vDotT||0,3);P.vDotK=.5;P.vDotBy=by;puff(P,TCOL.assassin,10,120)}
+  if(o.mark>0){P.vMark=Math.min(6,o.mark);rings.push({x:P.x,y:P.y,life:.5,max:.5,r:50,fx:true,foe:true});puff(P,'#b8263d',14,120)}
+}
+// one of my creatures is struck: the raw number comes off its health (the pets' own scale)
+function vsHurtPet(a,raw,by,pure){
+  if(!VS||!vsLive()||!vsCanHurt(a)||!(raw>0))return false;
+  if(a.pet&&!pure&&(a.ward>0||a.inv>0))return false;
+  const d=Math.max(.01,raw*VSK.cre*(a.vMark>0?1.5:1)),got=Math.min(d,a.hp);a.hp-=d;a.flash=.15;vsDm(by,a.nid,got);
+  if(S.t-(a._ft||0)>.3){a._ft=S.t;puff(a,a.s?col(a.s.col):'#e7dfcd',4,110)}
+  if(a.hp>0){
+    if(!a.pet||a.minion)return true;
+    if(a.ai==='hollow'){const ph=a.hp<=a.maxHp/3?3:a.hp<=a.maxHp*2/3?2:1;if(ph>(a.phase||1)){a.phase=ph;petPhase(a)}}else if(!a.rage&&a.hp<=a.maxHp*.4)petRage(a);
+    if(a.mods.length){
+      if(a.mods.includes('thorned')){const t=Math.floor(a.hp/a.maxHp*5);if(t<a.fifth&&!(a.thornT>0)){a.fifth=t;a.thornT=.6;rings.push({x:a.x,y:a.y,life:.6,max:.6,r:a.r+60,fx:true})}}
+      if(a.mods.includes('splitting')&&a.splitN>0&&a.hp<=a.maxHp*a.splitN/3){a.splitN--;petLesser(a);rings.push({x:a.x,y:a.y,life:.5,max:.5,r:a.r+70,fx:true})}}
+    return true}
+  a.hp=0;a.life=0;a.beam=null;puff(a,a.s?col(a.s.col):'#e7dfcd',a.pet&&!a.minion?22:8,180);
+  if(a.pet&&!a.minion&&a.e){a.e.down=true;a.e.frac=0;a.e.revT=0;if(!PETS.fallen.includes(a.e))PETS.fallen.push(a.e);PETS.down=petOn().every(e=>e.down);floats.push({x:a.x,y:a.y-a.r-20,txt:a.name+' falls',life:1.6,c:'#ff5b6e'});sfx(160,.5,'sawtooth',.2,60);haptic(40)}
+  nsend({t:'vc',by,k:a.pet?a.sk||a.ai:a.kind==='wolf'?'hound':'husk',ai:a.pet?a.ai:'mite',x:Math.round(a.x),y:Math.round(a.y),r:a.r,nm:a.name||''});
+  return true;
+}
+function vsDown(by,ring){
+  P.hp=0;P.down=true;MP.down=true;P.inv=0;P.moving=false;P.dashT=0;P.atk=0;P.vx=P.vy=0;P.stormT=P.fireT=P.renewT=0;P.cutN=P.starN=P.quakeN=0;P.rushHit=null;P.rushD=0;P.beam=null;P.bmT=0;
+  ST.deaths++;SND.dead();haptic([120,60,320]);for(const a of allies)puff(a,'#e7dfcd',6);allies=[];TSRC=[];fields=fields.filter(f=>f.rem);zones=zones.filter(z=>z.rem);pshots=[];
+  for(const k in keys)keys[k]=false;want.atk=want.dash=want.skill=false;want.pt=null;
+  const k=VS.score[by];floats.push({x:P.x,y:P.y-52,txt:'You are down',life:2.5,c:'#ff5b6e'});MP.note=(ring?'The ring took you'+(by>=0&&k?' ('+k.name+' gets the kill). ':'. '):by>=0&&k?k.name+' brought you down. ':'You are down. ')+'You watch until the round ends.';hud();
+  nsend({t:'vd',by,n:VS.round});mpSendMe(performance.now(),true);
+  const s=VS.score[VS.myIdx];if(MP.role==='host')vsHostDown(VS.myIdx,by);else if(s)s.down=true;
+}
+// no more than VSK.inv seconds untouchable at a stretch, whatever grants it; after that, VSK.invRest seconds in which nothing does
+function vsInv(dt){
+  if(VP.invBlk>0){VP.invBlk-=dt;P.inv=0;P.guardT=0;return}
+  if(P.inv>0||P.guardT>0){VP.invRun+=dt;if(VP.invRun>=VSK.inv){P.inv=0;P.guardT=0;VP.invRun=0;VP.invBlk=VSK.invRest}}else VP.invRun=0;
+}
+// every step, before the hero moves
+function vsStep(dt){
+  const ph=VS.phase,live=ph==='fight'||ph==='sudden';VP.frozen=ph==='countdown';
+  for(const k of['vStun','vSlow','vImm','vMark'])if(P[k]>0)P[k]-=dt;
+  VP.hold=!live||P.vStun>0;
+  for(const a of allies){
+    if(a.hp===undefined&&(a.kind==='thrall'||a.kind==='wolf'))a.hp=a.maxHp=Math.max(1,Math.round(GREF(VP.n)*(a.kind==='wolf'?VSK.wolf:VSK.thr)));
+    if(a.vMark>0)a.vMark-=dt;if(a.vDotT>0){a.vDotT-=dt;if((a.vDotK-=dt)<=0){a.vDotK=.5;vsHurtPet(a,a.vDotD,a.vDotBy,true)}}}
+  if(live&&!P.down){
+    if(P.vDotT>0){P.vDotT-=dt;if((P.vDotK-=dt)<=0){P.vDotK=.5;puff(P,'#7fd66b',4,80);vsHurt(P.vDotD,P.vDotBy,'dot',true)}}
+    // sudden death: outside the ring you burn, and once it is shut everyone does
+    if(ph==='sudden'&&VS.ring&&!P.down&&(VP.ringK-=dt)<=0){VP.ringK=.5;const R=VS.ring,shut=R.r<=1;
+      for(const a of allies)if(vsCanHurt(a)&&(shut||dist(a,R)>R.r)){a.hp-=a.maxHp*.2;a.flash=.15;if(a.hp<=0){a.hp=.01;vsHurtPet(a,1e9,-1,true)}}
+      if(shut||dist(P,R)>R.r){const d=P.maxHp*VSK.ringD*(shut?1.5:1);vsDm(-1,0,Math.min(d,P.hp));P.hp-=d;VP.fl+=d;VP.hud=true;puff(P,'#ff8a4c',8,140);if(S.t-VP.hurtT>.25){VP.hurtT=S.t;SND.hurt()}if(P.hp<=0)vsDown(S.t-VP.lastT<5?VP.last:-1,true)}}
+  }
+  // the stand-ins: every hostile hero that stands, and its creatures that can be hurt
+  const out=[];
+  if(ph!=='over'&&ph!=='results')for(const r of MP.remotes){if(!r.foe||r.dead||r.away||!r.hx)continue;const h=r.hx,q=r.P;h.vx=q.moving?q.vx||0:0;h.vy=q.moving?q.vy||0:0;h.x=Math.max(WALL+11,Math.min(W-WALL-11,q.x+h.vx*VSK.lead));h.y=Math.max(WALL+11,Math.min(H-WALL-11,q.y+h.vy*VSK.lead));h.hp=q.hp;h.maxHp=q.maxHp;if(h.flash>0)h.flash-=dt;out.push(h);
+    for(const a of r.allies)if(a.vs&&a.hp>0&&!a.hidden)out.push(a)}
+  mons=out;
+}
+// a blast of theirs goes off (called for a zone that was replicated from a hostile member)
+function vsBlast(x,y,R,d,by,skip,stun){
+  if(skip!==P&&!P.down&&Math.hypot(P.x-x,P.y-y)<R+8){if(vsHurt(d,by,'blast')&&stun)vsCC({stun},by)}
+  for(const a of allies)if(a!==skip&&vsCanHurt(a)&&Math.hypot(a.x-x,a.y-y)<R+a.r){if(vsHurtPet(a,d,by)&&stun&&a.pet)a.vStun=Math.min(2,stun*2)}
+}
+function vsZone(z){if(vsLive()&&S.mode==='play'&&z.vsD>0)vsBlast(z.x,z.y,z.r,z.vsD,z.vsBy,null,z.vsStun)}
+function vsField(f){
+  if(!vsLive()||S.mode!=='play')return;const dom=f.kind==='domain',by=f.vsBy;
+  if(!P.down&&dist(P,f)<f.r+8){if(dom)P.vMark=Math.max(P.vMark||0,.7);if(f.vsD>0)vsHurt(f.vsD,by,'field');if(f.vsSlow||dom)vsCC({slow:.8},by)}
+  for(const a of allies)if(vsCanHurt(a)&&dist(a,f)<f.r+a.r){if(dom)a.vMark=Math.max(a.vMark||0,.7);if(f.vsD>0)vsHurtPet(a,f.vsD,by)}
+}
+// a swing, a lunge or a shockwave of a hostile hero, when the picture of that hero reaches the moment it happened
+function vsEvent(r,e){
+  const a=e.a,by=r.idx,k=a[0],x=+a[1]||0,y=+a[2]||0;
+  const each=(test,d,fn)=>{if(!P.down&&test(P,11)){if(vsHurt(d,by,k==='s'?'swing':k==='r'?'rush':'shock')&&fn)fn(P)}for(const b of allies)if(vsCanHurt(b)&&test(b,b.r)){if(vsHurtPet(b,d,by)&&fn)fn(b)}};
+  if(k==='s'){const g=(a[3]||0)/100,reach=+a[4]||70,arc=(a[5]||110)/100;each((e2,er)=>{const d=Math.hypot(e2.x-x,e2.y-y);if(d>=reach+er)return false;const t=Math.atan2(e2.y-y,e2.x-x)-g;return Math.abs(Math.atan2(Math.sin(t),Math.cos(t)))<arc||d<er+18},+a[6]||0)}
+  else if(k==='r'){const g=(a[3]||0)/100,len=+a[4]||180,st=+a[6]||0;each((e2,er)=>segDist(e2,x,y,g,len)<er+30,+a[5]||0,st?e2=>{if(e2===P)vsCC({stun:st*.7},by);else if(e2.pet)e2.vStun=Math.min(2,st*2)}:null)}
+  else if(k==='k'){const R=+a[3]||60;each((e2,er)=>Math.hypot(e2.x-x,e2.y-y)<R+er,+a[4]||0)}
+}
+// a hostile bolt against my hero and my creatures; true when it is spent
+function vsShot(r,p){
+  const hs=p.hs||(p.hs=new Set()),by=r.idx;
+  const hit=e=>{hs.add(e);const d=p.d*(p.fl&8&&Math.hypot(p.x-p.sx,p.y-p.sy)>200?2:1);
+    if(e===P){if(vsHurt(d,by,'shot')&&(p.slow||p.stun))vsCC({slow:p.slow,stun:p.stun*.7},by)}else if(vsHurtPet(e,d,by)&&p.stun&&e.pet)e.vStun=Math.min(2,p.stun*2);
+    if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true,foe:true});vsBlast(p.x,p.y,85,p.boom,by,null)}
+    if(p.fl&16){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true,foe:true});vsBlast(p.x,p.y,70,d/2,by,e)}
+    if(p.pierce>0){p.pierce--;return false}return true};
+  if(!P.down&&!hs.has(P)&&P.inv<=0&&dist(P,p)<p.r+12&&hit(P))return true;
+  for(const a of allies)if(!hs.has(a)&&vsCanHurt(a)&&dist(a,p)<a.r+p.r+3&&hit(a))return true;
+  return false;
+}
+// what a hostile hero's creatures, ring of light and beam do to my hero and my creatures, every step (as a client's monsters do in co-op: mpMons)
+const vsMine=[];
+function vsFoes(dt){
+  if(!vsLive()||S.mode!=='play')return;
+  const t=S.t,mine=vsMine;mine.length=0;for(const a of allies)if(vsCanHurt(a))mine.push(a);
+  for(const r of MP.remotes){if(!r.foe||r.dead||r.away)continue;const by=r.idx,q=r.P;
+    if(q.auraR>0&&r._aud>0&&t-(r._auT||0)>=.5){r._auT=t;if(!P.down&&dist(P,q)<q.auraR+11)vsHurt(r._aud,by,'aura');for(const b of mine)if(dist(b,q)<q.auraR+b.r)vsHurtPet(b,r._aud,by)}
+    if(q.beam){const H2=r._bmH||(r._bmH=new Set()),d=q.beam.d||0,g=q.beam.a,len=q.beam.len;
+      if(!P.down&&!H2.has(P)&&P.inv<=0&&segDist(P,q.x,q.y,g,len)<25){H2.add(P);vsHurt(d,by,'beam')}
+      for(const b of mine)if(!H2.has(b)&&segDist(b,q.x,q.y,g,len)<14+b.r){H2.add(b);vsHurtPet(b,d,by)}}
+    else if(r._bmH)r._bmH=null;
+    for(const a of r.allies){
+      if(a.pet||a.shade){if(a.hidden||!a.du)continue;
+        const tm=a._tm||(a._tm=new Map()),ok=(e,gap,key)=>{const l=tm.get(key||e);return l===undefined||t-l>=gap};
+        if(a.st!=='leap'&&a.st!=='dazed'){const d=a.helper?a.du[0]:a.du[a.st==='charge'||a.st==='lunge'?2:0],gap=a.helper?.7:1;
+          if(!P.down&&dist(a,P)<a.r+11&&ok(P,gap)&&vsHurt(d,by,'touch'))tm.set(P,t);
+          for(const b of mine)if(dist(a,b)<a.r+b.r-4&&ok(b,gap)&&vsHurtPet(b,d,by))tm.set(b,t)}
+        if(a.beam&&a.beam.on){const w=a.beam.w,d=a.du[1];
+          for(const ry of a.beam.rays){if(!P.down&&segDist(P,a.x,a.y,ry.a,ry.len)<w+9&&ok(P,1,'bP')&&vsHurt(d,by,'beam'))tm.set('bP',t);
+            for(const b of mine)if(segDist(b,a.x,a.y,ry.a,ry.len)<w+b.r*.6&&ok(b,1,b.nid+'b')&&vsHurtPet(b,d,by))tm.set(b.nid+'b',t)}}
+        if(tm.size>60)tm.clear()}
+      else if(a.kind==='thrall'||a.kind==='wolf'){if((a._bcd=(a._bcd||0)-dt)>0||!(a.hp>0))continue;
+        let tg=null,bd=1e9;if(!P.down){const d=dist(a,P)-11;if(d<bd){bd=d;tg=P}}for(const b of mine){const d=dist(a,b)-b.r;if(d<bd){bd=d;tg=b}}
+        if(tg&&bd<a.r+5){const d=(r._tb||0)*(a.kind==='wolf'?2:1);a._bcd=.7;if(tg===P)vsHurt(d,by,'bite');else vsHurtPet(tg,d,by)}}}
+  }
+}
+/* --- my attacks on the stand-ins --- */
+// hurtM comes here for a stand-in. Inside GEO the victim works the blow out for itself; otherwise it is told
+function vsHit(m,d,quiet){
+  if(!(m.flash>0))m.flash=.1;if(GEO||!VS||!vsLive()||!(d>0))return;
+  VP.q.push(['d',m.own.idx,m.nid|0,Math.min(1e7,Math.round(d*100)/100)]);SND.hit(quiet);
+}
+function vsDebuff(m,o,D){
+  if(GEO||!VS||!vsLive())return;
+  VP.q.push(['db',m.own.idx,m.nid|0,o.slow||0,o.stun||0,o.dot?Math.round(o.dot*D*1000)/1000:0,o.mark||0]);
+  if(o.dot)puff(m,'#7fd66b',10,120);if(o.mark){rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+40,fx:true});puff(m,'#b8263d',14,120)}
+}
+function vsVen(m,d){if(GEO||!VS||!vsLive())return;VP.q.push(['vn',m.own.idx,m.nid|0,Math.round(d*1000)/1000])}
+function vsMove(m,x,y){if(GEO||!VS||!vsLive())return;VP.q.push(['mv',m.own.idx,m.nid|0,Math.round(x),Math.round(y)])}
+function vsSwing(a,reach,arc,dmg,twice){const e=['s',Math.round(P.x),Math.round(P.y),Math.round(a*100)||0,reach,Math.round(arc*100),Math.round(dmg*100)/100];VP.ev.push(e);if(twice)VP.ev.push([...e.slice(0,6),Math.round(dmg*60)/100])}
+function vsRush(a,dmg,stun){VP.ev.push(['r',Math.round(P.x),Math.round(P.y),Math.round(a*100)||0,190,Math.round(dmg*100)/100,stun||0])}
+function vsClear(c,r){for(const q of MP.remotes)if(q.foe)for(const p of q.pshots)if(dist(p,c)<=r)p.dead=true}
+function vsBeamBurn(a,len){for(const q of MP.remotes)if(q.foe)for(const p of q.pshots)if(segDist(p,P.x,P.y,a,len)<22)p.dead=true}
+function vsFlush(){
+  const by=new Map();for(const op of VP.q){let l=by.get(op[1]);if(!l)by.set(op[1],l=[]);if(l.length<200)l.push(op)}VP.q=[];
+  for(const[idx,l]of by){const r=MP.byIdx[idx];if(r)nsend({t:'vk',n:VS.round,l},r.id)}
+}
+function vsOnDirect(msg,from){
+  if(!VS||!vsLive()||S.mode!=='play'||(msg.n|0)!==VS.round||!Array.isArray(msg.l))return;const r=MP.rById.get(''+from);if(!r||!r.foe||r.dead)return;const by=r.idx;
+  for(const op of msg.l){if(!Array.isArray(op)||op[1]!==VS.myIdx)continue;const k=op[0],nid=op[2]|0,a=nid?allies.find(x=>x.nid===nid):null;if(nid&&!a)continue;
+    if(k==='d'){const d=+op[3];if(d>0){if(a)vsHurtPet(a,d,by);else vsHurt(d,by,'direct')}}
+    else if(k==='db'){const o={slow:+op[3]||0,stun:+op[4]||0,dot:+op[5]||0,mark:+op[6]||0};
+      if(!a)vsCC(o,by);else if(vsCanHurt(a)){if(o.stun>0&&a.pet)a.vStun=Math.min(2.5,o.stun*2);if(o.dot>0){a.vDotT=6;a.vDotD=o.dot;a.vDotK=.5;a.vDotBy=by}if(o.mark>0)a.vMark=Math.min(6,o.mark)}}
+    else if(k==='vn'){const d=+op[3];if(d>0){if(!a)vsCC({ven:d},by);else if(vsCanHurt(a)){a.vDotD=Math.max(a.vDotT>0&&a.vDotD||0,d);a.vDotT=3;a.vDotK=.5;a.vDotBy=by}}}
+    else if(k==='mv'){const e=a||P;if(a?!vsCanHurt(a):P.down||P.inv>0||P.dashT>0)continue;const x=+op[3]||e.x,y=+op[4]||e.y,d=Math.hypot(x-e.x,y-e.y),f=d>300?300/d:1;e.x+=(x-e.x)*f;e.y+=(y-e.y)*f;clamp(e,a?a.r:14);collide(e,a?a.r:14,true);if(!a){P.safeX=P.x;P.safeY=P.y}}
+  }
+}
+function vsFlushHurt(){
+  if(!VP.dm.size)return;const l=[];for(const[k,v]of VP.dm){const i=k.indexOf('|'),by=+k.slice(0,i),nid=+k.slice(i+1);l.push([by,Math.round(v*100)/100,nid]);if(MP.role==='host'&&!nid&&VS.score[by])VS.score[by].dmg+=v}VP.dm.clear();
+  nsend({t:'vh',l});
+}
+function vsOnHurt(msg,from){
+  if(!VS||!Array.isArray(msg.l))return;const r=MP.rById.get(''+from);if(!r)return;
+  for(const a of msg.l){const by=a[0]|0,d=+a[1]||0,nid=a[2]|0;if(!(d>0))continue;
+    if(MP.role==='host'&&!nid&&VS.score[by]&&VS.score[by].team!==r.team)VS.score[by].dmg+=d;
+    if(by===VS.myIdx){if(!nid)ST.dmgDealt+=d;const e=nid?r.allies.find(x=>x.nid===nid):r.P;if(e&&S.mode==='play'&&floats.length<60)floats.push({x:e.x+rand()*18-9,y:e.y-(nid?(e.r||10)+6:40),txt:fmt(Math.round(d*10)/10),life:.7,c:nid?'#958ea3':'#e7dfcd'});if(!nid&&r.hx)r.hx.flash=.12}}
+}
+function vsOnCreature(msg,from){
+  if(!VS||(msg.by|0)!==VS.myIdx||!P||P.down||S.mode!=='play')return;const r=MP.rById.get(''+from);if(!r||!r.foe)return;
+  ST.kills++;manaGive(P.maxMana*MKILL);
+  const k=typeof msg.k==='string'&&own(SPEC,msg.k)?msg.k:'husk',base=SPEC[k],d={s:{...base,r:Math.max(8,Math.min(40,+msg.r||base.r)),name:mpTxt(msg.nm)||base.name},ai:AI[msg.ai]?msg.ai:base.ai||'mite',kind:k,x:+msg.x||W/2,y:+msg.y||H/2};
+  FALLEN.push(d);if(FALLEN.length>24)FALLEN.shift();if(S.apex==='dominion'&&vsLive())shadeRise(d,SHLIFE,false);
+}
+/* --- the wire: what versus adds to 'me' and 'lk' --- */
+function vsLook(o){
+  o.au=P&&P.auraR>0&&!P.down?[P.auraR,Math.round(ORDAURA*(P.ascT>0?2:1)*dmgMul()*100)/100]:0;
+  o.tb=Math.round(dmgMul()*(1+eqv('thr')/100)*(P&&P.legT>0?1.5:1)*(S.apex==='dominion'?DOMSUM:1)*100)/100;
+}
+function vsOnLook(r,msg){
+  r.P.auraR=Array.isArray(msg.au)?Math.max(0,Math.min(400,+msg.au[0]||0)):0;r._aud=Array.isArray(msg.au)?+msg.au[1]||0:0;r._tb=+msg.tb||0;
+  const s=VS.score[r.idx];if(s&&r.look.cls){s.cls=r.look.cls;s.adv=r.look.adv;s.apex=r.look.apex}
+}
+function vsAllyStatic(a){
+  const du=a.helper?[a.dk,a.dk,a.dk]:a.du?a.du.map(v=>Math.round(v*100)/100):0;
+  if(a.shade)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.max),32,'shade',0,0,0,du];
+  if(a.pet)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.maxHp),(a.minion?1:0)|(a.lesser?2:0)|(a.helper?4:0)|(a.trophy?8:0)|(a.crown?16:0),a.owner,a.plv|0,a.mods&&a.mods.length?a.mods:0,a.perk||0,du];
+  if(a.trophy)return[a.nid,a.kind==='familiar'?'f':'g',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,a.tm||1,a.owner,Math.round(a.seed*100)/100,a.s.r];
+  return[a.nid,a.kind==='wolf'?'w':'t',a.r,hpR(a.hp||Math.max(1,Math.round(GREF(VP.n)*(a.kind==='wolf'?VSK.wolf:VSK.thr))))];
+}
+function vsAllyNew(r,o,a){
+  o.foe=r.foe;
+  if(o.pet||o.shade){const du=a[13];o.du=Array.isArray(du)?[+du[0]||0,+du[1]||0,+du[2]||0]:[0,0,0]}
+  if(o.kind==='thrall'||o.kind==='wolf'){const hp=+a[3]||1;Object.assign(o,{hp,maxHp:hp,s:{name:o.kind==='wolf'?'Wolf':'Thrall',col:'#e7dfcd',r:o.r,eyes:2},ai:'mite',st:'idle',hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false,flash:0})}
+  if(r.foe&&(o.pet&&!o.helper&&!o.trophy||o.kind==='thrall'||o.kind==='wolf')){o.vs=true;o.own=r;o.id='c'+r.idx+'.'+o.nid;o.vx=0;o.vy=0;o.decoy=false}
+}
+function vsShotOut(q,a){
+  if(!VS)return a;
+  const fl=(q.boom?1:0)|(q.slow?2:0)|(q.stun?4:0)|(q.kind==='arrow'&&pw(3)?8:0)|(q.kind==='bolt'&&S.adv==='pyromancer'?16:0)|(q.pet?32:0);
+  a.push(Math.round(q.dmg*100)/100,fl);if(fl&7)a.push(Math.round((q.boom||0)*100)/100,q.slow||0,q.stun||0);return a;
+}
+// a hostile or friendly member's attacks arrive (after the usual part of 'me'). k: what is left of the 100 ms of the delayed picture, in seconds
+function vsOnMe(r,msg,now,c){
+  const k=Math.max(0,Math.min(MPDELAY,MPDELAY-(now-(c+r._clk.off))))/1000,due=now+k*1000;
+  if(Array.isArray(msg.bm)&&r.P.beam)r.P.beam.d=+msg.bm[2]||0;
+  if(msg.s)for(const a of msg.s)if(r.pshots.length<400){const vx=+a[2]||0,vy=+a[3]||0,x=+a[0]||0,y=+a[1]||0;
+    r.pshots.push({x,y,vx,vy,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0,g:0,d:+a[7]||0,fl:a[8]|0,boom:+a[9]||0,slow:+a[10]||0,stun:+a[11]||0,sx:x,sy:y,hs:null})}
+  if(S.mode!=='play')return;
+  if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsStun:+a[7]||0,vsBy:r.idx};if(a[4]>=0&&a[5]>=0&&a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
+  if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push({kind:FKIND[a[0]]||'rain',x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsSlow:!!a[7],vsBy:r.idx});
+  if(msg.r)for(const a of msg.r){if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true,foe:r.foe})}if(r.foe&&a[4]>0&&r._ev.length<200)r._ev.push({t:due,a:['k',a[0],a[1],a[2],a[4]]})}
+  if(msg.v&&r.foe)for(const a of msg.v)if(Array.isArray(a)&&r._ev.length<200)r._ev.push({t:due,a});
+}
+// a remote hero's bolts, events and echoes, every frame (in place of the co-op part of mpRemoteStep)
+function vsRemote(r,dt,now){
+  const mine=r.foe&&!r.dead&&vsLive()&&S.mode==='play'&&!!P,ev=r._ev;
+  if(ev&&ev.length){let n=0;for(const e of ev){if(now<e.t){ev[n++]=e;continue}if(mine)vsEvent(r,e)}ev.length=n}
+  const ps=r.pshots;if(ps.length){let n=0;for(const p of ps){if(p.dead)continue;p.x+=p.vx*dt;p.y+=p.vy*dt;let dead=p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL||obstacles.length&&blocked(p);
+    if(p.g>0)p.g-=dt;
+    else if(!dead){if(mine)dead=vsShot(r,p);
+      // for the eye: it stops at whatever else it would hit (someone else's hero or creature that is hostile to its owner)
+      if(!dead)for(const o of MP.remotes){if(o===r||o.team===r.team||o.dead||o.away)continue;let h=null;if(dist(o.P,p)<p.r+12)h=o.P;else for(const a of o.allies)if((a.pet&&!a.helper||a.kind==='thrall'||a.kind==='wolf')&&!a.hidden&&dist(a,p)<a.r+p.r+3){h=a;break}
+        if(h&&p._h!==h){if(p.pierce>0){p.pierce--;p._h=h}else dead=true;break}}}
+    if(!dead&&!p.dead)ps[n++]=p}ps.length=n}
+  const es=r.echoes;if(es.length){let n=0;for(const e of es){e.life-=dt;if(e.life>0)es[n++]=e}es.length=n}
+}
+/* --- every frame --- */
+function vsFrame(dt,now){
+  if(VS.phase!=='results'){VS.t-=dt;if(VS.t<0&&!(MP.role==='host'&&VS.phase==='sudden'))VS.t=0}
+  if(VS.phase==='sudden'){const R=VS.ring||(VS.ring={x:W/2,y:H/2,r:VSK.ring0});R.r=VSK.ring0*Math.max(0,VS.t)/VSK.ringT}else if(VS.phase!=='over')VS.ring=null;
+  if(VS.phase==='pick'){
+    if(VS.t<=0&&!VP.mine)vsAuto();
+    else if(VP.scr==='wait'&&!VP.late&&!MP.menu&&now-VP.t0>(VSK.pick+8)*1000)vsWait()}
+  if(MP.role==='host')vsHostStep(dt,now);
+  if(!VS)return;
+  if(VP.q.length)vsFlush();
+  if(now>=VP.tVh){VP.tVh=now+160;vsFlushHurt()}
+  if(now>=MP.tMe){MP.tMe=Math.max(now+20,MP.tMe+1000/MPHZ);mpSendMe(now)}else if(VP.ev.length||MP.rq.length)mpSendMe(now); // a swing or a shockwave does not wait for the next tick
+  if(now>=VP.tFl){VP.tFl=now+300;if(VP.fl>0&&P){floats.push({x:P.x+rand()*14-7,y:P.y-44,txt:'-'+fmt(Math.max(.1,Math.round(VP.fl*10)/10)),life:.8,c:'#ff5b6e'});VP.fl=0}if(VP.hud){VP.hud=false;hud()}}
+  mpHud(now);
+}
+/* --- the 2D fallback: the ring, the countdown (pass 0 under the heroes, pass 1 over everything) --- */
+function vsDraw2d(pass){
+  if(!pass){const R=VS.ring;if(R){ctx.save();ctx.beginPath();ctx.rect(0,0,W,H);ctx.arc(R.x,R.y,Math.max(0,R.r),0,TAU,true);ctx.fillStyle='rgba(184,38,61,.28)';ctx.fill('evenodd');ctx.restore();circ(R.x,R.y,Math.max(1,R.r));ctx.strokeStyle='#ff8a4c';ctx.lineWidth=4;ctx.stroke()}return}
+  const ph=VS.phase;ctx.textAlign='center';
+  if(ph==='countdown'){ctx.fillStyle='rgba(13,12,17,.6)';ctx.fillRect(0,236,W,120);ctx.fillStyle='#d6a544';ctx.font='600 15px Spectral,Georgia,serif';ctx.fillText(('ROUND '+VS.round+'  ·  FIRST TO '+VS.wins).toUpperCase(),W/2,262);ctx.fillStyle='#e7dfcd';ctx.font='64px "Pirata One",Georgia,serif';ctx.fillText(''+Math.max(1,Math.ceil(VS.t)),W/2,330)}
+  else if((ph==='fight'||ph==='sudden')&&!$('vsHud')){const tt=Math.max(0,Math.ceil(VS.t)),txt=ph==='sudden'?'Sudden death':Math.floor(tt/60)+':'+('0'+tt%60).slice(-2);ctx.font='600 15px Spectral,Georgia,serif';const w=ctx.measureText(txt).width+24;ctx.fillStyle='rgba(13,12,17,.7)';ctx.fillRect(W/2-w/2,WALL+4,w,24);ctx.fillStyle=ph==='sudden'||tt<=10?'#ff5b6e':'#d6a544';ctx.fillText(txt,W/2,WALL+21)}
+}
+
+
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
 window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door(){return S.door&&DOOR[S.door.id]?{...doorInfo(S.door.id),floor:S.door.n+1}:null},get apex(){return apexInfo()},get sightR(){return S.mode==='title'?0:sightR()},APEX,mp:MP,settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
-  get P(){return P},get mons(){return mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
-  get echoes(){return echoes},get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return boss}};
+  get P(){return P},get mons(){return VS?VNONE:mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
+  get echoes(){return echoes},get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return VS?null:boss}};
 let last=0;
 let fast=1;
 function tick(dt){if(S.paused){S.t+=dt;return}if(S.mode==='play'){ST.time+=dt;ST.levelTime+=dt}if(S.stop>0&&!MP.on)S.stop-=dt;else step(dt)} // (the short freeze on a heavy blow is left out in multiplayer, where the world must not stop)
@@ -3002,7 +3558,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=r.apex==='dominion'||r.apex==='order'?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=r.apex==='dominion'||r.apex==='order'?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)

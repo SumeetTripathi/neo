@@ -1291,8 +1291,9 @@ function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.stroke
 // a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
 function petBar(a,MM,idCss,foe){
   const W=OV.w,H=OV.h;
-  if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
-  let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
+  const small=!!a&&foe===true&&!a.pet&&(a.kind==='thrall'||a.kind==='wolf'); // versus: an opponent's thralls and wolves can be killed, so they show their health too
+  if(!a||!(a.pet||small)||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
+  let top=small?(a.kind==='wolf'?24:40):(a.r||16)*2.4;if(!small&&MM&&MM.height)try{top=MM.height(a)}catch(e){}
   toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)return;
   if(idCss&&(sp.x<-12||sp.x>W+12||sp.y>H+12))return; // another member's pet out of frame: no bar pinned to the edge
   // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
@@ -1826,6 +1827,7 @@ function syncRemotes(list,dt,sight){
     if(k){auraR.geo.attributes.position.needsUpdate=true;auraR.geo.attributes.aCol.needsUpdate=true;auraR.geo.attributes.aSize.needsUpdate=true}}
 }
 // where the page's touch controls (stick, buttons) lie over the view, in overlay units: an edge badge is nudged out from under them. Measured twice a second.
+const edgeX=new Float32Array(16),edgeY=new Float32Array(16);let edgeN=0;
 const TAG_FONT='700 14px '+FONT,TAG_FONT_S='700 11px '+FONT;
 const padBox=[{on:false,x0:0,y0:0,x1:0,y1:0},{on:false,x0:0,y0:0,x1:0,y1:0}];let padAt=-1,padEls;
 function padBoxes(){
@@ -1842,7 +1844,7 @@ function padBoxes(){
 // overlay: name and health over each member, bars over their pets, and an arrow at the edge of the view toward anyone out of frame
 function remoteOverlay(MM,sight){
   const W=OV.w,H=OV.h;
-  const top=hudBottom(),now=MB.S.t;
+  const top=hudBottom(),now=MB.S.t;edgeN=0;
   for(let m=0;m<rems.length;m++){const al=rems[m].allyList,css=rems[m].css,foe=rems[m].foe;for(let i=0;i<al.length;i++)petBar(al[i],MM,css,foe)}
   ctx.save();ctx.textBaseline='alphabetic';ctx.lineJoin='round';
   for(let m=0;m<rems.length;m++){
@@ -1880,7 +1882,13 @@ function remoteOverlay(MM,sight){
       let k=1e9;if(dx>0)k=Math.min(k,(x1-cx)/dx);else if(dx<0)k=Math.min(k,(x0-cx)/dx);if(dy>0)k=Math.min(k,(y1-cy)/dy);else if(dy<0)k=Math.min(k,(y0-cy)/dy);
       let ex=cx+dx*k;const ey=cy+dy*k,a=Math.atan2(dy,dx),q=dead?0:Math.max(0,Math.min(1,P.hp/P.maxHp));
       padBoxes();for(let j=0;j<2;j++){const b=padBox[j];if(b.on&&ex>b.x0-22&&ex<b.x1+22&&ey>b.y0-16&&ey<b.y1+16)ex=(b.x0+b.x1)/2<cx?Math.min(cx,b.x1+24):Math.max(cx,b.x0-24)}
-      ctx.save();ctx.translate(ex,ey);ctx.globalAlpha=.95;
+      let ey2=ey;
+      if(VS.on){ // versus: badges that would lie on one another step along the edge
+        const side=Math.abs(ex-x0)<2||Math.abs(ex-x1)<2;
+        for(let pass=0;pass<8;pass++){let hit=false;for(let j=0;j<edgeN;j++)if(Math.abs(ex-edgeX[j])<32&&Math.abs(ey2-edgeY[j])<32){hit=true;break}
+          if(!hit)break;if(side)ey2=ey2+33>y1?ey2-33*(pass+1):ey2+33;else ex=ex+33>x1?ex-33*(pass+1):ex+33}
+        if(edgeN<16){edgeX[edgeN]=ex;edgeY[edgeN]=ey2;edgeN++}}
+      ctx.save();ctx.translate(ex,ey2);ctx.globalAlpha=.95;
       if(foe){ // an opponent out of frame: a diamond, filled from the bottom with what health they have left
         ctx.rotate(a);ctx.beginPath();ctx.moveTo(27,0);ctx.lineTo(16,-8);ctx.lineTo(16,8);ctx.closePath();ctx.fillStyle=css;ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.rotate(-a);
         ctx.beginPath();ctx.moveTo(0,-15);ctx.lineTo(15,0);ctx.lineTo(0,15);ctx.lineTo(-15,0);ctx.closePath();ctx.fillStyle='rgba(11,10,22,.92)';ctx.fill();
@@ -2061,7 +2069,7 @@ function trialOverlay(sight){
    None of this exists until a versus session is seen, and none of it runs in single-player or co-op. ---------- */
 const TEAM_HEX=[0x2f9dff,0xffb21e];
 const VS={on:false,v:null,teams:false,my:-1,mine:-1,phase:'',prev:'',pt:0,clock:0,ringOn:false,rx:W/2,ry:H/2,rr:0,out:0,
-  resOn:false,resBig:'',resSub:'',resTop:'',resCss:'#ffffff',resMine:0,resW:undefined};
+  resOn:false,resBig:'',resSub:'',resTop:'',resCss:'#ffffff',resMine:0,resW:undefined,at:0,dt:0};
 const SPEC={on:false,id:null,rm:null,x:W/2,y:H/2,name:'',css:'#ffffff',n:0};
 const specList=[],vsRounds=new Map();
 function vsOf(){const v=R.testVs||(MB.mp&&MB.mp.vs);return v&&typeof v==='object'?v:null}
@@ -2137,9 +2145,11 @@ function specPick(mates){
 }
 function vsFrame(dt){
   const v=vsOf();
-  if(!v){if(VS.on){VS.on=false;VS.v=null;VS.phase=VS.prev='';VS.ringOn=false;VS.resOn=false;VS.out=0;SPEC.on=false;SPEC.id=null;SPEC.rm=null;vsRounds.clear()}return}
+  if(!v){if(VS.on){VS.on=false;VS.at=0;VS.v=null;VS.phase=VS.prev='';VS.ringOn=false;VS.resOn=false;VS.out=0;SPEC.on=false;SPEC.id=null;SPEC.rm=null;vsRounds.clear()}return}
   const mp=MB.mp,P=MB.P;
-  VS.on=true;VS.v=v;VS.teams=v.format==='teams';VS.my=num(v.myTeam,-1);VS.clock+=dt;
+  // banners and the ring run on the wall clock (a slow device stretches game time, and a round's clock does not wait for it)
+  {const now=performance.now();dt=VS.at>0?Math.max(0,Math.min(.25,(now-VS.at)/1000)):0;VS.at=now}
+  VS.on=true;VS.v=v;VS.teams=v.format==='teams';VS.my=num(v.myTeam,-1);VS.clock+=dt;VS.dt=dt;
   {const ix=num(v.myIdx,mp?num(mp.myIdx,-1):-1);VS.mine=ix>=0?vsHex(ix,VS.my):VS.teams&&(VS.my===0||VS.my===1)?teamHex(VS.my):-1}
   const ph=typeof v.phase==='string'?v.phase:'';
   if(ph!==VS.phase){VS.prev=VS.phase;VS.phase=ph;VS.pt=0;VS.resOn=false;if(ph==='over'||ph==='results')vsResult(v,ph)}else{VS.pt+=dt;if(VS.resOn&&v.winner!==VS.resW)vsResult(v,ph)}
@@ -2188,7 +2198,7 @@ function ringSetup(){
 function syncRing(dt,sight){
   const on=VS.on&&VS.ringOn&&MB.S.mode==='play';
   if(!RG){if(!on)return;ringSetup()}
-  const G0=RG,t=VS.clock,low=Q.low;
+  const G0=RG,t=VS.clock,low=Q.low;dt=VS.on?VS.dt:dt;
   G0.show+=((on?1:0)-G0.show)*Math.min(1,dt*(on?4:6));
   if(G0.show<.01&&!on){if(G0.g.visible){G0.g.visible=false;G0.pts.geo.setDrawRange(0,0)}return}
   const r=Math.max(1,VS.rr),a=G0.show,sd=VS.phase==='sudden'?1:.8;
@@ -2197,7 +2207,7 @@ function syncRing(dt,sight){
   const h=(low?64:84)*a,fl=1+.06*Math.sin(t*9)+.04*Math.sin(t*23.7);
   G0.w1.scale.set(r,h*fl,r);G0.w2.scale.set(r*1.004,h*.55*(2-fl),r*1.004);G0.w2.visible=!low;
   G0.t1.offset.x=t*.045;G0.t2.offset.x=-t*.11;
-  G0.m1.opacity=.7*a*sd;G0.m2.opacity=.5*a*sd;
+  G0.m1.opacity=.6*a*sd;G0.m2.opacity=.5*a*sd;
   G0.burn.scale.set(r,1,r);G0.wash.scale.set(r,1,r);G0.hot.scale.set(r,1,r);G0.line.scale.set(r,1,r);G0.safe.scale.set(r,1,r);
   G0.burnM.opacity=.62*a;G0.washM.opacity=(.13+.05*Math.sin(t*2.6))*a;G0.hotM.opacity=(.4+.12*Math.sin(t*7))*a;G0.lineM.opacity=a;G0.safeM.opacity=(.09+.03*Math.sin(t*2))*a;
   G0.safe.visible=r>46;
@@ -2208,9 +2218,11 @@ function syncRing(dt,sight){
       col[i*4]=1;col[i*4+1]=hot?.9:.42;col[i*4+2]=hot?.6:.16;col[i*4+3]=Math.sin(life*Math.PI)*.9*a;size[i]=(hot?2.2:3)+(i%3)*.6}
     P0.geo.setDrawRange(0,n);if(n){P0.geo.attributes.position.needsUpdate=true;P0.geo.attributes.aCol.needsUpdate=true;P0.geo.attributes.aSize.needsUpdate=true}}
 }
+// banner text is laid out for a wide view and scaled down for a narrow one; an upright phone, whose overlay unit is small, gets it larger again
+function vsScale(){const W=OV.w,H=OV.h;return H>W*1.2?Math.min(1.35,W/500):Math.min(1,W/760)}
 // a word across the middle of the view: a dark slanted band, a small line over it, the word, a line under it. k = 0..1 how far in it is
 function vsBand(top,big,sub,css,a,slide,y0,size){
-  const W=OV.w,H=OV.h,s=Math.min(1,W/760),bh=(size*1.5+(top?26:0)+(sub?30:0))*s,y1=y0+bh,sl=24;
+  const W=OV.w,H=OV.h,s=vsScale(),bh=(size*1.5+(top?26:0)+(sub?30:0))*s,y1=y0+bh,sl=24;
   ctx.save();ctx.globalAlpha=a;
   ctx.beginPath();ctx.moveTo(-sl,y0);ctx.lineTo(W+sl*2,y0);ctx.lineTo(W+sl,y1);ctx.lineTo(-sl*2,y1);ctx.closePath();ctx.fillStyle='rgba(8,7,18,.86)';ctx.fill();
   ctx.fillStyle=css;ctx.fillRect(0,y0-4,W,2);ctx.fillRect(0,y1+2,W,2);
@@ -2226,7 +2238,7 @@ function vsBand(top,big,sub,css,a,slide,y0,size){
 }
 function vsOverlay(sight){
   const v=VS.v;if(!v)return;
-  const W=OV.w,H=OV.h,ph=VS.phase,pt=VS.pt,t=VS.clock,s=Math.min(1,W/760),top=hudBottom(),play=MB.S.mode==='play';
+  const W=OV.w,H=OV.h,ph=VS.phase,pt=VS.pt,t=VS.clock,s=vsScale(),top=hudBottom(),play=MB.S.mode==='play';
   ctx.save();ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.lineJoin='round';
   // outside the ring: the edges burn and a word says so, with a chevron toward the way back
   if(VS.out>.02&&play){const a=VS.out,pu=.7+.3*Math.sin(t*9),e=18+8*pu;
@@ -2238,7 +2250,7 @@ function vsOverlay(sight){
       ctx.restore()}
     ctx.globalAlpha=a;ctx.font='700 '+Math.round(22*s)+'px '+FONT;spaced(4);inked('OUTSIDE THE RING',W/2,Math.max(top+34,H*.17),pu>.85?CSS.bone:CSS.foe,5);spaced(0);ctx.globalAlpha=1}
   // spectating: who (or what) is being watched
-  if(SPEC.on&&play&&ph!=='over'){const y=H-Math.max(58,H*.1);
+  if(SPEC.on&&play&&ph!=='over'){const y=H*.79;
     ctx.font='700 '+Math.round(13*s)+'px '+FONT;spaced(5);inked('SPECTATING',W/2,y,CSS.dim,4);spaced(0);
     ctx.font='700 '+Math.round(24*s)+'px '+FONT;spaced(1.5);inked(SPEC.rm?SPEC.name.toUpperCase():'THE FIGHT',W/2,y+26*s,SPEC.rm?SPEC.css:CSS.bone,5);spaced(0);
     if(SPEC.n>1||(SPEC.n===1&&SPEC.rm&&!(VS.teams&&!SPEC.rm.foe))){const w=64*s;ctx.fillStyle=SPEC.css;ctx.globalAlpha=.9;
@@ -2246,6 +2258,7 @@ function vsOverlay(sight){
   if(ph==='countdown'){
     const tl=num(v.t,0);
     if(tl>0){const n=Math.min(9,Math.ceil(tl)),f=clamp01(n-tl),pop=calm?1:1.55-.55*easeOut(clamp01(f*5)),a=clamp01(f*8)*clamp01((1-f)*5),cy=H*.44,size=170*s;
+      ctx.globalAlpha=.5;ctx.fillStyle=CSS.ink;ctx.beginPath();ctx.ellipse(W/2,cy,size*1.5,size*.95,0,0,TAU);ctx.fill();ctx.globalAlpha=.3;ctx.beginPath();ctx.ellipse(W/2,cy,size*1.15,size*.72,0,0,TAU);ctx.fill();ctx.globalAlpha=1;
       ctx.font='700 '+Math.round(17*s)+'px '+FONT;spaced(5);inked('ROUND '+Math.max(1,num(v.round,1)|0),W/2,cy-size*.62,CSS.gold,4);spaced(0);
       ctx.save();ctx.globalAlpha=a;slant(W/2,cy+size*.3,0,pop*.9,pop);ctx.font='700 '+Math.round(size)+'px '+FONT;
       ctx.fillStyle=VS.mine>=0?cssOf(VS.mine):CSS.power;ctx.globalAlpha=a*.7;ctx.fillText(''+n,5,5);ctx.globalAlpha=a;inked(''+n,0,0,CSS.bone,Math.max(5,size*.07));ctx.restore();

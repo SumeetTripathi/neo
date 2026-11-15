@@ -508,6 +508,8 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
    .vs-ffa: .vsh-mid over .vsh-chips (a .vsh-chip per player: name and rounds won; .me, .down, .lead). --tc = the side's or the player's colour, as in the arena.
    .urgent = the last ten seconds and sudden death; .ph-count .ph-sudden .ph-over = the moment ---- */
 .wrap.vs-on #bossName,.wrap.vs-on #bossBar{display:none}
+/* a versus round is not a floor of the climb: no glimpse of the floors ahead */
+.wrap.vs-on .mbt-peek{display:none}
 #vsHud{grid-area:1/1;position:relative;z-index:2;align-self:start;justify-self:center;box-sizing:border-box;margin:var(--hud-mid,var(--hud0)) 0 0;max-width:min(calc(var(--u)*620),calc(100% - var(--sl,12px) - var(--sr,12px)));pointer-events:none;
   display:flex;align-items:stretch;justify-content:center;gap:calc(var(--u)*5);font-family:var(--display);text-shadow:0 1px calc(var(--u)*2) #000;font-variant-numeric:tabular-nums}
 #vsHud.vs-ffa{flex-direction:column;align-items:center;gap:calc(var(--u)*4);width:min(calc(var(--u)*520),calc(100% - var(--sl,12px) - var(--sr,12px)))}
@@ -592,6 +594,9 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
   .vsTable{font-size:.84rem}.vsTable th{padding:calc(var(--u)*3) calc(var(--u)*6);font-size:.64rem;letter-spacing:.08em}.vsTable td{padding:calc(var(--u)*4) calc(var(--u)*6)}.vsTable td.nm,.vsTable td:first-child{font-size:.95rem;padding-left:calc(var(--u)*10);max-width:7.5em}.vsTable td.num{font-size:.95rem}
   .vsRules{font-size:.8rem;padding:calc(var(--u)*6) calc(var(--u)*10)}
 }
+/* small screens: the fighters come first, the rules after them; the game's one-line versus news (#mpParty) does not sit on a screen */
+@media (max-width:600px),(max-height:600px){.panel.vsPick #ovExtra{order:5}.panel.vsPick #ovBtns{order:6}}
+.wrap.vs-on .stage:has(#ov:not([hidden])) #mpParty{visibility:hidden}
 @media (prefers-reduced-motion:reduce){.panel.vsWin{animation:none}}
 /* ---- tower.js: the map of the climb (#mbt, a layer like #mbn), the seasoned-climb steps, the glimpse between floors (.mbt-peek) and the trial HUD (.trialHud).
    Colours: --trial = ember, for trial floors and their HUD; --bh / --bf = a band's own colour and wash, set inline from MB.tower.bands; --k = a floor kind's colour.
