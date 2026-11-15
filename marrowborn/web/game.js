@@ -3034,8 +3034,21 @@ MP.begin=mpBegin;MP.end=mpEnd;
 const VFLOORS=[11,31,51,101,151],VNONE=[];
 const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,
   cls:{},dev:false};
-// VCLS: placeholder
-const VCLS={};
+// VCLS: per hero level, k (the level's own factor on the conversion) and the factors of every build [what its blows on heroes are multiplied by, what the blows it takes are multiplied by].
+// A build is the class, with its upgrade past floor 50 and its apex path past 100. Found with the versus bots (r9-sim/tuneb.js: every build near 50% over all opponents, a mirror match near 30 s);
+// each column has a geometric mean of 1, so K x k is the conversion for an average build.
+const VCLS={
+ 11:{k:0.81,
+  'fighter':[0.63,0.67],'tank':[0.52,0.79],'assassin':[0.46,0.68],'mage':[1.1,0.85],'ranger':[1.78,1.33],'healer':[1.47,1.82],'necro':[2.35,1.35]},
+ 31:{k:2.38,
+  'fighter':[0.46,0.53],'tank':[0.69,0.85],'assassin':[0.58,0.72],'mage':[1.51,0.89],'ranger':[1.82,0.86],'healer':[1.56,2.12],'necro':[1.27,1.9]},
+ 51:{k:1.87,
+  'fighter/champion':[0.49,0.53],'fighter/duelist':[0.56,0.44],'tank/paladin':[1.08,1.16],'tank/berserker':[0.62,0.78],'assassin/nightblade':[0.45,0.84],'assassin/phantom':[0.59,1.2],'mage/archmage':[1.6,0.73],'mage/pyromancer':[1.81,0.71],'ranger/sharpshooter':[1.51,0.8],'ranger/beastmaster':[2.51,0.78],'healer/saint':[1.06,2.24],'healer/inquisitor':[0.64,1.89],'necro/lich':[2.32,2.08],'necro/reaper':[1.17,1.66]},
+ 101:{k:3.86,
+  'fighter/champion/order':[0.61,0.53],'fighter/champion/dominion':[1.08,0.38],'fighter/duelist/order':[0.85,0.5],'fighter/duelist/dominion':[1.19,0.37],'tank/paladin/order':[0.97,0.86],'tank/paladin/dominion':[1.44,0.65],'tank/berserker/order':[0.6,0.53],'tank/berserker/dominion':[0.93,0.45],'assassin/nightblade/order':[0.55,1.23],'assassin/nightblade/dominion':[0.66,1.0],'assassin/phantom/order':[0.68,2.02],'assassin/phantom/dominion':[0.71,1.94],'mage/archmage/order':[1.07,1.09],'mage/archmage/dominion':[1.12,0.61],'mage/pyromancer/order':[1.19,1.15],'mage/pyromancer/dominion':[1.2,0.62],'ranger/sharpshooter/order':[0.97,0.83],'ranger/sharpshooter/dominion':[1.2,0.5],'ranger/beastmaster/order':[1.4,1.13],'ranger/beastmaster/dominion':[0.94,0.69],'healer/saint/order':[1.82,2.72],'healer/saint/dominion':[2.31,1.48],'healer/inquisitor/order':[1.25,2.0],'healer/inquisitor/dominion':[1.29,1.43],'necro/lich/order':[1.79,2.16],'necro/lich/dominion':[0.9,2.45],'necro/reaper/order':[0.88,1.87],'necro/reaper/dominion':[0.43,2.38]},
+ 151:{k:3.36,
+  'fighter/champion/order':[0.78,0.58],'fighter/champion/dominion':[1.25,0.42],'fighter/duelist/order':[0.95,0.68],'fighter/duelist/dominion':[1.5,0.43],'tank/paladin/order':[1.26,0.9],'tank/paladin/dominion':[1.75,0.73],'tank/berserker/order':[0.8,0.53],'tank/berserker/dominion':[1.37,0.44],'assassin/nightblade/order':[1.09,0.99],'assassin/nightblade/dominion':[1.17,0.87],'assassin/phantom/order':[1.33,1.45],'assassin/phantom/dominion':[1.16,1.38],'mage/archmage/order':[0.83,1.09],'mage/archmage/dominion':[0.8,0.58],'mage/pyromancer/order':[0.97,1.07],'mage/pyromancer/dominion':[0.84,0.58],'ranger/sharpshooter/order':[1.95,0.94],'ranger/sharpshooter/dominion':[2.21,0.49],'ranger/beastmaster/order':[1.88,1.17],'ranger/beastmaster/dominion':[1.04,0.72],'healer/saint/order':[1.55,3.98],'healer/saint/dominion':[1.76,1.82],'healer/inquisitor/order':[0.93,2.8],'healer/inquisitor/dominion':[1.08,1.59],'necro/lich/order':[0.74,1.75],'necro/lich/dominion':[0.25,2.6],'necro/reaper/order':[0.53,1.82],'necro/reaper/dominion':[0.12,1.31]},
+};
 const VRULES=['Every blow is scaled to a hero\'s health, and no single blow takes more than '+Math.round(VSK.cap*100)+'% of it.',
   'Healing and lifesteal work at half strength.',
   'Nothing keeps you untouchable for more than '+VSK.inv+' seconds at a stretch.',

@@ -68,15 +68,57 @@ function ahead(t,n){var a=[];try{a=t.ahead(n)||[]}catch(e){}return a.filter(func
 function cps(t){var a=[];try{a=(t.checkpoints||[]).map(Number).filter(isFinite)}catch(e){}return a.sort(function(x,y){return x-y})}
 function climbing(){var m=S().mode;return !!m&&m!=='title'}
 function hasSetting(k){try{return !!MB.settings&&k in MB.settings&&typeof MB.setSetting==='function'}catch(e){return false}}
-// the two apex paths. LOGIC owns the names: taken from whatever it exposes, with plain fallbacks
+// the apex paths. The game owns them (MB.apexPaths: [{id, side, name, title, blurb, skills:[{name,text}]}]); until it lists them, this copy of the ten stands in:
+// [id, side, name, title, one sentence]. The sides: 'dominion' = you command others, 'order' = you are the weapon.
+var APEXTAB=[
+  ['dominion','dominion','The Tithe','Tithe-Taker','What you kill owes you: the slain rise as the Owed and fight at your side.'],
+  ['beasts','dominion','The Feral Vow','Vowkeeper','A spectral pack hunts beside you and grows stronger in numbers.'],
+  ['frost','dominion','The Still Winter','Winterbound','Monsters are chilled, frozen solid and shattered, and ice-wights stand guard.'],
+  ['plague','dominion','The Slow Rot','Rotwright','A rot spreads from monster to monster and weakens whatever it touches.'],
+  ['flame','dominion','The Last Pyre','Pyrekeeper','The ground burns, and living cinders hurl themselves at monsters.'],
+  ['order','order','The White Marrow','Whitemarrow','The power is your own: a ring of light, a beam, and ascension.'],
+  ['storm','order','The Split Sky','Skysplit','Great speed, and lightning that chains from monster to monster.'],
+  ['stone','order','The Standing Stone','Stonesworn','Guard plates that barely break, fissures and crushing blows.'],
+  ['blade','order','The Thousandth Cut','Edgewalker','Blades of light float beside you, strike when you strike and finish the weak.'],
+  ['tide','order','The Returning Tide','Tidecaller','Waves push monsters back and wear them down while you steadily heal.']];
+function apexId(v){return typeof v==='string'&&/^[a-z][a-z0-9]{0,23}$/i.test(v)?v:''}
+function apexRow(id){for(var i=0;i<APEXTAB.length;i++)if(APEXTAB[i][0]===id)return APEXTAB[i];return null}
+function str(v){return typeof v==='string'?v:''}
+// every path that can be named: the game's list when it has one (real:true), else the built-in ten with the game's own words for those it knows
+function apexAll(){
+  var src=null,out=[],i;
+  try{src=MB.apexPaths}catch(e){}
+  if(Array.isArray(src)){
+    for(i=0;i<src.length;i++){var o=src[i],id=o&&apexId(o.id||o.path);if(!id)continue;var r=apexRow(id)||[id,'order',id,'',''];
+      out.push({id:id,side:o.side==='dominion'||o.side==='order'?o.side:r[1],name:str(o.name)||r[2],title:str(o.title)||r[3],blurb:str(o.blurb)||str(o.sub)||r[4],text:str(o.text)||str(o.lore),
+        skills:(Array.isArray(o.skills)?o.skills:[]).map(function(x){return x&&typeof x==='object'?str(x.name):str(x)}).filter(Boolean).slice(0,4),real:true})}
+    if(out.length)return out;
+  }
+  var old=null;try{old=MB.APEX}catch(e){}
+  return APEXTAB.map(function(r){var o=old&&typeof old==='object'&&old[r[0]]||{};return {id:r[0],side:r[1],name:str(o.name)||r[2],title:str(o.title)||r[3],blurb:r[4],text:str(o.text),skills:[],real:false}});
+}
+// the paths a seasoned climb can start with. The game's own list is taken as it is. Without one, a path is offered only if the game keeps it when asked what such a hero would be
+// (it turns a path it does not know into another); where that cannot be asked, all are offered.
+function apexOffer(t,floor,cls){
+  var all=apexAll();if(!all.length||all[0].real||!t||typeof t.seasoned!=='function')return all;
+  var ok=[],asked=false,i,d;
+  for(i=0;i<all.length;i++){d=null;try{d=t.seasoned(Math.max(101,floor||101),{cls:cls,apex:all[i].id})}catch(e){}
+    if(d&&typeof d==='object'&&'apex' in d){asked=true;if(d.apex===all[i].id)ok.push(all[i])}}
+  return asked&&ok.length?ok:all;
+}
 function apexInfo(id){
-  var src=null,o=null;
-  try{src=MB.APEX||MB.apexPaths||(T()&&T().apex)||null;if(!src&&MB.apex&&MB.apex.path===id)src={};if(MB.apex&&MB.apex.path===id&&!(src&&src[id]))o=MB.apex;if(!o)o=src&&(src[id]||(Array.isArray(src)&&src.filter(function(x){return x&&(x.id===id||x.path===id)})[0]))||null}catch(e){}
-  var fb=id==='dominion'?{name:'The Tithe',sub:'Command what you kill',text:'What you kill owes you. The slain rise for a short while and fight at your side, your summons grow stronger, and pets hold less of your mana.'}
-                        :{name:'The White Marrow',sub:'Be the weapon',text:'Nothing rises for you. The power is your own: you hit harder, last longer, and an aura around you hurts and slows whatever stands near.'};
-  if(o&&typeof o==='object')return {name:o.name||fb.name,sub:o.sub||o.title||o.tag||fb.sub,text:o.text||o.lore||o.body||o.desc||fb.text};
-  if(typeof o==='string')fb.name=o;
-  return fb;
+  var all=apexAll(),i,a=null;for(i=0;i<all.length;i++)if(all[i].id===id){a=all[i];break}
+  if(!a){var r=apexRow(id),m=null;try{m=MB.apex}catch(e){}if(m&&m.path!==id)m=null;
+    a={id:apexId(id),side:m&&m.side||r&&r[1]||'order',name:m&&m.name||r&&r[2]||String(id||''),title:m&&m.title||r&&r[3]||'',blurb:r&&r[4]||'',text:m&&str(m.lore)||'',skills:[],real:false}}
+  return a;
+}
+function sigil(){return h('i',{class:'apexSigil','aria-hidden':'true'})}
+// a path named in passing (the map, the trail of a seasoned start): sigil, title, name
+function apexBadge(id,short){var a=apexInfo(id);return h('span',{class:'apexBadge'+(a.id?' apexPath-'+a.id:'')+' apexSide-'+a.side},sigil(),short||!a.title?a.name:a.title,short||!a.title?null:h('small',{text:a.name}))}
+function apexCard(a,fn,on,long){
+  var b=h('button',{type:'button',class:'apexCard apexSide-'+a.side+' apexPath-'+a.id,'data-apex':a.id,'data-skills':a.skills.length?a.skills.join(' · '):null,'aria-pressed':on?'true':null},
+    h('b',{text:a.name}),h('small',{text:a.title}),h('span',{text:long&&a.text||a.blurb}));
+  b.addEventListener('click',function(){blip();fn()});return b;
 }
 
 /* ---------- the layer: one dialog over the arena (like the settings and multiplayer layers) ---------- */
@@ -140,6 +182,8 @@ function showMap(){
     var mark=inRun||floor>1,here=bandAt(t,floor),starts=list.filter(function(f){return f>=11}),canStart=!co&&starts.length>0&&typeof t.startAt==='function';
     var top=Math.max(best,floor)+50;
     p.appendChild(h('div',{class:'mbt-head'},h('p',{class:'kick',text:'The climb'}),h('h2',{text:t.name||'The tower'})));
+    var mine=null;try{mine=MB.apex}catch(e){}
+    if(mine&&mine.path&&mark&&S().cls)p.appendChild(h('p',{class:'mbt-apex'},apexBadge(mine.path)));
     p.appendChild(h('div',{class:'mbx-tiles mbt-tiles'},
       tile(mark?floor:'—',inRun?'Floor now':mark?'Resume at floor':'Not climbing','mbt-t-now'),
       tile(best||'—','Best floor','mbt-t-best'),
@@ -223,9 +267,10 @@ function trail(){
   var out=[];if(flow.floor)out.push('Floor '+flow.floor);
   var c=clsOf(flow.cls);if(c)out.push(c.name||flow.cls);
   var a=advOf(flow.cls,flow.adv);if(a&&flow.floor>50)out.push(a[1]);
-  if(flow.apex&&flow.floor>100)out.push(apexInfo(flow.apex).name);
+  if(flow.apex&&flow.floor>100)out.push({apex:flow.apex});
   return out;
 }
+function crumb(x){return x&&x.apex?apexBadge(x.apex,true):h('span',{text:x})}
 function card(title,sub,body,fn,cls,on){
   var b=h('button',{type:'button',class:cls||null,'aria-pressed':on?'true':null},h('b',{text:title}),h('small',{text:sub||''}),h('span',{text:body||''}));
   b.addEventListener('click',function(){blip();fn()});return b;
@@ -238,7 +283,7 @@ function step(name){
     var focus=null,tr=trail();
     function head(title,lead){
       p.appendChild(h('div',{class:'mbt-head'},h('p',{class:'kick',text:'Seasoned climb · step '+n+' of '+of}),h('h2',{text:title})));
-      if(tr.length&&name!=='ok')p.appendChild(h('p',{class:'mbt-trail'},tr.map(function(x){return h('span',{text:x})})));
+      if(tr.length&&name!=='ok')p.appendChild(h('p',{class:'mbt-trail'},tr.map(crumb)));
       if(lead)p.appendChild(h('p',{class:'mbx-center',text:lead}));
     }
     function foot(extra){var b=btn(prev?'Back':'Back to the map',goBack),bt=h('div',{class:'btns'});if(extra)bt.appendChild(extra);bt.appendChild(b);p.appendChild(bt);return b}
@@ -268,19 +313,25 @@ function step(name){
       p.appendChild(as);var b3=foot();return focus||b3;
     }
     if(name==='apex'){
-      head('The apex path','Past floor 100 every hero has taken one of two paths, for good.');
-      var xs=h('div',{class:'cards mbt-cards two'});
-      ['dominion','order'].forEach(function(id){var a=apexInfo(id),e=card(a.name,a.sub,a.text,function(){flow.apex=id;step(nextOf('apex'))},'apexCard '+(id==='dominion'?'apexDominion':'apexOrder'),flow.apex===id);
-        if(flow.apex===id||!focus)focus=flow.apex===id?e:focus||e;xs.appendChild(e)});
+      var offer=apexOffer(t,flow.floor,flow.cls),cnt={2:'two',3:'three',4:'four',5:'five',6:'six',8:'eight',10:'ten'}[offer.length]||String(offer.length);
+      head('The apex path','Past floor 100 every hero has taken one of '+cnt+' paths, for good.');
+      var xs=h('div',{class:'cards mbt-cards apexGrid',role:'group','aria-label':'The apex paths: those that command, then those that are the weapon'});
+      // those who command first, so the keyboard walks the list as it is drawn
+      offer.filter(function(a){return a.side==='dominion'}).concat(offer.filter(function(a){return a.side!=='dominion'})).forEach(function(a){
+        var e=apexCard(a,function(){flow.apex=a.id;step(nextOf('apex'))},flow.apex===a.id,offer.length<=2);
+        if(flow.apex===a.id||!focus)focus=flow.apex===a.id?e:focus||e;xs.appendChild(e)});
       p.appendChild(xs);var b4=foot();return focus||b4;
     }
     /* confirm */
+    var d=null,swap='';try{if(typeof t.seasoned==='function')d=t.seasoned(flow.floor,{cls:flow.cls,adv:flow.floor>50?flow.adv:null,apex:flow.floor>100?flow.apex:null})}catch(e){}
+    // a path this version of the game does not know becomes another: say so, and show what the hero will really be
+    if(d&&typeof d==='object'&&flow.floor>100&&flow.apex&&apexId(d.apex)&&d.apex!==flow.apex){swap=apexInfo(flow.apex).name;flow.apex=d.apex;tr=trail()}
     head('Begin at floor '+flow.floor+'?');
-    p.appendChild(h('p',{class:'mbt-trail big'},tr.map(function(x){return h('span',{text:x})})));
+    p.appendChild(h('p',{class:'mbt-trail big'},tr.map(crumb)));
+    if(swap)p.appendChild(h('p',{class:'mbt-note',role:'note',text:swap+' is not open in this version of the game. This hero takes '+apexInfo(flow.apex).name+' instead.'}));
     var sv=null,cur='';try{sv=MB.api&&MB.api.getSave&&MB.api.getSave()}catch(e){}
     if(sv&&num(sv.level)>0){var sc=clsOf(sv.cls);cur=' (floor '+(Math.round(num(sv.level))+1)+(sc?', '+(sc.name||sv.cls):'')+')'}
     p.appendChild(h('p',{class:'mbt-warn',role:'note'},h('b',{text:'This replaces your single-player run'+cur+'. '}),'That run cannot be brought back. Checkpoints, records and settings are kept.'));
-    var d=null;try{if(typeof t.seasoned==='function')d=t.seasoned(flow.floor,{cls:flow.cls,adv:flow.floor>50?flow.adv:null,apex:flow.floor>100?flow.apex:null})}catch(e){}
     if(d&&typeof d==='object'){
       var dl=h('dl',{class:'mbt-kit'}),row=function(k,v){if(v)dl.appendChild(h('div',null,h('dt',{class:'lab',text:k}),h('dd',{text:v})))},names=function(a){return Array.isArray(a)?a.map(function(x){return x&&typeof x==='object'?x.name||'':x}).filter(Boolean):[]};
       var nb=0;if(d.boons&&typeof d.boons==='object')for(var bk in d.boons)nb+=num(d.boons[bk]);else nb=num(d.boons);
@@ -331,6 +382,36 @@ function addButton(){
 win.addEventListener('keydown',function(e){
   try{var t=e.target,ov=$('ov');if(e.key!=='Enter'||!t||t.tagName!=='BUTTON'||!ov||ov.hidden||!ov.contains(t))return;
     var first=ov.querySelector('#ovBtns button');if(t!==first)e.stopImmediatePropagation()}catch(_){}
+},true);
+// Arrow keys walk a grid of choice cards by where the cards are drawn (Home and End: first and last). On the tower's own screens this is every card grid;
+// on the game's screens only the apex choice, where an arrow key with nothing in focus also enters the grid.
+function cardGrid(){
+  var a=doc.activeElement,g=a&&a.tagName==='BUTTON'&&a.parentNode,ov=$('ov'),inT=!!layer&&!layer.hidden;
+  if(g&&g.classList&&g.classList.contains('cards')&&(inT?layer.contains(g):!!ov&&!ov.hidden&&ov.contains(g)&&!!g.querySelector('.apexCard[class*="apexSide-"]')))return {g:g,a:a};
+  if(a&&a!==doc.body&&a!==panel&&/^(BUTTON|INPUT|SELECT|TEXTAREA)$/.test(a.tagName))return null;
+  var x=doc.querySelector('#mbx:not([hidden]),#mbn:not([hidden])');if(x)return null;
+  g=inT?panel.querySelector('.cards.apexGrid'):ov&&!ov.hidden&&!ov.inert?ov.querySelector('#ovCards:not([hidden])'):null;
+  return g&&g.querySelector('.apexCard[class*="apexSide-"]')?{g:g,a:null}:null;
+}
+win.addEventListener('keydown',function(e){
+  try{
+    var k=e.key,dx=k==='ArrowRight'?1:k==='ArrowLeft'?-1:0,dy=k==='ArrowDown'?1:k==='ArrowUp'?-1:0,edge=k==='Home'||k==='End';
+    if(!dx&&!dy&&!edge||e.altKey||e.ctrlKey||e.metaKey)return;
+    var c=cardGrid();if(!c)return;
+    var all=[].filter.call(c.g.querySelectorAll('button'),function(b){return !b.disabled&&b.offsetParent!==null});if(!all.length)return;
+    var R=all.map(function(b){var r=b.getBoundingClientRect();return {b:b,l:r.left,r:r.right,t:r.top,m:r.bottom,x:(r.left+r.right)/2,y:(r.top+r.bottom)/2}});
+    // reading order: rows from the top, each from the left
+    var ord=R.slice().sort(function(p,q){return Math.abs(p.t-q.t)>6?p.t-q.t:p.l-q.l}),to=null,i,best=1e18;
+    if(!c.a)to=(c.g.querySelector('button[aria-pressed="true"]')||ord[0].b);
+    else if(edge)to=ord[k==='Home'?0:ord.length-1].b;
+    else{var me=R[all.indexOf(c.a)];if(!me)return;
+      for(i=0;i<R.length;i++){var o=R[i];if(o===me)continue;
+        var along=dx?(o.x-me.x)*dx:(o.y-me.y)*dy,across=dx?Math.max(0,Math.max(o.t,me.t)-Math.min(o.m,me.m)):Math.max(0,Math.max(o.l,me.l)-Math.min(o.r,me.r));
+        if(along<4)continue;var sc=along+across*6+(dx?Math.abs(o.y-me.y):Math.abs(o.x-me.x))*.05;if(sc<best){best=sc;to=o.b}}
+      if(!to)to=c.a}
+    e.preventDefault();e.stopImmediatePropagation();
+    if(to&&to!==doc.activeElement)try{to.focus()}catch(_){}
+  }catch(_){}
 },true);
 var ob=$('ovBtns');
 if(ob&&win.MutationObserver)new MutationObserver(function(){try{addButton()}catch(e){}}).observe(ob,{childList:true});
@@ -470,6 +551,6 @@ var hudOk=true;
 setInterval(function(){if(!hudOk)return;try{hudTick()}catch(e){hudOk=false;try{hudOff();console.warn('tower: trial HUD stopped',e)}catch(_){}}},100);
 
 // for tests and for the other files
-MB.towerUi={open:openTower,close:closeAll,peek:showPeek,icon:icon,kinds:KIND};
+MB.towerUi={open:openTower,close:closeAll,peek:showPeek,icon:icon,kinds:KIND,apexPaths:apexAll,apexOffer:apexOffer,apexBadge:apexBadge,apexCard:apexCard};
 }catch(e){try{console.warn('tower.js: not started',e)}catch(_){}}
 })();
