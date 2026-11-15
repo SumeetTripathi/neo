@@ -488,12 +488,12 @@ function modes(cur,pick){
 /* ---- versus: words and colours ---- */
 var VS_LAB={format:'Format',floor:'Hero level',wins:'Rounds to win',time:'Round time'};
 function vsWord(k,v){return k==='format'?(v==='teams'?'Teams':'Free-for-all'):k==='floor'?'Floor '+v:k==='wins'?'First to '+v:v+' s'}
-var TEAM_NAME=['Team 1','Team 2'],TEAM_COL=['#4fd8ff','#ff9f1a'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
+var TEAM_NAME=['Team 1','Team 2'],TEAM_COL=['#2f9dff','#ffb21e'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
 function hex(c){if(typeof c==='number'&&c>=0)c='#'+('000000'+Math.floor(c).toString(16)).slice(-6);return typeof c==='string'&&/^#[0-9a-f]{3,8}$/i.test(c)?c:''}
 /* the colours the arena uses, so that the lobby, the HUD and the rings round the heroes agree: the renderer's own when it offers them, else the game's member colours */
 function teamColor(t){
   var R=MB.renderer,mp=MB.mp||{},c='';t=t?1:0;
-  try{if(R&&typeof R.teamColor==='function')c=hex(R.teamColor(t));if(!c&&mp.teamColors)c=hex(mp.teamColors[t])}catch(e){}
+  try{if(R&&typeof R.teamColor==='function')c=hex(R.teamColor(t));var l=(mp.vs&&mp.vs.teamColors)||mp.teamColors;if(!c&&l)c=hex(l[t])}catch(e){}
   return c||TEAM_COL[t];
 }
 function memberColor(i){

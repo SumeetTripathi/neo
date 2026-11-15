@@ -75,6 +75,9 @@ function ink(o,th){var S=window.MBStyle;if(S&&typeof S.outline==='function')try{
 // shadow (cheap: a legion of them is on screen at once), a thin violet ring under it, and it thins to light as its time (life/max) runs out.
 // Each variant has its own cached material set, so a pet never shares (or recolours) the materials of the hostile monsters around it.
 var PV=0;
+// PF (versus): the creature being built belongs to an opponent (m.foe): the body keeps its variant, but its eyes and lights stay the monsters' own
+// red, and none of the friendly dress (rune circle, entry ring, wisps) is made: the renderer lays a thorn ring in the owner's colour under it.
+var PF=0;
 function M(hex,shade){
   var key=(PV?PV+'|':'')+hex+'|'+(shade||0),m=MATS[key];if(m)return m;
   _c.set(hex);
@@ -131,7 +134,7 @@ function spike(mat,par,x,y,z,dx,dy,dz,len,rad){var o=mk(G.cone,mat,par,x,y,z);or
 function grp(par,x,y,z){var g=new T.Group();g.position.set(x||0,y||0,z||0);par.add(g);return g}
 function eye(par,list,x,y,z,er,nx,ny,nz,red,lo){
   var l=Math.sqrt(nx*nx+ny*ny+nz*nz)||1;nx/=l;ny/=l;nz/=l;
-  mk(lo?G.sphLo:G.sph,PV==='necro'?FX.eyeGreen:PV==='shade'?FX.eyeS:PV==='beast'?FX.eyeBlue:red==='g'?FX.eyeGreen:red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
+  mk(lo?G.sphLo:G.sph,PF?FX.eyeRed:PV==='necro'?FX.eyeGreen:PV==='shade'?FX.eyeS:PV==='beast'?FX.eyeBlue:red==='g'?FX.eyeGreen:red?FX.eyeRed:FX.eye,par,x,y,z,er,er,er,true);
   var pu=mk(G.sphLo,FX.pupil,par,x+nx*er*.7,y+ny*er*.7,z+nz*er*.7,er*.5,er*.5,er*.5,true);
   list.push({pu:pu,x:pu.position.x,er:er});
 }
@@ -152,7 +155,7 @@ function claw3(){return merged('claw3',function(add){for(var k=-1;k<=1;k++){add(
 var CUR=null;
 function eyeGlow(par,cx,cy,cz,dx,er,red,n){
   var p=CUR;if(!p)return;
-  var col=PV==='necro'?pal('necro',0x7dff8c):PV==='beast'?pal('beast',0xcfeaff):red==='g'?0x7fe85a:pal('foe',0xff2d55),k,t;
+  var col=PF?pal('foe',0xff2d55):PV==='necro'?pal('necro',0x7dff8c):PV==='beast'?pal('beast',0xcfeaff):red==='g'?0x7fe85a:pal('foe',0xff2d55),k,t;
   p.glows.push(fxMesh(G.sphLo,glowM(col,.3),par,cx,cy,cz-er*.4,(n>1?dx:0)+er*2.2,er*2,er*1.5));
   for(k=-1;k<=1;k+=2){
     if(n===1&&k>0)break;
@@ -523,7 +526,7 @@ BUILD.beamer=function(b,m,p){
 ANIM.beamer=function(p,m,t,tt,st,look,u){
   var wind=st==='wind',beam=st==='beam',i,q,k;
   p.ball.rotation.y=wind||beam?0:look*.5;p.ball.rotation.x=beam?.22:wind?.12:.05*sin(tt*1.7);
-  var hot=beam||wind&&sin(t*38)>0,mat=u&&u.pv?(u.pv==='necro'?(hot?FX.irisNHot:FX.irisN):u.pv==='shade'?(hot?FX.irisSHot:FX.irisS):(hot?FX.irisBHot:FX.irisB)):hot?FX.irisHot:FX.iris;if(!u.spec&&p.iris.material!==FX.white&&p.iris.material!==u.ghost&&p.iris.material!==u.wane&&p.iris.material!==mat)p.iris.material=mat;
+  var hot=beam||wind&&sin(t*38)>0,mat=u&&u.pv&&!u.foe?(u.pv==='necro'?(hot?FX.irisNHot:FX.irisN):u.pv==='shade'?(hot?FX.irisSHot:FX.irisS):(hot?FX.irisBHot:FX.irisB)):hot?FX.irisHot:FX.iris;if(!u.spec&&p.iris.material!==FX.white&&p.iris.material!==u.ghost&&p.iris.material!==u.wane&&p.iris.material!==mat)p.iris.material=mat;
   k=beam?1.12+.06*sin(t*50):wind?.8+.25*(1-max(0,min(1,(m.t||0)/.95))):1+.05*sin(tt*3);p.iris.scale.set(.5*k,.5*k,.4);
   k=beam?.5:wind?1.3:1;p.pupil.scale.set(.22*k,.3*k,.18);
   for(i=0;i<p.nerves.length;i++){q=p.nerves[i];q.a.rotation.x=sin(tt*2.2+q.ph)*.3+(beam?.5:0);q.a.rotation.z=cos(tt*1.8+q.ph)*.25;q.b.rotation.x=sin(tt*3+q.ph)*.4}
@@ -647,7 +650,7 @@ var PM=null;
 function petMats(){
   if(PM)return PM;
   var add=function(c,o){return new T.MeshBasicMaterial({color:c,transparent:true,opacity:o,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false})};
-  PM={necro:add(0x4fe86a,.9),beast:add(0x8fc8ff,.9),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2)};
+  PM={necro:add(0x4fe86a,.9),beast:add(0x8fc8ff,.9),foe:add(0xff3a50,.9),quad:new T.PlaneGeometry(1,1).rotateX(-PI/2)};
   // shades share everything (nothing on one of them pulses alone): the ring under it and its smoke
   PM.shadeMark=new T.MeshBasicMaterial({map:petTex('shade'),transparent:true,opacity:.9,depthWrite:false,fog:false,toneMapped:false});
   PM.shadeSmoke=new T.MeshBasicMaterial({color:0x140a2c,transparent:true,opacity:.5,depthWrite:false});
@@ -663,6 +666,10 @@ function petDress(u,g,m,pv){
   var gm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:pv==='necro'?.8:.95,depthWrite:false,fog:false,toneMapped:false});
   own.push(gm);
   o=new T.Mesh(pm.quad,gm);o.position.y=1.2;o.renderOrder=2;g.add(o);u.gmark=o;u.gmat=gm;u.gk=pv==='necro'?(big?4.6:3.4):(big?4:3);u.gmin=big?34:22;
+  if(u.foe){ // an opponent's: no rune circle, no entry ring, no friendly lights; only the red motes of its arrival
+    o.visible=false;u.sring=new T.Group();u.sring.visible=false;g.add(u.sring);u.smat=gm;
+    u.motes=grp(g);u.motes.visible=false;for(i=0;i<(big?8:4);i++)fxMesh(G.sphLo,pm.foe,u.motes,0,0,0,1);
+    return}
   // entry: a ring racing outward and motes rising
   var sm=new T.MeshBasicMaterial({map:petTex(pv),transparent:true,opacity:0,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
   own.push(sm);o=new T.Mesh(pm.quad,sm);o.position.y=1.6;o.renderOrder=3;o.visible=false;g.add(o);u.sring=o;u.smat=sm;
@@ -686,7 +693,7 @@ function petDress(u,g,m,pv){
 function shadeDress(u,g,m){
   var pm=petMats(),i,o;
   for(i=0;i<u.meshes.length;i++)u.meshes[i].castShadow=false;
-  o=new T.Mesh(pm.quad,pm.shadeMark);o.position.y=1.1;o.renderOrder=2;o.userData.noOutline=true;g.add(o);u.gmark=o;
+  o=new T.Mesh(pm.quad,pm.shadeMark);o.position.y=1.1;o.renderOrder=2;o.userData.noOutline=true;g.add(o);u.gmark=o;if(u.foe)o.visible=false;
   u.puffs=grp(g);for(i=0;i<2;i++){o=fxMesh(G.sphLo,pm.shadeSmoke,u.puffs,0,0,0,1);o.userData.noOutline=true}
 }
 function shadeUpdate(g,m,u,t,dt,r){
@@ -713,13 +720,13 @@ function mk0(geo,mat,par,x,y,z,sx,sy,sz){var o=new T.Mesh(geo,mat);o.position.se
 
 function create(m,MB){
   geos();fx();fxm();
-  var s=m.s||{},ai=pickAi(m),spec=!!m.spectre,pv=spec?0:petKind(m,MB);
-  if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st,spectre:m.spectre};
+  var s=m.s||{},ai=pickAi(m),spec=!!m.spectre,pv=spec?0:petKind(m,MB),foe=!!(pv&&m.foe===true);
+  if(!m.s||typeof m.s.col!=='string')m={s:{col:'#888888',eyes:m.s&&m.s.eyes||2,legs:m.s&&m.s.legs,spikes:m.s&&m.s.spikes},ai:ai,r:m.r||20,seed:0,boss:m.boss,pet:m.pet,x:m.x,y:m.y,st:m.st,spectre:m.spectre,foe:m.foe,minion:m.minion};
   var g=new T.Group(),root=grp(g),body=grp(root),p={body:body,eyes:[],glows:[],trails:[]},cfg=CFG[ai],r=m.r||m.s.r||20;
-  REG=[];PV=pv;CUR=p;
-  try{BUILD[ai](body,m,p,root)}finally{PV=0;CUR=null}
+  REG=[];PV=pv;PF=foe?1:0;CUR=p;
+  try{BUILD[ai](body,m,p,root)}finally{PV=0;PF=0;CUR=null}
   var meshes=REG,mats=[],i,o;REG=null;
-  if(pv){ // the few glowing parts that are not tinted through M(): no hostile reds or ambers left on a pet
+  if(pv&&!foe){ // the few glowing parts that are not tinted through M(): no hostile reds or ambers left on a pet
     for(i=0;i<meshes.length;i++){o=meshes[i].material;
       if(pv==='shade')o=o===FX.eye||o===FX.eyeRed?FX.eyeS:o===FX.ember?FX.emberS:o===FX.ring?FX.ringS:o===FX.iris?FX.irisS:o===FX.crack?FX.crackS:o;
       else if(pv==='necro')o=o===FX.eye||o===FX.eyeRed?FX.eyeGreen:o===FX.ember?FX.emberN:o===FX.ring?FX.ringN:o===FX.iris?FX.irisN:o===FX.crack?FX.crackN:o;
@@ -730,7 +737,7 @@ function create(m,MB){
   root.scale.setScalar(r*(cfg.k||1));
   var u={ai:ai,root:root,body:body,p:p,cfg:cfg,meshes:meshes,mats:mats,mode:0,rot:0,init:false,sx:1,sy:1,sz:1,tilt:0,shake:0,slam:0,prev:m.st,aura:null,r:r,
     fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x||0,pz:m.y||0,mv:0,ma:0,auraCol:m.s.col,rageMats:null,
-    pv:pv,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0,rl:0,crown:null,lw:r<14?.7:m.boss&&!pv&&ai!=='mimic'?1.25:1};
+    pv:pv,foe:foe,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0,rl:0,crown:null,lw:r<14?.7:m.boss&&!pv&&ai!=='mimic'?1.25:1};
   u.fx.scale.setScalar(r);
   if(pv==='shade'){u.own=[];shadeDress(u,g,m)}
   else if(pv){u.own=[];petDress(u,g,m,pv)}
@@ -770,7 +777,7 @@ function petUpdate(g,m,u,t,dt,r){
   o=u.gmark;o.position.y=ground;o.rotation.y=pv==='necro'?-t*.35+seed:t*.5+seed;o.scale.set(k,1,k);
   u.gmat.opacity=(pv==='necro'?.74+.16*sin(t*2.6+seed):.9+.08*sin(t*3+seed))*fade;
   o=u.sring;
-  if(u.born<.9&&!u.fa){
+  if(u.born<.9&&!u.fa&&!u.foe){
     q=u.born/.9;o.visible=true;o.position.y=ground+.4;k=max(u.gmin,r*u.gk)*(.5+1.9*q);o.scale.set(k,1,k);o.rotation.y=t*2;u.smat.opacity=.95*(1-q)*(1-q);
   }else if(o.visible)o.visible=false;
   o=u.motes;
@@ -787,7 +794,7 @@ function fade(g,q){
   var i,k,r=u.r,necro=u.pv!=='beast';q=q<0?0:q>1?1:q;
   if(!u.ghost){
     if(u.puffs)u.puffs.visible=false;
-    u.ghost=u.wane||new T.MeshBasicMaterial({color:u.pv==='shade'?0x9a6cff:necro?0x4be070:0xbfe2ff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
+    u.ghost=u.wane||new T.MeshBasicMaterial({color:u.foe?0xff4a5c:u.pv==='shade'?0x9a6cff:necro?0x4be070:0xbfe2ff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
     if(!u.own)u.own=[];if(u.ghost!==u.wane)u.own.push(u.ghost);
     for(i=0;i<u.meshes.length;i++){u.meshes[i].material=u.ghost;u.meshes[i].castShadow=false;k=u.meshes[i].userData.mbLineMesh;if(k)k.visible=false}
     if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=false;if(u.crown)u.crown.visible=false;
@@ -976,9 +983,10 @@ function troCreate(a,MB){
   var R=tro();a=a||{};
   var g=new T.Group(),kind=a.kind==='guardian'?'guardian':a.kind==='familiar'?'familiar':'wisp',s=a.s&&typeof a.s==='object'?a.s:null,own=[],i,o;
   var pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),holy=pal('holy',0xffd66e);
-  var col=hexOf(s&&s.col,pw2),u={tro:kind,own:own,spec:null,col:col,col2:_c.setHex(col).lerp(_c2.set(0xffffff),.6).getHex(),ct:9,was:'idle',sh:0,shOn:false,rot:0,t0:undefined,r:0,seed:typeof a.seed==='number'?a.seed:0};
+  var foe=a.foe===true;if(foe){pw=pal('foe',0xff2d55);pw2=pal('foe2',0xffb0a0);holy=0xff6a3a} // versus, an opponent's: the same body lit in the foe palette
+  var col=hexOf(s&&s.col,pw2),u={foe:foe,tro:kind,own:own,spec:null,col:col,col2:_c.setHex(col).lerp(_c2.set(0xffffff),.6).getHex(),ct:9,was:'idle',sh:0,shOn:false,rot:0,t0:undefined,r:0,seed:typeof a.seed==='number'?a.seed:0};
   var gm=new T.MeshBasicMaterial({map:R.mark,color:kind==='guardian'?holy:pw,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
-  own.push(gm);o=new T.Mesh(R.quad,gm);o.position.y=1.15;o.renderOrder=2;o.userData.noOutline=true;g.add(o);u.gmark=o;u.gmat=gm;
+  own.push(gm);o=new T.Mesh(R.quad,gm);o.position.y=1.15;o.renderOrder=2;o.userData.noOutline=true;g.add(o);u.gmark=o;u.gmat=gm;if(foe)o.visible=false;
   if(kind==='guardian'){
     var r=max(15,min(40,a.r||s&&s.r||20));u.r=r;
     if(s&&typeof s.col==='string'){try{u.spec=spectre(a,MB,r)}catch(e){u.spec=null}}
@@ -986,7 +994,7 @@ function troCreate(a,MB){
     else{u.top=r*2.6;u.body=grp(g,0,0,0);fxMesh(G.robe,glowM(holy,.4),u.body,0,0,0,r*.8,r*1.5,r*.8);fxMesh(G.sph,glowM(0xfff4dc,.55),u.body,0,r*2.1,0,r*.42)}
     // halo over the head, and the shell of light it lends while the ward is ready
     u.halo=grp(g,0,u.top+r*.3,0);fxMesh(G.torus,glowM(0xfff4dc,.95),u.halo,0,0,0,r*.5,r*.5,r*.5);fxMesh(R.thin,glowM(holy,.8),u.halo,0,0,0,r*.72,r*.72,r*.72);
-    var shm=specMat();own.push(shm);shm.uniforms.uC.value.setHex(holy);shm.uniforms.uC2.value.setHex(0xfffbf0);shm.uniforms.uB.value=.03;shm.side=T.DoubleSide;
+    var shm=specMat();own.push(shm);shm.uniforms.uC.value.setHex(holy);shm.uniforms.uC2.value.setHex(foe?0xffe0d0:0xfffbf0);shm.uniforms.uB.value=.03;shm.side=T.DoubleSide;
     u.shell=fxMesh(R.shell,shm,g,0,u.top*.5,0,r*1.5,u.top*.62,r*1.5);u.shell.renderOrder=5;u.shell.visible=false;u.shm=shm;
     u.motes=grp(g);for(i=0;i<4;i++)fxMesh(G.sphLo,glowM(holy,.8),u.motes,0,0,0,1);
   }else{
@@ -1020,7 +1028,7 @@ function troUpdate(g,a,MB,dt){
     k=r*3.5*(.9+.1*grow)*(1+.12*flare);o.scale.set(k,1,k);o.rotation.y=t*.4+seed;u.gmat.opacity=(.62+.1*sin(t*2.2+seed)+.3*flare)*grow;
     if(u.spec){
       var lift=specPose(u.spec,a.x||0,a.y||0,face,cq,MB,dt);
-      specTint(u.spec,0xffd66e,0xfffbf0,(.92+.08*sin(t*2.6+seed)+.5*flare)*grow,.24,t+seed);
+      specTint(u.spec,u.foe?0xff5a3a:0xffd66e,u.foe?0xffe0d0:0xfffbf0,(.92+.08*sin(t*2.6+seed)+.5*flare)*grow,.24,t+seed);
       u.spec.position.y=lift*r*.8+r*.06*(1+sin(t*1.7+seed));
     }else if(u.body){u.body.position.y=2+sin(t*1.7+seed)*2;u.body.rotation.y=PI/2-face}
     u.halo.rotation.y=t*.9;u.halo.position.y=u.top+r*.34+sin(t*2.1+seed)*r*.05;k=grow*(1+.25*flare);u.halo.scale.set(k,k,k);
@@ -1046,7 +1054,7 @@ function troUpdate(g,a,MB,dt){
   u.hm.opacity=min(1,.34+.3*q+.06*sin(t*5+seed)+.5*flare);k=38+10*q+30*flare;u.haloS.scale.set(k,k,1);
   if(u.spec){
     specPose(u.spec,a.x||0,a.y||0,face,cq,MB,dt);u.spec.position.set(0,-u.mh,0);
-    specTint(u.spec,u.col,u.col2,1.5+.9*flare,.5,t+seed);
+    if(u.foe)specTint(u.spec,0xff2d55,0xffb0a0,1.5+.9*flare,.5,t+seed);else specTint(u.spec,u.col,u.col2,1.5+.9*flare,.5,t+seed);
   }
 }
 function easeO(q){q=1-q;return 1-q*q*q}

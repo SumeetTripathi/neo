@@ -393,7 +393,7 @@ function blade(b,slot,m,x,z,phi,len,wid,th){const c=Math.cos(phi),sn=Math.sin(ph
   b.put(slot,m,gCone(4),x+c*len/2,0,z-sn*len/2,0,phi,-HP,th,len,wid);b.put(slot,m,gCone(4),x-c*len*.11,0,z+sn*len*.11,0,phi+PI,-HP,th,len*.22,wid)}
 // ----- the apex tier: what a hero past floor 100 wears over everything else -----
 function buildApex(b,s,ud,c,apex,tier){
-  const pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),W=ud.apexMat;
+  const pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),W=ud.apexMat,gp=ud.foe?pal('foe',0xff2d55):pw,gp2=ud.foe?pal('foe2',0xffb0a0):pw2; // gp, gp2: what lies on the floor
   if(apex==='dominion'){
     // the crown: a dark band that hovers over the head, ringed with upturned finger-bones of uneven height, one violet splinter turning above it
     const Bd=mat(0x241d33),Bn=mat(C.bone),V=lit(pw,1.7,0xc9a8ff),cy=c==='mage'?12.4:c==='tank'?12:c==='healer'?11.6:11,cr=c==='mage'?5.3:6;
@@ -419,9 +419,9 @@ function buildApex(b,s,ud,c,apex,tier){
     const D=decal(0x05030c,.56),D2=decal(0x05030c,.34);
     b.put('dom',D,gRing(.01,32,0,TAU),0,.52,0,-HP,0,0,40,40,1);b.put('dom',D2,gRing(.01,32,0,TAU),0,.5,0,-HP,0,0,53,53,1);
     for(let i=0;i<13;i++){const a=i*TAU/13+(i%3)*.11,L=58+(i*37%23);b.put('dom',D,gRing(.01,3,-.09,.18),0,.54,0,-HP,0,a,L,L,1)}
-    b.put('dom',glow(pw,.5),gRing(.955,40,0,TAU),0,.6,0,-HP,0,0,41,41,1);
-    for(let i=0;i<3;i++)b.put('dom',glow(pw,.3),gRing(.93,12,i*TAU/3,1.35),0,.62,0,-HP,0,0,29,29,1);
-    for(let i=0;i<5;i++){const a=i*TAU/5+.3;b.put('dom',glow(pw,.34),gRing(.6,2,-.022,.044),0,.64,0,-HP,0,a,58,58,1)}
+    b.put('dom',glow(gp,.5),gRing(.955,40,0,TAU),0,.6,0,-HP,0,0,41,41,1);
+    for(let i=0;i<3;i++)b.put('dom',glow(gp,.3),gRing(.93,12,i*TAU/3,1.35),0,.62,0,-HP,0,0,29,29,1);
+    for(let i=0;i<5;i++){const a=i*TAU/5+.3;b.put('dom',glow(gp,.34),gRing(.6,2,-.022,.044),0,.64,0,-HP,0,a,58,58,1)}
     b.put('domW',W,gRing(.9,40,0,TAU),0,.66,0,-HP,0,0,1,1,1);
   }else{
     // the halo: a great ring of light broken in three, standing behind the shoulders, a thin gold circle inside it
@@ -442,9 +442,9 @@ function buildApex(b,s,ud,c,apex,tier){
     // a brow-mark of light and bright cuffs
     b.fine=true;b.co('head',L,0,c==='tank'?10.6:9.6,c==='mage'?5.2:3.6,.9,2.6,0,0,0,4);for(const f of['foreL','foreR'])b.to(f,L,0,-7.2,0,2.5,.36);b.fine=false;
     // the aura: a disc of radius 1 that update() scales to P.auraR; rim, faint fill, inward teeth, a broken gold ring turning inside, and a pulse
-    b.put('oaura',glow(pw2,.6),gRing(.972,56,0,TAU),0,.7,0,-HP,0,0,1,1,1);b.put('oaura',glow(pw2,.07),gRing(.01,40,0,TAU),0,.62,0,-HP,0,0,1,1,1);
-    for(let i=0;i<12;i++)b.put('oaura',glow(pw2,.5),gRing(.86,2,i*TAU/12-.02,.04),0,.72,0,-HP,0,0,1,1,1);
-    for(let i=0;i<4;i++)b.put('oaura2',glow(C.gold,.42),gRing(.955,14,i*HP+.2,1.05),0,.74,0,-HP,0,0,.72,.72,1);
+    b.put('oaura',glow(gp2,.6),gRing(.972,56,0,TAU),0,.7,0,-HP,0,0,1,1,1);b.put('oaura',glow(ud.foe?gp:pw2,.07),gRing(.01,40,0,TAU),0,.62,0,-HP,0,0,1,1,1);
+    for(let i=0;i<12;i++)b.put('oaura',glow(gp2,.5),gRing(.86,2,i*TAU/12-.02,.04),0,.72,0,-HP,0,0,1,1,1);
+    for(let i=0;i<4;i++)b.put('oaura2',glow(ud.foe?0xff7a30:C.gold,.42),gRing(.955,14,i*HP+.2,1.05),0,.74,0,-HP,0,0,.72,.72,1);
     b.put('oauraW',W,gRing(.93,48,0,TAU),0,.76,0,-HP,0,0,1,1,1);
   }
 }
@@ -488,9 +488,11 @@ function rebuildPlayer(g,MB){
   s.hips.position.set(0,HIP,0);s.legL.position.set(2.9,0,0);s.legR.position.set(-2.9,0,0);s.shinL.position.set(0,-UL,0);s.shinR.position.set(0,-UL,0);
   s.foreL.position.set(0,-UA,0);s.foreR.position.set(0,-UA,0);s.handL.position.set(0,-FA,0);s.handR.position.set(0,-FA,0);
   ud.cls=c;ud.adv=adv;ud.apex=apex;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.bowH=13;
-  const b=new Builder(s),pw=pal('power',0x8b4dff),pw2=pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone;
+  // versus: an opponent's marks on the floor (upgrade aura, skill-ready ring, the apex ground and aura) are laid in the foe palette; the body is untouched
+  const foe=MB.foe===true;ud.foe=foe;
+  const b=new Builder(s),pw=foe?pal('foe',0xff2d55):pal('power',0x8b4dff),pw2=foe?pal('foe2',0xffb0a0):pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone;
   if(skin)buildHuman(b,s,ud,st,c,adv,tier,apex);else buildSkeleton(b,s,!!(st&1));
-  if(apex){const W=ud.apexMat||(ud.apexMat=slashMat());W.color.setHex(apex==='dominion'?pal('power',0x8b4dff):pal('power2',0xc4f4ff));buildApex(b,s,ud,c,apex,tier)}
+  if(apex){const W=ud.apexMat||(ud.apexMat=slashMat());W.color.setHex(foe?pal('foe',0xff2d55):apex==='dominion'?pal('power',0x8b4dff):pal('power2',0xc4f4ff));buildApex(b,s,ud,c,apex,tier)}
   buildWeapon(b,s,ud,skin,c,adv,tier);
   // ground effects: upgrade aura, skill-ready ring, melee slash arc
   if(adv){b.put('aura',glow(pw,.42),gRing(.9,8,0,TAU),0,.7,0,-HP,0,0,24,24,1);b.put('aura',glow(pw2,.4),gRing(.95,28,0,TAU),0,.7,0,-HP,0,0,28.5,28.5,1);b.put('aura',glow(pw,.1),gRing(.01,20,0,TAU),0,.6,0,-HP,0,0,21.6,21.6,1)}
@@ -525,7 +527,7 @@ const player={
   },
   update(g,P,MB,dt){
     const ud=g.userData,s=ud.s,S=MB.S,t=S.t||0;dt=dt||0;
-    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+tierOf(S)+'|'+(apexOf(MB)||'');
+    const key=stageOf(MB)+'|'+(MB.cls()||'')+'|'+(S.adv||'')+'|'+(MB.pw(1)?1:0)+'|'+tierOf(S)+'|'+(apexOf(MB)||'')+(MB.foe===true?'|foe':'');
     if(key!==ud.key){ud.key=key;rebuildPlayer(g,MB)}
     const c=ud.cls,wt=ud.wtype,atk=P.atk>0,mel=wt!=='staff'&&wt!=='bow';
     // facing (and how fast it is turning, for the cloth)

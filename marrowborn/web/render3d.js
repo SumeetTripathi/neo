@@ -2061,43 +2061,48 @@ function trialOverlay(sight){
    None of this exists until a versus session is seen, and none of it runs in single-player or co-op. ---------- */
 const TEAM_HEX=[0x2f9dff,0xffb21e];
 const VS={on:false,v:null,teams:false,my:-1,mine:-1,phase:'',prev:'',pt:0,clock:0,ringOn:false,rx:W/2,ry:H/2,rr:0,out:0,
-  resOn:false,resBig:'',resSub:'',resTop:'',resCss:'#ffffff',resMine:0,cdN:-1};
+  resOn:false,resBig:'',resSub:'',resTop:'',resCss:'#ffffff',resMine:0,resW:undefined};
 const SPEC={on:false,id:null,rm:null,x:W/2,y:H/2,name:'',css:'#ffffff',n:0};
 const specList=[],vsRounds=new Map();
 function vsOf(){const v=R.testVs||(MB.mp&&MB.mp.vs);return v&&typeof v==='object'?v:null}
-function teamHex(t){const mp=MB.mp,v=VS.v,l=(v&&v.teamColors)||(mp&&mp.teamColors),c=l&&l[t];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);return TEAM_HEX[t===1?1:0]}
-// a fighter's colour: the team's in a team match, the member's own otherwise
-function vsHex(idx,team){return VS.on&&VS.teams&&(team===0||team===1)?teamHex(team):memberHex(idx)}
-function vsKey(e){return VS.teams?num(e.team,-1):e.id}
-// who took the round (or the match): the session's own word when it gives one (vs.winner: a team number, a member id, or null / -1 / 'draw'),
+// colours: the session's own list per member index when it gives one (vs.colors, which its scoreboards and the page's HUD use too); else the two
+// team colours here (or vs.teamColors / MB.mp.teamColors) in a team match and the member colour otherwise
+function vsListed(i){const v=VS.v,c=v&&v.colors&&v.colors[i];return typeof c==='string'&&HEX_RE.test(c)?echoHex(c):-1}
+function teamHex(t){const mp=MB.mp,v=VS.v,l=(v&&v.teamColors)||(mp&&mp.teamColors),c=l&&l[t];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);
+  const sc=v&&Array.isArray(v.score)?v.score:NONE;for(let i=0;i<sc.length;i++){const e=sc[i];if(e&&e.team===t){const h=vsListed(num(e.idx,i));if(h>=0)return h;break}}
+  return TEAM_HEX[t===1?1:0]}
+function vsHex(idx,team){if(!VS.on)return memberHex(idx);const h=vsListed(idx);return h>=0?h:VS.teams&&(team===0||team===1)?teamHex(team):memberHex(idx)}
+// a side: the team number (in a free-for-all every fighter is a side of one: its member index)
+function vsKey(e,i){return num(e.team,num(e.idx,i))}
+// who took the round (or the match): the session's own word when it gives one (vs.winner: a side, -1 / null for nobody; a member id is understood too),
 // else whoever's count of rounds went up, else whoever is still standing
 function vsResult(v,ph){
-  const sc=Array.isArray(v.score)?v.score:NONE,teams=VS.teams,mp=MB.mp,myId=v.myId!==undefined?v.myId:mp?mp.myId:undefined;
-  let wk,known=false;
-  if('winner' in v&&v.winner!==undefined){const w=v.winner;known=true;wk=w===null||w===-1||w==='draw'?null:typeof w==='object'?vsKey(w):w}
-  if(!known&&ph==='results'){let best=-1,tie=false;const tot=new Map();
-    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e),n=teams?Math.max(tot.get(k)||0,num(e.rounds,0)):num(e.rounds,0);tot.set(k,n)}
-    for(const[k,n]of tot){if(n>best){best=n;wk=k;tie=false}else if(n===best)tie=true}
+  const sc=Array.isArray(v.score)?v.score:NONE,teams=VS.teams,mp=MB.mp,myId=v.myId!==undefined?v.myId:mp?mp.myId:undefined,myIdx=num(v.myIdx,mp?num(mp.myIdx,-1):-1);
+  let wk=null,known=false;
+  VS.resW=v.winner;
+  if(v.winner!==undefined&&v.winner!==null){const w=v.winner;known=true;
+    if(typeof w==='number')wk=w<0?null:w;else if(w==='draw')wk=null;else{wk=null;for(let i=0;i<sc.length;i++)if(sc[i]&&sc[i].id===w){wk=vsKey(sc[i],i);break}}}
+  if(!known&&ph==='results'){let best=-1,tie=false;
+    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e,i),n=num(e.rounds,0);if(n>best){best=n;wk=k;tie=false}else if(n===best&&k!==wk)tie=true}
     known=true;if(tie||best<0)wk=null}
   if(!known){let n=0,k0;
-    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e),was=vsRounds.get(e.id);if(was!==undefined&&num(e.rounds,0)>was&&k!==k0){k0=k;n++}}
-    if(n===1){wk=k0;known=true}
-    else{n=0;k0=undefined;for(let i=0;i<sc.length;i++){const e=sc[i];if(!e||e.down)continue;const k=vsKey(e);if(k!==k0){k0=k;n++}}
-      wk=n===1?k0:null;known=true}}
+    for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;const k=vsKey(e,i),was=vsRounds.get(e.id);if(was!==undefined&&num(e.rounds,0)>was&&k!==k0){k0=k;n++}}
+    if(n===1)wk=k0;
+    else{n=0;k0=undefined;for(let i=0;i<sc.length;i++){const e=sc[i];if(!e||e.down||e.left)continue;const k=vsKey(e,i);if(k!==k0){k0=k;n++}}
+      wk=n===1?k0:null}}
   const match=ph==='results';let mine=0,who='',hex=0xf2ecff,tally='';
-  if(wk===null||wk===undefined){VS.resBig='DRAW';VS.resCss=CSS.bone;VS.resMine=0}
-  else if(teams){mine=VS.my<0?0:wk===VS.my?1:-1;who=mine>0?'YOUR TEAM':mine<0?'ENEMY TEAM':'TEAM '+((wk|0)+1);hex=teamHex(wk|0);
+  if(wk===null||wk===undefined){VS.resBig=match?'NO WINNER':'DRAW';VS.resCss=CSS.bone;VS.resMine=0}
+  else if(teams){mine=VS.my<0?0:wk===VS.my?1:-1;who=mine>0?'YOUR TEAM':mine<0?'ENEMY TEAM':'TEAM '+(wk?'B':'A');hex=teamHex(wk|0);
     let a=0,b=0;for(let i=0;i<sc.length;i++){const e=sc[i];if(!e)continue;if(e.team===0)a=Math.max(a,num(e.rounds,0));else if(e.team===1)b=Math.max(b,num(e.rounds,0))}
     tally=VS.my===1?b+' – '+a:a+' – '+b}
-  else{let e=null,at=0;for(let i=0;i<sc.length;i++)if(sc[i]&&sc[i].id===wk){e=sc[i];at=i;break}
-    const me=!!e&&(e.me===true||(myId!==undefined&&e.id===myId));mine=me?1:VS.mine>=0?-1:0;
-    who=me?'YOU':cleanName(e?e.name:wk,at).toUpperCase();
-    const rm=remById.get(wk);hex=me&&VS.mine>=0?VS.mine:rm?rm.hex:memberHex(e&&typeof e.idx==='number'?e.idx:at);
+  else{let e=null,at=0;for(let i=0;i<sc.length;i++)if(sc[i]&&vsKey(sc[i],i)===wk){e=sc[i];at=i;break}
+    const ix=e?num(e.idx,at):wk|0,me=!!e&&(e.me===true||(myId!==undefined&&e.id===myId)||(myIdx>=0&&ix===myIdx));mine=me?1:VS.mine>=0?-1:0;
+    who=me?'YOU':cleanName(e?e.name:'',ix).toUpperCase();hex=vsHex(ix,wk);
     if(e)tally=num(e.rounds,0)+' / '+Math.max(1,num(v.wins,1))}
   if(who){VS.resCss=cssOf(hex);VS.resMine=mine;
-    VS.resBig=match?(mine>0?'VICTORY':mine<0?'DEFEAT':who+(who==='YOU'?' WIN':' WINS')):who+(who==='YOU'?' WIN':' WINS')}
+    VS.resBig=match?(mine>0?'VICTORY':mine<0?'DEFEAT':who+' WINS'):who+(who==='YOU'?' WIN':' WINS')}
   VS.resTop=match?'MATCH OVER':'ROUND '+Math.max(1,num(v.round,1)|0);
-  VS.resSub=match?(who?(mine?who+(who==='YOU'?' TAKE':' TAKES')+' THE MATCH':'TAKES THE MATCH'):'NOBODY TAKES THE MATCH')+(tally?'   '+tally:''):(tally?(teams?'ROUNDS  '+tally:'ROUNDS  '+tally):'');
+  VS.resSub=match?(who?who+(who==='YOU'?' TAKE':' TAKES')+' THE MATCH':'NOBODY TAKES THE MATCH')+(tally?'     '+tally:''):(tally?'ROUNDS   '+tally:'');
   VS.resOn=true;
 }
 function specAlive(rm){return rm.vis&&!rm.dead&&rm.sm.init}
@@ -2135,9 +2140,9 @@ function vsFrame(dt){
   if(!v){if(VS.on){VS.on=false;VS.v=null;VS.phase=VS.prev='';VS.ringOn=false;VS.resOn=false;VS.out=0;SPEC.on=false;SPEC.id=null;SPEC.rm=null;vsRounds.clear()}return}
   const mp=MB.mp,P=MB.P;
   VS.on=true;VS.v=v;VS.teams=v.format==='teams';VS.my=num(v.myTeam,-1);VS.clock+=dt;
-  VS.mine=VS.teams?(VS.my===0||VS.my===1?teamHex(VS.my):-1):mp&&typeof mp.myIdx==='number'?memberHex(mp.myIdx):num(v.myIdx,null)!==null?memberHex(v.myIdx):-1;
+  {const ix=num(v.myIdx,mp?num(mp.myIdx,-1):-1);VS.mine=ix>=0?vsHex(ix,VS.my):VS.teams&&(VS.my===0||VS.my===1)?teamHex(VS.my):-1}
   const ph=typeof v.phase==='string'?v.phase:'';
-  if(ph!==VS.phase){VS.prev=VS.phase;VS.phase=ph;VS.pt=0;VS.resOn=false;if(ph==='over'||ph==='results')vsResult(v,ph)}else VS.pt+=dt;
+  if(ph!==VS.phase){VS.prev=VS.phase;VS.phase=ph;VS.pt=0;VS.resOn=false;if(ph==='over'||ph==='results')vsResult(v,ph)}else{VS.pt+=dt;if(VS.resOn&&v.winner!==VS.resW)vsResult(v,ph)}
   if(ph!=='over'&&ph!=='results'){const sc=Array.isArray(v.score)?v.score:NONE;for(let i=0;i<sc.length&&i<16;i++){const e=sc[i];if(e)vsRounds.set(e.id,num(e.rounds,0))}}
   // the closing ring
   const rg=v.ring&&typeof v.ring==='object'&&num(v.ring.x,null)!==null&&num(v.ring.y,null)!==null&&num(v.ring.r,-1)>=0?v.ring:null;
