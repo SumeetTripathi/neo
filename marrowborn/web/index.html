@@ -37,8 +37,9 @@
   --body:"Barlow","Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
   --mb-btn:1;
   /* the interface scale. --ua follows the window (1 on phones, tablets and small laptops, growing with the shorter side: about 1.2 at 1080p, 1.6 at 1440p, 2.4 at 4K);
-     --mb-ui is the player's own setting (MB.settings.ui, set on the root by tower.js). Every length in this sheet is a multiple of --u, and 1rem = 16 of them. */
-  --ua:clamp(1px,calc(100vmin/900),3px); --u:calc(var(--ua)*var(--mb-ui,1));
+     --mb-ui is the player's own setting (MB.settings.ui, set on the root by extras.js and tower.js), held to what a small phone can fit (about 1.16 at 360 px).
+     Every length in this sheet is a multiple of --u, and 1rem = 16 of them. */
+  --ua:clamp(1px,calc(100vmin/900),3px); --u:min(calc(var(--ua)*var(--mb-ui,1)),calc(100vmin/310));
 }
 *{scrollbar-width:thin;scrollbar-color:var(--line) transparent}
 html{background:#000;-webkit-text-size-adjust:100%;text-size-adjust:100%;touch-action:manipulation;height:100%;font-size:calc(var(--u)*16)}
@@ -278,13 +279,13 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
   .wrap{--hud0:calc(var(--u)*96)}
   header,.ledger{display:flex}
   #ov{padding-top:calc(var(--u)*50)}
-  .vitals>div:first-child{flex:0 1 auto;max-width:30vw}
+  .vitals>div:first-child{flex:0 1 auto;max-width:29vw}
   .vitals>div:last-child{position:fixed;top:calc(var(--st) + calc(var(--u)*32));left:0;right:0;margin-inline:auto;width:fit-content;max-width:36vw;flex-wrap:nowrap;justify-content:center}
   #bossName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
   /* a screen with many cards (the classes) may use the width; its text keeps a readable measure */
-  .panel.wide:has(.cards>:nth-child(5)):not(:has(.cards.list)){max-width:min(calc(var(--u)*1120),calc(100vw - calc(var(--u)*32)))}.panel.wide>p{max-width:78ch}
+  .panel.wide:has(.cards>:nth-child(5)):not(:has(.cards.list)){max-width:min(calc(var(--u)*1120),calc(100vw - calc(var(--u)*32)))}.panel.wide:has(.cards>:nth-child(5)):not(:has(.cards.list)) .cards{grid-template-columns:repeat(4,minmax(0,1fr))}.panel.wide>p{max-width:78ch}
 }
-@media (min-width:1280px) and (min-height:560px){h1{display:flex}header{max-width:46vw}}
+@media (min-width:1280px) and (min-height:560px){h1{display:flex}header{max-width:38vw}}
 /* small screens (phones either way up, small windows): a denser HUD */
 @media (max-height:600px),(max-width:600px){
   .lab{font-size:.78rem}

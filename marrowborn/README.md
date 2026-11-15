@@ -1,4 +1,4 @@
-# Marrowborn
+# Ashes to Apex
 
 A top-down arena game. You start as a bare skeleton in a crypt. Each level is one
 fight against one monster, and each win gives part of a body back: organs, then skin,
@@ -8,12 +8,20 @@ without touch your health is hidden.
 
 This folder is self-contained and is not part of the url-shortening Maven build.
 
-| Levels | What happens |
+The game is one climb up a tower, the Marrowspire. (The folder, file and storage names
+still say "marrowborn", the game's working title, so existing installs and saves keep working.)
+
+| Floors | What happens |
 |---|---|
-| 1 to 8 | One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. Level 8 is The Hollow. |
-| 9 to 12 | You choose a class and get its basic equipment and first two skills. Level 10 is the first boss, The Flayed King. |
-| 13 onward | Generated levels across five areas. Ordinary levels are short, sharp fights against a monster with modest health that hits hard, in rooms with pillars, pits and traps, sometimes after a wave. Every tenth level is a boss: a three-phase tyrant with high health and power. Each clear gives an equipment drop and a boon. |
-| After 50 | You choose one of two upgrades for your class. The levels continue without end. |
+| 1 to 8 | The Root. One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. |
+| 9 to 12 | You choose a class and get its basic equipment and first two skills. Floor 10 is the first guardian, The Flayed King. |
+| 13 onward | Generated floors in named bands. Most are short, sharp fights against a monster with modest health that hits hard. About three in ten are trials: survive for a time, guard a lamp, beat a clock, fight under a handicap, or choose a door at a crossroads. Every tenth floor is a guardian with high health and power. Each clear gives an equipment drop and a boon. |
+| After 50 | You choose one of two upgrades for your class. |
+| After 100 | You choose one of two apex paths: the Tithe (the dead you make fight for you) or the White Marrow (overwhelming personal power). The climb has no end. |
+
+Clearing every tenth floor unlocks the next floor as a checkpoint, from which a new
+climb can start with a ready-made hero. The tower map ("The climb") shows bands,
+checkpoints and the floors ahead.
 
 The title screen also offers "Skip to class selection", which starts at level 9.
 
@@ -46,6 +54,10 @@ and a fallen pet revives by spending mana. The other classes take a trophy that 
 attack: a technique (Fighter), ward (Tank), venom (Assassin), familiar (Mage),
 arrowhead (Ranger before the upgrade) or guardian (Healer).
 
+The game fills the window at any size and shape, from a phone to an ultrawide or 4K
+monitor, and renders at the display's native resolution. Graphics quality has three
+tiers (Low, High, Ultra) with a resolution scale and an interface scale.
+
 Rendering is cel-shaded 3D (three.js, bundled in `web/vendor/`) with an automatic fallback to the
 original 2D canvas renderer when WebGL is unavailable. Settings cover music and effects
 volume, haptic strength, button size, a left-handed layout and a low-graphics mode.
@@ -65,7 +77,7 @@ Single-player works everywhere, and also straight from `web/index.html` without 
 ### On a computer (Windows, macOS, Linux)
 
 Keep `marrowborn-server.jar` and the launcher for your system in the same folder, then double-click the launcher:
-`Marrowborn.bat` on Windows, `Marrowborn.command` on macOS (the first time: right-click, Open), `marrowborn.sh` on Linux.
+`AshesToApex.bat` on Windows, `AshesToApex.command` on macOS (the first time: right-click, Open), `ashes-to-apex.sh` on Linux.
 Double-clicking the jar itself also works where Java is set up for that. Or from a terminal:
 
     java -jar marrowborn-server.jar [port] [--web DIR] [--no-browser] [--no-window]
@@ -132,7 +144,7 @@ several devices.
 - `android/` is a thin WebView wrapper that packages `web/` as an app and can run the relay for hosting.
 - `ios/` is an Xcode project for a WKWebView wrapper, source only and never built; see `ios/README.md`.
 - `dist/` holds the builds: `Marrowborn.apk` is the current single-player release (3.3) and `Marrowborn-3.4-mp1.apk`
-  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.3.apk` is the previous release and
+  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.4.apk` is the previous release and
   `Marrowborn-2.0.apk` the last 2D-only build; `marrowborn-server.jar` with its three launchers is the desktop server.
 
 ## Play in a browser

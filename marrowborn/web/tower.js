@@ -345,7 +345,8 @@ addButton();
 
 /* ---------- between floors: a glimpse of the way up, at the foot of the arena as the floor begins. It blocks nothing and goes by itself. ---------- */
 var peek=null,peekT=0,peekAt=0,peekFloor=-1,peekWhen=0;
-function hidePeek(){clearTimeout(peekT);peekT=0;if(peek)peek.classList.remove('on')}
+var peekWait=0;
+function hidePeek(){clearTimeout(peekT);clearInterval(peekWait);peekT=0;if(peek)peek.classList.remove('on')}
 function showPeek(d){
   var t=T();if(!t)return;
   var floor=Math.round(num(d&&d.floor,num(t.floor,0)));if(floor<1)return;
@@ -356,10 +357,13 @@ function showPeek(d){
   peek.textContent='';peek.setAttribute('style','--bh:'+c[0]+';--bf:'+c[1]);
   peek.appendChild(h('span',{class:'mbt-pk now k-'+(KIND[kind]?kind:'fight')},icon(kind),h('b',{text:'Floor '+floor}),h('small',{text:kindOf(kind).name+(bandName(b)?' · '+bandName(b):'')})));
   if(nx.length){var up=h('span',{class:'mbt-pkup'});nx.forEach(function(a){up.appendChild(h('span',{class:'mbt-pk k-'+(KIND[a.kind]?a.kind:'fight')},icon(a.kind),h('b',{text:String(a.floor)})))});peek.appendChild(up)}
-  void peek.offsetWidth;peek.classList.add('on');peekAt=now;
-  clearTimeout(peekT);peekT=setTimeout(hidePeek,calm()?2600:3400);
+  // a screen may still be up (a story interlude, a co-op wait): the few seconds start when the arena is in view
+  clearTimeout(peekT);clearInterval(peekWait);var tries=0;
+  var go=function(){void peek.offsetWidth;peek.classList.add('on');peekAt=Date.now();clearTimeout(peekT);peekT=setTimeout(hidePeek,calm()?2600:3400)};
+  if(!screenUp())go();else peekWait=setInterval(function(){if(++tries>100||S().mode==='title'){clearInterval(peekWait);return}if(!screenUp()&&S().mode==='play'){clearInterval(peekWait);go()}},200);
 }
-function skipPeek(){if(peek&&peekT&&Date.now()-peekAt>900)hidePeek()}
+function screenUp(){var ids=['ov','mbx','mbn','mbt'],i,e;for(i=0;i<ids.length;i++){e=$(ids[i]);if(e&&!e.hidden)return true}return false}
+function skipPeek(){if(peek&&peekT&&peek.classList.contains('on')&&Date.now()-peekAt>900)hidePeek()}
 if(typeof MB.on==='function'){
   MB.on('floor',function(d){try{showPeek(d)}catch(e){}});
   MB.on('levelstart',function(d){try{if(T())showPeek({floor:num(d&&d.level,-1)+1,kind:d&&d.L&&d.L.floorKind})}catch(e){}});
@@ -372,7 +376,7 @@ win.addEventListener('pointerdown',skipPeek,true);
 var lastTitle='',hud=null,H={},last={},stateT=0,endState='',endKind='',sawTrial=false;
 var TLAB={survive:'Hold out',guard:'Protect',race:'Race',ordeal:'Ordeal',cross:'Crossroads'};
 var HCAP={nomana:'No mana returns',dark:'The dark is back',alone:'No pets or familiars',halfheal:'Healing halved',swift:'Swift monsters'};
-function clock(s){s=Math.max(0,s);if(s<10)return s.toFixed(1);s=Math.ceil(s);var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r}
+function clock(s){s=Math.max(0,s);if(s<=0)return '0:00';if(s<10)return s.toFixed(1);s=Math.ceil(s);var m=Math.floor(s/60),r=s%60;return m+':'+(r<10?'0':'')+r}
 function meter(cls,label){
   var fill=h('i'),val=h('b'),lab=h('span',{class:'lab',text:label}),e=h('span',{class:'th-m '+cls,hidden:true},lab,h('span',{class:'th-bar'},fill),val);
   return {el:e,fill:fill,val:val,lab:lab};
