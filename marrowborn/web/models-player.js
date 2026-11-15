@@ -119,7 +119,7 @@ const WISPS=8;
 
 function stageOf(MB){let n=0;for(let i=0;i<PARTS.length;i++)if(MB.has(PARTS[i]))n|=1<<i;return n}
 // rank as a number: '' 0, E 1 ... A 5, S 6, S+ 7
-function tierOf(S){const r=S&&typeof S.rank==='string'?S.rank:'';if(!r)return 0;const i='EDCBAS'.indexOf(r[0]);return i<0?0:i+1+(r.length>1?1:0)}
+function tierOf(S){const r=S&&typeof S.rank==='string'?S.rank:'';if(!r)return 0;if(r[0]==='X')return 8;const i='EDCBAS'.indexOf(r[0]);return i<0?0:i+1+(r.length>1?1:0)}
 
 function buildSkeleton(b,s,org){
   const B=mat(C.bone),Bs=mat(C.boneS),O=mat(C.dark);
@@ -399,45 +399,45 @@ function buildApex(b,s,ud,c,apex,tier){
     const Bd=mat(0x241d33),Bn=mat(C.bone),V=lit(pw,1.7,0xc9a8ff),cy=c==='mage'?12.4:c==='tank'?12:c==='healer'?11.6:11,cr=c==='mage'?5.3:6;
     ud.crownY=cy;s.crown.position.set(0,cy,-.5);
     b.to('crown',Bd,0,0,0,cr,.62,1);
-    const hs=[8.4,4.6,6.6,3.8,5.6,4.2,7.2];
+    const hs=[11.5,6,8.6,5,7.4,5.6,9.6];
     for(let i=0;i<7;i++){const a=HP+.45+i*TAU/7,x=Math.cos(a)*cr,z=Math.sin(a)*cr,h=hs[i];
-      b.spike('crown',i%2?Bd:Bn,x,.1,z,Math.cos(a)*.3,1,Math.sin(a)*.3,h,1.15);b.sp('crown',i%2?Bn:Bd,x,.1,z,.95);
+      b.spike('crown',i%2?Bd:Bn,x,.1,z,Math.cos(a)*.34,1,Math.sin(a)*.34,h,1.45);b.sp('crown',i%2?Bn:Bd,x,.1,z,1.15);
       b.fine=true;b.spike('crown',V,x*1.04,h*.25,z*1.04,Math.cos(a)*.3,1,Math.sin(a)*.3,h*.52,.42);b.fine=false}
-    b.fine=true;b.co('crown',V,0,6.2,0,1,2.6,0,0,0,4);b.co('crown',V,0,3.9,0,1,2,PI,0,0,4);b.fine=false;b.sp('crown',glow(pw,.3),0,5.2,0,2.6);
+    b.fine=true;b.co('crown',V,0,8.6,0,1.4,3.8,0,0,0,4);b.co('crown',V,0,5.4,0,1.4,2.6,PI,0,0,4);b.fine=false;b.sp('crown',glow(pw,.34),0,7.2,0,3.6);
     // a yoke of vertebrae across the shoulders
     for(let i=-3;i<=3;i++)b.sp('torso',i%2?Bd:Bn,i*2.5,18.4-Math.abs(i)*.42,-2.2-Math.abs(i)*.1,1.5,1.05,.8,1.05);
     for(const k of[-1,1])b.spike('torso',Bn,k*8.6,17.6,-1.4,k*.9,.75,-.5,6.2,1.3);
     // the orbit: shards of rib and bone carried round the body in two slow rings that lean against each other
     s.orbA.position.set(0,33,0);s.orbB.position.set(0,17,0);
     for(let i=0;i<4;i++){const a=i*TAU/4+.4,R=20+(i%2)*2.5,x=Math.cos(a)*R,z=Math.sin(a)*R,y=(i%2?3:-2),dx=-Math.sin(a)*.5,dz=Math.cos(a)*.5;
-      b.spike('orbA',Bn,x,y,z,dx,1,dz,6.5+i%2*2,1.25,.55);b.spike('orbA',Bn,x,y,z,-dx,-1,-dz,3.2,1.25,.55);
-      b.fine=true;b.spike('orbA',V,x*.95,y,z*.95,dx,1,dz,4.4,.4);b.fine=false;b.sp('orbA',glow(pw,.2),x,y+1.5,z,2.6)}
+      b.spike('orbA',Bn,x,y,z,dx,1,dz,10+i%2*3,2,.55);b.spike('orbA',Bn,x,y,z,-dx,-1,-dz,5,2,.55);
+      b.fine=true;b.spike('orbA',V,x*.94,y,z*.94,dx,1,dz,6.6,.6);b.fine=false;b.sp('orbA',glow(pw,.22),x,y+2,z,4)}
     for(let i=0;i<3;i++){const a=i*TAU/3+1.3,R=25.5,x=Math.cos(a)*R,z=Math.sin(a)*R;
-      b.sp('orbB',Bd,x,0,z,1.9,1.1,.8,1.1);b.spike('orbB',Bn,x,0,z,Math.cos(a),.35,Math.sin(a),4.6,.95);b.spike('orbB',Bn,x,0,z,-Math.sin(a),.2,Math.cos(a),3.6,.8);b.spike('orbB',Bn,x,0,z,Math.sin(a),.2,-Math.cos(a),3.6,.8);
-      b.fine=true;b.sp('orbB',V,x,1.1,z,.7);b.fine=false}
+      b.sp('orbB',Bd,x,0,z,2.8,1.1,.8,1.1);b.spike('orbB',Bn,x,0,z,Math.cos(a),.35,Math.sin(a),6.6,1.4);b.spike('orbB',Bn,x,0,z,-Math.sin(a),.2,Math.cos(a),5.2,1.2);b.spike('orbB',Bn,x,0,z,Math.sin(a),.2,-Math.cos(a),5.2,1.2);
+      b.fine=true;b.sp('orbB',V,x,1.6,z,1.05);b.fine=false;b.sp('orbB',glow(pw,.2),x,1,z,3.6)}
     // the domain: the floor goes dark under the hero in a jagged stain, edged in violet; a wave keeps spreading out of it
     const D=decal(0x05030c,.56),D2=decal(0x05030c,.34);
     b.put('dom',D,gRing(.01,32,0,TAU),0,.52,0,-HP,0,0,40,40,1);b.put('dom',D2,gRing(.01,32,0,TAU),0,.5,0,-HP,0,0,53,53,1);
     for(let i=0;i<13;i++){const a=i*TAU/13+(i%3)*.11,L=58+(i*37%23);b.put('dom',D,gRing(.01,3,-.09,.18),0,.54,0,-HP,0,a,L,L,1)}
     b.put('dom',glow(pw,.5),gRing(.955,40,0,TAU),0,.6,0,-HP,0,0,41,41,1);
     for(let i=0;i<3;i++)b.put('dom',glow(pw,.3),gRing(.93,12,i*TAU/3,1.35),0,.62,0,-HP,0,0,29,29,1);
-    for(let i=0;i<5;i++){const a=i*TAU/5+.3;b.put('dom',glow(pw2,.42),gRing(.01,3,-.03,.06),0,.64,0,-HP,0,a,52,52,1)}
+    for(let i=0;i<5;i++){const a=i*TAU/5+.3;b.put('dom',glow(pw,.34),gRing(.6,2,-.022,.044),0,.64,0,-HP,0,a,58,58,1)}
     b.put('domW',W,gRing(.9,40,0,TAU),0,.66,0,-HP,0,0,1,1,1);
   }else{
     // the halo: a great ring of light broken in three, standing behind the shoulders, a thin gold circle inside it
-    const L=lit(pw2,1.6,0xffffff),Gd=lit(C.gold,1,0xffe9a8),R=13.5;
+    const L=lit(pw2,1.6,0xffffff),Gd=lit(C.gold,1,0xffe9a8),R=15.5;
     s.nimbus.position.set(0,18.5,-6);s.nimbus.rotation.set(HP-.1,0,0);
     b.fine=true;
-    for(const[a0,len]of[[.25,1.75],[2.4,1.2],[4.05,1.85]])b.to('nring',L,0,0,0,R,.8,1,len,HP,0,a0);
+    for(const[a0,len]of[[.25,1.75],[2.4,1.2],[4.05,1.85]])b.to('nring',L,0,0,0,R,1,1,len,HP,0,a0);
     b.to('nring',Gd,0,0,0,R-3.4,.34,1);
     for(let i=0;i<6;i++){const a=i*TAU/6+.2;b.spike('nring',Gd,Math.cos(a)*(R-3.4),0,Math.sin(a)*(R-3.4),-Math.cos(a),0,-Math.sin(a),2.6,.55,.5)}
     b.fine=false;
     b.to('nring',glow(pw2,.16),0,0,0,R,2.5);
     // blade-wings: three long splinters of light on each side, hanging in the air off the halo, longest on top
     for(const[sl,k]of[['wingL',1],['wingR',-1]]){s[sl].position.set(k*8,0,-1);
-      const BL=[[1.02,25,2.6],[.56,20,2.3],[.1,14,2]];
-      for(let i=0;i<3;i++){const q=BL[i],phi=k>0?q[0]:PI-q[0],x=k*(7+i*1.2),z=-4+i*4.6;
-        b.fine=true;blade(b,sl,L,x,z,phi,q[1],q[2],.5);b.fine=false;blade(b,sl,glow(pw2,.2),x,z,phi,q[1]*1.12,q[2]*2.1,.3)}
+      const BL=[[1.0,36,3.4],[.52,29,3],[.06,20,2.6]];
+      for(let i=0;i<3;i++){const q=BL[i],phi=k>0?q[0]:PI-q[0],x=k*(8+i*1.4),z=-5+i*5.4;
+        b.fine=true;blade(b,sl,L,x,z,phi,q[1],q[2],.6);b.fine=false;blade(b,sl,glow(pw2,.2),x,z,phi,q[1]*1.12,q[2]*2.1,.3)}
       b.fine=true;blade(b,sl,Gd,k*5.5,-1,k>0?.8:PI-.8,7,.9,.4);b.fine=false}
     // a brow-mark of light and bright cuffs
     b.fine=true;b.co('head',L,0,c==='tank'?10.6:9.6,c==='mage'?5.2:3.6,.9,2.6,0,0,0,4);for(const f of['foreL','foreR'])b.to(f,L,0,-7.2,0,2.5,.36);b.fine=false;
@@ -503,7 +503,7 @@ function rebuildPlayer(g,MB){
   ud.shieldMeshes.length=0;ud.shieldOn=null;
   for(const m of s.shield.children)if(m.userData.part)ud.shieldMeshes.push(m,m.material,dimOf(m.material));
   // power wisps: more of them with an upgrade and with every rank
-  ud.nw=Math.min(WISPS,(adv?3:0)+Math.max(0,tier-1));ud.auraK=0;
+  ud.nw=Math.min(WISPS,(adv?3:0)+Math.max(0,tier-1));ud.auraK=0;ud.ascK=0;
   for(let i=0;i<WISPS;i++)ud.wisps[i].visible=false;
   ink(g,.75);
 }
@@ -516,7 +516,7 @@ const player={
   create(MB){
     const g=new T.Group();g.name='player';const s=mkSlots(g,P_TREE);
     g.userData={s,key:'',rot:null,mb:0,ab:0,k:1,dl:0,yv:0,atkDur:.16,lastAtk:0,cls:null,adv:null,skin:false,robe:false,wtype:'club',full:false,shieldMeshes:[],slashMat:slashMat(),shieldOn:null,
-      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13,apex:null,apexMat:null,crownY:11,auraK:0};
+      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13,apex:null,apexMat:null,crownY:11,auraK:0,ascK:0};
     // rising wisps of power: a fixed handful of shared-geometry meshes, placed in update()
     const wg=new T.Group();wg.name='wisps';g.add(wg);
     for(let i=0;i<WISPS;i++){const w=new T.Mesh(gCone(4),glow(i%3===2?pal('power2',0xc4f4ff):pal('power',0x8b4dff),i%3===2?.5:.6));w.castShadow=false;w.userData.noOutline=true;w.visible=false;wg.add(w);g.userData.wisps.push(w)}
@@ -609,7 +609,9 @@ const player={
       const q=(t*.42)%1,w=22+52*q;s.domW.scale.set(w,1,w);ud.apexMat.opacity=.5*(1-q)*(1-q);
     }else if(ud.apex==='order'){
       s.nimbus.position.y=18.5+Math.sin(t*1.6)*.5;s.nring.rotation.y=t*.3;
-      const open=.1*Math.sin(t*1.3)+ab*.3+dl*.45-mb*.12;s.wingL.rotation.y=open;s.wingR.rotation.y=-open;s.wingL.rotation.x=s.wingR.rotation.x=mb*.2+dl*.25;
+      const asc=P.ascT>0?1:0;ud.ascK+=(asc-ud.ascK)*Math.min(1,dt*6);const ak=ud.ascK;
+      const open=.1*Math.sin(t*1.3)+ab*.3+dl*.45-mb*.12+ak*.35;s.wingL.rotation.y=open;s.wingR.rotation.y=-open;s.wingL.rotation.x=s.wingR.rotation.x=mb*.2+dl*.25;
+      const ws=1+ak*(.4+.05*Math.sin(t*9));s.nimbus.scale.set(ws,ws,ws);
       const ar=+P.auraR||0,on=ar>4;ud.auraK+=((on?ar:0)-ud.auraK)*Math.min(1,dt*6+(ud.auraK?0:1));
       const R=ud.auraK;s.oaura.visible=s.oauraW.visible=R>4;
       if(R>4){const f=R*(1+.012*Math.sin(t*4));s.oaura.scale.set(f,1,f);s.oaura.rotation.y=t*.12;s.oaura2.rotation.y=-t*.5;

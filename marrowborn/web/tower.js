@@ -326,6 +326,12 @@ function addButton(){
   e.addEventListener('click',function(){blip();openTower()});
   b.insertBefore(e,before);
 }
+// Enter on a focused button of the game's own screens: the game's key handler would also press the FIRST button of the screen (on the title that is "Rise", which starts a run).
+// The key is kept from that handler; the browser still clicks the focused button.
+win.addEventListener('keydown',function(e){
+  try{var t=e.target,ov=$('ov');if(e.key!=='Enter'||!t||t.tagName!=='BUTTON'||!ov||ov.hidden||!ov.contains(t))return;
+    var first=ov.querySelector('#ovBtns button');if(t!==first)e.stopImmediatePropagation()}catch(_){}
+},true);
 var ob=$('ovBtns');
 if(ob&&win.MutationObserver)new MutationObserver(function(){try{addButton()}catch(e){}}).observe(ob,{childList:true});
 if(typeof MB.on==='function'){
@@ -397,14 +403,14 @@ function hudTick(){
   setTxt('st',H.state,st==='clear'?'Cleared':st==='fail'?'Failed':'Trial');
   if(live){
     setTxt('rule',H.rule,st==='fail'?(tr.rule?tr.rule+' ':'')+'The floor begins again.':tr.rule||kindOf(kind).line);
-    var dur=num(tr.dur),t=num(tr.t),goal=num(tr.goal),pr=num(tr.progress),o=tr.obj,left=Math.max(0,dur-t),urgent=false;
+    var dur=num(tr.dur),t=num(tr.t),goal=num(tr.goal),pr=num(tr.progress),o=tr.obj,left=Math.max(0,dur-t),urgent=false,late=false;
     if(H.time.el.hidden!==!(dur>0))H.time.el.hidden=!(dur>0);
     if(dur>0){
       // a race drains towards failure; holding out fills towards success
       var drain=kind!=='survive'&&kind!=='guard';
       setTxt('tv',H.time.val,clock(left));setW('tw',H.time.fill,drain?left/dur:t/dur);
       setTxt('tl',H.time.lab,drain?'Time left':'Hold for');
-      urgent=drain&&left<Math.max(5,dur*.25)&&!st;
+      late=urgent=drain&&left<Math.max(5,dur*.25)&&!st;
     }
     if(H.goal.el.hidden!==!(goal>0))H.goal.el.hidden=!(goal>0);
     if(goal>0){setTxt('gv',H.goal.val,Math.min(goal,Math.floor(pr))+' / '+Math.round(goal));setW('gw',H.goal.fill,pr/goal);setTxt('gl',H.goal.lab,kind==='guard'||kind==='race'?'Slain':'Progress')}
@@ -412,16 +418,13 @@ function hudTick(){
     if(H.obj.el.hidden!==!hasO)H.obj.el.hidden=!hasO;
     if(hasO){setTxt('ol2',H.obj.lab,o.name?String(o.name).replace(/^the\s+/i,''):'Relic');var f=Math.max(0,num(o.hp))/num(o.maxHp);setTxt('ov',H.obj.val,Math.ceil(f*100)+'%');setW('ow',H.obj.fill,f);if(f<.34&&!st)urgent=true;if(last.ol!==(f<.34)){last.ol=f<.34;H.obj.el.classList.toggle('low',f<.34)}}
     var cap=tr.handicap&&(HCAP[tr.handicap]||'')||'';if(H.cap.hidden!==!cap)H.cap.hidden=!cap;if(cap)setTxt('cap',H.cap,cap);
-    setCls('trialHud k-'+(TLAB[kind]?kind:'ordeal')+(st?' s-'+st:'')+(urgent?' urgent':''));
+    setCls('trialHud k-'+(TLAB[kind]?kind:'ordeal')+(st?' s-'+st:'')+(urgent?' urgent':'')+(late?' late':''));
   }else{
     setTxt('rule',H.rule,st==='clear'?'The trial is passed. A better reward waits.':'The trial is lost. The floor begins again.');
     H.time.el.hidden=H.goal.el.hidden=H.obj.el.hidden=H.cap.hidden=true;
     setCls('trialHud k-'+(TLAB[kind]?kind:'ordeal')+' s-'+st+' done');
   }
-  // sideways on a phone the vitals float over the arena: sit right under them
-  try{var v=doc.querySelector('.vitals'),sr;if(v&&getComputedStyle(v).position==='fixed'){sr=hud.parentNode.getBoundingClientRect();var top=Math.round(v.getBoundingClientRect().bottom-sr.top+4);if(last.top!==top){last.top=top;hud.style.setProperty('--th-top',top+'px')}}
-    else if(last.top!==-1){last.top=-1;hud.style.removeProperty('--th-top')}}catch(e){}
-  if(hud.hidden)hud.hidden=false;
+  if(hud.hidden){hud.hidden=false;measure()}
 }
 function say(x){try{if(H.say)H.say.textContent=x}catch(e){}}
 if(typeof MB.on==='function'){
@@ -433,6 +436,30 @@ if(typeof MB.on==='function'){
   }catch(e){}});
   MB.on('title',function(){endState='';hudOff()});
 }
+/* ---- where the floating HUD ends. The vitals wrap as health, pets and names grow, so what sits under them cannot have a fixed place:
+   --hud-top = under the top left block (the trial HUD goes there), --hud-mid = under whatever holds the top middle (the hint toast), --hud-top2 = under the trial HUD too (the co-op party list).
+   Set on .stage, in CSS pixels from its top edge; the style sheet has fallbacks for when this file is missing. ---- */
+var mLast={};
+function setVar(el,k,v){if(mLast[k]!==v){mLast[k]=v;el.style.setProperty(k,v+'px')}}
+function measure(){
+  var stage=doc.querySelector('.stage'),v=doc.querySelector('.vitals');if(!stage||!v)return;
+  var sr=stage.getBoundingClientRect(),a=v.firstElementChild,b=v.lastElementChild,gap=Math.max(4,Math.round(sr.height/140));
+  if(!a||!sr.height||getComputedStyle(v).visibility==='hidden')return; // a screen is up: keep the last figures
+  var ra=a.getBoundingClientRect(),rb=b&&b!==a?b.getBoundingClientRect():ra,fixed=!!b&&getComputedStyle(b).position==='fixed';
+  // the boss bar: in the block with the health (small screens) or on its own in the top middle (roomy ones)
+  var top=(fixed?ra.bottom:Math.max(ra.bottom,rb.bottom))-sr.top,mid=fixed?rb.bottom-sr.top:top;
+  var hd=doc.querySelector('header');if(hd&&hd.offsetParent!==null)mid=Math.max(mid,hd.getBoundingClientRect().bottom-sr.top);
+  setVar(stage,'--hud-top',Math.round(top+gap));setVar(stage,'--hud-mid',Math.round(mid+gap+2));
+  var t2=top+gap;if(hud&&!hud.hidden){var rh=hud.getBoundingClientRect();if(rh.height&&rh.left<sr.left+sr.width/2)t2=rh.bottom-sr.top+gap}
+  setVar(stage,'--hud-top2',Math.round(t2));
+}
+setInterval(function(){try{measure()}catch(e){}},400);
+win.addEventListener('resize',function(){try{measure()}catch(e){}});
+try{measure()}catch(e){}
+// the interface scale: extras.js sets --mb-ui too; this keeps it right if that file is missing
+function uiScale(){try{var u=num(MB.settings&&MB.settings.ui,1);u=Math.max(.8,Math.min(1.5,u||1));doc.documentElement.style.setProperty('--mb-ui',String(Math.round(u*100)/100))}catch(e){}}
+if(typeof MB.on==='function')MB.on('settings',function(d){if(!d||d.key==='ui'||d.key==null){uiScale();setTimeout(function(){try{measure()}catch(e){}},0)}});
+uiScale();
 var hudOk=true;
 setInterval(function(){if(!hudOk)return;try{hudTick()}catch(e){hudOk=false;try{hudOff();console.warn('tower: trial HUD stopped',e)}catch(_){}}},100);
 

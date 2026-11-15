@@ -28,7 +28,7 @@ function h(tag,attrs){
 function clock(s){s=Math.max(0,Math.round(num(s)));var hh=Math.floor(s/3600),m=Math.floor(s%3600/60),ss=s%60;return hh?hh+'h '+(m<10?'0':'')+m+'m':m+':'+(ss<10?'0':'')+ss}
 function blip(){try{if(api().haptic)api().haptic(10)}catch(e){}}
 function className(id){var c=MB.CLASSES&&MB.CLASSES[id];return c&&c.name||id||''}
-function bossName(level){try{return MB.levelDef(level).spec.name}catch(e){return ''}}
+function bossName(level){try{var L=MB.levelDef(level);return L.name||L.spec.name}catch(e){return ''}}
 
 /* ---------- the layer: one dialog over the arena, used by settings, records and story ---------- */
 var layer=null,panel=null,view=null; // view: {esc:fn, enter:fn|null}
@@ -87,6 +87,8 @@ function applyLayout(){
   if(!phoneLand){var vw=root.clientWidth||innerWidth||1000,room=vw-32,narrow=vw<=420;while(k>.8&&(narrow?192:216)*k+120*Math.max(1,k)+(narrow?12:16)>room)k-=.05}
   root.style.setProperty('--mb-btn',(Math.round(Math.max(.8,k)*100)/100).toFixed(2));
   root.classList.toggle('mb-left',!!s.left);
+  // the interface scale (0.8 to 1.5): the page reads --mb-ui
+  root.style.setProperty('--mb-ui',(Math.round(clamp(num(s.ui,1)||1,.8,1.5)*100)/100).toFixed(2));
 }
 guard('layout',function(){
   applyLayout();
@@ -106,7 +108,7 @@ function decodeSave(code){
   code=String(code||'').replace(/\s+/g,'');
   if(!code)return{ok:false,why:'Paste a save code first.'};
   var m=/^MB(\d+)\.([A-Za-z0-9_-]+)\.([0-9a-f]{8})$/.exec(code);
-  if(!m)return{ok:false,why:/^MB\d+\./.test(code)?'This code is incomplete. Copy all of it, from MB1 to the last character.':'That is not a Marrowborn save code. A code starts with MB1.'};
+  if(!m)return{ok:false,why:/^MB\d+\./.test(code)?'This code is incomplete. Copy all of it, from MB1 to the last character.':'That is not an Ashes to Apex save code. A code starts with MB1.'};
   if(m[1]!=='1')return{ok:false,why:'This code comes from a newer version of the game.'};
   var json;
   try{var b=m[2].replace(/-/g,'+').replace(/_/g,'/');while(b.length%4)b+='=';json=decodeURIComponent(escape(atob(b)))}catch(e){return{ok:false,why:'This code is damaged. Part of it is missing or was changed.'}}
@@ -118,7 +120,7 @@ function decodeSave(code){
 function saveLine(s){
   if(!s||typeof s!=='object')return '';
   var lv=Math.floor(num(s.level))+1,c=className(s.cls);
-  return 'level '+lv+(c?', '+c:', still in the crypt');
+  return 'floor '+lv+(c?', '+c:', still in the root');
 }
 
 /* ---------- records ---------- */
@@ -198,9 +200,9 @@ guard('records',function(){
     var lv=Math.floor(num(d.level,MB.S?MB.S.level:0)),t=levelSeconds(0),c=classRec(MB.S&&MB.S.cls);
     bankLevel(t);rec.deaths++;if(c)c.deaths++;run.died=lv;
     saveRec();
-    var parts=['Level '+(lv+1)+', '+clock(t)+' into the fight.'];
+    var parts=['Floor '+(lv+1)+', '+clock(t)+' into the fight.'];
     if(MB.stats){var k=Math.floor(stat('kills')),rt=stat('time');parts.push('This run: '+k+(k===1?' kill':' kills')+(rt>0?', '+clock(rt)+' played':'')+'.')}
-    var best=h('b',{text:run.newBest&&rec.best===lv+1?'A new best: level '+rec.best+'.':'Best: level '+rec.best+'.'});
+    var best=h('b',{text:run.newBest&&rec.best===lv+1?'A new best: floor '+rec.best+'.':'Best: floor '+rec.best+'.'});
     panelNote(function(){return MB.S&&MB.S.mode==='dead'},h('p',{class:'keys mbx-note'},parts.join(' ')+' ',best));
   });
   MB.openRecords=openRecords;
@@ -225,16 +227,16 @@ function openRecords(){
   return openView('mbx-wide','Records',function(p){
     var hd=heading('Records',rec.best?'What the dark remembers':'Nothing to remember yet'),i;
     for(i=0;i<hd.length;i++)if(hd[i])p.appendChild(hd[i]);
-    if(!rec.best&&!rec.runs){p.appendChild(h('p',{class:'dim mbx-center',text:'Start a run. Your best level, your fastest kills and your deaths are kept here.'}))}
+    if(!rec.best&&!rec.runs){p.appendChild(h('p',{class:'dim mbx-center',text:'Start a climb. Your best floor, your fastest kills and your deaths are kept here.'}))}
     else{
       var tile=function(v,l){return h('div',null,h('b',{text:String(v)}),h('small',{text:l}))};
-      p.appendChild(h('div',{class:'mbx-tiles'},tile(rec.best||'—','Best level'),tile(rec.runs,'Runs'),tile(rec.bosses,'Bosses killed'),tile(rec.deaths,'Deaths'),tile(clock(rec.time),'Time played')));
+      p.appendChild(h('div',{class:'mbx-tiles'},tile(rec.best||'—','Best floor'),tile(rec.runs,'Climbs'),tile(rec.bosses,'Bosses killed'),tile(rec.deaths,'Deaths'),tile(clock(rec.time),'Time played')));
       var cols=h('div',{class:'mbx-rec'});
       // fastest kills: once a class is chosen only those fights count, the crypt ones are too short to compare
       var ks=Object.keys(rec.fast).map(Number),late=ks.filter(function(k){return k>=8}),pick=(late.length?late:ks).sort(function(a,b){return rec.fast[a].t-rec.fast[b].t}).slice(0,6);
       if(pick.length){
         var ol=h('ol');
-        pick.forEach(function(k){var f=rec.fast[k],nm=bossName(k);ol.appendChild(h('li',null,h('span',{text:'Level '+(k+1)+(nm?' · '+nm:'')+(f.cls?' · '+className(f.cls):'')}),h('span',{text:clock(f.t)})))});
+        pick.forEach(function(k){var f=rec.fast[k],nm=bossName(k);ol.appendChild(h('li',null,h('span',{text:'Floor '+(k+1)+(nm?' · '+nm:'')+(f.cls?' · '+className(f.cls):'')}),h('span',{text:clock(f.t)})))});
         cols.appendChild(h('section',null,h('h3',{text:'Fastest kills'}),ol));
       }
       var ids=Object.keys(MB.CLASSES||{}).filter(function(id){return rec.cls[id]});
@@ -242,7 +244,7 @@ function openRecords(){
         var tb=h('tbody');
         ids.sort(function(a,b){return rec.cls[b].best-rec.cls[a].best}).forEach(function(id){var c=rec.cls[id];
           tb.appendChild(h('tr',null,h('td',{text:className(id)}),h('td',{text:String(c.best||'—')}),h('td',{text:String(c.runs)}),h('td',{text:String(c.deaths)}),h('td',{text:clock(c.time)})))});
-        cols.appendChild(h('section',null,h('h3',{text:'By class'}),h('table',null,h('thead',null,h('tr',null,h('th',{scope:'col',text:'Class'}),h('th',{scope:'col',text:'Best'}),h('th',{scope:'col',text:'Runs'}),h('th',{scope:'col',text:'Deaths'}),h('th',{scope:'col',text:'Time'}))),tb)));
+        cols.appendChild(h('section',null,h('h3',{text:'By class'}),h('table',null,h('thead',null,h('tr',null,h('th',{scope:'col',text:'Class'}),h('th',{scope:'col',text:'Best'}),h('th',{scope:'col',text:'Climbs'}),h('th',{scope:'col',text:'Deaths'}),h('th',{scope:'col',text:'Time'}))),tb)));
       }
       if(cols.firstChild)p.appendChild(cols);
     }
@@ -278,6 +280,21 @@ function openSettings(){
     syncers.push(function(){inp.checked=!!S[key];note.textContent=S[key]?onText:offText});
     return h('div',{class:'mbx-row'},h('label',{class:'lab',for:i,text:label}),h('div',{class:'mbx-ctl'},h('label',{class:'mbx-sw'},inp,h('span'),note)));
   }
+  // not a stored setting: the page itself goes full screen (desktop browsers; the Android app is full screen already)
+  var fsEl=function(){return doc.fullscreenElement||doc.webkitFullscreenElement||null};
+  var fsCan=function(){var e=root;return !window.Android&&!!(e.requestFullscreen||e.webkitRequestFullscreen)&&(doc.fullscreenEnabled!==false)&&(doc.fullscreenEnabled||doc.webkitFullscreenEnabled||false)};
+  function fullscreenRow(){
+    var i=id(),note=h('em'),inp=h('input',{type:'checkbox',role:'switch',id:i,onchange:function(){
+      try{if(inp.checked){var e=root,pr=(e.requestFullscreen||e.webkitRequestFullscreen).call(e);if(pr&&pr.catch)pr.catch(function(){sync()})}
+        else{var x=doc.exitFullscreen||doc.webkitExitFullscreen;if(x&&fsEl())x.call(doc)}}catch(err){}
+      setTimeout(sync,150)}});
+    syncers.push(function(){inp.checked=!!fsEl();note.textContent=fsEl()?'On':'Off'});
+    return h('div',{class:'mbx-row mbx-fs'},h('label',{class:'lab',for:i,text:'Fullscreen'}),h('div',{class:'mbx-ctl'},h('label',{class:'mbx-sw'},inp,h('span'),note)));
+  }
+  var wide=function(row){row.className+=' mbx-row-wide';row.style.gridColumn='1 / -1';return row};
+  var restart=h('p',{class:'mbx-msg mbx-restart',role:'status'});
+  syncers.push(function(){var R=MB.renderer;restart.textContent=R&&R.needsRestart?'Applies the next time you start the game.':''});
+  var has=function(k){return Object.prototype.hasOwnProperty.call(S,k)};
   var pct=function(v){return v+'%'},ping=function(){try{if(api().sfx)api().sfx('pickup')}catch(e){}},buzz=function(){try{if(api().haptic)api().haptic(40)}catch(e){}};
   var canSave=typeof api().getSave==='function',canLoad=typeof api().loadSave==='function';
   return openView('','Settings',function(p){
@@ -286,11 +303,15 @@ function openSettings(){
       slider('Music','music',0,100,5,function(v){return v?v+'%':'Off'}),
       slider('Effects','sfx',0,100,5,function(v){return v?v+'%':'Off'},ping),
       choice('Haptics','haptic',[[0,'Off'],[.5,'Low'],[1,'Full']],buzz),
-      choice('Graphics','gfx',[['high','High'],['low','Low']]),
+      choice('Graphics','gfx',[['low','Low'],['high','High'],['ultra','Ultra']]),
+      has('res')?slider('Resolution','res',50,100,5,pct):null,
+      has('ui')?slider('Interface','ui',80,150,5,pct):null,
       slider('Button size','btn',80,140,5,pct),
       toggle('Left-handed','left','Stick on the right','Stick on the left'),
-      toggle('Hints','hints','Shown once each','Off'));
-    p.appendChild(rows);
+      toggle('Hints','hints','Shown once each','Off'),
+      fsCan()?fullscreenRow():null,
+      has('testUnlock')?wide(toggle('Checkpoints','testUnlock','Testing: all unlocked, up to floor 201','Unlock all checkpoints (testing): off')):null);
+    p.appendChild(rows);p.appendChild(restart);
     var done=button('Done',close,true),btns=h('div',{class:'btns'},done);
     if(canSave)btns.appendChild(button('Export save',function(){exportView(openSettings)}));
     if(canLoad)btns.appendChild(button('Import save',function(){importView(openSettings)}));
@@ -306,6 +327,7 @@ guard('settings',function(){
   if(!MB.settings||typeof MB.settings!=='object'||typeof MB.setSetting!=='function')return;
   MB.openSettings=openSettings;
   listen('settings',function(){if(layer&&!layer.hidden&&settingsSync)try{settingsSync()}catch(e){}});
+  doc.addEventListener('fullscreenchange',function(){if(layer&&!layer.hidden&&settingsSync)try{settingsSync()}catch(e){}});
 });
 
 function exportView(back){
@@ -368,34 +390,49 @@ function importView(back){
 
 /* ---------- story interludes ---------- */
 // keyed by 0-based level; shown just before that level starts
+var SPIRE=(MB.tower&&MB.tower.name)||'The Marrowspire';
 var TALES={
-  0:['The crypt','You were buried without a name, and the dark kept the rest: heart, skin, eyes, tongue. The things that crawl down here are wearing what was yours. Get up. Bones can still hold a blade.'],
-  8:['Out of the crypt','The crypt door stands open behind you and nothing follows you out. You have a heartbeat again, and a face you do not recognise. A body has to eat, so you take up a trade, and the only work on this side of the door is killing what the door let loose.'],
-  12:[null,'The King is dead behind you, and his road is yours to walk. It runs through country that burned a long time ago and never quite went out. Whatever outlived the fire did it by becoming worse.'],
-  20:[null,'The road ends where the water begins. The fen swallowed a town once. Its roofs still show at low water, and the bell rings when something large moves underneath. Watch where you put your feet.'],
-  30:[null,'Above the fen the ground rises into ribs. These peaks are a carcass, something vast that lay down here before there was anyone to see it fall. What nests in it has never had a reason to be afraid.'],
-  40:[null,'Past the peaks stands a court with no kingdom left to rule. Its nobles keep their seats, their banners and their grudges. They have heard of you. That is new: until now, nothing had.'],
-  50:[null,'Beyond the court there is no road and no map, only the dark that every one of these things crawled out of. People set candles in their windows now and say your name over them. There is no last monster. There is only how far you go.']
+  0:['The root of '+SPIRE,'You were burned and buried without a name at the foot of a tower that should not stand, and the dark kept the rest: heart, skin, eyes, tongue. The things that crawl in its root are wearing what was yours. Get up. Ash and bone can still hold a blade.'],
+  8:['Out of the root','The crypt door stands open behind you and nothing follows you through it. You have a heartbeat again, and a face you do not recognise. Above you the Spire goes up out of sight, floor on floor, and something holds every one of them. A body has to eat, so you take up a trade, and the only work in this tower is clearing it.'],
+  12:[null,'The King is dead on his floor, and the stair he kept is yours to climb. The Spire swallows whole countries as it grows, and keeps them. The first is a road through land that burned a long time ago and never quite went out. Some floors will ask more of you than a kill. The Spire calls those trials, and it pays for them.'],
+  20:[null,'The road ends where the water begins, twenty floors up. The fen swallowed a town once, and then the Spire swallowed the fen. Its roofs still show at low water, and the bell rings when something large moves underneath. Watch where you put your feet.'],
+  30:[null,'Above the fen the floors rise into ribs. These peaks are a carcass, something vast that lay down before there was a tower to hold it. What nests in it has never had a reason to be afraid.'],
+  40:[null,'Past the peaks stands a court with no kingdom left to rule. Its nobles keep their seats, their banners and their grudges. They have heard you climbing. That is new: until now, nothing above had looked down.'],
+  50:[null,'Above the court there are no countries left, only the dark the Spire grew out of, fifty floors of it. Far below, people set candles in their windows and say your name over them. No one has seen a last floor. There is only how high you go.'],
+  100:[null,'A hundred floors. From here the root is a rumour, and so is the pile of ash that got up out of it. The dark thins into a sound: floor on floor of throats that never stop, singing the names of everyone who climbed this far. Yours is already in it.']
 };
-// one line before each boss of a tenth level: the Flayed King on level 10 (index 9), then the tyrants
+// one for each band past the hundredth floor, told when its first floor is reached
+var BANDTALES={
+  'The Endless Dark':'The dark again, and more of it. The Spire is not repeating itself. It is showing you how much there is.',
+  'The Hollow Choir':'The singing has not stopped since you first heard it. It is louder on every floor, and now and then it gets a word right.',
+  'The Tallow Halls':'Halls of wax, lit from the inside. Everything here was poured, not born, and none of it has set.',
+  'The Glass Orchard':'Trees of glass, and fruit you can see through. Something is curled up in every one.',
+  'The Rust Sea':'A sea that stopped moving and went red. The ships are still on it. So are their crews.',
+  'The Pale Archive':'Shelf on shelf of bone, filed and labelled. Somewhere on these floors is a drawer with your name on it, and it is empty. They would like it filled.',
+  'The Lantern Deep':'The higher you climb, the deeper it gets. The lights under the floor are not lamps.',
+  'The Thorn Cloister':'A cloister grown shut. The ones who prayed here are still inside the hedge, and still at it.'
+};
+// one line before each boss of a tenth floor: the Flayed King on floor 10 (index 9), then the tyrants
 var TYRANTS={
-  9:'They flayed him for the crown and he kept it anyway. Everything past this hall still pays him its tithe. He is the first of the tyrants, and he has been expecting someone.',
+  9:'They flayed him for the crown and he kept it anyway. Every floor above this hall still pays him its tithe. He is the first of the tyrants, and he has been expecting someone.',
   19:'It lit the fire that made this road, and it has stood guard over the cinders ever since.',
   29:'It drowned the town to have subjects who could never leave. It counts them every night.',
   39:'It has gnawed at the great carcass for an age, and it is not yet full.',
-  49:'The last of the court to wear a crown. It will not bow, and it has forgotten how to die.'
+  49:'The last of the court to wear a crown. It will not bow, and it has forgotten how to die.',
+  99:'The hundredth floor. Whatever holds it has watched every climber before you turn back or turn to ash. It does not expect to learn anything new.'
 };
-var DARK=['The dark has no throne, so this one built its own out of everything that came before you.','Another one. The dark grows them the way a wound grows scar.','It knows your name. It has been saying it for some time.'];
+var DARK=['The Spire gave this one a floor, so it built a throne on it out of everything that came before you.','Another one. The Spire grows them the way a wound grows scar.','It knows your name. It has been saying it for some time.'];
 function taleFor(lv){
   if(TALES[lv]){var t=TALES[lv],kick=t[0];if(!kick)try{kick=MB.levelDef(lv).title}catch(e){kick=''}return{kick:kick,text:t[1]}}
+  if(lv>100&&lv%50===0){var bn='';try{bn=MB.levelDef(lv).title}catch(e){}var bt=BANDTALES[bn.replace(/ [IVX]+$/,'')];if(bt)return{kick:bn+' · floor '+(lv+1),text:bt}}
   var line=TYRANTS[lv]||(lv>=59&&(lv+1)%10===0?DARK[Math.floor((lv-59)/10)%DARK.length]:null);
-  if(line)return{kick:(bossName(lv)||'A tyrant')+' · level '+(lv+1),text:line};
+  if(line)return{kick:(bossName(lv)||'A tyrant')+' · floor '+(lv+1),text:line};
   return null;
 }
 guard('story',function(){
   var seen=store.get('tales',[]);
   if(!Array.isArray(seen))seen=[];
-  seen=seen.filter(function(x){return typeof x==='number'}).slice(-60);
+  seen=seen.filter(function(x){return typeof x==='number'}).slice(-80);
   // a new class is a new story from the crypt door on
   listen('classpicked',function(){if(inMp())return;seen=seen.filter(function(x){return x<8});store.set('tales',seen)});
   MB.interlude=function(level,done){

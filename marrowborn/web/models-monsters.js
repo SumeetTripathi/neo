@@ -87,7 +87,7 @@ function M(hex,shade){
   }else if(PV==='beast'&&hex!==BONE)_c.lerp(_c2.set(0xa07c4c),.3);
   if(shade>0)_c.lerp(_c2.set(PV==='necro'?0x8fae94:PV==='shade'?0x9a86d8:0xffffff),PV==='necro'||PV==='shade'?shade*.7:shade);else if(shade<0)_c.multiplyScalar(1+shade);
   var h=_c.getHex();
-  m=PV==='necro'?toonM(h,{emissive:0x0a3a18,emissiveIntensity:.5}):PV==='shade'?toonM(h,{emissive:0x3a1c9a,emissiveIntensity:.55}):toonM(h);
+  m=PV==='necro'?toonM(h,{emissive:0x0a3a18,emissiveIntensity:.5}):PV==='shade'?toonM(h,{emissive:0x3a1c9a,emissiveIntensity:.32}):toonM(h);
   BODY.set(m,h);
   return MATS[key]=m;
 }

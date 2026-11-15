@@ -193,10 +193,15 @@ MB.renderer=R;
 const THREE=window.THREE;if(!THREE||!glc)return;
 const ST=window.MBStyle,PAL=ST.palette;
 
-let renderer;
+// graphics tier: MB.settings.gfx 'low' | 'high' | 'ultra' (anything else counts as high)
+const tierNow=()=>{const g=MB.settings&&MB.settings.gfx;return g==='low'?'low':g==='ultra'?'ultra':'high'};
+const wantAA=()=>{const t=tierNow();return t==='ultra'?true:t==='low'?false:(window.devicePixelRatio||1)<2};
+let renderer,aaMade=false;
 try{
-  const hiDpi=(window.devicePixelRatio||1)>=2;
-  renderer=new THREE.WebGLRenderer({canvas:glc,antialias:!hiDpi,alpha:false,powerPreference:'high-performance',stencil:false});
+  // MSAA is fixed when the context is made: off in low, on in ultra, on in high unless the screen is dense already. A later change of
+  // tier that would want it the other way shows as MB.renderer.needsRestart (it applies the next time the game starts).
+  aaMade=wantAA();
+  renderer=new THREE.WebGLRenderer({canvas:glc,antialias:aaMade,alpha:false,powerPreference:'high-performance',stencil:false});
   if(!renderer.getContext())throw new Error('no context');
 }catch(e){console.warn('Marrowborn: WebGL unavailable, staying 2D');return}
 
@@ -212,12 +217,14 @@ const EXPOSURE=1.0,FLOOR_GAIN=.6,SUN_K=1.65,HEMI_K=1.25,PT_K=.5,ENV_K=.52;
 // overlay text: one family constant (the page may bundle a font later)
 const FONT='"Rajdhani","Oswald","Barlow Condensed","Roboto Condensed","Arial Narrow","sans-serif-condensed","Helvetica Neue",Arial,sans-serif';
 // graphics quality: MB.settings.gfx 'low' = no shadow maps, pixel ratio 1, no bump maps, two point lights, few particles, blob shadows
-const Q={low:false};
+const Q={low:false,ultra:false,tier:'high'};
 const isLow=()=>!!(MB.settings&&MB.settings.gfx==='low');
 renderer.outputEncoding=THREE.sRGBEncoding;
 renderer.toneMapping=THREE.LinearToneMapping;renderer.toneMappingExposure=EXPOSURE;
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFShadowMap;
-const maxAniso=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+const anisoCap=renderer.capabilities.getMaxAnisotropy()||1,maxTex=renderer.capabilities.maxTextureSize||4096;
+let maxAniso=Math.min(4,anisoCap); // ultra: the most the card offers
+const maxRB=(()=>{try{const gl=renderer.getContext();return Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE)||4096,maxTex)}catch(e){return 4096}})();
 
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0x050408);
@@ -271,7 +278,7 @@ const G={
 
 /* ---------- textures ---------- */
 function floorTexture(theme,hue,area,low,bi){
-  bi=bi|0;const far=area==='far',TW=low?1024:2048,TH=TW/2,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue+bi*53);
+  bi=bi|0;const far=area==='far',TW=low?1024:Q.ultra?Math.min(4096,maxTex):2048,TH=TW/2,c=mkCanvas(TW,TH),g=c.getContext('2d'),rnd=rng(11+hue+bi*53);
   g.scale(TW/W,TH/H);
   const crypt=theme==='crypt',court=area==='court';
   // base colour [h,s,l], slab colour fn, share of ground that is paved
@@ -377,7 +384,7 @@ function floorTexture(theme,hue,area,low,bi){
   return canvasTex(c,false);
 }
 function brickTexture(hue,sat){
-  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(5+hue);
+  const k=Q.ultra?2:1,c=mkCanvas(256*k,256*k),g=c.getContext('2d'),rnd=rng(5+hue);g.scale(k,k);
   g.fillStyle=hsl(240,20,3);g.fillRect(0,0,256,256);
   for(let r=0;r<4;r++)for(let i=-1;i<2;i++){
     const x=i*128+(r%2?64:0),y=r*64,v=rnd();
@@ -414,7 +421,8 @@ const AREA_BY_HUE={28:'ash',165:'fen',215:'peaks',285:'court',340:'dark'};
 const _d=new THREE.Object3D(),_col=new THREE.Color(),_pt={x:0,z:0};
 function inst(geo,mat,n,noShadow){const m=new THREE.InstancedMesh(geo,mat,n);m.castShadow=!noShadow;m.receiveShadow=!noShadow;return m}
 function put(im,i,x,y,z,sx,sy,sz,rx,ry,rz){_d.position.set(x,y,z);_d.scale.set(sx,sy,sz);_d.rotation.set(rx||0,ry||0,rz||0);_d.updateMatrix();im.setMatrixAt(i,_d.matrix)}
-function outside(rnd,pad,south){let x,z;do{x=-620+rnd()*(W+1240);z=-560+rnd()*(H+(south?700:520))}while(x>-pad&&x<W+pad&&z>-pad&&z<H+pad);_pt.x=x;_pt.z=z;return _pt}
+let OUT_X=620; // how far to each side the scattered surroundings reach (further when the view is very wide)
+function outside(rnd,pad,south){let x,z;do{x=-OUT_X+rnd()*(W+2*OUT_X);z=-560+rnd()*(H+(south?700:520))}while(x>-pad&&x<W+pad&&z>-pad&&z<H+pad);_pt.x=x;_pt.z=z;return _pt}
 function bannerTexture(){
   const c=mkCanvas(64,128),g=c.getContext('2d');
   g.beginPath();g.moveTo(2,0);g.lineTo(62,0);g.lineTo(62,126);g.lineTo(32,104);g.lineTo(2,126);g.closePath();g.fillStyle='#3a1250';g.fill();g.save();g.clip();
@@ -433,12 +441,13 @@ function runeTexture(R0){ // [colour, half-size in world units, [[radius,width].
   const n=R0[3],rr=R0[4];g.beginPath();for(let i=0;i<=n;i++){const a=i*3/n*TAU-Math.PI/2;g[i?'lineTo':'moveTo'](Math.cos(a)*rr,Math.sin(a)*rr)}g.stroke();
   return new THREE.CanvasTexture(c);
 }
-function buildEnv(key,low){
+function buildEnv(key,low,wide){
+  OUT_X=wide?1500:620;
   const crypt=key==='crypt',km=crypt?null:/^h(-?[\d.]+)(?:b(\d+))?$/.exec(key),hue=crypt?208:km?+km[1]||0:+key.slice(1)||0,far=!!(km&&km[2]!==undefined),bi=far?+km[2]:0,area=crypt?'crypt':far?'far':AREA_BY_HUE[hue]||'pass';
   let lightHue=hue;
-  const root=new THREE.Group(),E={key,low,crypt,area,hue,root,flames:[],lit:[],ticks:[],crystals:[],glowOnly:[],rune:null,runeM:null,fire:crypt,
+  const root=new THREE.Group(),E={key,low,tier:Q.tier,wide:!!wide,crypt,area,hue,root,flames:[],lit:[],ticks:[],crystals:[],glowOnly:[],rune:null,runeM:null,fire:crypt,
     sun:new THREE.Color(0xe6e9f2),sunI:.66,hemiI:.36,lightI:1.6,lightD:400,fogFar:1300,mote:[1,.9,.68],moteMode:'drift',moteN:low?0:40};
-  const rnd=rng(77+hue+bi*131),dn=n=>low?Math.ceil(n*.5):n;
+  const rnd=rng(77+hue+bi*131),dk=(low?.5:Q.ultra?1.4:1)*(wide?1.6:1),dn=n=>Math.ceil(n*dk);
   const ftex=floorTexture(crypt?'crypt':'out',hue,area,low,bi);
   const floor=noLine(new THREE.Mesh(new THREE.PlaneGeometry(W,H).rotateX(-Math.PI/2),ST.toonRaw(0xffffff,{map:ftex,rim:false})));
   floor.material.color.setScalar(crypt?FLOOR_GAIN*.9:area==='peaks'?FLOOR_GAIN*.72:area==='court'?FLOOR_GAIN*1.15:FLOOR_GAIN);
@@ -469,7 +478,7 @@ function buildEnv(key,low){
   const rocks=(n,col)=>{const im=inst(new THREE.DodecahedronGeometry(1,0),std(col,{flatShading:true,roughness:1}),n);
     for(let i=0;i<n;i++){const p=outside(rnd,60,true),s=6+rnd()*16;put(im,i,p.x,s*.3,p.z,s,s*(.6+rnd()*.8),s,rnd()*3,rnd()*3,rnd()*3)}root.add(im)};
   if(crypt){
-    const T=260,hN=92,hS=14;
+    const T=wide?1900:260,hN=92,hS=14;
     root.add(slab(-T,W+T,0,hN,-T,WALL,mats),slab(-T,WALL,0,hN,WALL,H+T,mats),slab(W-WALL,W+T,0,hN,WALL,H+T,mats),slab(WALL,W-WALL,0,hS,H-WALL,H+T,mats));
     // buttresses break up the long walls and catch the torchlight
     for(const x of[150,330,630,810])root.add(slab(x-15,x+15,0,hN+8,WALL-2,WALL+9,mats));
@@ -702,6 +711,7 @@ function buildEnv(key,low){
   // a glowing seal over the circle painted on the floor (crypt, court)
   if(E.rune){const R0=E.rune,m=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:runeTexture(R0),color:R0[0],transparent:true,opacity:.4,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));
     m.position.set(W/2,.5,H/2);m.scale.setScalar(R0[1]*2);m.renderOrder=1;root.add(m);E.runeM=m;E.glowOnly.push(m)}
+  if(Q.ultra)E.moteN=Math.min(MOTES,Math.round(E.moteN*1.6));
   scene.fog.color.copy(scene.background);
   if(!low)ST.outline(root,{thickness:1.25});
   scene.add(root);
@@ -738,12 +748,12 @@ function bandOf(n){
   return null;
 }
 function syncEnv(){
-  const n=MB.S.level,low=isLow(),tb=R.testBand||null;if(env&&n===envLevel&&env.low===low&&tb===envBand)return;envLevel=n;envBand=tb;
+  const n=MB.S.level,low=isLow(),tb=R.testBand||null,wide=camera.aspect>2.05;if(env&&n===envLevel&&env.tier===Q.tier&&env.wide===wide&&tb===envBand)return;envLevel=n;envBand=tb;
   let key=n<8?'crypt':'h'+MB.levelDef(n).hue;
   if(n>=50||R.testBand){const b=bandOf(n);if(b)key='h'+b.hue+'b'+b.idx}
-  if(env&&env.key===key&&env.low===low)return;
+  if(env&&env.key===key&&env.tier===Q.tier&&env.wide===wide)return;
   if(env)disposeEnv(env);
-  env=buildEnv(key,low);
+  env=buildEnv(key,low,wide);
 }
 
 /* ---------- pools for the short-lived things ---------- */
@@ -754,10 +764,13 @@ const pbeamCore=new THREE.MeshBasicMaterial({color:0xeaf6ff,toneMapped:false,fog
 const beamCore=new THREE.MeshBasicMaterial({color:0xfff2c8,toneMapped:false,fog:false}),
   beamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:0xffa02a,transparent:true,opacity:.75,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
   beamLine=new THREE.MeshBasicMaterial({color:0xff4a3a,transparent:true,opacity:.7,depthWrite:false,toneMapped:false,fog:false});
+const obeamCore=new THREE.MeshBasicMaterial({color:0xffffff,toneMapped:false,fog:false}),
+  obeamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.power2,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
+  obeamEdge=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.gold,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false});
 const fieldTex={};
 function fieldTexture(kind){
   if(fieldTex[kind])return fieldTex[kind];
-  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
+  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':kind==='domain'?'150,96,255':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
   g.translate(128,128);
   const gr=g.createRadialGradient(0,0,10,0,0,122);gr.addColorStop(0,rgba(.1));gr.addColorStop(.75,rgba(.2));gr.addColorStop(1,rgba(.42));
   g.fillStyle=gr;g.beginPath();g.arc(0,0,122,0,TAU);g.fill();g.strokeStyle=rgba(.95);g.lineWidth=3.5;g.beginPath();g.arc(0,0,121,0,TAU);g.stroke();
@@ -772,6 +785,11 @@ function fieldTexture(kind){
     for(let i=0;i<24;i++){g.save();g.rotate(i*TAU/24);const l=i%2?104:84;g.beginPath();g.moveTo(-3.2,52);g.lineTo(0,l);g.lineTo(3.2,52);g.closePath();g.fill();g.restore()}
     g.strokeStyle=rgba(.9);g.lineWidth=3;g.beginPath();g.arc(0,0,46,0,TAU);g.stroke();g.lineWidth=1.5;g.beginPath();g.arc(0,0,110,0,TAU);g.stroke();
     g.lineWidth=3;g.beginPath();g.moveTo(0,-26);g.lineTo(0,26);g.moveTo(-17,-6);g.lineTo(17,-6);g.stroke();
+  }else if(kind==='domain'){
+    // the tally ground: tally strokes in fives round the rim, a jagged inner edge
+    g.strokeStyle=rgba(.85);g.lineWidth=2.4;
+    for(let i=0;i<12;i++){g.save();g.rotate(i*TAU/12);for(let j=0;j<4;j++){g.beginPath();g.moveTo(-9+j*6,96);g.lineTo(-9+j*6,112);g.stroke()}g.beginPath();g.moveTo(-13,110);g.lineTo(13,98);g.stroke();g.restore()}
+    g.fillStyle=rgba(.5);for(let i=0;i<18;i++){g.save();g.rotate(i*TAU/18+.1);const l=60+rnd()*26;g.beginPath();g.moveTo(-4,90);g.lineTo(0,l);g.lineTo(4,90);g.closePath();g.fill();g.restore()}
   }else if(kind==='rain'){
     g.strokeStyle=rgba(.45);g.lineWidth=1.5;g.setLineDash([7,7]);g.beginPath();g.arc(0,0,84,0,TAU);g.stroke();g.beginPath();g.arc(0,0,44,0,TAU);g.stroke();g.setLineDash([]);
     for(let i=0;i<22;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*104,x=Math.cos(a)*d,y=Math.sin(a)*d;g.save();g.translate(x,y);g.rotate(-.5+rnd()*.3);
@@ -813,12 +831,16 @@ const pools={
   pbomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.bolt),halo=new THREE.Sprite(glowMat(0x4fb4ff,.9));b.scale.setScalar(5.5);b.castShadow=true;halo.scale.setScalar(30);g.add(b,halo);return g}),
   bomb:new Pool(()=>{const g=new THREE.Group(),b=new THREE.Mesh(G.sphere,mCore.dark),halo=new THREE.Sprite(glowMat(0xff7a30,.9)),f=new THREE.Mesh(G.sphere,mCore.e);b.scale.setScalar(6.5);b.castShadow=true;halo.scale.setScalar(30);f.scale.setScalar(2.2);f.position.y=6.5;g.add(b,halo,f);return g}),
   blob:new Pool(()=>{const m=new THREE.Mesh(G.quad,blobMat);m.renderOrder=0;return m}),
+  // the floor going dark under a dominion field, and the beam an order hero sweeps
+  dark:new Pool(()=>{const m=new THREE.Mesh(G.disc,new THREE.MeshBasicMaterial({color:0x000000,transparent:true,opacity:.5,depthWrite:false,fog:false}));m.position.y=.4;m.renderOrder=1;return m}),
+  obeam:new Pool(()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.box,obeamCore),glow=new THREE.Mesh(G.quad,obeamGlow),edge=new THREE.Mesh(G.quad,obeamEdge);
+    glow.position.y=-SHOT_Y+.8;glow.renderOrder=3;edge.position.y=-SHOT_Y+1;edge.renderOrder=3;core.renderOrder=5;g.add(core,glow,edge);g.userData={core,glow,edge};return g}),
   ward:new Pool(()=>{const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:PAL.holy,transparent:true,opacity:.6,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.25;m.renderOrder=4;return m}),
   ring:new Pool(()=>{const m=new THREE.Mesh(G.rim,new THREE.MeshBasicMaterial({color:0xffd27a,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}));m.position.y=1.1;m.renderOrder=4;return m}),
 };
 
 /* ---------- particles: one Points object, soft round dots sized in world units ---------- */
-const PMAX=480,PMAX_LOW=140,MOTES=64;
+const PMAX=480,PMAX_LOW=140,MOTES=104;
 function makePoints(n){
   const geo=new THREE.BufferGeometry(),pos=new Float32Array(n*3),col=new Float32Array(n*4),size=new Float32Array(n);
   geo.setAttribute('position',new THREE.BufferAttribute(pos,3).setUsage(THREE.DynamicDrawUsage));
@@ -1143,13 +1165,34 @@ function fitCamera(){
   }
   fitD=hi;
 }
+// Sizes. The CSS box shared by #gl and #cv can be any size and shape; both backing stores follow it:
+//   #gl  = box x devicePixelRatio x MB.settings.res (0.5..1), the ratio capped by tier (low 1, high 2, ultra 3) and the frame by a pixel budget
+//          (low/high about 8.3 million = native 4K, ultra half as much again) and by the card's largest renderbuffer;
+//   #cv  = box x devicePixelRatio (up to 3, low 2; at least three quarters of full even when res is turned down, so text stays sharp).
+// Everything is measured every frame and reallocated only when a target size really changes (window, monitor, zoom, either setting).
+// The overlay is laid out in OV units: OV.u CSS pixels each, chosen so text is neither tiny on a 360 px phone nor huge on a 4K monitor.
+const OV={w:W,h:H,u:1,k:2,bw:0,bh:0,stamp:0},FR={w:0,h:0,pr:1,bw:0,bh:0};
 function resize(){
-  const w=cv.clientWidth||glc.clientWidth,h=cv.clientHeight||glc.clientHeight,pr=Q.low?1:Math.min(2,window.devicePixelRatio||1);
-  if(!w||!h||(w===viewW&&h===viewH&&pr===viewPR))return;
-  viewW=w;viewH=h;viewPR=pr;
-  renderer.setPixelRatio(pr);renderer.setSize(w,h,false);
-  camera.aspect=w/h;camera.updateProjectionMatrix();fitCamera();
-  const s=h*pr/(2*Math.tan(camera.fov*Math.PI/360));for(let i=0;i<pointSets.length;i++)pointSets[i].mat.uniforms.uScale.value=s;
+  const w=cv.clientWidth||glc.clientWidth,h=cv.clientHeight||glc.clientHeight;if(!w||!h)return;
+  const dpr=window.devicePixelRatio||1,res=Math.max(.5,Math.min(1,num(MB.settings&&MB.settings.res,1)));
+  let pr=Math.min(dpr,Q.low?1:Q.ultra?3:2)*res;
+  const budget=Q.ultra?12.45e6:8.3e6;if(w*h*pr*pr>budget)pr=Math.sqrt(budget/(w*h));
+  pr=Math.min(pr,maxRB/w,maxRB/h);
+  const bw=Math.max(1,Math.floor(w*pr)),bh=Math.max(1,Math.floor(h*pr));
+  if(bw!==FR.bw||bh!==FR.bh||w!==viewW||h!==viewH){
+    viewW=w;viewH=h;viewPR=pr;FR.w=w;FR.h=h;FR.pr=pr;FR.bw=bw;FR.bh=bh;
+    renderer.setPixelRatio(pr);renderer.setSize(w,h,false);
+    camera.aspect=w/h;camera.updateProjectionMatrix();fitCamera();
+    const s=h*pr/(2*Math.tan(camera.fov*Math.PI/360));for(let i=0;i<pointSets.length;i++)pointSets[i].mat.uniforms.uScale.value=s;
+  }
+  // the overlay canvas
+  let ok=Math.min(dpr,Q.low?2:3)*Math.max(.75,res);if(w*h*ok*ok>8.3e6)ok=Math.sqrt(8.3e6/(w*h));
+  const ow=Math.max(1,Math.round(w*ok)),oh=Math.max(1,Math.round(h*ok));
+  if(ow!==OV.bw||oh!==OV.bh||cv.width!==ow||cv.height!==oh){
+    cv.width=ow;cv.height=oh;OV.bw=ow;OV.bh=oh;
+    const ref=Math.min(h/600,w/800),u=Math.max(.5,Math.pow(ref,.8));
+    OV.u=u;OV.w=w/u;OV.h=h/u;OV.k=ow/OV.w;OV.stamp++;vig=null;capGrad.clear();hudAt=-1;padAt=-1;
+  }
 }
 // Framing: the hero stays large, but the boss (or the nearest pack) and any blast about to land near the player must be on screen.
 // The view leans from the player toward that group and widens step by step until everything fits; at zoom 1 it is the whole arena.
@@ -1182,7 +1225,7 @@ function frameWant(sight){
   }
 }
 const sp={x:0,y:0,ok:true};
-function toScreen(x,y,z){v3.set(x,y,z).project(camera);sp.x=(v3.x*.5+.5)*W;sp.y=(.5-v3.y*.5)*H;sp.ok=v3.z<1;return sp}
+function toScreen(x,y,z){v3.set(x,y,z).project(camera);sp.x=(v3.x*.5+.5)*OV.w;sp.y=(.5-v3.y*.5)*OV.h;sp.ok=v3.z<1;return sp}
 
 /* ---------- 2D overlay ---------- */
 function groundEllipse(x,z,r){ // screen-space ellipse of a circle lying on the floor
@@ -1192,6 +1235,7 @@ function groundEllipse(x,z,r){ // screen-space ellipse of a circle lying on the 
 // how far the page's floating HUD (.vitals is fixed over the arena on small screens) reaches down the view, in overlay units; measured twice a second
 let hudY=0,hudAt=-1,hudEl;
 function hudBottom(){
+  const H=OV.h;
   const now=MB.S.t;if(now>=hudAt&&now-hudAt<.5)return hudY;hudAt=now;
   try{
     if(hudEl===undefined)hudEl=document.querySelector('.vitals')||null;
@@ -1201,7 +1245,7 @@ function hudBottom(){
   return hudY;
 }
 let vig=null;
-function vignette(){if(!vig){vig=ctx.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*.98);vig.addColorStop(0,'rgba(6,4,18,0)');vig.addColorStop(.6,'rgba(6,4,18,.3)');vig.addColorStop(1,'rgba(5,3,16,.8)')}return vig}
+function vignette(){const W=OV.w,H=OV.h;if(!vig){vig=ctx.createRadialGradient(W/2,H/2,H*.4,W/2,H/2,H*.98);vig.addColorStop(0,'rgba(6,4,18,0)');vig.addColorStop(.6,'rgba(6,4,18,.3)');vig.addColorStop(1,'rgba(5,3,16,.8)')}return vig}
 // overlay text helpers: condensed, slightly slanted, inked
 const CSS={ink:'#0b0a16',bone:'#f2ecff',gold:'#f0b848',power:'#8b4dff',power2:'#c4f4ff',foe:'#ff2d55',dim:'#a9a4c8'};
 // colours on the overlay lose their hue with the eyes: the game's own grey before there are eyes, a grey worked out here when an ordeal takes them away again
@@ -1215,6 +1259,7 @@ function slant(x,y,rot,sx,sy){ctx.translate(x,y);if(rot)ctx.rotate(rot);ctx.tran
 function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.strokeStyle=CSS.ink;ctx.strokeText(txt,x,y);ctx.fillStyle=fill;ctx.fillText(txt,x,y)}
 // a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
 function petBar(a,MM,idCss){
+  const W=OV.w,H=OV.h;
   if(!a||!a.pet||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
   let top=(a.r||16)*2.4;if(MM&&MM.height)try{top=MM.height(a)}catch(e){}
   toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)return;
@@ -1231,9 +1276,9 @@ function petBar(a,MM,idCss){
   ctx.strokeStyle='rgba(8,8,12,.8)';ctx.stroke();
 }
 function drawOverlay(sight){
-  const S=MB.S,P=MB.P;
+  const S=MB.S,P=MB.P,W=OV.w,H=OV.h; // W and H in here are the overlay's own width and height in OV units, not the arena's
   ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';ctx.clearRect(0,0,cv.width,cv.height);
-  ctx.setTransform(cv.width/W,0,0,cv.height/H,0,0);
+  ctx.setTransform(OV.k,0,0,OV.k,0,0);
   if(!sight&&P){
     // no eyes: everything past arm's reach is black
     const e=groundEllipse(P.x,P.y,fogR*1.04),k=e.ry/e.rx;
@@ -1318,7 +1363,7 @@ function drawOverlay(sight){
     ctx.fillStyle=sight?(death?CSS.power2:CSS.foe):'#ddd';ctx.globalAlpha=e;ctx.fillRect(0,bh,W,1.5);ctx.fillRect(0,H-bh-1.5,W,1.5);ctx.globalAlpha=1}
   // level banner: a slanted dark band that cuts in from the left, thin accent lines, the title sliding in against it
   if(S.banner>0&&S.mode==='play'&&S.L){
-    const L=S.L,age=2.8-S.banner,tin=easeOut(clamp01(age/.32)),out=clamp01(S.banner/.4),a=Math.min(1,tin*1.2)*out,sl=28,y0=204,y1=338,xr=W*tin+sl,ac=tint(CSS.power),ac2=tint(CSS.power2);
+    const L=S.L,age=2.8-S.banner,tin=easeOut(clamp01(age/.32)),out=clamp01(S.banner/.4),a=Math.min(1,tin*1.2)*out,sl=28,y0=Math.round(H*.34),y1=y0+134,xr=W*tin+sl,ac=tint(CSS.power),ac2=tint(CSS.power2);
     ctx.save();ctx.globalAlpha=a;
     ctx.beginPath();ctx.moveTo(-sl,y0);ctx.lineTo(xr+sl,y0);ctx.lineTo(xr-sl,y1);ctx.lineTo(-sl*3,y1);ctx.closePath();ctx.fillStyle='rgba(8,7,18,.84)';ctx.fill();
     ctx.fillStyle=ac;ctx.fillRect(0,y0-5,W*tin,2);ctx.fillRect(W*(1-tin),y1+3,W*tin,2);
@@ -1472,7 +1517,7 @@ function syncFx(dt,sight){
   TF.slash.run(fdt,upSlash);TF.ghost.run(fdt,upGhost);TF.streak.run(fdt,upStreak);TF.flash.run(fdt,upFlash);TF.burst.run(fdt,upFlash);TF.crack.run(fdt,upCrack);
   if(TFR){TFR.slash.run(fdt,upSlash);TFR.ghost.run(fdt,upGhost);TFR.streak.run(fdt,upStreak);TFR.flash.run(fdt,upFlash)}
   // power rising off the hero: more of it with every rank
-  {let k=0;const ap=cls?apexPath(MB):null;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=ap?1.25:r&&r[0]==='S'?1:RANK_K[r]||.12}
+  {let k=0;const ap=cls?apexPath(MB):null;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=ap||(r&&r[0]==='X')?1.25:r&&r[0]==='S'?1:RANK_K[r]||.12}
     FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK,AC=APEX_COL[ap||''];
     const n=rk<.02||!P?0:Math.min(48,Math.round((low?3:8)+(low?9:40)*rk)),pos=auraP.pos,col=auraP.col,size=auraP.size,c=FX.clock;
     for(let i=0;i<n;i++){const a=i*2.399+c*(.5+i%3*.22),rad=9+(i*7%19)+6*Math.sin(c*1.3+i),h=(i*17.3+c*(20+i%5*7+26*rk))%(54+34*rk),q=h/(54+34*rk);
@@ -1492,6 +1537,10 @@ function drawPshot(p,i,x,y,t,low,pool){
   else if(pool===pools.skull){const a=Math.atan2(vy,vx);o.scale.setScalar(r*1.25);o.rotation.y=0;o.userData.trail.rotation.y=-a;o.userData.trail.position.set(-Math.cos(a)*3.8,0,-Math.sin(a)*3.8);o.userData.core.rotation.y=Math.PI/2-a;o.userData.core.rotation.z=Math.sin(t*14+i)*.25}
   else{o.scale.setScalar(Math.max(4.5,r));o.rotation.y=-Math.atan2(vy,vx);o.userData.core.scale.setScalar(.8)}
 }
+// an order hero's sweeping beam: P.beam = {a, len, w, on}, from the hero outward
+function heroBeam(P,t){const b=P&&P.beam;if(!b||typeof b!=='object'||b.on===false)return;const a=num(b.a,0),len=Math.max(1,num(b.len,300)),w=Math.max(4,num(b.w,16)),o=pools.obeam.get(),u=o.userData,fl=1+.14*Math.sin(t*53);
+  o.position.set(P.x+Math.cos(a)*len/2,SHOT_Y+8,P.y+Math.sin(a)*len/2);o.rotation.y=-a;
+  u.core.scale.set(len,w*.22*fl,w*.5*fl);u.glow.position.y=-SHOT_Y-7.2;u.edge.position.y=-SHOT_Y-7;u.glow.scale.set(len+w*3,1,w*5*fl);u.edge.scale.set(len+w*5,1,w*9)}
 // a pet's beam is the same shape as a monster's, in friendly blue
 function allyBeams(allies,t){
   for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue;
@@ -1667,6 +1716,7 @@ function syncRemotes(list,dt,sight){
     P.face=num(sp.face,P.face);P.swing=num(sp.swing,P.face);P.moving=!!sp.moving&&!dead;
     P.maxHp=Math.max(1,num(sp.maxHp,P.maxHp));P.hp=Math.max(0,Math.min(P.maxHp,num(sp.hp,P.hp)));P.shield=sp.shield===true?1:num(sp.shield,0);P.skCd=num(sp.skCd,0);
     // the order aura: the radius the member sends (P.auraR, or look.auraR), else our own when we walk the same path, else a plain default
+    P.beam=!dead&&sp.beam&&typeof sp.beam==='object'?sp.beam:null;P.ascT=num(sp.ascT,0);if(P.beam&&!r.away)heroBeam(P,t);
     P.auraR=S.apex==='order'&&!dead?Math.max(0,Math.min(400,num(sp.auraR,num(L.auraR,LP&&LP.auraR>0?LP.auraR:96)))):0;
     P.atk=runTimer(tm,'atk','ratk',sp.atk,dt);P.dashT=runTimer(tm,'dashT','rdashT',sp.dashT,dt);P.inv=runTimer(tm,'inv','rinv',sp.inv,dt);
     if(dead){P.atk=P.dashT=P.inv=tm.atk=tm.dashT=tm.inv=0}
@@ -1709,7 +1759,7 @@ function syncRemotes(list,dt,sight){
         drawPshot(p,j,p.x+num(p.vx,0)*rm.psAge,p.y+num(p.vy,0)*rm.psAge,t,low,pools[PK[p.kind]===1?p.kind:'bolt'])}}
     remEchoes(rm,!away&&Array.isArray(r.echoes)?r.echoes:NONE,dt);
     // power rising off them, as it does off the local hero
-    {let k=0;const ap=S.apex;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=ap?1.25:rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
+    {let k=0;const ap=S.apex;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=ap||(rk&&rk[0]==='X')?1.25:rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
       rm.rankK+=(k-rm.rankK)*Math.min(1,dt*2);const rk=rm.rankK,d=rm.disc,c=FX.clock;
       d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(ap==='order'?PAL.power2:PAL.power)}
         d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3+i));d.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5+i))*(ap==='dominion'?.45:1)}}
@@ -1729,6 +1779,7 @@ function syncRemotes(list,dt,sight){
 const TAG_FONT='700 14px '+FONT,TAG_FONT_S='700 11px '+FONT;
 const padBox=[{on:false,x0:0,y0:0,x1:0,y1:0},{on:false,x0:0,y0:0,x1:0,y1:0}];let padAt=-1,padEls;
 function padBoxes(){
+  const W=OV.w,H=OV.h;
   const now=MB.S.t;if(now>=padAt&&now-padAt<.5)return;padAt=now;
   try{
     if(padEls===undefined)padEls=[document.getElementById('pad'),document.querySelector('.touch .acts')];
@@ -1740,6 +1791,7 @@ function padBoxes(){
 }
 // overlay: name and health over each member, bars over their pets, and an arrow at the edge of the view toward anyone out of frame
 function remoteOverlay(MM,sight){
+  const W=OV.w,H=OV.h;
   const top=hudBottom(),now=MB.S.t;
   for(let m=0;m<rems.length;m++){const al=rems[m].allyList,css=rems[m].css;for(let i=0;i<al.length;i++)petBar(al[i],MM,css)}
   ctx.save();ctx.textBaseline='alphabetic';ctx.lineJoin='round';
@@ -1812,7 +1864,11 @@ function trialSetup(){
   for(const m of[track,lit,haze]){m.frustumCulled=false;m.renderOrder=2}
   const head=new THREE.Sprite(glowMat(0xffffff,.9));head.scale.setScalar(46);head.position.y=4;
   const edge=new THREE.Group();edge.add(track,haze,lit,head);g.add(edge);
-  TR.edge={g:edge,track,lit,haze,head,trackM,litM,hazeM,x0,x1,z0,z1,w,h,per};
+  // the same count as a thin arc round the hero's feet, for when the walls are out of view
+  const footGeo=new THREE.RingGeometry(.9,1,64,1,Math.PI/2,-TAU).rotateX(-Math.PI/2),footM=new THREE.MeshBasicMaterial({color:PAL.power2,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false,side:THREE.DoubleSide}),
+    foot=noLine(new THREE.Mesh(footGeo,footM)),footBack=noLine(new THREE.Mesh(G.ring,new THREE.MeshBasicMaterial({color:0x8a86b0,transparent:true,opacity:.2,depthWrite:false,toneMapped:false,fog:false})));
+  foot.position.y=.82;footBack.position.y=.8;foot.renderOrder=footBack.renderOrder=3;foot.scale.setScalar(40);footBack.scale.setScalar(40);g.add(footBack,foot);
+  TR.edge={g:edge,track,lit,haze,head,trackM,litM,hazeM,x0,x1,z0,z1,w,h,per,foot,footBack,footGeo,footM};
   // the marrow-lamp
   const o=new THREE.Group(),body=new THREE.Group(),stone=std(0x6a6876,{flatShading:true}),boneM=ST.toon(PAL.bone),boneD=ST.toon(0x8f8676),dead=ST.toon(0x3a3640);
   const plinth=new THREE.Mesh(mergeGeos([new THREE.CylinderGeometry(15,18,5,7).translate(0,2.5,0),new THREE.CylinderGeometry(11,13,4,7).translate(0,7,0)]),stone);plinth.castShadow=plinth.receiveShadow=true;body.add(plinth);
@@ -1821,7 +1877,7 @@ function trialSetup(){
   const spine=new THREE.Mesh(mergeGeos([0,1,2].map(i=>new THREE.SphereGeometry(2.6-i*.4,6,5).scale(1,.7,1).translate(0,10.5+i*2.8,0))),boneD);spine.castShadow=true;body.add(spine);
   const coreM=basic(0xfff0c2),core=noLine(new THREE.Mesh(new THREE.OctahedronGeometry(1,0),coreM));core.position.y=26;
   const shellM=new THREE.MeshBasicMaterial({color:PAL.gold,transparent:true,opacity:.35,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),shell=noLine(new THREE.Mesh(G.sphere,shellM));shell.position.y=26;
-  const halo=new THREE.Sprite(glowMat(PAL.gold,.8));halo.position.y=27;
+  const halo=new THREE.Sprite(glowMat(PAL.gold,.55));halo.position.y=27;
   const pool=noLine(new THREE.Mesh(G.quad,flatGlowMat(PAL.gold,.3)));pool.position.y=.6;pool.renderOrder=1;
   body.add(core,shell,halo);
   // floor rings: the reach of the thing itself, its health (drawn up to a fraction through the geometry's draw range), and the count
@@ -1844,7 +1900,7 @@ function syncTrial(tr,dt,sight){
   TR.fail+=((tr.failed?1:0)-TR.fail)*Math.min(1,dt*6);
   const dur=num(tr.dur,0),goal=num(tr.goal,0),frac=dur>0?clamp01(TR.t/dur):goal>0?clamp01(num(tr.progress,0)/goal):-1;TR.frac=frac;
   // the track at the walls: survive fills, race burns down
-  const edgeOn=(kind==='survive'||kind==='race')&&frac>=0&&sight;E.g.visible=edgeOn;
+  const edgeOn=(kind==='survive'||kind==='race')&&frac>=0&&sight;E.g.visible=edgeOn;E.foot.visible=E.footBack.visible=edgeOn&&!!P&&!P.down;
   if(edgeOn){
     const race=kind==='race',q=race?1-frac:frac,n=Math.max(0,Math.min(SEGS,Math.round(q*SEGS))),hot=race&&q<.25,beat=hot?.6+.4*Math.sin(t*12):1,f=TR.fail;TR.q=q;
     E.lit.count=n;E.haze.count=low?0:n;
@@ -1856,6 +1912,7 @@ function syncTrial(tr,dt,sight){
     const d=(q*E.per+E.w/2)%E.per,h=E.head;let x,z;
     if(d<E.w){x=E.x0+d;z=E.z0}else if(d<E.w+E.h){x=E.x1;z=E.z0+d-E.w}else if(d<2*E.w+E.h){x=E.x1-(d-E.w-E.h);z=E.z1}else{x=E.x0;z=E.z1-(d-2*E.w-E.h)}
     h.visible=q>.004&&q<.996;h.position.x=x;h.position.z=z;h.material.color.copy(_hc);h.scale.setScalar((hot?58:44)+6*Math.sin(t*9));
+    if(P){E.foot.position.x=E.footBack.position.x=P.x;E.foot.position.z=E.footBack.position.z=P.y;E.footGeo.setDrawRange(0,Math.round(64*q)*6);E.footM.color.copy(_hc);E.footM.opacity=.8*beat}
   }
   // the thing to protect
   const ob=tr.obj&&typeof tr.obj==='object'&&num(tr.obj.x,null)!==null&&num(tr.obj.y,null)!==null?tr.obj:null;
@@ -1878,7 +1935,7 @@ function syncTrial(tr,dt,sight){
     Lm.core.visible=Lm.shell.visible=Lm.halo.visible=sz>.3;
     Lm.core.scale.set(sz*.62,sz*1.25,sz*.62);Lm.core.rotation.y=t*1.8;Lm.core.position.y=26+Math.sin(t*2.2)*1.1;Lm.coreM.color.copy(_hc).lerp(_c0.setHex(0xffffff),.45);
     Lm.shell.scale.setScalar(sz*1.5);Lm.shell.position.y=Lm.core.position.y;Lm.shellM.color.copy(_hc);Lm.shellM.opacity=.3+.12*Math.sin(t*5);
-    Lm.halo.material.color.copy(_hc);Lm.halo.scale.setScalar((40+60*hp)*flick);Lm.halo.position.y=Lm.core.position.y;
+    Lm.halo.material.color.copy(_hc);Lm.halo.scale.setScalar((26+30*hp)*flick);Lm.halo.position.y=Lm.core.position.y;
     Lm.pool.visible=!brk&&sight;Lm.pool.material.color.copy(_hc);Lm.pool.material.opacity=(.14+.2*hp)*flick;Lm.pool.scale.set((r+60)*2.6,1,(r+60)*2.1);
     // rings
     const R1=r+17,sh=TR.hpShow;
@@ -1891,9 +1948,9 @@ function syncTrial(tr,dt,sight){
   }else{TR.hp=1;TR.hpShow=1}
 }
 const capGrad=new Map();
-function capGradient(key,c){let g=capGrad.get(key);if(!g){g=ctx.createRadialGradient(W/2,H/2,H*.34,W/2,H/2,H*.98);const p='rgba('+c[0]+','+c[1]+','+c[2]+',';g.addColorStop(0,p+'0)');g.addColorStop(.55,p+'.1)');g.addColorStop(1,p+'.5)');capGrad.set(key,g)}return g}
+function capGradient(key,c){const W=OV.w,H=OV.h;let g=capGrad.get(key);if(!g){g=ctx.createRadialGradient(W/2,H/2,H*.34,W/2,H/2,H*.98);const p='rgba('+c[0]+','+c[1]+','+c[2]+',';g.addColorStop(0,p+'0)');g.addColorStop(.55,p+'.1)');g.addColorStop(1,p+'.5)');capGrad.set(key,g)}return g}
 function trialOverlay(sight){
-  const S=MB.S,t=S.t,cap=TR.cap,top=hudBottom();
+  const S=MB.S,t=S.t,cap=TR.cap,top=hudBottom(),W=OV.w,H=OV.h;
   // an ordeal's handicap: the edge of the view takes its colour, and two thin lines hold it top and bottom
   if(cap&&cap!=='dark'){const c=HC_COL[cap]||HC_COL.other,pu=.82+.18*Math.sin(t*1.7),css='rgb('+c[0]+','+c[1]+','+c[2]+')';
     ctx.save();ctx.globalAlpha=pu;ctx.fillStyle=capGradient(cap,c);ctx.fillRect(0,0,W,H);
@@ -1928,22 +1985,35 @@ function trialOverlay(sight){
 
 /* ---------- graphics quality, switched live ---------- */
 function applyQuality(){
-  const low=isLow();Q.low=low;
+  const low=isLow(),tier=tierNow(),ultra=tier==='ultra';Q.low=low;Q.ultra=ultra;Q.tier=tier;
+  maxAniso=ultra?anisoCap:Math.min(4,anisoCap);
   sun.castShadow=!low;renderer.shadowMap.enabled=!low;
-  if(low&&sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}
+  // shadows: 1024 in high over the whole arena; ultra 4096 (2048 on small cards), fitted to the part of the arena in view (fitShadow)
+  {const n=ultra?(maxTex>=8192?4096:2048):1024;if(sun.shadow.mapSize.x!==n||low){sun.shadow.mapSize.set(n,n);if(sun.shadow.map){sun.shadow.map.dispose();sun.shadow.map=null}}}
+  shS=0;fitShadow();
   points[2].visible=points[3].visible=!low;XL[0].visible=XL[1].visible=!low;
   viewPR=0; // resize() picks the new pixel ratio; syncEnv() rebuilds the place without bump maps and with fewer props
   ST.refresh(scene); // ink outlines: stripped in low, rebuilt from the remembered requests in high
 }
-if(typeof MB.on==='function')try{MB.on('settings',()=>{if(alive&&isLow()!==Q.low)applyQuality()})}catch(e){}
+// ultra: the shadow camera covers only as much of the arena as the view shows (never less than six tenths), centred where the camera looks and
+// moved in whole texels so edges do not crawl; the other tiers keep the whole arena
+let shS=0,shX=1e9,shZ=1e9;
+function fitShadow(){
+  const c=sun.shadow.camera,s=Q.ultra?Math.max(.6,Math.min(1,Math.ceil((zoom+.16)*10)/10)):1;
+  if(s!==shS){shS=s;shX=1e9;c.left=-560*s;c.right=560*s;c.top=420*s;c.bottom=-420*s;c.updateProjectionMatrix()}
+  let ox=0,oz=0;
+  if(s<1){const tx=1120*s/sun.shadow.mapSize.x*4,mx=560*(1-s),mz=300*(1-s);ox=Math.round(Math.max(-mx,Math.min(mx,camTarget.x-W/2))/tx)*tx;oz=Math.round(Math.max(-mz,Math.min(mz,camTarget.z-H/2))/tx)*tx}
+  if(ox!==shX||oz!==shZ){shX=ox;shZ=oz;sun.position.set(W/2-300+ox,620,H/2+300+oz);sun.target.position.set(W/2+ox,0,H/2+oz);sun.target.updateMatrixWorld()}
+}
+if(typeof MB.on==='function')try{MB.on('settings',()=>{if(alive&&tierNow()!==Q.tier)applyQuality()})}catch(e){}
 
 /* ---------- frame ---------- */
 let lastSight=null,alive=true;
 function draw(dt){
   if(!alive)return;
   const S=MB.S,P=MB.P,t=S.t,trial=trialOf(),dark=!!trial&&MB.has('sight')&&HCAP(trial)==='dark',sight=MB.has('sight')&&!dark;
-  fogR=dark?Math.max(FOG,Math.min(520,num(trial.sight,num(trial.sightR,num(MB.sightR,FOG*1.85))))):FOG;seeing=sight;
-  if(isLow()!==Q.low)applyQuality();
+  fogR=dark?Math.max(FOG,Math.min(520,trial.sight>0?+trial.sight:MB.sightR>0?+MB.sightR:FOG*1.85)):FOG;seeing=sight;
+  if(tierNow()!==Q.tier)applyQuality();
   resize();syncEnv();
   if(sight!==lastSight){lastSight=sight;glc.style.filter=sight?'none':'grayscale(1) contrast(1.22) brightness(1.06)';
     ST.uRim.value.setHex(sight?PAL.rim:0xffffff).multiplyScalar(sight?.55:.8)}
@@ -1959,7 +2029,8 @@ function draw(dt){
     placeCamera(camTarget.x+(FX.bx-camTarget.x)*m,camTarget.z+(FX.bz-camTarget.z)*m,fitD*zoom*(1-.07*e))}
   basePos.copy(camera.position);
   scene.fog.near=fitD*zoom*.95;scene.fog.far=fitD*zoom+env.fogFar;
-  ST.uMin.value=viewH?2*fitD*zoom*Math.tan(camera.fov*Math.PI/360)/viewH*.95:0; // ink lines never thinner than about a pixel
+  ST.uMin.value=viewH?2*fitD*zoom*Math.tan(camera.fov*Math.PI/360)/viewH*.95*Math.max(1,1/viewPR)*Math.max(1,Math.min(1.8,viewH/900)):0; // ink lines never thinner than about a pixel (a little more on a very tall view)
+  if(!Q.low)fitShadow();
 
   // lights
   const low=Q.low,nL=low?2:4;
@@ -2016,7 +2087,8 @@ function draw(dt){
   for(let i=0;i<ps.length;i++){const p=ps[i];drawPshot(p,i,p.x,p.y,t,low,pools[p.kind]||pools.bolt)}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
-  {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'?f.kind:'other');
+  {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'||f.kind==='domain'?f.kind:'other');
+    if(f.kind==='domain'){const d=pools.dark.get();d.position.x=f.x;d.position.z=f.y;d.scale.setScalar(f.r*(1+.02*Math.sin(t*2+i)));d.material.opacity=.5*Math.max(0,Math.min(1,f.t*4,(f.dur-f.t)*2))}
     if(m.map!==tex)m.map=tex;o.position.x=f.x;o.position.z=f.y;o.scale.setScalar(f.r*2.1);o.rotation.y=f.kind==='rain'?0:t*(f.kind==='frost'?.22:-.3);
     m.opacity=Math.max(0,Math.min(1,f.t*5,(f.dur-f.t)*2.5))*(.8+.14*Math.sin(t*5+i))}}
   if(sight&&MB.has('touch')){const zs=MB.zones;
@@ -2032,7 +2104,7 @@ function draw(dt){
   // the guardian's ward, while it is ready to take a blow: a thin gold ring at the healer's feet
   if(P&&sight)for(let i=0;i<allies.length;i++){const a=allies[i];if(!a||a.kind!=='guardian'||!(a.shield===true||a.shield>0))continue;
     const o=pools.ward.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(27+1.5*Math.sin(t*4));o.rotation.y=t*.8;o.material.opacity=.5+.15*Math.sin(t*4);break}
-  allyBeams(allies,t);
+  allyBeams(allies,t);if(P&&P.beam)heroBeam(P,t);
   {const zs=MB.zones;for(let i=0;i<zs.length;i++){const z=zs[i];if(typeof z.sx!=='number'||z.t>=z.dur)continue;const q=Math.max(0,z.t/z.dur),o=(z.mine?pools.pbomb:pools.bomb).get();
     o.position.set(z.sx+(z.x-z.sx)*q,12+Math.sin(q*Math.PI)*(70+z.dur*40),z.sy+(z.y-z.sy)*q);o.rotation.x=t*7+i}}
   if(sight){const rs=MB.rings,hear=MB.has('hearing');
@@ -2077,7 +2149,7 @@ function dispose(){
   if(!alive)return;alive=false;R.ok=false;
   glc.hidden=true;glc.style.filter='';cv.style.zIndex='';
   glc.removeEventListener('webglcontextlost',onLost);
-  try{ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.clearRect(0,0,cv.width,cv.height)}catch(e){}
+  try{cv.width=W*2;cv.height=H*2;ctx.setTransform(1,0,0,1,0,0);ctx.globalAlpha=1;ctx.clearRect(0,0,cv.width,cv.height)}catch(e){} // back to the size the 2D game set at load
   try{if(env)disposeEnv(env);renderer.dispose()}catch(e){}
 }
 function onLost(e){e.preventDefault();console.warn('Marrowborn: WebGL context lost, falling back to 2D');dispose()}
@@ -2087,7 +2159,10 @@ glc.addEventListener('webglcontextlost',onLost);
 cv.style.zIndex='0';
 glc.style.transition='filter 1.2s';
 glc.hidden=false;
+applyQuality();
 resize();placeCamera(W/2,H/2,fitD);
-if(isLow())applyQuality();
-R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
+R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;
+// frame(): what is being drawn right now: CSS box, pixel ratio and backing size of #gl, the overlay's backing size and unit, the tier, MSAA
+R.frame=()=>({css:[FR.w,FR.h],pr:FR.pr,gl:[FR.bw,FR.bh],pixels:FR.bw*FR.bh,overlay:[OV.bw,OV.bh],unit:OV.u,tier:Q.tier,msaa:aaMade,shadow:Q.low?0:sun.shadow.mapSize.x,aniso:maxAniso});
+Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.memberColor=memberColor;R.scene=scene;R.camera=camera;R.ok=true;
 })();
