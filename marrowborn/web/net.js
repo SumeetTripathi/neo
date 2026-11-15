@@ -488,7 +488,7 @@ function modes(cur,pick){
 /* ---- versus: words and colours ---- */
 var VS_LAB={format:'Format',floor:'Hero level',wins:'Rounds to win',time:'Round time'};
 function vsWord(k,v){return k==='format'?(v==='teams'?'Teams':'Free-for-all'):k==='floor'?'Floor '+v:k==='wins'?'First to '+v:v+' s'}
-var TEAM_NAME=['Team 1','Team 2'],TEAM_COL=['#2f9dff','#ffb21e'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
+var TEAM_NAME=['Team A','Team B'],TEAM_COL=['#2f9dff','#ffb21e'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
 function hex(c){if(typeof c==='number'&&c>=0)c='#'+('000000'+Math.floor(c).toString(16)).slice(-6);return typeof c==='string'&&/^#[0-9a-f]{3,8}$/i.test(c)?c:''}
 /* the colours the arena uses, so that the lobby, the HUD and the rings round the heroes agree: the renderer's own when it offers them, else the game's member colours */
 function teamColor(t){
@@ -720,6 +720,8 @@ function txt(el,s){if(el&&el.textContent!==s)el.textContent=s}
 function cls(el,name,on){if(el&&el.classList.contains(name)!==!!on)el.classList.toggle(name,!!on)}
 function clock(t){t=Math.max(0,Math.ceil(t));return Math.floor(t/60)+':'+('0'+t%60).slice(-2)}
 function pips(n){var b=h('span',{class:'vsh-pips','aria-hidden':'true'}),i;for(i=0;i<n;i++)b.appendChild(h('i'));return b}
+function vhTeam(v,t){var l=Array.isArray(v.teams)?v.teams:[],i;for(i=0;i<l.length;i++)if(l[i]&&l[i].team===t)return l[i];return null}
+function vhTeamName(v,t){var o=vhTeam(v,t),n=o&&typeof o.name==='string'?cleanName(o.name):'';return n||TEAM_NAME[t]}
 function vhBuild(v,score,teams){
   vh.textContent='';vhT={sides:[],chips:{}};
   var mid=h('div',{class:'vsh-mid'},vhT.round=h('span',{class:'vsh-round'}),vhT.time=h('b',{class:'vsh-time'}),vhT.note=h('span',{class:'vsh-note'}));
@@ -731,7 +733,7 @@ function vhBuild(v,score,teams){
       var men=h('span',{class:'vsh-men','aria-hidden':'true'}),side=h('div',{class:'vsh-side '+(t?'b':'a')+(v.myTeam===t?' mine':'')}),o={el:side,men:{},pips:null,sr:null};
       side.style.setProperty('--tc',teamColor(t));
       score.forEach(function(e){if((e.team?1:0)===t){var d=h('i',{class:e.id===myId?'me':null});o.men[e.id]=d;men.appendChild(d)}});
-      side.appendChild(h('span',{class:'vsh-tn',text:TEAM_NAME[t]+(v.myTeam===t?' · you':'')}));
+      side.appendChild(h('span',{class:'vsh-tn',text:vhTeamName(v,t)+(v.myTeam===t?' · you':'')}));
       side.appendChild(o.pips=pips(wins));side.appendChild(men);side.appendChild(o.sr=h('span',{class:'mbt-sr'}));
       vhT.sides.push(o);
     });
@@ -752,7 +754,7 @@ function vhBuild(v,score,teams){
 function vhDraw(v){
   if(!vh&&!vhMake())return;
   var score=Array.isArray(v.score)?v.score:[],teams=v.format==='teams',ph=String(v.phase||''),t=+v.t||0,wins=v.wins|0;
-  var key=(teams?'T':'F')+wins+'|'+v.myTeam+'|'+score.map(function(e){return e.id+':'+e.name+':'+e.team}).join(',');
+  var key=(teams?'T'+vhTeamName(v,0)+'/'+vhTeamName(v,1):'F')+wins+'|'+v.myTeam+'|'+teamColor(0)+memberColor(1)+'|'+score.map(function(e){return e.id+':'+e.name+':'+e.team}).join(',');
   if(key!==vhKey){vhKey=key;vhBuild(v,score,teams)}
   var w=doc.querySelector('.wrap');if(w&&!w.classList.contains('vs-on'))w.classList.add('vs-on');
   // nothing to show while everyone is choosing a hero, and the results screen says it all
@@ -770,14 +772,15 @@ function vhDraw(v){
   if(teams){
     for(i=0;i<2;i++){
       o=vhT.sides[i];won=0;var up=0,all=0;
-      for(j=0;j<score.length;j++){e=score[j];if((e.team?1:0)!==i)continue;won=Math.max(won,e.rounds|0);all++;if(!e.down)up++;cls(o.men[e.id],'down',e.down)}
+      for(j=0;j<score.length;j++){e=score[j];if((e.team?1:0)!==i)continue;won=Math.max(won,e.rounds|0);cls(o.men[e.id],'down',e.down||e.left);cls(o.men[e.id],'left',e.left);if(e.left)continue;all++;if(!e.down)up++}
+      var tt=vhTeam(v,i);if(tt&&typeof tt.rounds==='number')won=tt.rounds|0;
       for(j=0;j<o.pips.children.length;j++)cls(o.pips.children[j],'on',j<won);
       cls(o.el,'out',all>0&&!up);
       txt(o.sr,won+' of '+wins+' rounds, '+up+' of '+all+' standing');
     }
   }else{
     for(j=0;j<score.length;j++)best=Math.max(best,score[j].rounds|0);
-    for(j=0;j<score.length;j++){e=score[j];o=vhT.chips[e.id];if(!o)continue;txt(o.n,String(e.rounds|0));cls(o.el,'down',e.down);cls(o.el,'lead',best>0&&(e.rounds|0)===best)}
+    for(j=0;j<score.length;j++){e=score[j];o=vhT.chips[e.id];if(!o)continue;txt(o.n,String(e.rounds|0));cls(o.el,'down',e.down||e.left);cls(o.el,'left',e.left);cls(o.el,'lead',!e.left&&best>0&&(e.rounds|0)===best)}
   }
 }
 function vhTick(){
@@ -789,6 +792,7 @@ function vhTick(){
 }
 // asleep until a versus match is on: a slow look, then every frame while it lasts
 setInterval(function(){if(!vhRaf&&!vhBad&&vsNow())vhTick()},250);
+try{vhMake()}catch(e){} // the game looks for #vsHud to know that the page shows the score itself
 MBNet.on('net:end',function(){vhBad=false});
 
 /* ---- the way in: a Multiplayer button on the title screen ---- */

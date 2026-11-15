@@ -808,7 +808,7 @@ class Pool{constructor(make){this.make=make;this.items=[];this.n=0}
   begin(){this.n=0}
   get(){let o=this.items[this.n];if(!o){o=this.make();fx.add(o);this.items.push(o)}this.n++;o.visible=true;return o}
   end(){for(let i=this.n;i<this.items.length;i++)this.items[i].visible=false}}
-const fbeamCore=new THREE.MeshBasicMaterial({color:0xffe9e0,toneMapped:false,fog:false}),
+const fbeamCore=new THREE.MeshBasicMaterial({color:0xff9a8c,toneMapped:false,fog:false}),
   fbeamGlow=new THREE.MeshBasicMaterial({map:glowTex,color:PAL.foe,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
   fbeamEdge=new THREE.MeshBasicMaterial({map:glowTex,color:0xff6a1e,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false});
 const mCore={e:basic(0xffe6dc),hot:basic(0xfff0d0),bolt:basic(0xf2ecff),orb:basic(0xfff6cf),bone:basic(0xcfc7b4),dark:basic(0x15121b),steel:basic(0xd5dce2),
@@ -1637,7 +1637,7 @@ function remSetup(){
     g.fillStyle='#fff';g.beginPath();g.moveTo(h*.96,0);g.lineTo(h*.74,h*.14);g.lineTo(h*.74,-h*.14);g.closePath();g.fill();
     g.globalAlpha=.7;g.strokeStyle='#fff';g.lineWidth=h*.03;g.setLineDash([h*.09,h*.07]);g.beginPath();g.arc(0,0,h*.58,0,TAU);g.stroke();g.setLineDash([])});
   // an opponent's creature: a thin ring of six thorns
-  idTexAF=fxTex(128,(g,h)=>{ring(g,h,h*.78,h*.07,6,.12,.5);for(let i=0;i<6;i++){g.save();g.rotate(i*TAU/6);fang(g,h,h*.8,h*.99,h*.1,.5);g.restore()}});
+  idTexAF=fxTex(128,(g,h)=>{ring(g,h,h*.84,h*.045,6,.1,.45);for(let i=0;i<6;i++){g.save();g.rotate(i*TAU/6);fang(g,h,h*.85,h*.99,h*.065,.45);g.restore()}});
 }
 const newSm=()=>({init:false,x:0,y:0,w:0,l:0,fx:0,fy:0,fw:0,fl:0,tx:0,ty:0,tw:0,tl:0,T:0,el:0,since:0,iv:.083});
 // ease a position (and a walk phase and a lift) from one snapshot to the next. A new target starts a straight run from where the thing is drawn
@@ -1799,7 +1799,7 @@ function syncRemotes(list,dt,sight){
     {const im=rm.marks;let n=0;
       for(let j=0;j<al.length&&n<MARKS;j++){const a=al[j];if(a.hidden||a.dead||a.hp<=0)continue;
         const r0=a.r||12,rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
-        markAt(im,n++,a.x,a.y,rad*(foe?2.7:2.33),t*(j%2?.5:-.5)+j)}
+        markAt(im,n++,a.x,a.y,rad*(foe?2.4:2.33),t*(j%2?.5:-.5)+j)}
       im.count=n;im.visible=n>0;if(n)im.instanceMatrix.needsUpdate=true}
     const bc=rm.beacon;bc.visible=f>.05&&!hide;if(bc.visible){bc.position.set(P.x,46,P.y);bc.scale.set(26+4*Math.sin(t*3+i),150,1);bc.material.opacity=(.62+.14*Math.sin(t*3+i))*f}
     // their shots: drawn where the last snapshot put them, carried on along their flight until the next one
@@ -2158,9 +2158,9 @@ function vsFrame(dt){
 let RG=null;
 function ringTexture(seed,tall){ // flame tongues, tiling sideways; white-hot at the foot, ember, then crimson thinning to nothing
   const c=mkCanvas(512,128),g=c.getContext('2d'),rnd=rng(seed);
-  const gr=g.createLinearGradient(0,128,0,0);gr.addColorStop(0,'rgba(255,244,214,1)');gr.addColorStop(.08,'rgba(255,196,96,.95)');gr.addColorStop(.3,'rgba(255,104,36,.7)');gr.addColorStop(.62,'rgba(255,40,70,.34)');gr.addColorStop(1,'rgba(200,20,70,0)');
+  const gr=g.createLinearGradient(0,128,0,0);gr.addColorStop(0,'rgba(255,236,200,.95)');gr.addColorStop(.05,'rgba(255,170,70,.8)');gr.addColorStop(.2,'rgba(255,84,30,.5)');gr.addColorStop(.5,'rgba(255,36,64,.24)');gr.addColorStop(1,'rgba(200,20,70,0)');
   g.fillStyle=gr;g.fillRect(0,0,512,128);g.globalCompositeOperation='destination-out';
-  for(let x=0;x<512;x+=tall?16:11){const h=(tall?44:20)+rnd()*(tall?70:60),w=(tall?15:10)+rnd()*6,j=rnd()*8-4;
+  for(let x=0;x<512;x+=tall?34:21){const h=(tall?70:34)+rnd()*(tall?52:70),w=(tall?26:17)+rnd()*8,j=rnd()*14-7;
     for(const ox of[0,512,-512]){g.beginPath();g.moveTo(x+ox-w,0);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+j*1.6,h);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+w,0);g.closePath();g.fill()}}
   const t=new THREE.CanvasTexture(c);t.wrapS=THREE.RepeatWrapping;return t;
 }
@@ -2172,7 +2172,7 @@ function ringSetup(){
   const m1=add(t1,.9),m2=add(t2,.8),w1=noLine(new THREE.Mesh(wallGeo,m1)),w2=noLine(new THREE.Mesh(wallGeo,m2));w1.renderOrder=w2.renderOrder=5;
   // the floor: everything outside is burnt (a wide dark ring and a red wash over it), a hot line where the wall stands, a pale band on the safe side
   const outGeo=new THREE.RingGeometry(1,80,128,1).rotateX(-Math.PI/2),inGeo=new THREE.RingGeometry(.9,1,128,1).rotateX(-Math.PI/2),lineGeo=new THREE.RingGeometry(.985,1.012,160,1).rotateX(-Math.PI/2),
-    hotGeo=new THREE.RingGeometry(1,1.16,128,1).rotateX(-Math.PI/2);
+    hotGeo=new THREE.RingGeometry(1,1.07,128,1).rotateX(-Math.PI/2);
   const burnM=new THREE.MeshBasicMaterial({color:0x0a0206,transparent:true,opacity:.62,depthWrite:false,fog:false,toneMapped:false}),
     washM=new THREE.MeshBasicMaterial({color:0xff1c3c,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false}),
     hotM=new THREE.MeshBasicMaterial({color:0xff5a1e,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false}),
@@ -2193,13 +2193,13 @@ function syncRing(dt,sight){
   if(G0.show<.01&&!on){if(G0.g.visible){G0.g.visible=false;G0.pts.geo.setDrawRange(0,0)}return}
   const r=Math.max(1,VS.rr),a=G0.show,sd=VS.phase==='sudden'?1:.8;
   G0.g.visible=true;G0.g.position.set(VS.rx,0,VS.ry);
-  if(r!==G0.r){G0.r=r;const n=Math.max(6,Math.round(TAU*r/150));G0.t1.repeat.x=n;G0.t2.repeat.x=Math.max(8,Math.round(n*1.7))}
-  const h=(low?70:92)*a,fl=1+.06*Math.sin(t*9)+.04*Math.sin(t*23.7);
+  if(r!==G0.r){G0.r=r;const n=Math.max(4,Math.round(TAU*r/260));G0.t1.repeat.x=n;G0.t2.repeat.x=Math.max(8,Math.round(n*1.7))}
+  const h=(low?64:84)*a,fl=1+.06*Math.sin(t*9)+.04*Math.sin(t*23.7);
   G0.w1.scale.set(r,h*fl,r);G0.w2.scale.set(r*1.004,h*.55*(2-fl),r*1.004);G0.w2.visible=!low;
   G0.t1.offset.x=t*.045;G0.t2.offset.x=-t*.11;
-  G0.m1.opacity=.86*a*sd;G0.m2.opacity=.8*a*sd;
+  G0.m1.opacity=.7*a*sd;G0.m2.opacity=.5*a*sd;
   G0.burn.scale.set(r,1,r);G0.wash.scale.set(r,1,r);G0.hot.scale.set(r,1,r);G0.line.scale.set(r,1,r);G0.safe.scale.set(r,1,r);
-  G0.burnM.opacity=.62*a;G0.washM.opacity=(.13+.05*Math.sin(t*2.6))*a;G0.hotM.opacity=(.5+.14*Math.sin(t*7))*a;G0.lineM.opacity=a;G0.safeM.opacity=(.16+.05*Math.sin(t*2))*a;
+  G0.burnM.opacity=.62*a;G0.washM.opacity=(.13+.05*Math.sin(t*2.6))*a;G0.hotM.opacity=(.4+.12*Math.sin(t*7))*a;G0.lineM.opacity=a;G0.safeM.opacity=(.09+.03*Math.sin(t*2))*a;
   G0.safe.visible=r>46;
   // sparks
   {const P0=G0.pts,n=low||!sight?0:Math.min(128,Math.max(24,Math.round(r*.4))),pos=P0.pos,col=P0.col,size=P0.size;

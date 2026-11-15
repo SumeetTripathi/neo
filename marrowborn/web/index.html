@@ -491,7 +491,7 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 .mbn-team .mbn-list{max-height:none;overflow:visible}
 .mbn-team .mbn-li,.mbn-li.col{box-shadow:inset calc(var(--u)*3) 0 0 var(--tc)}
 .mbn-team .mbn-li.me,.mbn-li.col.me{box-shadow:inset calc(var(--u)*5) 0 0 var(--tc),inset 0 0 0 1px rgba(196,244,255,.35)}
-.mbn-ffa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(calc(var(--u)*250),100%),1fr));gap:calc(var(--u)*5) calc(var(--u)*16);max-height:none;overflow:visible}
+.mbn-ffa{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(calc(var(--u)*330),100%),1fr));gap:calc(var(--u)*5) calc(var(--u)*16);max-height:none;overflow:visible}
 @media (pointer:coarse){.mbn-seg button,.mbn-th button{min-height:max(44px,calc(var(--u)*44))}}
 @media (max-width:600px){
   .mbn-opt{grid-template-columns:minmax(0,1fr);gap:1px;padding-bottom:calc(var(--u)*3)}.mbn-opt>.lab{font-size:.72rem}
@@ -541,12 +541,13 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 .vsh-chip{--tc:var(--bone);display:flex;align-items:center;gap:calc(var(--u)*6);box-sizing:border-box;min-width:0;max-width:calc(25% - calc(var(--u)*3));padding:1px calc(var(--u)*8) 1px calc(var(--u)*8);background:rgba(9,11,24,.84);box-shadow:inset calc(var(--u)*3) 0 0 var(--tc);
   font-weight:600;font-size:.72rem;line-height:1.4;letter-spacing:.07em;text-transform:uppercase;color:var(--bone)}
 #vsHud.n2 .vsh-chip,#vsHud.n3 .vsh-chip{max-width:calc(33% - calc(var(--u)*3))}
+#vsHud.n5 .vsh-chips,#vsHud.n6 .vsh-chips,#vsHud.n7 .vsh-chips,#vsHud.n8 .vsh-chips{display:grid;grid-template-columns:repeat(4,minmax(0,max-content))}#vsHud.n5 .vsh-chip,#vsHud.n6 .vsh-chip,#vsHud.n7 .vsh-chip,#vsHud.n8 .vsh-chip{max-width:none}
 .vsh-nm{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vsh-n{flex:none;font-weight:700;font-size:.92rem;line-height:1;color:var(--tc)}
 .vsh-chip.me{box-shadow:inset calc(var(--u)*3) 0 0 var(--tc),inset 0 0 0 1px rgba(255,255,255,.55)}
 .vsh-chip.lead .vsh-n{color:var(--gold)}
-.vsh-chip.down{background:rgba(9,11,24,.6)}.vsh-chip.down .vsh-nm{color:var(--ash);text-decoration:line-through}.vsh-chip.down .vsh-n{opacity:.6}
-.stage:has(#ov:not([hidden]):not(.soft)) #vsHud,.stage:has(#mbx:not([hidden])) #vsHud,.stage:has(#mbn:not([hidden])) #vsHud,.stage:has(#mbt:not([hidden])) #vsHud{visibility:hidden}
+.vsh-chip.left,.vsh-men i.left{opacity:.45}.vsh-chip.down{background:rgba(9,11,24,.6)}.vsh-chip.down .vsh-nm{color:var(--ash);text-decoration:line-through}.vsh-chip.down .vsh-n{opacity:.6}
+.stage:has(#ov:not([hidden])) #vsHud,.stage:has(#mbx:not([hidden])) #vsHud,.stage:has(#mbn:not([hidden])) #vsHud,.stage:has(#mbt:not([hidden])) #vsHud{visibility:hidden}
 /* a hint would sit on the score: it moves to the foot of the arena */
 .stage:has(#vsHud:not([hidden])) #mbHint{align-self:end;margin-top:0;margin-bottom:var(--foot)}
 /* wide screens: the strip takes the boss bar's place, straight under the floor line */
@@ -559,6 +560,39 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 /* sideways on a phone the stick and the buttons own the lower corners: the strip keeps to the middle */
 @media (orientation:landscape) and (pointer:coarse) and (max-height:600px){#vsHud{max-width:calc(100% - calc(var(--u)*300))}#vsHud.vs-ffa{width:min(calc(var(--u)*460),calc(100% - calc(var(--u)*300)))}}
 @media (prefers-reduced-motion:reduce){#vsHud.urgent .vsh-mid{animation:none;box-shadow:inset 0 calc(var(--u)*-2) 0 var(--foe),inset 0 0 0 1px var(--foe)}}
+/* ---- versus screens. game.js builds them through the overlay: #ovPanel.vsPanel with .vsPick (choose a fighter; the rules), .vsRound (between rounds) or .vsResults (+ .vsWin / .vsLose);
+   #ovExtra holds what the plain overlay cannot: ul.vsRules, and div.vsScroll > table.vsTable (rows .me .win .down .left .team, --c = the row's colour, td.nm = name, td.num = a figure) ---- */
+.panel.vsPanel{--sweep:rgba(255,45,85,.2)}
+.panel.vsPanel .kick{color:#ffd3da;background:linear-gradient(90deg,rgba(255,45,85,.12),rgba(255,45,85,.42),rgba(255,45,85,.12))}
+.panel.vsPanel h2::after{width:calc(var(--u)*96);background:linear-gradient(90deg,var(--foe),var(--power))}
+.panel.vsWin{--sweep:rgba(240,184,72,.32);animation-name:mbIn,mbSweepC;animation-duration:.2s,1.1s}
+.panel.vsWin .kick{color:#ffe9bd;background:linear-gradient(90deg,rgba(240,184,72,.1),rgba(240,184,72,.4),rgba(240,184,72,.1))}
+.panel.vsWin h2:not([style*="color"]){color:var(--gold)}.panel.vsWin h2::after{background:var(--gold)}
+.panel.vsLose h2:not([style*="color"]){color:var(--ash)}.panel.vsLose h2::after{background:var(--stone-2)}
+.panel.vsResults,.panel.vsRound{width:100%;max-width:calc(var(--u)*640)}.panel.vsPick{width:100%}
+.panel.vsRound{gap:calc(var(--u)*6);padding-block:calc(var(--u)*14)}.panel.vsRound h2{font-size:1.7rem}.panel.vsRound h2::after{margin-top:calc(var(--u)*6)}
+#ovExtra{align-self:stretch;min-width:0;display:flex;flex-direction:column;gap:calc(var(--u)*10)}#ovExtra:empty{display:none}
+.vsScroll{max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain}
+.vsTable{border-collapse:collapse;width:100%;font-size:.95rem;font-variant-numeric:tabular-nums;text-align:right}
+.vsTable th{font-family:var(--display);font-weight:600;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ash);padding:calc(var(--u)*4) calc(var(--u)*9);border-bottom:1px solid var(--line);white-space:nowrap}
+.vsTable td{padding:calc(var(--u)*6) calc(var(--u)*9);border-bottom:1px solid var(--stone-2);color:var(--text);white-space:nowrap;background-color:#0b0d1c}
+.vsTable th:first-child,.vsTable td:first-child{text-align:left;position:sticky;left:0}.vsTable th:first-child{background-color:#0b0d1c}
+.vsTable td.nm,.vsTable td:first-child{font-family:var(--display);font-weight:600;font-size:1.08rem;letter-spacing:.03em;color:var(--bone);padding-left:calc(var(--u)*13);box-shadow:inset calc(var(--u)*4) 0 0 var(--c,var(--line));max-width:11em;overflow:hidden;text-overflow:ellipsis}
+.vsTable td.num{font-family:var(--display);font-weight:600;font-size:1.05rem}
+.vsTable tr.me td{background-color:#1a1540;color:var(--bone)}
+.vsTable tr.win td.num{color:var(--gold)}.vsTable tr.win td:first-child{color:var(--gold)}.vsTable tr.win td{border-bottom-color:rgba(240,184,72,.55)}
+.vsTable tr.down td:first-child{color:var(--ash)}
+.vsTable tr.left td{color:var(--ash);opacity:.6}.vsTable tr.left td:first-child{text-decoration:line-through}
+.vsTable tr.team td{font-family:var(--display);font-weight:700;font-size:.84rem;letter-spacing:.12em;text-transform:uppercase;color:var(--c,var(--power2));padding-block:calc(var(--u)*4);border-bottom-color:var(--c,var(--line))}
+.vsRules{list-style:none;margin:0;padding:calc(var(--u)*8) calc(var(--u)*12);display:grid;grid-template-columns:repeat(auto-fit,minmax(min(calc(var(--u)*240),100%),1fr));gap:calc(var(--u)*3) calc(var(--u)*20);text-align:left;font-size:.86rem;line-height:1.35;color:var(--text);background:rgba(17,22,46,.7);box-shadow:inset calc(var(--u)*3) 0 0 var(--foe)}
+.vsRules li{position:relative;padding-left:calc(var(--u)*14)}
+.vsRules li::before{content:"";position:absolute;left:0;top:.48em;width:calc(var(--u)*6);height:calc(var(--u)*6);background:var(--foe);transform:skewX(-20deg)}
+.vsTeam{display:inline-block;font-family:var(--display);font-weight:700;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;color:var(--ink);background:var(--c,var(--power2));padding:1px calc(var(--u)*10);clip-path:polygon(calc(var(--u)*6) 0,100% 0,calc(100% - calc(var(--u)*6)) 100%,0 100%)}
+@media (max-width:480px),(max-height:600px){
+  .vsTable{font-size:.84rem}.vsTable th{padding:calc(var(--u)*3) calc(var(--u)*6);font-size:.64rem;letter-spacing:.08em}.vsTable td{padding:calc(var(--u)*4) calc(var(--u)*6)}.vsTable td.nm,.vsTable td:first-child{font-size:.95rem;padding-left:calc(var(--u)*10);max-width:7.5em}.vsTable td.num{font-size:.95rem}
+  .vsRules{font-size:.8rem;padding:calc(var(--u)*6) calc(var(--u)*10)}
+}
+@media (prefers-reduced-motion:reduce){.panel.vsWin{animation:none}}
 /* ---- tower.js: the map of the climb (#mbt, a layer like #mbn), the seasoned-climb steps, the glimpse between floors (.mbt-peek) and the trial HUD (.trialHud).
    Colours: --trial = ember, for trial floors and their HUD; --bh / --bf = a band's own colour and wash, set inline from MB.tower.bands; --k = a floor kind's colour.
    .mbt-tiles = the four figures, .mbt-cols = tower beside next floors, .mbt-col = the scrolling tower, .mbt-band = one band (.here .done .far), .mbt-rail = how much of it is climbed,
