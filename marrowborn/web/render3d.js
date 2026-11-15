@@ -772,7 +772,7 @@ const fieldTex={};
 function fieldTexture(kind,foe){
   const key=foe?kind+'!':kind;
   if(fieldTex[key])return fieldTex[key];
-  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=foe?(kind==='halo'?'255,120,70':kind==='rain'?'255,150,130':'255,52,84'):kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':kind==='domain'?'150,96,255':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
+  const c=mkCanvas(256,256),g=c.getContext('2d'),rnd=rng(kind.length*97+3),col=foe?(kind==='halo'?'255,120,70':kind==='rain'?'255,150,130':'255,52,84'):kind==='frost'?'143,211,255':kind==='halo'?'255,214,110':kind==='rain'?'231,223,205':kind==='domain'?'150,96,255':kind==='ice'?'178,228,255':kind==='rot'?'176,196,40':kind==='fire'?'255,112,36':'200,190,220',rgba=a=>'rgba('+col+','+a+')';
   g.translate(128,128);
   const gr=g.createRadialGradient(0,0,10,0,0,122);gr.addColorStop(0,rgba(.1));gr.addColorStop(.75,rgba(.2));gr.addColorStop(1,rgba(.42));
   g.fillStyle=gr;g.beginPath();g.arc(0,0,122,0,TAU);g.fill();g.strokeStyle=rgba(.95);g.lineWidth=3.5;g.beginPath();g.arc(0,0,121,0,TAU);g.stroke();
@@ -792,6 +792,26 @@ function fieldTexture(kind,foe){
     g.strokeStyle=rgba(.85);g.lineWidth=2.4;
     for(let i=0;i<12;i++){g.save();g.rotate(i*TAU/12);for(let j=0;j<4;j++){g.beginPath();g.moveTo(-9+j*6,96);g.lineTo(-9+j*6,112);g.stroke()}g.beginPath();g.moveTo(-13,110);g.lineTo(13,98);g.stroke();g.restore()}
     g.fillStyle=rgba(.5);for(let i=0;i<18;i++){g.save();g.rotate(i*TAU/18+.1);const l=60+rnd()*26;g.beginPath();g.moveTo(-4,90);g.lineTo(0,l);g.lineTo(4,90);g.closePath();g.fill();g.restore()}
+  }else if(kind==='ice'){
+    // frozen ground: a sheet of ice broken into plates, a few six-armed crystals in it
+    g.fillStyle=rgba(.16);g.beginPath();g.arc(0,0,118,0,TAU);g.fill();
+    g.strokeStyle=rgba(.85);g.lineWidth=2.2;g.lineJoin='round';
+    for(let i=0;i<9;i++){let a=i*TAU/9+rnd()*.4,x=Math.cos(a)*118,y=Math.sin(a)*118;g.beginPath();g.moveTo(x,y);for(let j=0;j<4;j++){a+=Math.PI+(rnd()-.5)*1.5;const l=22+rnd()*26;x+=Math.cos(a)*l*(j?.6:1);y+=Math.sin(a)*l*(j?.6:1);if(x*x+y*y>112*112)break;g.lineTo(x,y);a-=Math.PI}g.stroke()}
+    for(const[x,y,s2]of[[-34,-22,26],[40,30,20],[8,-62,16],[-52,48,15]]){g.save();g.translate(x,y);g.rotate(rnd()*2);g.strokeStyle=rgba(.95);g.lineWidth=2.6;
+      for(let i=0;i<6;i++){g.rotate(TAU/6);g.beginPath();g.moveTo(0,0);g.lineTo(0,s2);g.moveTo(-s2*.26,s2*.82);g.lineTo(0,s2*.56);g.lineTo(s2*.26,s2*.82);g.stroke()}g.restore()}
+    g.fillStyle=rgba(.9);for(let i=0;i<18;i++){g.save();g.rotate(i*TAU/18+rnd()*.2);const l=8+rnd()*13;g.beginPath();g.moveTo(-5,121);g.lineTo(0,121-l);g.lineTo(5,121);g.closePath();g.fill();g.restore()}
+  }else if(kind==='rot'){
+    // a cloud of sickness: blotches, bubbles and spores, a ragged dashed edge
+    for(let i=0;i<16;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*92,r2=14+rnd()*24;const gr2=g.createRadialGradient(Math.cos(a)*d,Math.sin(a)*d,0,Math.cos(a)*d,Math.sin(a)*d,r2);gr2.addColorStop(0,rgba(.3));gr2.addColorStop(1,rgba(0));g.fillStyle=gr2;g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d,r2,0,TAU);g.fill()}
+    g.strokeStyle=rgba(.85);g.lineWidth=2.2;for(let i=0;i<9;i++){const a=rnd()*TAU,d=20+rnd()*84;g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d,3+rnd()*6,0,TAU);g.stroke()}
+    g.fillStyle=rgba(.95);for(let i=0;i<34;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*108;g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d,1+rnd()*1.8,0,TAU);g.fill()}
+    g.strokeStyle=rgba(.7);g.lineWidth=5;g.setLineDash([3,13,9,7]);g.beginPath();g.arc(0,0,113,0,TAU);g.stroke();g.setLineDash([]);
+  }else if(kind==='fire'){
+    // burning ground: tongues of flame licking inward from the rim, a bed of embers, a hot heart
+    const hot=foe?'255,176,160':'255,214,130',gr2=g.createRadialGradient(0,0,0,0,0,112);gr2.addColorStop(0,'rgba('+hot+',.34)');gr2.addColorStop(.5,rgba(.26));gr2.addColorStop(1,rgba(.1));g.fillStyle=gr2;g.beginPath();g.arc(0,0,118,0,TAU);g.fill();
+    g.fillStyle=rgba(.75);for(let i=0;i<20;i++){g.save();g.rotate(i*TAU/20+rnd()*.14);const l=60+rnd()*42,w=7+rnd()*5;g.beginPath();g.moveTo(-w,121);g.quadraticCurveTo(-w*.2,121-(121-l)*.5,rnd()*8-4,l);g.quadraticCurveTo(w*.6,121-(121-l)*.4,w,121);g.closePath();g.fill();g.restore()}
+    g.fillStyle='rgba('+hot+',.95)';for(let i=0;i<30;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*100,s2=1.5+rnd()*2.6;g.beginPath();g.arc(Math.cos(a)*d,Math.sin(a)*d,s2,0,TAU);g.fill()}
+    g.strokeStyle='rgba('+hot+',.7)';g.lineWidth=2;for(let i=0;i<7;i++){let a=rnd()*TAU,x=Math.cos(a)*14,y=Math.sin(a)*14;g.beginPath();g.moveTo(x,y);for(let j=0;j<3;j++){a+=(rnd()-.5)*1.4;x+=Math.cos(a)*20;y+=Math.sin(a)*20;g.lineTo(x,y)}g.stroke()}
   }else if(kind==='rain'){
     g.strokeStyle=rgba(.45);g.lineWidth=1.5;g.setLineDash([7,7]);g.beginPath();g.arc(0,0,84,0,TAU);g.stroke();g.beginPath();g.arc(0,0,44,0,TAU);g.stroke();g.setLineDash([]);
     for(let i=0;i<22;i++){const a=rnd()*TAU,d=Math.sqrt(rnd())*104,x=Math.cos(a)*d,y=Math.sin(a)*d;g.save();g.translate(x,y);g.rotate(-.5+rnd()*.3);
@@ -1070,7 +1090,7 @@ const isPet=e=>!!(e&&(e.pet||e.shade||e.kind==='shade'||e.owner==='necro'||e.own
 // Trophies that stand in the arena (a mage's familiar, a healer's guardian) have their own friendly models. An ally of a kind this file has
 // never heard of is drawn the same way (as a plain wisp), so nothing friendly can ever come out looking like a hostile monster or throw.
 const isTrophy=e=>!!(e&&(e.kind==='familiar'||e.kind==='guardian'||(e.trophy&&e.kind!=='pet'&&e.kind!=='shade')));
-const allyModel=e=>isTrophy(e)?'trophy':isPet(e)?'monster':e.kind==='thrall'||e.kind==='wolf'?'ally':'trophy';
+const allyModel=e=>isTrophy(e)?'trophy':isPet(e)?'monster':e.kind==='thrall'||e.kind==='wolf'||(typeof e.kind==='string'&&APX_ALLY[e.kind]===1)?'ally':'trophy';
 const dying=[]; // pets that left the list in the middle of a fight: they fade out where they stood
 let dyingLevel=-1;
 function dropEnt(rec){ents.remove(rec.g);
@@ -1081,7 +1101,8 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight,V){
   for(let i=0;i<list.length;i++){
     const e=list[i];if(!e)continue;let rec=map.get(e);
     if(!rec){const k=name==='ally'?allyModel(e):name,pet=name==='ally'&&k==='monster',tro=k==='trophy';
-      rec=tro?makeEnt('trophy',e,phTrophy,V):pet?makeEnt('monster',e,phMonster,V):makeEnt(name,e,phMake,V);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec)}
+      rec=tro?makeEnt('trophy',e,phTrophy,V):pet?makeEnt('monster',e,phMonster,V):makeEnt(name,e,phMake,V);rec.pet=pet;rec.tro=tro;rec.e=e;map.set(e,rec);
+      if(k==='ally'&&e.apexAlly===true&&typeof e.kind==='string'&&APX_ALLY[e.kind]===1){rec.apx=true;if(MB.S.mode==='play')apexAllyFx(e,0,V)}}
     rec.stamp=stamp;
     let hide=!!e.hidden||(rec.pet&&(e.dead||e.hp<=0));
     if(!hide&&!sight&&P){const dx=e.x-P.x,dy=e.y-P.y,lim=fogR+(e.r||0)+8;if(dx*dx+dy*dy>lim*lim)hide=true}
@@ -1091,11 +1112,14 @@ function syncMap(map,list,name,dt,phMake,phUpdate,sight,V){
       rec.gone=false;updateEnt(rec,'monster',e,dt,phMonster,phMonsterUpdate);
     }else if(rec.tro)updateEnt(rec,'trophy',e,dt,phTrophy,phTrophyUpdate);
     else updateEnt(rec,name,e,dt,phMake,phUpdate);
+    if(name==='monster'){const fz=e.frozen>0;if(rec.fz&&!fz&&!hide)shatterAt(e.x,e.y,e.r||16,Q.low);rec.fz=fz} // frozen solid, then thawed: the shell bursts
     if(hide)rec.g.visible=false;
     else if(Q.low&&!rec.tro&&e.kind!=='shade'){const b=pools.blob.get(),r=e.r||12,k=1-.4*(e.lift||0);b.position.set(e.x,.55,e.y);b.scale.set(r*5.4*k,1,r*4.4*k)}
   }
   if(map.size>list.length||(map.size&&!list.length))for(const[e,rec]of map)if(rec.stamp!==stamp){
     map.delete(e);
+    if(rec.fz&&rec.g.visible&&MB.S.mode!=='title')shatterAt(rec.g.position.x,rec.g.position.z,rec.e.r||16,Q.low);          // died frozen: it shatters
+    else if(rec.apx&&rec.g.visible&&MB.S.mode==='play'&&rec.e)apexAllyFx(rec.e,1,rec.V);                                    // an apex ally whose time is up
     if(rec.pet&&!rec.gone&&rec.g.visible&&MB.S.mode==='play'&&MB.S.level===dyingLevel)startFade(rec,true);else dropEnt(rec);
   }
 }
@@ -1291,9 +1315,9 @@ function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.stroke
 // a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
 function petBar(a,MM,idCss,foe){
   const W=OV.w,H=OV.h;
-  const small=!!a&&foe===true&&!a.pet&&(a.kind==='thrall'||a.kind==='wolf'); // versus: an opponent's thralls and wolves can be killed, so they show their health too
+  const small=!!a&&foe===true&&!a.pet&&(a.kind==='thrall'||a.kind==='wolf'||(typeof a.kind==='string'&&APX_ALLY[a.kind]===1)); // versus: an opponent's thralls and wolves can be killed, so they show their health too
   if(!a||!(a.pet||small)||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
-  let top=small?(a.kind==='wolf'?24:40):(a.r||16)*2.4;if(!small&&MM&&MM.height)try{top=MM.height(a)}catch(e){}
+  let top=small?(a.kind==='wolf'||a.kind==='packbeast'?24:a.kind==='icewight'?54:a.kind==='cinder'?30:40):(a.r||16)*2.4;if(!small&&MM&&MM.height)try{top=MM.height(a)}catch(e){}
   toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)return;
   if(idCss&&(sp.x<-12||sp.x>W+12||sp.y>H+12))return; // another member's pet out of frame: no bar pinned to the edge
   // on a phone the health and boss bars float over the top of the view: a bar that would sit under them is held just below (and never off the sides)
@@ -1451,7 +1475,7 @@ const TF={
   crack:new Timed(7,()=>{const g=new THREE.Group(),d=new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:crackTex,color:0x06050e,transparent:true,depthWrite:false,fog:false,toneMapped:false})),h=new THREE.Mesh(G.quad,addMat(crackTex,PAL.foe));
     d.position.y=.42;h.position.y=.5;d.renderOrder=1;h.renderOrder=2;g.add(d,h);g.userData.d=d;g.userData.h=h;return g}),
 };
-const FX={fall:0,prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0,apex:null};
+const FX={fall:0,prevAtk:0,dir:1,ghostT:0,px:0,py:0,lvl:-1,mode:'',boss:null,ph:0,rage:false,bx:W/2,bz:H/2,drama:0,dramaMax:1,kind:'',hurt:0,avg:0,nAvg:0,rankK:0,clock:0,apex:null,stT:0,stN:0,trD:0,trN:0};
 const born=new WeakMap(),prevZones=[],prevRings=[];
 // Damage numbers that land on the same spot within half a second are shown as ONE number (the running total, with a small hit count), led by
 // the newest float of the group; the older ones are not drawn. Numbers that cannot merge (a heavy hit, another colour) are stacked upward.
@@ -1477,20 +1501,21 @@ function upCrack(o,q){const u=o.userData;u.d.material.opacity=Math.min(1,(1-q)*2
 function flashAt(x,y,z,s0,s1,hex,life,k,pool){const o=(pool||TF.flash).spawn(life||.14),u=o.userData;o.position.set(x,y,z);u.s0=s0;u.s1=s1;u.k=k===undefined?1:k;o.material.color.setHex(hex);o.material.rotation=(x*.37+z*.11)%1.5;o.scale.setScalar(s0);return o}
 function burstAt(x,y,z,s0,s1,hex,life){const o=TF.burst.spawn(life||.2),u=o.userData;o.position.set(x,y,z);u.s0=s0;u.s1=s1;u.k=.9;o.material.color.setHex(hex);o.material.rotation=(x*.21+z*.4)%TAU;o.scale.setScalar(s0)}
 function crackAt(x,z,r,hex,life){const o=TF.crack.spawn(life||2.6),u=o.userData;o.position.set(x,0,z);o.rotation.y=(x*.13+z*.29)%TAU;o.scale.setScalar(Math.max(40,r*2.5));u.hot=!Q.low;u.h.material.color.setHex(hex)}
-function clearFx(){for(const k in TF)TF[k].clear();if(TFR)for(const k in TFR)TFR[k].clear()}
+function clearFx(){for(const k in TF)TF[k].clear();if(TFR)for(const k in TFR)TFR[k].clear();if(TX){TX.trail.clear();TX.shard.clear()}}
 function drama(kind,x,z,len){if(calm)return;FX.drama=FX.dramaMax=len;FX.kind=kind;FX.bx=x;FX.bz=z}
 const RANK_K={'':0,E:.22,D:.38,C:.54,B:.7,A:.85,S:1};
 // the apex tier: which path a hero walks ('dominion' | 'order' | null), read from the object its model reads (the game, or a member's view);
 // R.testApex forces the local hero's. The motes that rise off a hero take the path's colours [base rgb, hot rgb].
-function apexPath(B){let a=B===MB?R.testApex:null;if(!a){a=B.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=B.S&&B.S.apex}return a==='dominion'||a==='order'?a:null}
-const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5]},FOE_COL=[1,.16,.3,1,.72,.62];
+function apexPath(B){let a=B===MB?R.testApex:null;if(!a){a=B.apex;if(a&&typeof a==='object')a=a.path;if(!a)a=B.S&&B.S.apex}return typeof a==='string'&&APEX_OK[a]===1?a:null}
+const APEX_COL={'':[.55,.3,1,.77,.96,1],dominion:[.5,.22,1,.93,.88,1],order:[.72,.95,1,1,.86,.5],
+  beasts:[.37,.88,.48,.85,1,.82],frost:[.56,.85,1,.95,.98,1],plague:[.72,.78,.12,.42,.23,.48],flame:[1,.42,.12,1,.82,.48],storm:[1,.9,.29,1,.98,.88],stone:[.88,.66,.29,.66,.67,.71],blade:[.56,.63,1,.93,.95,1],tide:[.1,.83,.77,.85,1,.97]},FOE_COL=[1,.16,.3,1,.72,.62];
 if(typeof MB.on==='function')try{
   MB.on('bossdead',()=>{if(!alive)return;const x=FX.bx,z=FX.bz;drama('death',x,z,1.25);flashAt(x,34,z,60,330,0xffffff,.42,1);burstAt(x,34,z,90,420,PAL.power2,.38);crackAt(x,z,90,PAL.power,3.4)});
   MB.on('levelstart',()=>{clearFx();FX.drama=0;FX.hurt=0;FX.avg=0;FX.nAvg=0;prevZones.length=0;prevRings.length=0});
 }catch(e){}
 // what a hero's own movement throws off: F = that hero's little state {prevAtk,dir,ghostT,px,py}, T = the timed pools to draw from
 // (the local hero has its own; the other members share a larger set)
-function heroFx(F,P,cls,dt,sight,low,T){
+function heroFx(F,P,cls,dt,sight,low,T,ap){
   // weapon trail on a swing, a muzzle flare on a cast or shot
   const atk=P.atk||0;
   if(atk>F.prevAtk+.04){
@@ -1510,6 +1535,12 @@ function heroFx(F,P,cls,dt,sight,low,T){
         const s=T.streak.spawn(.3),u=s.userData;s.position.set(F.px+dx/2,22,F.py+dy/2);s.rotation.y=-a;u.len=len*1.15;u.w=34;if(T===TFR)s.material.color.setHex(F.foe?PAL.foe:PAL.power);upStreak(s,0);
         flashAt(P.x,34,P.y,24,96,F.foe?PAL.foe2:PAL.power2,.2,.9,T.flash)}}
   }
+  // the newer apex paths: a Split Sky hero stutters after-images as it runs (more with its speed surge), a Feral Vow hero leaves paw prints and a Last Pyre hero scorched footprints
+  if(ap&&sight){
+    if(ap==='storm'){if(!low&&P.moving&&!(P.dashT>0)){const h=P.haste>0?Math.min(1,P.haste):0;F.stT-=dt;if(F.stT<=0){F.stT=.13-.07*h;F.stN++;const o=T.ghost.spawn(.2+.1*h),k=F.stN%2?10:19;
+      o.position.set(P.x-Math.cos(P.face)*k,0,P.y-Math.sin(P.face)*k);o.rotation.set(.12,Math.PI/2-P.face,0,'YXZ');o.userData.k=.2+.22*h;o.material.color.setHex(F.foe?PAL.foe:0xffe74a)}}}
+    else if((ap==='beasts'||ap==='flame')&&jump<200*200){F.trD+=Math.sqrt(jump);if(F.trD>(low?46:24)){F.trD=0;F.trN++;trailAt(ap,P.x,P.y,Math.atan2(dy,dx),F.trN%2?1:-1,F.foe)}}
+  }
   F.px=P.x;F.py=P.y;
 }
 function syncFx(dt,sight){
@@ -1527,7 +1558,7 @@ function syncFx(dt,sight){
     if((ph>FX.ph||(rg&&!FX.rage))&&play){drama('phase',B.x,B.y,.85);if(sight){flashAt(B.x,B.r+10,B.y,B.r*2,B.r*7,PAL.foe,.32,1);if(!low)burstAt(B.x,B.r+10,B.y,B.r*3,B.r*9,PAL.foe2,.3);crackAt(B.x,B.y,B.r*1.5,PAL.foe,3)}}
     FX.ph=ph;FX.rage=rg}
   if(B&&B.hp>0){FX.bx=B.x;FX.bz=B.y}
-  if(P&&play&&!P.down)heroFx(FX,P,cls,dt,sight,low,TF);else if(P&&P.down){FX.px=P.x;FX.py=P.y;FX.prevAtk=P.atk||0}
+  if(P&&play&&!P.down)heroFx(FX,P,cls,dt,sight,low,TF,cls?apexPath(MB):null);else if(P&&P.down){FX.px=P.x;FX.py=P.y;FX.prevAtk=P.atk||0}
   // slams: a telegraphed blast going off, or a heavy shockwave, cracks the floor for a while
   {const zs=MB.zones;
     for(let i=0;i<prevZones.length;i++){const z=prevZones[i];if(zs.indexOf(z)>=0||!(z.t>=z.dur*.92)||!play)continue;
@@ -1552,6 +1583,7 @@ function syncFx(dt,sight){
       else if(!low)flashAt(f.x,26,f.y+20,14,50,cls?PAL.power2:0xffffff,.11,.8)}}
   TF.slash.run(fdt,upSlash);TF.ghost.run(fdt,upGhost);TF.streak.run(fdt,upStreak);TF.flash.run(fdt,upFlash);TF.burst.run(fdt,upFlash);TF.crack.run(fdt,upCrack);
   if(TFR){TFR.slash.run(fdt,upSlash);TFR.ghost.run(fdt,upGhost);TFR.streak.run(fdt,upStreak);TFR.flash.run(fdt,upFlash)}
+  if(TX){TX.trail.run(fdt,upTrail);TX.shard.run(fdt,upShard)}
   // power rising off the hero: more of it with every rank
   {let k=0;const ap=cls?apexPath(MB):null;if(cls&&P&&play&&sight){const r=MB.rank?MB.rank():'';k=ap||(r&&r[0]==='X')?1.25:r&&r[0]==='S'?1:RANK_K[r]||.12}
     FX.rankK+=(k-FX.rankK)*Math.min(1,dt*2);const rk=FX.rankK,AC=APEX_COL[ap||''];
@@ -1561,8 +1593,8 @@ function syncFx(dt,sight){
       const hot=i%4===0,o=hot?3:0;col[i*4]=AC[o];col[i*4+1]=AC[o+1];col[i*4+2]=AC[o+2];col[i*4+3]=Math.sin(q*Math.PI)*(.5+.4*Math.min(1,rk));size[i]=(hot?1.5:2.1)+rk*1.1+(i%3)*.4}
     auraP.geo.setDrawRange(0,n);
     if(n){auraP.geo.attributes.position.needsUpdate=true;auraP.geo.attributes.aCol.needsUpdate=true;auraP.geo.attributes.aSize.needsUpdate=true}
-    auraDisc.visible=rk>.02&&!!P;if(auraDisc.visible){if(ap!==FX.apex){FX.apex=ap;auraDisc.material.color.setHex(ap==='order'?PAL.power2:PAL.power)}
-      auraDisc.position.x=P.x;auraDisc.position.z=P.y;auraDisc.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3));auraDisc.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5))*(ap==='dominion'?.45:1)}}
+    auraDisc.visible=rk>.02&&!!P;if(auraDisc.visible){if(ap!==FX.apex){FX.apex=ap;auraDisc.material.color.setHex(APEX_HEX[ap]||PAL.power)}
+      auraDisc.position.x=P.x;auraDisc.position.z=P.y;auraDisc.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3));auraDisc.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5))*(APEX_DISC[ap]||1)}}
 }
 
 // one of our side's projectiles (pool = which body: bolt, orb, skull, arrow), drawn at x,y
@@ -1587,6 +1619,157 @@ function allyBeams(allies,t,foe){
       else u.line.scale.set(len,.6,2.2+1.2*Math.sin(t*26))}}
 }
 
+/* ---------- round 10: the eight newer apex paths ----------
+   Fields: 'ice', 'rot', 'fire' are discs like the older kinds (their own textures, a few standing pieces in high graphics); 'wave' is a moving
+   front (vx, vy: a crest of water rolling the way it travels, r = half its width); 'quake' is a fissure from x,y to x2,y2 (w = half-width, optional).
+   MB.arcs = [{x1,y1,x2,y2,life,max,col?,foe?}]: jagged lightning between two points with a flash where it lands.
+   Trails: a Feral Vow hero leaves ghostly paw prints, a Last Pyre hero scorched footprints; a Split Sky hero stutters after-images as it runs.
+   A frozen monster that thaws or dies bursts into shards. All of it is built on first use and costs nothing until then. */
+const APEX_OK={dominion:1,order:1,beasts:1,frost:1,plague:1,flame:1,storm:1,stone:1,blade:1,tide:1},APX_ALLY={packbeast:1,icewight:1,cinder:1};
+const APEX_HEX={dominion:PAL.power,order:PAL.power2,beasts:0x5fe07a,frost:0x8fd8ff,plague:0xb7c61f,flame:0xff6a1e,storm:0xffe74a,stone:0xe0a84a,blade:0x8fa0ff,tide:0x19d3c5};
+const APEX_DISC={dominion:.45,plague:.5,stone:.45,flame:.7,beasts:.6,blade:.7};
+const ALLY_HEX={packbeast:0x5fe07a,icewight:0x8fd8ff,cinder:0xff6a1e};
+const hsh=i=>{const v=Math.sin(i*12.9898+7.3)*43758.5453;return v-Math.floor(v)};
+let TX=null,ARCG=null;
+function upTrail(o,q){o.material.opacity=o.userData.k*(1-q)*(q<.08?q*12.5:1)}
+function upShard(o,q){const c=o.children,R=o.userData.r;for(let i=0;i<c.length;i++){const m=c[i],d=m.userData,k=R*.3*d.k*(1-q*q);
+  m.position.set(d.x*R*(.4+2.1*q),Math.max(1,R*(.7+d.y*2.2*q-2.6*q*q)),d.z*R*(.4+2.1*q));m.rotation.set(q*d.s*7,i,q*d.s*5);m.scale.set(k,k*1.9,k)}}
+function txSetup(){
+  if(TX)return TX;
+  const paw=fxTex(64,(g,h)=>{g.fillStyle='#fff';g.beginPath();g.ellipse(-h*.12,0,h*.34,h*.3,0,0,TAU);g.fill();
+    for(const[x,y]of[[.3,-.42],[.52,-.15],[.52,.15],[.3,.42]]){g.beginPath();g.ellipse(h*x,h*y,h*.15,h*.12,0,0,TAU);g.fill()}});
+  const scorch=fxTex(64,(g,h)=>{ // a charred sole with an ember edge: black stays black under the tint, the white rim takes the colour
+    g.fillStyle='rgba(255,255,255,.9)';g.beginPath();g.ellipse(h*.2,0,h*.5,h*.3,0,0,TAU);g.ellipse(-h*.5,0,h*.26,h*.24,0,0,TAU);g.fill();
+    g.fillStyle='rgba(0,0,0,.92)';g.beginPath();g.ellipse(h*.2,0,h*.42,h*.22,0,0,TAU);g.ellipse(-h*.5,0,h*.19,h*.17,0,0,TAU);g.fill();
+    g.fillStyle='#fff';for(const[x,y]of[[.1,.05],[.36,-.08],[-.5,.03]]){g.beginPath();g.arc(h*x,h*y,h*.035,0,TAU);g.fill()}});
+  const ice=ST.toon(0xcfeeff,{emissive:0x4aa8e8,emissiveIntensity:.55}),sg=new THREE.OctahedronGeometry(1,0);
+  TX={paw,scorch,
+    trail:new Timed(56,()=>{const m=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:paw,transparent:true,depthWrite:false,toneMapped:false,fog:false})));m.renderOrder=1;return m}),
+    shard:new Timed(4,()=>{const g=new THREE.Group();for(let i=0;i<10;i++){const m=noLine(new THREE.Mesh(sg,ice)),a=i*TAU/10+hsh(i)*.6;m.userData={x:Math.cos(a)*(.5+hsh(i+9)*.6),z:Math.sin(a)*(.5+hsh(i+9)*.6),y:.5+hsh(i+20),s:hsh(i+30)-.5,k:.6+hsh(i+40)*.8};g.add(m)}g.userData.r=16;return g})};
+  return TX;
+}
+function trailAt(ap,x,z,a,side,foe){const T=txSetup(),paw=ap==='beasts',o=T.trail.spawn(paw?1.5:2.6),m=o.material,tex=paw?T.paw:T.scorch;
+  if(m.map!==tex){m.map=tex;m.blending=paw?THREE.AdditiveBlending:THREE.NormalBlending}
+  m.color.setHex(foe?PAL.foe:paw?0x5fe07a:0xff7a2a);o.userData.k=paw?.7:.95;m.opacity=0;
+  o.position.set(x-Math.sin(a)*side*6,.47,z+Math.cos(a)*side*6);o.rotation.y=-a;o.scale.set(paw?17:20,1,paw?17:13)}
+function shatterAt(x,z,r,low){const o=txSetup().shard.spawn(.6);o.position.set(x,0,z);o.userData.r=Math.max(10,Math.min(60,r));o.rotation.y=(x*.7+z*.3)%TAU;upShard(o,0);
+  flashAt(x,r,z,r*1.2,r*5,0xdff4ff,.22,.9);if(!low)burstAt(x,r,z,r*2,r*6.5,0x8fd8ff,.26)}
+// an apex ally arriving (out = 0) or going when its time is up (out = 1)
+function apexAllyFx(e,out,V){const foe=!!(V&&V.foe),hex=foe?PAL.foe:ALLY_HEX[e.kind]||PAL.power2,r=e.r||12,low=Q.low;
+  if(!out){flashAt(e.x,r,e.y,r,r*5.5,hex,.24,.9);if(!low)burstAt(e.x,r,e.y,r*2,r*6,hex,.22);return}
+  if(e.kind==='icewight'&&!foe)shatterAt(e.x,e.y,r*1.2,low);
+  else{flashAt(e.x,r+4,e.y,r*1.5,r*(e.kind==='cinder'?9:5),e.kind==='cinder'&&!foe?0xffd27a:hex,.26,1);if(!low||e.kind==='cinder')burstAt(e.x,r+4,e.y,r*2,r*(e.kind==='cinder'?10:6),hex,.26)}}
+// lightning: each shape is two crossed ribbons along x (-.5 .. .5) that wander in y and z, so it shows from every side; a thin one and a wide one
+function arcShape(seed,h){const n=9,pos=[],idx=[],rnd=rng(seed*7+3),py=[],pz=[];
+  for(let i=0;i<=n;i++){const e=i===0||i===n?0:1;py.push((rnd()-.5)*e);pz.push((rnd()-.5)*e)}
+  for(let s2=0;s2<2;s2++){const base=pos.length/3;
+    for(let i=0;i<=n;i++){const x=i/n-.5;if(s2)pos.push(x,py[i],pz[i]+h,x,py[i],pz[i]-h);else pos.push(x,py[i]+h,pz[i],x,py[i]-h,pz[i])}
+    for(let i=0;i<n;i++){const a=base+i*2;idx.push(a,a+1,a+2,a+1,a+3,a+2)}}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setIndex(idx);g.computeBoundingSphere();return g}
+const arcSeen=new WeakSet();
+pools.arc=new Pool(()=>{if(!ARCG){ARCG=[];for(let i=0;i<3;i++)ARCG.push(arcShape(i+1,.05));for(let i=0;i<3;i++)ARCG.push(arcShape(i+1,.2))}
+  const g=new THREE.Group(),core=new THREE.Mesh(ARCG[0],new THREE.MeshBasicMaterial({color:0xfffbe0,transparent:true,side:THREE.DoubleSide,depthWrite:false,toneMapped:false,fog:false})),
+    glow=new THREE.Mesh(ARCG[3],new THREE.MeshBasicMaterial({color:0xffe74a,transparent:true,blending:THREE.AdditiveBlending,side:THREE.DoubleSide,depthWrite:false,toneMapped:false,fog:false})),
+    pool=new THREE.Mesh(G.quad,flatGlowMat(0xffe74a,.4));
+  pool.position.y=-SHOT_Y-8.4;pool.renderOrder=3;glow.renderOrder=5;core.renderOrder=6;g.add(glow,core,pool);g.userData={core,glow,pool};return g});
+function drawArcs(list,t,low,sight){
+  for(let i=0;i<list.length&&i<64;i++){const a=list[i];if(!a||typeof a!=='object')continue;
+    const x1=num(a.x1,null),y1=num(a.y1,null),x2=num(a.x2,null),y2=num(a.y2,null);if(x1===null||y1===null||x2===null||y2===null)continue;
+    const dx=x2-x1,dz=y2-y1,len=Math.sqrt(dx*dx+dz*dz);if(len<2)continue;
+    const max=a.max>0?a.max:.2,q=clamp01(num(a.life,max)/max),foe=a.foe===true,hex=foe?PAL.foe:typeof a.col==='number'&&a.col===a.col?a.col:typeof a.col==='string'&&HEX_RE.test(a.col)?echoHex(a.col):0xffe74a;
+    if(!arcSeen.has(a)){arcSeen.add(a);if(sight){flashAt(x2,SHOT_Y+9,y2,16,low?60:84,foe?PAL.foe2:0xfffbe0,.15,.95);if(!low)flashAt(x1,SHOT_Y+9,y1,10,44,hex,.12,.8)}}
+    if(!sight)continue;
+    const o=pools.arc.get(),u=o.userData,v=(i+Math.floor(t*22))%3,amp=Math.min(30,7+len*.14);
+    o.position.set((x1+x2)/2,SHOT_Y+9,(y1+y2)/2);o.rotation.y=-Math.atan2(dz,dx);
+    u.core.geometry=ARCG[v];u.glow.geometry=ARCG[3+v];u.core.scale.set(len,amp,amp);u.glow.scale.set(len,amp,amp);
+    u.core.material.color.setHex(foe?0xffd9d0:0xfffbe0);u.core.material.opacity=Math.min(1,q*2.4);u.glow.material.color.setHex(hex);u.glow.material.opacity=.9*Math.min(1,q*1.6);
+    u.pool.visible=!low;if(!low){u.pool.scale.set(len+34,1,40);u.pool.material.color.setHex(hex);u.pool.material.opacity=.42*q}}
+}
+// standing pieces for the newer fields: one instanced mesh per kind of piece, filled each frame (nothing is made until a field needs it)
+const IMX={},IMK=[];
+function imx(key){
+  let s=IMX[key];if(s)return s;let geo,mat,n=96,shadow=false;
+  if(key==='flame'){geo=new THREE.ConeGeometry(1,1,5).translate(0,.5,0);mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.85,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false});n=160}
+  else if(key==='spike'||key==='fspike'){geo=new THREE.ConeGeometry(1,1,4).translate(0,.5,0);mat=ST.toonRaw(0xffffff,{emissive:key==='spike'?0x2f6aa8:0x8a1424,emissiveIntensity:.5});shadow=true}
+  else if(key==='puff'){geo=new THREE.SphereGeometry(1,8,6);mat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.34,depthWrite:false,toneMapped:false,fog:false});n=64}
+  else{geo=new THREE.DodecahedronGeometry(1,0);mat=ST.toonRaw(0xffffff,{});shadow=true}
+  const m=noLine(new THREE.InstancedMesh(geo,mat,n));m.count=0;m.frustumCulled=false;m.castShadow=shadow;m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);if(key==='flame'||key==='puff')m.renderOrder=4;
+  m.setColorAt(0,_col.setHex(0xffffff));m.instanceColor.setUsage(THREE.DynamicDrawUsage);fx.add(m);
+  s=IMX[key]={m,n:0,max:n};IMK.push(s);return s;
+}
+function putI(s,x,y,z,sx,sy,sz,ry,rz,hex){if(s.n>=s.max)return;_d.position.set(x,y,z);_d.scale.set(sx,sy,sz);_d.rotation.set(0,ry,rz);_d.updateMatrix();s.m.setMatrixAt(s.n,_d.matrix);s.m.setColorAt(s.n,_col.setHex(hex).convertSRGBToLinear());s.n++}
+function imxEnd(){for(let i=0;i<IMK.length;i++){const s=IMK[i],m=s.m;if(!s.n&&!m.count){m.visible=false;continue}m.count=s.n;m.visible=s.n>0;if(s.n){m.instanceMatrix.needsUpdate=true;m.instanceColor.needsUpdate=true}s.n=0}}
+const waveTex={},quakeTex={};
+function waveTexture(){if(waveTex.t)return waveTex.t;
+  const c=mkCanvas(256,256),g=c.getContext('2d');g.translate(128,128);g.lineCap='round'; // the front faces +x: a bright crescent, streaks of foam trailing behind it
+  for(let i=0;i<5;i++){g.strokeStyle='rgba(255,255,255,'+(.95-i*.19)+')';g.lineWidth=i?4-i*.5:9;g.beginPath();g.arc(-150-i*4,0,255-i*19,-.44+i*.02,.44-i*.02);g.stroke()}
+  const rnd=rng(77);g.strokeStyle='rgba(255,255,255,.5)';g.lineWidth=2.5;
+  for(let i=0;i<16;i++){const y=(rnd()-.5)*190,x=95-Math.abs(y)*.34-rnd()*30,l=30+rnd()*70;g.beginPath();g.moveTo(x,y);g.lineTo(x-l,y*1.04);g.stroke()}
+  const gr=g.createLinearGradient(-128,0,128,0);gr.addColorStop(0,'rgba(255,255,255,0)');gr.addColorStop(.75,'rgba(255,255,255,.2)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.beginPath();g.ellipse(0,0,120,104,0,0,TAU);g.fill();
+  return waveTex.t=canvasTex(c,false)}
+function quakeTexture(glow){const k=glow?'g':'d';if(quakeTex[k])return quakeTex[k];
+  const c=mkCanvas(512,96),g=c.getContext('2d'),rnd=rng(41),top=[],bot=[];g.translate(0,48);
+  for(let i=0;i<=24;i++){const x=6+i*500/24,e=Math.sin(i/24*Math.PI),m=(rnd()-.5)*16*e,w=(glow?3:5+rnd()*9)*Math.pow(e,.6);top.push(x,m-w);bot.push(x,m+w)}
+  g.fillStyle=glow?'#fff':'rgba(3,2,6,.96)';if(glow){g.shadowColor='#fff';g.shadowBlur=14}
+  g.beginPath();g.moveTo(top[0],top[1]);for(let i=2;i<top.length;i+=2)g.lineTo(top[i],top[i+1]);for(let i=bot.length-2;i>=0;i-=2)g.lineTo(bot[i],bot[i+1]);g.closePath();g.fill();if(glow)g.fill();
+  g.shadowBlur=0;g.strokeStyle=glow?'rgba(255,255,255,.7)':'rgba(3,2,6,.9)';g.lineWidth=glow?1.5:3;g.lineCap='round';
+  for(let i=2;i<23;i+=2){const x=top[i*2],y=(top[i*2+1]+bot[i*2+1])/2,s2=i%4?1:-1,l=12+rnd()*22;g.beginPath();g.moveTo(x,y);g.lineTo(x+(rnd()-.5)*26,y+s2*l*.6);g.lineTo(x+(rnd()-.5)*40,y+s2*l);g.stroke()}
+  return quakeTex[k]=canvasTex(c,false)}
+pools.wave=new Pool(()=>{const g=new THREE.Group(),tg=new THREE.TorusGeometry(1,.13,6,18,2.1).rotateZ(-1.05).rotateX(-Math.PI/2),
+    floor=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:waveTexture(),color:0x19d3c5,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}))),
+    crest=noLine(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0x1fa8c8,transparent:true,opacity:.62,depthWrite:false,toneMapped:false,fog:false}))),
+    foam=noLine(new THREE.Mesh(tg,new THREE.MeshBasicMaterial({color:0xd8fff8,transparent:true,opacity:.8,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false})));
+  floor.position.y=.5;floor.renderOrder=1;crest.renderOrder=3;foam.renderOrder=4;g.add(floor,crest,foam);g.userData={floor,crest,foam};return g});
+pools.quake=new Pool(()=>{const g=new THREE.Group(),
+    d=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:quakeTexture(false),transparent:true,depthWrite:false,toneMapped:false,fog:false}))),
+    h=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:quakeTexture(true),color:0xe0a84a,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false})));
+  d.position.y=.46;h.position.y=.54;d.renderOrder=1;h.renderOrder=2;g.add(d,h);g.userData={d,h};return g});
+function drawWave(f,i,t,low){
+  const vx=num(f.vx,0),vy=num(f.vy,0),a=vx||vy?Math.atan2(vy,vx):num(f.a,0),r=Math.max(12,num(f.r,60)),foe=f.foe===true,dur=f.dur>0?f.dur:1,k=Math.max(0,Math.min(1,num(f.t,1)*6,(dur-num(f.t,0))*3));
+  const o=pools.wave.get(),u=o.userData,ca=Math.cos(a),sa=Math.sin(a),sw=1+.06*Math.sin(t*9+i);
+  o.position.set(f.x,0,f.y);o.rotation.y=-a;
+  u.floor.scale.set(r*1.7,1,r*2.3);u.floor.position.x=-r*.42;u.floor.material.color.setHex(foe?PAL.foe:0x19d3c5);u.floor.material.opacity=.9*k;
+  const hy=Math.min(9,(16+r*.12)/(.13*r))*k*sw;
+  u.crest.position.set(-r*.86,0,0);u.crest.scale.set(r,r*hy,r);u.crest.material.color.setHex(foe?0x8a1430:0x1fa8c8);u.crest.material.opacity=.62*k;
+  u.foam.visible=!low;if(!low){u.foam.position.set(-r*.84,(16+r*.12)*k*sw*.92,0);u.foam.scale.set(r,r*.9,r);u.foam.material.color.setHex(foe?PAL.foe2:0xd8fff8);u.foam.material.opacity=.8*k}
+  if(!low&&k>.2){const s=imx('puff');for(let j=0;j<5;j++){const q=(t*1.4+j*.2+i*.37)%1,off=(j-2)*r*.36,bx=f.x+ca*(r*(.1-.12*Math.abs(j-2)))-sa*off,bz=f.y+sa*(r*(.1-.12*Math.abs(j-2)))+ca*off,sz=(3+r*.05)*(1-q*.6)*k;
+    putI(s,bx+ca*q*10,6+q*(18+r*.1),bz+sa*q*10,sz,sz,sz,0,0,foe?0xffb0a0:0xd8fff8)}}
+}
+function drawQuake(f,i,t,low){
+  const x1=num(f.x,0),y1=num(f.y,0),x2=num(f.x2,x1+1),y2=num(f.y2,y1),dx=x2-x1,dz=y2-y1,len=Math.max(8,Math.sqrt(dx*dx+dz*dz)),a=Math.atan2(dz,dx),foe=f.foe===true,dur=f.dur>0?f.dur:1,ft=num(f.t,1);
+  const open=Math.min(1,ft*7),k=Math.max(0,Math.min(1,(dur-ft)*2.5)),w=(num(f.w,num(f.r,15))*2+22)*(.55+.45*open),o=pools.quake.get(),u=o.userData,L=len*open;
+  o.position.set(x1+dx/len*L/2,0,y1+dz/len*L/2);o.rotation.y=-a;
+  u.d.scale.set(L*1.04,1,w);u.d.material.opacity=k;u.h.scale.set(L*1.04,1,w);u.h.material.color.setHex(foe?PAL.foe:0xe0a84a);u.h.material.opacity=k*(.5+.5*Math.max(0,1-ft*1.6))*(.8+.2*Math.sin(t*7+i));
+  if(!low){const s=imx('rock'),n=Math.min(12,Math.max(3,Math.round(len/34))),px=-dz/len,pz=dx/len;
+    for(let j=0;j<n;j++){const q=(j+.5)/n;if(q>open)break;const h1=hsh(j+i*13+x1*.1),side=j%2?1:-1,d=(w*.24+h1*5)*side,rise=Math.min(1,(open-q)*n*.8+.3)*k,sz=(3.6+h1*4.2)*rise;
+      putI(s,x1+dx*q+px*d,sz*.5,y1+dz*q+pz*d,sz,sz*(1.1+h1*.6),sz,h1*6,side*.35,foe?0x5a2a34:j%3?0x777a84:0x9a9ca4)}}
+}
+// the standing pieces of a disc field (high graphics): flames on burning ground, ice teeth round frozen ground, a slow murk over a rot cloud
+function fieldExtras(f,i,t,k){
+  const r=f.r,foe=f.foe===true,seed=f.x*.13+f.y*.07+i;
+  if(f.kind==='fire'){const s=imx('flame'),n=Math.min(14,Math.round(5+r/11));
+    for(let j=0;j<n;j++){const h1=hsh(seed+j),h2=hsh(seed+j*3.1+5),a=h1*TAU,d=Math.sqrt(h2)*r*.86,fl=1+.3*Math.sin(t*13+j*2.1)+.15*Math.sin(t*29+j),hgt=(9+h2*15)*fl*k,rad=2.6+h1*2.6;
+      putI(s,f.x+Math.cos(a)*d,.6,f.y+Math.sin(a)*d,rad,hgt,rad,j,0,foe?PAL.foe:0xff6a1e);
+      if(j%2===0)putI(s,f.x+Math.cos(a)*d,.6,f.y+Math.sin(a)*d,rad*.5,hgt*.6,rad*.5,j,0,foe?PAL.foe2:0xffd27a)}}
+  else if(f.kind==='ice'){const s=imx(foe?'fspike':'spike'),n=Math.min(12,Math.round(5+r/16)),grow=Math.min(1,f.t*4)*k;
+    for(let j=0;j<n;j++){const h1=hsh(seed+j),a=j*TAU/n+h1*.5,d=r*(.74+.2*hsh(seed+j*2.3)),hgt=(9+h1*13)*grow,rad=2.4+h1*2;
+      putI(s,f.x+Math.cos(a)*d,0,f.y+Math.sin(a)*d,rad,hgt,rad,-a,-.28,foe?0xffc0c8:0xcfeeff)}}
+  else if(f.kind==='rot'){const s=imx('puff');
+    for(let j=0;j<6;j++){const h1=hsh(seed+j),a=j*TAU/6+t*.22+h1,d=r*(.22+.5*h1),sz=r*.3*(1+.16*Math.sin(t*1.3+j*1.7))*k;
+      putI(s,f.x+Math.cos(a)*d,9+5*Math.sin(t*.9+j*2),f.y+Math.sin(a)*d,sz,sz*.62,sz,0,0,foe?0x7a1c30:j%2?0x6a7414:0x4a5210)}}
+}
+function drawFields(fs,t,low,sight){
+  for(let i=0;i<fs.length;i++){const f=fs[i];if(!f||typeof f!=='object')continue;
+    if(f.kind==='wave'){if(sight)drawWave(f,i,t,low);continue}
+    if(f.kind==='quake'){if(sight)drawQuake(f,i,t,low);continue}
+    const kd=f.kind,nw=kd==='ice'||kd==='rot'||kd==='fire',o=pools.field.get(),m=o.material,tex=fieldTexture(kd==='frost'||kd==='halo'||kd==='rain'||kd==='domain'||nw?kd:'other',f.foe===true),k=Math.max(0,Math.min(1,f.t*5,(f.dur-f.t)*2.5));
+    if(kd==='domain'){const d=pools.dark.get();d.position.x=f.x;d.position.z=f.y;d.scale.setScalar(f.r*(1+.02*Math.sin(t*2+i)));d.material.opacity=.5*Math.max(0,Math.min(1,f.t*4,(f.dur-f.t)*2))}
+    else if(kd==='rot'||kd==='fire'){const d=pools.dark.get();d.position.x=f.x;d.position.z=f.y;d.scale.setScalar(f.r*.97);d.material.opacity=(kd==='rot'?.42:.36)*k}
+    if(m.map!==tex)m.map=tex;o.position.x=f.x;o.position.z=f.y;o.scale.setScalar(f.r*2.1);o.rotation.y=kd==='rain'||kd==='ice'?0:kd==='fire'?Math.floor(t*7+i)*1.3:kd==='rot'?t*.1:t*(kd==='frost'?.22:-.3);
+    m.opacity=nw?k*(kd==='fire'?.8+.2*Math.sin(t*17+i):.86+.1*Math.sin(t*3+i)):Math.max(0,Math.min(1,f.t*5,(f.dur-f.t)*2.5))*(.8+.14*Math.sin(t*5+i));
+    if(nw&&!low&&sight&&k>0)fieldExtras(f,i,t,k)}
+}
+
 /* ---------- multiplayer: the other members of the party ----------
    MB.mp.remotes (or the test hook R.testRemotes, same shape) = [{id, name, dead, slot?, P:{x,y,face,moving,walk,hp,maxHp,inv,atk,swing,dashT,shield,skCd},
      look:{level,cls,adv,rank,pw:[b,b,b],parts,skill0Ready}, allies:[...as MB.allies, each with a stable nid], pshots:[{x,y,vx,vy,r,kind}], echoes:[...as MB.echoes]}]
@@ -1608,6 +1791,7 @@ let TFR=null,auraR=null,idTexH=null,idTexA=null,idTexHF=null,idTexAF=null,remSta
 const PK={bolt:1,orb:1,skull:1,arrow:1},FPK={bolt:'fbolt',orb:'forb',skull:'fskull',arrow:'farrow'},CLS_OK={fighter:1,tank:1,assassin:1,mage:1,ranger:1,healer:1,necro:1},WORD_RE=/^[a-z]{1,24}$/,NOLOOK={};
 const NAME_RE=/[\u0000-\u001f\u007f-\u009f\u00ad\u200b-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff9-\ufffb]/g;
 const num=(v,d)=>typeof v==='number'&&v===v&&v!==Infinity&&v!==-Infinity?v:d;
+const sp0=r=>r.P&&typeof r.P==='object'?r.P:NOLOOK;
 function cleanName(n,i){let s='';try{s=typeof n==='string'?n:n==null?'':''+n}catch(e){s=''}
   s=s.replace(NAME_RE,'').replace(/\s+/g,' ').trim();if(s.length>16)s=Array.from(s).slice(0,16).join('').trim();return s||'Player '+(i+1)}
 function remSetup(){
@@ -1660,14 +1844,14 @@ function runTimer(tm,k,rk,raw,dt){let v=tm[k]-dt;if(v<0)v=0;raw=num(raw,0);if(ra
   if(raw!==tm[rk]){tm[rk]=raw;if(raw>v+.045||raw<v-.08)v=raw}
   return tm[k]=v}
 function remNew(id){
-  const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0,auraR:0};
+  const P={x:W/2,y:H/2,face:Math.PI/2,swing:Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,dashT:0,shield:0,skCd:0,auraR:0,blades:undefined,plates:undefined,pack:undefined,haste:0};
   const S={adv:null,rank:'',level:0,mode:'play',t:0,cls:null,paused:false,apex:null},sk0={unlocked:true,ready:false};
   // the view: everything the models ask the game about their owner, answered for this member
   const V={S,P,remote:true,foe:false,apex:null,parts:7,pwA:null,skills:[sk0],sk0,settings:MB.settings,melee:MB.melee,col:MB.col,
     has(p){if(!PART_IX){PART_IX={};const a=MB.PARTS||[];for(let i=0;i<a.length;i++)PART_IX[a[i]&&a[i].id||a[i]]=i}const i=PART_IX[p];return i===undefined?true:i<V.parts},
     cls(){return S.cls},pw(i){const a=V.pwA;return !!(a&&a[i-1])},rank(){return S.rank},
     get mons(){return MB.mons},get allies(){return rm.allyList},get boss(){return MB.boss}};
-  const rm={id,idx:0,i:0,stamp:0,foe:false,foeTex:false,team:-1,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false,foe:false},
+  const rm={id,idx:0,i:0,stamp:0,foe:false,foeTex:false,team:-1,V,P,sm:newSm(),tm:{atk:0,ratk:0,dashT:0,rdashT:0,inv:0,rinv:0},rec:null,fx:{prevAtk:0,dir:1,ghostT:0,px:0,py:0,init:false,foe:false,stT:0,stN:0,trD:0,trN:0},packN:0,
     allyMap:new Map(),allyList:[],allyRecs:new Map(),aStamp:0,echo:[],eStamp:0,psRef:null,psX:NaN,psN:0,psAge:0,
     name:'',initial:'?',nameW:0,nameAt:-9,rawName:undefined,nameI:-1,dead:false,fall:0,vis:false,rankK:0,apexC:null,
     mat:null,matA:null,mark:null,marks:null,disc:null,beacon:null,hex:-1,css:'#ffffff',soft:'#ffffff'};
@@ -1757,7 +1941,9 @@ function syncRemotes(list,dt,sight){
     S.cls=typeof L.cls==='string'&&CLS_OK[L.cls]===1?L.cls:null;S.adv=S.cls&&typeof L.adv==='string'&&WORD_RE.test(L.adv)?L.adv:null;
     S.rank=typeof L.rank==='string'&&L.rank.length<6?L.rank:'';S.level=num(L.level,S0.level);S.mode=S0.mode;S.t=t;
     V.parts=typeof L.parts==='number'?L.parts:7;V.pwA=Array.isArray(L.pw)?L.pw:null;
-    S.apex=V.apex=S.cls&&(L.apex==='dominion'||L.apex==='order')?L.apex:null;
+    S.apex=V.apex=S.cls&&typeof L.apex==='string'&&APEX_OK[L.apex]===1?L.apex:null;
+    // what the newer paths show of a hero's state: sent with P (or look), else a default the model picks; the pack is counted from their allies when not sent
+    P.blades=num(sp0(r).blades,num(L.blades,undefined));P.plates=num(sp0(r).plates,num(L.plates,undefined));P.haste=num(sp0(r).haste,0);P.pack=num(sp0(r).pack,num(L.pack,rm.packN));
     // where they are and what they are doing
     const sp=r.P&&typeof r.P==='object'?r.P:NOLOOK,tm=rm.tm;
     if(num(sp.x,null)!==null&&num(sp.y,null)!==null)chase(rm.sm,sp.x,sp.y,num(sp.walk,0),0,dt,130);
@@ -1784,7 +1970,7 @@ function syncRemotes(list,dt,sight){
     if(low&&!hide){const b=pools.blob.get();b.position.set(P.x,.55,P.y);b.scale.set(70+30*f,1,56+30*f)}
     const F=rm.fx;
     if(!F.init||!play||dead||hide){F.init=true;F.px=P.x;F.py=P.y;F.prevAtk=P.atk;F.ghostT=0}
-    else heroFx(F,P,S.cls,dt,sight,low,TFR);
+    else heroFx(F,P,S.cls,dt,sight,low,TFR,S.apex);
     // their allies, through the same path as ours
     remAllies(rm,!away&&Array.isArray(r.allies)?r.allies:NONE,dt);
     syncMap(rm.allyMap,rm.allyList,'ally',dt,phAlly,phAllyUpdate,true,V);
@@ -1797,7 +1983,8 @@ function syncRemotes(list,dt,sight){
     mk.visible=!hide;mk.position.x=P.x;mk.position.z=P.y;mk.scale.setScalar((foe?90:74)*pulse);mk.rotation.y=dead?t*.7:g.rotation.y-Math.PI/2;rm.mat.opacity=dead?.5+.3*Math.sin(t*5+i):.92;
     // versus: a pool of the fighter's colour on the floor under the ring (brighter under an opponent), so the colour carries at any size
     if(VS.on&&!hide&&!dead&&sight){const o=pools.vglow.get();o.position.x=P.x;o.position.z=P.y;o.scale.setScalar(foe?150+8*Math.sin(t*3+i):118);o.material.color.setHex(rm.hex);o.material.opacity=foe?.5:.3}
-    {const im=rm.marks;let n=0;
+    {const im=rm.marks;let n=0,pk=0;
+      for(let j=0;j<al.length;j++)if(al[j].kind==='packbeast')pk++;rm.packN=pk;
       for(let j=0;j<al.length&&n<MARKS;j++){const a=al[j];if(a.hidden||a.dead||a.hp<=0)continue;
         const r0=a.r||12,rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
         markAt(im,n++,a.x,a.y,rad*(foe?2.4:2.33),t*(j%2?.5:-.5)+j)}
@@ -1812,8 +1999,8 @@ function syncRemotes(list,dt,sight){
     // power rising off them, as it does off the local hero
     {let k=0;const ap=S.apex;if(S.cls&&play&&sight&&!dead&&!hide){const rk=S.rank;k=ap||(rk&&rk[0]==='X')?1.25:rk&&rk[0]==='S'?1:RANK_K[rk]||.12}
       rm.rankK+=(k-rm.rankK)*Math.min(1,dt*2);const rk=rm.rankK,d=rm.disc,c=FX.clock;
-      d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(foe?PAL.foe:ap==='order'?PAL.power2:PAL.power)}
-        d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3+i));d.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5+i))*(ap==='dominion'?.45:1)}}
+      d.visible=rk>.02&&!hide;if(d.visible){if(ap!==rm.apexC){rm.apexC=ap;d.material.color.setHex(foe?PAL.foe:APEX_HEX[ap]||PAL.power)}
+        d.position.x=P.x;d.position.z=P.y;d.scale.setScalar(64+52*Math.min(1,rk)+4*Math.sin(c*3+i));d.material.opacity=(.1+.2*Math.min(1,rk)+.03*Math.sin(c*5+i))*(APEX_DISC[ap]||1)}}
   }
   // members who have left
   for(let i=rems.length-1;i>=0;i--){const rm=rems[i];if(rm.stamp!==st){remDrop(rm);remById.delete(rm.id);rems.splice(i,1)}}
@@ -2385,10 +2572,8 @@ function draw(dt){
   for(let i=0;i<ps.length;i++){const p=ps[i];drawPshot(p,i,p.x,p.y,t,low,pools[p.kind]||pools.bolt)}
   const mor=MB.morsels;
   for(let i=0;i<mor.length;i++){const f=mor[i],o=pools.morsel.get();o.position.set(f.x,0,f.y);const b=o.userData.bob;b.position.y=13+Math.sin(t*4+i)*3;b.rotation.y=t*1.6+i}
-  {const fs=MB.fields;if(fs)for(let i=0;i<fs.length;i++){const f=fs[i],o=pools.field.get(),m=o.material,tex=fieldTexture(f.kind==='frost'||f.kind==='halo'||f.kind==='rain'||f.kind==='domain'?f.kind:'other',f.foe===true);
-    if(f.kind==='domain'){const d=pools.dark.get();d.position.x=f.x;d.position.z=f.y;d.scale.setScalar(f.r*(1+.02*Math.sin(t*2+i)));d.material.opacity=.5*Math.max(0,Math.min(1,f.t*4,(f.dur-f.t)*2))}
-    if(m.map!==tex)m.map=tex;o.position.x=f.x;o.position.z=f.y;o.scale.setScalar(f.r*2.1);o.rotation.y=f.kind==='rain'?0:t*(f.kind==='frost'?.22:-.3);
-    m.opacity=Math.max(0,Math.min(1,f.t*5,(f.dur-f.t)*2.5))*(.8+.14*Math.sin(t*5+i))}}
+  {const fs=MB.fields;if(fs&&fs.length)drawFields(fs,t,low,sight);if(R.testFields)drawFields(R.testFields,t,low,sight);
+    const ar=R.testArcs||MB.arcs;if(ar&&ar.length)drawArcs(ar,t,low,sight);if(IMK.length)imxEnd()}
   if(sight&&MB.has('touch')){const zs=MB.zones;
     for(let i=0;i<zs.length;i++){const z=zs[i],q=Math.min(1,z.t/z.dur),o=pools.zone.get(),u=o.userData;o.position.set(z.x,0,z.y);
       const zm=z.mine&&z.foe!==true;u.disc.material.color.setHex(zm?0x5a48ff:0xd0143c);u.rim.material.color.setHex(zm?PAL.power2:0xffc04a);
@@ -2463,5 +2648,5 @@ resize();placeCamera(W/2,H/2,fitD);
 R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;
 // frame(): what is being drawn right now: CSS box, pixel ratio and backing size of #gl, the overlay's backing size and unit, the tier, MSAA
 R.frame=()=>({css:[FR.w,FR.h],pr:FR.pr,gl:[FR.bw,FR.bh],pixels:FR.bw*FR.bh,overlay:[OV.bw,OV.bh],unit:OV.u,tier:Q.tier,msaa:aaMade,shadow:Q.low?0:sun.shadow.mapSize.x,aniso:maxAniso});
-Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
+Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testFields=null;R.testArcs=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
 })();

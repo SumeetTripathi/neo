@@ -242,6 +242,7 @@ function showMap(){
       // the switch itself is in Settings; here it can only be turned off, so nobody mistakes a test for their own climb
       p.appendChild(h('p',{class:'mbt-note mbt-testing'},h('b',{text:'Testing. '}),'Every checkpoint up to floor 201 is open. ',btn('Turn off',function(){try{MB.setSetting('testUnlock',false)}catch(e){}if(screen==='map')showMap()},false,{class:'mbt-mini'})));
     }
+    if(testing())p.appendChild(jumpBox(t,'map'));
     var first=btn(inRun&&!co&&S().paused?'Back':'Close',closeAll,!canStart),bt=h('div',{class:'btns'});
     if(canStart){var sb=btn('Start from a checkpoint',function(){startFlow(0)},true);bt.appendChild(sb);bt.appendChild(first);first=sb}else bt.appendChild(first);
     p.appendChild(bt);
@@ -253,9 +254,9 @@ function showMap(){
 
 /* ---------- a seasoned climb from a checkpoint: floor, class, upgrade past 50, apex path past 100, then a confirm step ---------- */
 var flow=null;
-function startFlow(floor){
+function startFlow(floor,jump){
   var t=T();if(!t||coop())return;
-  flow={floor:floor||0,cls:null,adv:null,apex:null,fixed:!!floor};
+  flow={floor:floor||0,cls:null,adv:null,apex:null,fixed:!!floor,jump:jump||'',hero:jump?heroFloor(t,floor):floor||0};
   step(floor?'cls':'cp');
 }
 function steps(){var a=['cp','cls'];if(flow.floor>50)a.push('adv');if(flow.floor>100)a.push('apex');a.push('ok');return a}
@@ -278,7 +279,7 @@ function card(title,sub,body,fn,cls,on){
 function step(name){
   var t=T();if(!t||!flow||coop()){showMap();return}
   var all=steps(),n=all.indexOf(name)+(flow.fixed?0:1),of=all.length-(flow.fixed?1:0),prev=prevOf(name);
-  function goBack(){if(prev)step(prev);else{flow=null;showMap()}}
+  function goBack(){if(prev)step(prev);else{var j=flow.jump;flow=null;if(j==='jump')showJump();else showMap()}}
   render('flow',function(p){
     var focus=null,tr=trail();
     function head(title,lead){
@@ -286,19 +287,19 @@ function step(name){
       if(tr.length&&name!=='ok')p.appendChild(h('p',{class:'mbt-trail'},tr.map(crumb)));
       if(lead)p.appendChild(h('p',{class:'mbx-center',text:lead}));
     }
-    function foot(extra){var b=btn(prev?'Back':'Back to the map',goBack),bt=h('div',{class:'btns'});if(extra)bt.appendChild(extra);bt.appendChild(b);p.appendChild(bt);return b}
+    function foot(extra){var b=btn(prev?'Back':flow.jump==='jump'?'Back':'Back to the map',goBack),bt=h('div',{class:'btns'});if(extra)bt.appendChild(extra);bt.appendChild(b);p.appendChild(bt);return b}
     if(name==='cp'){
       head('Where the climb starts','Each open checkpoint is the floor after a guardian you have beaten.');
       var g=h('div',{class:'mbt-pick'});
       cps(t).filter(function(f){return f>=11}).forEach(function(f){
         var b=bandAt(t,f),c=bandCol(b),e=h('button',{type:'button',class:'mbt-cpb','aria-pressed':flow.floor===f?'true':null,style:'--bh:'+c[0]+';--bf:'+c[1]},h('b',{text:'Floor '+f}),h('small',{text:bandName(b)}));
-        e.addEventListener('click',function(){blip();flow.floor=f;if(f<=50)flow.adv=null;if(f<=100)flow.apex=null;step(nextOf('cp'))});
+        e.addEventListener('click',function(){blip();flow.floor=flow.hero=f;if(f<=50)flow.adv=null;if(f<=100)flow.apex=null;step(nextOf('cp'))});
         if(flow.floor===f||!focus)focus=flow.floor===f?e:focus||e;g.appendChild(e);
       });
       p.appendChild(g);var bk=foot();return focus||bk;
     }
     if(name==='cls'){
-      head('Who climbs','The hero arrives with the skills, boons and equipment that are usual for floor '+flow.floor+'.');
+      head('Who climbs','The hero arrives with the skills, boons and equipment that are usual for floor '+(flow.hero||flow.floor)+'.');
       var cs=h('div',{class:'cards mbt-cards'}),C={};try{C=MB.CLASSES||{}}catch(e){}
       Object.keys(C).forEach(function(id){var c=C[id]||{},e=card(c.name||id,c.gear,c.text,function(){if(flow.cls!==id)flow.adv=null;flow.cls=id;step(nextOf('cls'))},null,flow.cls===id);
         if(flow.cls===id||!focus)focus=flow.cls===id?e:focus||e;cs.appendChild(e)});
@@ -323,7 +324,7 @@ function step(name){
       p.appendChild(xs);var b4=foot();return focus||b4;
     }
     /* confirm */
-    var d=null,swap='';try{if(typeof t.seasoned==='function')d=t.seasoned(flow.floor,{cls:flow.cls,adv:flow.floor>50?flow.adv:null,apex:flow.floor>100?flow.apex:null})}catch(e){}
+    var d=null,swap='';try{if(typeof t.seasoned==='function')d=t.seasoned(flow.hero||flow.floor,{cls:flow.cls,adv:flow.floor>50?flow.adv:null,apex:flow.floor>100?flow.apex:null})}catch(e){}
     // a path this version of the game does not know becomes another: say so, and show what the hero will really be
     if(d&&typeof d==='object'&&flow.floor>100&&flow.apex&&apexId(d.apex)&&d.apex!==flow.apex){swap=apexInfo(flow.apex).name;flow.apex=d.apex;tr=trail()}
     head('Begin at floor '+flow.floor+'?');
@@ -331,6 +332,7 @@ function step(name){
     if(swap)p.appendChild(h('p',{class:'mbt-note',role:'note',text:swap+' is not open in this version of the game. This hero takes '+apexInfo(flow.apex).name+' instead.'}));
     var sv=null,cur='';try{sv=MB.api&&MB.api.getSave&&MB.api.getSave()}catch(e){}
     if(sv&&num(sv.level)>0){var sc=clsOf(sv.cls);cur=' (floor '+(Math.round(num(sv.level))+1)+(sc?', '+(sc.name||sv.cls):'')+')'}
+    if(flow.jump&&flow.hero&&flow.hero!==flow.floor)p.appendChild(h('p',{class:'mbt-note mbt-testing',role:'note'},h('b',{text:'Testing. '}),'Ready-made heroes are made for checkpoint floors: this is the hero of floor '+flow.hero+', set down on floor '+flow.floor+'.'));
     p.appendChild(h('p',{class:'mbt-warn',role:'note'},h('b',{text:'This replaces your single-player run'+cur+'. '}),'That run cannot be brought back. Checkpoints, records and settings are kept.'));
     if(d&&typeof d==='object'){
       var dl=h('dl',{class:'mbt-kit'}),row=function(k,v){if(v)dl.appendChild(h('div',null,h('dt',{class:'lab',text:k}),h('dd',{text:v})))},names=function(a){return Array.isArray(a)?a.map(function(x){return x&&typeof x==='object'?x.name||'':x}).filter(Boolean):[]};
@@ -349,11 +351,92 @@ function step(name){
 function begin(msg){
   var t=T(),f=flow,ok=false;if(!t||!f||coop())return;
   var o={cls:f.cls,adv:f.floor>50?f.adv:null,apex:f.floor>100?f.apex:null};
-  try{ok=t.startAt(f.floor,o)}catch(e){ok=false;try{console.warn('tower: startAt failed',e)}catch(_){}}
+  try{
+    if(f.jump&&f.hero&&f.hero!==f.floor){
+      // the game makes ready-made heroes for checkpoint floors only: start at the checkpoint below, and as soon as that floor has begun go on to the floor asked for
+      pendingJump={base:f.hero,floor:f.floor};ok=t.startAt(f.hero,o);if(ok===false)pendingJump=null;
+    }else ok=t.startAt(f.floor,o);
+  }catch(e){ok=false;pendingJump=null;try{console.warn('tower: startAt failed',e)}catch(_){}}
   if(ok===false){if(msg){msg.className='mbx-msg bad';msg.textContent='The climb could not be started from here.'}return}
   flow=null;back=null;hideLayer();
   // the game normally takes the screen away itself; if the title is somehow still up, hand the overlay back to it
   try{var ov=$('ov');if(S().mode==='title'&&MB.api&&MB.api.hide)MB.api.hide();else if(ov&&!ov.hidden&&S().mode==='play'&&!S().paused&&MB.api&&MB.api.hide)MB.api.hide()}catch(e){}
+}
+
+/* ---------- testing: jump to any floor (only while the Checkpoints testing switch is on, never in multiplayer). It uses what the game already offers:
+   MB.api.startLevel(n) for the hero as it is, MB.tower.startAt for a ready-made hero. ---------- */
+var jumpF=0,pendingJump=null,JMAX=9999;
+function testing(){try{return hasSetting('testUnlock')&&MB.settings.testUnlock===true}catch(e){return false}}
+function isTrial(k){return k==='survive'||k==='guard'||k==='race'||k==='ordeal'||k==='cross'}
+// the floor a ready-made hero is made for: the floor itself where a climb can start there, else the nearest checkpoint below (0: none)
+function heroFloor(t,f){var a=cps(t).filter(function(c){return c>=11&&c<=f});return a.length?a[a.length-1]:0}
+function jumpHero(f){
+  f=Math.round(num(f));if(!testing()||coop()||!S().cls||!(f>=9&&f<=JMAX)||!MB.api||typeof MB.api.startLevel!=='function')return false;
+  flow=null;back=null;pendingJump=null;hideLayer();
+  if(S().paused){var pb=$('pauseB');if(pb)try{pb.click()}catch(e){}}
+  var ok=false;try{ok=MB.api.startLevel(f-1)!==false}catch(e){try{console.warn('tower: jump failed',e)}catch(_){}}
+  return ok;
+}
+function jumpBox(t,home){
+  var cur=Math.max(1,Math.round(num(t.floor,1))),co=coop(),box=h('section',{class:'mbt-jump','aria-label':'Testing: jump to a floor'});
+  box.appendChild(h('div',{class:'mbt-jhead'},h('h3',{class:'mbt-h',text:'Jump to floor'}),h('span',{class:'mbt-tag best',text:'Testing'})));
+  if(co){box.appendChild(h('p',{class:'mbt-note',text:'Jumping between floors is off in multiplayer.'}));return box}
+  var f=Math.max(1,Math.min(JMAX,jumpF||cur+1)),inp=h('input',{type:'number',class:'mbt-jnum',min:'1',max:String(JMAX),step:'1',inputmode:'numeric',value:String(f),'aria-label':'Floor to jump to'});
+  var kind=h('p',{class:'mbt-jkind','aria-live':'polite'}),note=h('p',{class:'mbt-note mbt-jnote'});
+  var bHero=btn('Jump with this hero',function(){jumpHero(f)},true),bMade=btn('Jump with a ready-made hero',function(){startFlow(f,home)});
+  function set(v,keep){
+    v=Math.round(num(v,f));f=jumpF=Math.max(1,Math.min(JMAX,v||1));if(!keep||String(f)!==inp.value)inp.value=String(f);
+    var a=floorAt(t,f),k=kindOf(a.kind),bn=rowBand(t,a),hero=!!S().cls,base=heroFloor(t,f);
+    kind.textContent='';kind.className='mbt-jkind k-'+(KIND[a.kind]?a.kind:'fight');
+    kind.appendChild(icon(a.kind));kind.appendChild(h('span',null,h('b',{text:'Floor '+f+' \u00b7 '+k.name+(bn?' \u00b7 '+bn:'')}),' '+(a.rule||k.line)));
+    bHero.disabled=!(hero&&f>=9);bMade.disabled=!(base&&typeof t.startAt==='function');
+    note.textContent=f<9?'Floors 1 to 8 are the story start, with the body still in pieces: use Rise on the title screen for those. A ready-made hero can start from floor 11.'
+      :!hero?(f<11?'There is no hero with a class yet, and a ready-made one can start from floor 11.':'There is no hero with a class yet: take a ready-made one.')
+      :f<11?'A ready-made hero can start from floor 11.'
+      :base&&base!==f?'A ready-made hero is the one of floor '+base+', the checkpoint below.':'';
+    note.hidden=!note.textContent;
+  }
+  function near(test){for(var x=f+1;x<=Math.min(JMAX,f+400);x++){var k=floorAt(t,x).kind;if(test(k))return x}return 0}
+  function stepB(lab,d){return btn(lab,function(){set(f+d)},false,{class:'mbt-step','aria-label':(d>0?'Up ':'Down ')+Math.abs(d)+(Math.abs(d)>1?' floors':' floor')})}
+  inp.addEventListener('input',function(){if(inp.value!=='')set(inp.value,true)});
+  inp.addEventListener('change',function(){set(inp.value===''?f:inp.value)});
+  box.appendChild(h('div',{class:'mbt-jrow'},stepB('\u221210',-10),stepB('\u22121',-1),inp,stepB('+1',1),stepB('+10',10),
+    btn('Next trial',function(){var x=near(isTrial);if(x)set(x)},false,{class:'mbt-step mbt-jgo'}),btn('Next guardian',function(){var x=near(function(k){return k==='guardian'});if(x)set(x)},false,{class:'mbt-step mbt-jgo'})));
+  box.appendChild(kind);box.appendChild(h('div',{class:'btns mbt-jacts'},bHero,bMade));box.appendChild(note);
+  box.appendChild(h('p',{class:'mbt-note',text:'For testing only. Nothing is marked: the single-player save simply goes on from the floor you land on.'}));
+  set(f);box._focus=inp;
+  return box;
+}
+function showJump(){
+  var t=T();if(!t||!testing()){closeAll();return}
+  render('jump',function(p){
+    p.appendChild(h('div',{class:'mbt-head'},h('p',{class:'kick',text:'Testing'}),h('h2',{text:'Jump to a floor'})));
+    var box=jumpBox(t,'jump');p.appendChild(box);
+    var b=btn('Back',closeAll);p.appendChild(h('div',{class:'btns'},b));
+    return touch()?b:box._focus||b;
+  },{esc:closeAll,enter:null});
+}
+function openJump(backFn){
+  if(!T()||!testing())return false;
+  back=typeof backFn==='function'?backFn:function(){try{if(MB.api&&MB.api.hide)MB.api.hide()}catch(e){}};
+  flow=null;showJump();return true;
+}
+if(typeof MB.on==='function'){
+  MB.on('levelstart',function(d){var pj=pendingJump;if(!pj)return;pendingJump=null;
+    if(d&&Math.round(num(d.level,-1))===pj.base-1&&!coop())setTimeout(function(){try{if(Math.round(num(S().level,-1))===pj.base-1)MB.api.startLevel(pj.floor-1)}catch(e){}},0)});
+  MB.on('title',function(){pendingJump=null});
+}
+// the pause menu while testing: the jump control, and one floor up or down with the hero as it is
+function addJump(){
+  var b=$('ovBtns'),ov=$('ov'),s=S();
+  if(!b||!ov||ov.hidden||b.hidden||!T()||!testing()||coop()||!s.paused||b.querySelector('[data-mbj]'))return;
+  var all=b.querySelectorAll('button'),i,before=null;if(!all.length||all[0].textContent!=='Resume')return;
+  for(i=0;i<all.length;i++)if(all[i].textContent==='Settings'){before=all[i];break}
+  var cur=Math.round(num(s.level,0))+1,hero=!!s.cls;
+  function add(label,fn,off){var e=h('button',{type:'button',text:label,'data-mbj':'1',class:'mbt-jbtn',disabled:off?true:null});e.addEventListener('click',function(){blip();fn()});b.insertBefore(e,before)}
+  add('Jump to floor\u2026',function(){openJump()});
+  add('Next floor',function(){jumpHero(cur+1)},!hero||cur+1<9||cur>=JMAX);
+  add('Previous floor',function(){jumpHero(cur-1)},!hero||cur-1<9);
 }
 
 /* ---------- ways in: MB.openTower(back) for the game's own menus, and a button added to the title, pause and co-op menus when the game offers none ---------- */
@@ -414,10 +497,10 @@ win.addEventListener('keydown',function(e){
   }catch(_){}
 },true);
 var ob=$('ovBtns');
-if(ob&&win.MutationObserver)new MutationObserver(function(){try{addButton()}catch(e){}}).observe(ob,{childList:true});
+if(ob&&win.MutationObserver)new MutationObserver(function(){try{addButton()}catch(e){}try{addJump()}catch(e){}}).observe(ob,{childList:true});
 if(typeof MB.on==='function'){
   MB.on('title',function(){setTimeout(addButton,0)});
-  MB.on('pause',function(){setTimeout(addButton,0)});
+  MB.on('pause',function(){setTimeout(addButton,0);setTimeout(function(){try{addJump()}catch(e){}},0)});
   // a co-op game starts or ends, or the run is replaced, while the map is up: it would show the wrong thing
   MB.on('mp',function(){if(layer&&!layer.hidden){if(screen==='flow'){flow=null}back=null;hideLayer();try{if(MB.api&&MB.api.hide)MB.api.hide()}catch(e){}}});
 }
@@ -551,6 +634,6 @@ var hudOk=true;
 setInterval(function(){if(!hudOk)return;try{hudTick()}catch(e){hudOk=false;try{hudOff();console.warn('tower: trial HUD stopped',e)}catch(_){}}},100);
 
 // for tests and for the other files
-MB.towerUi={open:openTower,close:closeAll,peek:showPeek,icon:icon,kinds:KIND,apexPaths:apexAll,apexOffer:apexOffer,apexBadge:apexBadge,apexCard:apexCard};
+MB.towerUi={openJump:openJump,jumpHero:jumpHero,open:openTower,close:closeAll,peek:showPeek,icon:icon,kinds:KIND,apexPaths:apexAll,apexOffer:apexOffer,apexBadge:apexBadge,apexCard:apexCard};
 }catch(e){try{console.warn('tower.js: not started',e)}catch(_){}}
 })();

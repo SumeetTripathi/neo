@@ -548,18 +548,33 @@ function fxm(){
     thornTip:toonM(0x8c2f39),
     seam:new T.MeshBasicMaterial({color:0x8fe02a,fog:false,toneMapped:false}),seamGlow:add(0x58c010,.3),
     dot:add(0x7fe85a,.8),mark:new T.MeshBasicMaterial({color:0xff2a40,fog:false,toneMapped:false,transparent:true,opacity:.95,depthTest:false}),
-    burst:add(0xff6a5a,.6),frost:add(0x8fd3ff,.45)
+    burst:add(0xff6a5a,.6),frost:add(0x8fd3ff,.45),
+    // round 10: what the apex paths do to monsters (chill / frozen, rot, burn, shock, soak)
+    ice:toonM(0xcfeeff,{emissive:0x4aa8e8,emissiveIntensity:.55}),
+    iceShell:toonM(0xbfe6ff,{emissive:0x5ab4f0,emissiveIntensity:.55,transparent:true,opacity:.62,depthWrite:false}),
+    iceEdge:new T.MeshBasicMaterial({color:0xeaf8ff,transparent:true,opacity:.5,wireframe:true,depthWrite:false,fog:false,toneMapped:false}),
+    rime:add(0xdff4ff,.55),
+    rotBlob:toonM(0x2c2e12),rotBruise:toonM(0x5a3068),rotTip:toonM(0x5a6410,{emissive:0xb7c61f,emissiveIntensity:1.4,rim:false}),rotMote:add(0xb7c61f,.75),
+    fire:add(0xff6a1e,.85),fireCore:add(0xffd27a,.9),
+    arc:new T.MeshBasicMaterial({color:0xfffbe0,fog:false,toneMapped:false}),arcGlow:add(0xffe74a,.55),
+    drip:add(0x8ff0e6,.75)
   };
   return FXM;
 }
 // tinted twins of a body material: further cached variants (rage has a dim and a bright one, for the pulse), shared by every monster of that colour
-var VAR={rage:new Map(),rage1:new Map(),slow:new Map(),hit:new Map()};
+var VAR={rage:new Map(),rage1:new Map(),slow:new Map(),hit:new Map(),frozen:new Map(),shock:new Map(),burn:new Map(),soak:new Map(),rot:new Map()};
+var MODEK=[0,0,'rage','slow','frozen','shock','burn','soak','rot']; // body tint by mode (0 plain, 1 hit flash)
 function variant(mat,kind){
   var h=BODY.get(mat);if(h===undefined)return mat;
   var map=VAR[kind],v=map.get(mat);if(v)return v;
   _c.setHex(h);
   if(kind==='hit'){_c.lerp(_c2.set(0xfff2e4),.4);v=toonM(_c.getHex(),{emissive:0xffe9d8,emissiveIntensity:.26})}
   else if(kind==='slow'){_c.lerp(_c2.set(0x3f8cff),.6);v=toonM(_c.getHex(),{emissive:0x1a3f9a,emissiveIntensity:.5})}
+  else if(kind==='frozen'){_c.lerp(_c2.set(0xbfe6ff),.78);v=toonM(_c.getHex(),{emissive:0x3a8ad8,emissiveIntensity:.45})}
+  else if(kind==='shock'){_c.lerp(_c2.set(0xfff6b0),.55);v=toonM(_c.getHex(),{emissive:0xffe74a,emissiveIntensity:.9})}
+  else if(kind==='burn'){_c.lerp(_c2.set(0x2a100a),.5);v=toonM(_c.getHex(),{emissive:0xff5a14,emissiveIntensity:.55})}
+  else if(kind==='soak'){_c.lerp(_c2.set(0x0e3a4e),.5);v=toonM(_c.getHex(),{emissive:0x19d3c5,emissiveIntensity:.3})}
+  else if(kind==='rot'){_c.lerp(_c2.set(0x3c401a),.5);v=toonM(_c.getHex(),{emissive:0x2c3a06,emissiveIntensity:.4})}
   else{_c.lerp(_c2.set(0xff2a30),.28);v=toonM(_c.getHex(),{emissive:0xff1a26,emissiveIntensity:kind==='rage1'?.72:.3})}
   map.set(mat,v);return v;
 }
@@ -585,8 +600,30 @@ var DRESS={
   mark:function(u){var g=grp(u.fx,0,u.top+.55,0);g.renderOrder=7;fxMesh(G.torus,FXM.mark,g,0,0,0,.5,.6,.5).renderOrder=7;
     fxMesh(merged('markTicks',function(add){for(var i=0;i<4;i++){var a=i*TAU/4;add(G.box,cos(a)*.62,0,sin(a)*.62,cos(a),0,sin(a),.07,.36,.07)}}),FXM.mark,g).renderOrder=7;return g},
   burst:function(u){return fxMesh(G.sph,FXM.burst,u.fx,0,u.top*.5,0,1)},
-  slow:function(u){return fxMesh(G.aura,auraMat(0x8fd3ff),u.fx,0,.06,0,1.5,1,1.5)}
+  slow:function(u){return fxMesh(G.aura,auraMat(0x8fd3ff),u.fx,0,.06,0,1.5,1,1.5)},
+  // chill: frost creeping up from the feet: a ring of ice teeth round the base that grows with the cold, rime climbing the body
+  chill:function(u){var g=grp(u.fx),i,a,r;solid(fxMesh(ringGeo('chillA',9,.84,0,1.7,.62,.18),FXM.ice,g,0,0,0));
+    r=grp(g);for(i=0;i<6;i++){a=i*2.4+.4;fxMesh(G.sphLo,FXM.rime,r,cos(a)*.9,.22+(i/6)*u.top*.7,sin(a)*.9,.34,.2,.34)}ink(g,u.lw);return g},
+  // frozen solid: a faceted block with hard spurs of ice through it
+  frozen:function(u){var g=grp(u.fx,0,u.top*.5,0);fxMesh(G.ico1,FXM.iceShell,g,0,0,0,1.36,u.top*.64,1.36).renderOrder=5;fxMesh(G.ico,FXM.iceEdge,g,0,0,0,1.44,u.top*.68,1.44).renderOrder=5;
+    solid(fxMesh(merged('iceSpurs',function(add){var i,a;for(i=0;i<7;i++){a=i*TAU/7+.3;add(G.cone4,cos(a)*.95,-.84+(i%3)*.5,sin(a)*.95,cos(a),.5+(i%2)*.9,sin(a),.22,.8+(i%3)*.22,.22)}}),FXM.ice,g,0,0,0,1,u.top*.5,1));
+    ink(g,u.lw);return g},
+  // rot: pustules breaking out over the body (two more with every stack), motes of sickness coming off it
+  rot:function(u){var g=grp(u.fx),i,a,o;
+    for(i=0;i<10;i++){a=i*2.399+.7;o=grp(g,cos(a)*.94,.25+((i*37)%10)/10*u.top*.72,sin(a)*.94);
+      solid(fxMesh(G.sphLo,i%4===3?FXM.rotBruise:FXM.rotBlob,o,0,0,0,.21+(i%3)*.05));fxMesh(G.sphLo,FXM.rotTip,o,cos(a)*.15,.06,sin(a)*.15,.11)}
+    for(i=0;i<3;i++)fxMesh(G.sphLo,FXM.rotMote,g,0,0,0,.1);ink(g,u.lw);return g},
+  // burn: fire standing on its head and shoulders
+  burn:function(u){var g=grp(u.fx),i,f;for(i=0;i<5;i++){f=grp(g);fxMesh(G.cone4,FXM.fire,f,0,0,0,.26,.85,.26);fxMesh(G.cone4,FXM.fireCore,f,0,0,0,.13,.5,.13)}return g},
+  // shock: three jagged arcs that jump about the body
+  shock:function(u){var g=grp(u.fx),i,h;for(i=0;i<3;i++){h=grp(g);fxMesh(arcGeo(i,.11),FXM.arcGlow,h,0,0,0,1,u.top,1);fxMesh(arcGeo(i,.04),FXM.arc,h,0,0,0,1,u.top,1)}return g},
+  // soak: water running off it into a ring on the floor
+  soak:function(u){var g=grp(u.fx),i;fxMesh(G.aura,auraMat(0x19d3c5),g,0,.05,0,1.55,1,1.55).renderOrder=1;for(i=0;i<5;i++)fxMesh(G.sphLo,FXM.drip,g,0,0,0,.07,.17,.07);return g}
 };
+// a standing zigzag of thin bars (unit height, at about the body's radius), three shapes
+function arcGeo(i,w){return merged('arc'+i+'_'+w,function(add){var n=5,j,x=1.05,y=.04,z=0,x2,y2,z2,dx,dy,dz,l;
+  for(j=0;j<n;j++){x2=1.05+(((i*7+j*13)%9)/9-.5)*.5;y2=(j+1)/n;z2=(((i*5+j*11)%7)/7-.5)*.7;dx=x2-x;dy=y2-y;dz=z2-z;l=Math.sqrt(dx*dx+dy*dy+dz*dz);
+    add(G.box,(x+x2)/2,(y+y2)/2,(z+z2)/2,dx,dy,dz,w,l+w*.5,w);x=x2;y=y2;z=z2}})}
 function dress(u,k,on){
   var o=u.f[k];
   if(!on){if(o)o.visible=false;return null}
@@ -819,7 +856,8 @@ function update(g,m,MB,dt){
   dt=dt>0?min(dt,.1):1/60;
   var rage=!!m.rage,stun=m.stun>0;
   if(rage)u.extra+=dt*.8; // enraged: everything idles faster
-  var tt=t+seed+u.extra;
+  var tt=t+seed+u.extra,fz=m.frozen>0;
+  if(fz){if(u.fzT===undefined)u.fzT=tt;tt=u.fzT}else if(u.fzT!==undefined)u.fzT=undefined; // frozen solid: it holds the pose it was caught in
   var r=m.r||u.r;if(r!==u.r){u.r=r;root.scale.setScalar(r*(cfg.k||1));u.fx.scale.setScalar(r);if(u.aura)u.aura.scale.setScalar(r*2.3)}
   // facing
   var a=P?Math.atan2(P.y-m.y,P.x-m.x):0;
@@ -833,7 +871,7 @@ function update(g,m,MB,dt){
   else if(u.ai==='beamer'&&(st==='wind'||st==='beam')&&typeof m.ba==='number')face=m.ba;
   else if(u.ai==='mite')face=a+sin(t*3+seed)*.6;
   var want=PI/2-face;
-  if(!u.init){u.init=true;u.rot=want}else if(!stun)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
+  if(!u.init){u.init=true;u.rot=want}else if(!stun&&!fz)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
   root.rotation.y=u.rot;
   var look=wrap(PI/2-a-u.rot);look=look>1.1?1.1:look<-1.1?-1.1:look;
   // pose targets
@@ -852,7 +890,7 @@ function update(g,m,MB,dt){
   body.rotation.set(u.tilt,0,roll);
   body.position.y=cfg.y0+(st==='idle'||st==='up'?cfg.bob*(.5+.5*sin(tt*cfg.spd)):0);
   if(u.shake>.02)root.position.set(sin(t*91+seed)*.07*r*u.shake,0,cos(t*77+seed)*.05*r*u.shake);else root.position.set(0,0,0);
-  ANIM[u.ai](p,m,t,tt,st,look,u,dt);
+  if(!fz)ANIM[u.ai](p,m,t,tt,st,look,u,dt);
   if(u.pv==='shade')shadeUpdate(g,m,u,t,dt,r);else if(u.pv)petUpdate(g,m,u,t,dt,r);
   // how fast and which way it is moving (eye trails, swift streaks)
   var vx=(m.x-u.px)/dt,vz=(m.y-u.pz)/dt,sp=Math.sqrt(vx*vx+vz*vz);u.px=m.x;u.pz=m.y;
@@ -881,18 +919,29 @@ function update(g,m,MB,dt){
     else{u.aura.material.opacity=.5+.12*sin(t*2.4)}
   }
   // body materials: hit flash, then chill, then rage
-  var mode=u.wane?u.mode:m.flash>0?1:m.slow>0?3:rage?2:0,ms,mt;
+  var mode=u.wane?u.mode:m.flash>0?1:fz?4:m.shock>0?5:m.slow>0||m.chill>0?3:rage?2:m.burn>0?6:m.soak>0?7:m.rot>0?8:0,ms,mt;
   if(mode!==u.mode){
-    u.mode=mode;ms=u.meshes;mt=u.mats;var kind=mode===2?'rage':'slow',soft=mode===1&&(m.boss||r>=30)&&!u.pv;
+    u.mode=mode;ms=u.meshes;mt=u.mats;var kind=MODEK[mode]||'slow',soft=mode===1&&(m.boss||r>=30)&&!u.pv;
     // a hit: small things blink white; a boss fills most of the view, so it only brightens to a pale tint of its own colour (eyes and glows keep theirs)
     for(i=0;i<ms.length;i++)ms[i].material=mode===0?mt[i]:mode===1?(soft?variant(mt[i],'hit'):FX.white):variant(mt[i],kind);
     u.rl=0;
   }
   // rage beats between two cached tints (a hard cel pulse, nothing mutated)
   if(mode===2){k=sin(t*7.5)>.2?1:0;if(k!==u.rl){u.rl=k;ms=u.meshes;mt=u.mats;for(i=0;i<ms.length;i++)ms[i].material=variant(mt[i],k?'rage1':'rage')}}
+  // shocked: the body snaps between a hot yellow and a pale tint
+  else if(mode===5){k=sin(t*55)>0?1:0;if(k!==u.rl){u.rl=k;ms=u.meshes;mt=u.mats;for(i=0;i<ms.length;i++)ms[i].material=variant(mt[i],k?'shock':'hit')}}
   // statuses
   var F=u.f,top=u.top,on;
-  on=m.slow>0;if(on||F.slow){o=dress(u,'slow',on);if(o){o.position.y=.06-g.position.y/r;o.rotation.y=t*.7}}
+  on=m.chill>0&&!fz;if(on||F.chill){o=dress(u,'chill',on);if(o){k=min(1,m.chill);o.position.y=-g.position.y/r;o.children[0].scale.set(1,.5+k*1.7,1);q=o.children[1].children;for(i=0;i<q.length;i++)q[i].visible=i<k*6+.5}}
+  if(fz||F.frozen){o=dress(u,'frozen',fz);if(o){u.fzK=min(1,(u.fzK||0)+dt*9);k=.55+.45*u.fzK;o.scale.set(k,k,k)}else u.fzK=0}
+  on=m.rot>0;if(on||F.rot){o=dress(u,'rot',on);if(o){k=min(5,max(1,Math.round(m.rot)))*2;for(i=0;i<10;i++){q=o.children[i];q.visible=i<k;if(i<k){var ps=1+.16*sin(t*4+i*1.9);q.scale.set(ps,ps,ps)}}
+    for(i=10;i<13;i++){q=(tt*.6+i*.33)%1;var ra=i*2.1+seed+q*1.5;o.children[i].position.set(cos(ra)*(1.2+.3*q),.3+q*top*1.15,sin(ra)*(1.2+.3*q));ps=.1+.12*sin(q*PI);o.children[i].scale.set(ps,ps,ps)}}}
+  on=m.burn>0;if(on||F.burn){o=dress(u,'burn',on);if(o)for(i=0;i<o.children.length;i++){q=o.children[i];var fa=i*TAU/4+seed,fr=i?.72:0,fl=1+.3*sin(t*19+i*2.1)+.15*sin(t*37+i);
+    q.position.set(cos(fa)*fr,i?top*(.5+((i*3)%4)*.1):top*.9,sin(fa)*fr);q.scale.set(i?.8:1.2,(i?.8:1.3)*fl,i?.8:1.2)}}
+  on=m.shock>0;if(on||F.shock){o=dress(u,'shock',on);if(o)for(i=0;i<3;i++){q=o.children[i];k=sin((Math.floor(t*16)+i*7.1)*12.9898)*43758.5453;k-=Math.floor(k);q.rotation.y=k*TAU;q.visible=k>.2}}
+  on=m.soak>0;if(on||F.soak){o=dress(u,'soak',on);if(o){q=o.children[0];q.position.y=.05-g.position.y/r;k=1.55+.12*sin(t*2.6);q.scale.set(k,1,k);
+    for(i=1;i<o.children.length;i++){q=(tt*1.25+i*.21)%1;k=i*2.4+seed;o.children[i].position.set(cos(k)*.96,.08+(1-q*q)*top*.9,sin(k)*.96)}}}
+  on=m.slow>0||m.chill>0;if(on||F.slow){o=dress(u,'slow',on);if(o){o.position.y=.06-g.position.y/r;o.rotation.y=t*.7}}
   on=m.ward>0;if(on||F.ward){o=dress(u,'ward',on);if(o){k=1+.05*sin(t*11);o.scale.set(k,k,k);o.rotation.y=t*.8;FXM.ward.opacity=.26+.1*sin(t*11)}}
   on=m.dotT>0;if(on||F.dot){o=dress(u,'dot',on);if(o)for(i=0;i<o.children.length;i++){q=(tt*.85+i*.2)%1;k=i*2.4+seed;
     o.children[i].position.set(cos(k+q*2)*(1.12-.3*q),.25+q*top*1.05,sin(k+q*2)*(1.12-.3*q));k=.2*(1-q*.7);o.children[i].scale.set(k,k*1.3,k)}}
