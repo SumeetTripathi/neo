@@ -2724,7 +2724,7 @@ function mpSendMe(now,force){
     if(P.beam){msg.bm=[Math.round(P.beam.a*100),Math.round(P.beam.len)];if(VS)msg.bm.push(Math.round(14*dmgMul()*100)/100);ev=true}else if(MP.hadBm){msg.bm=0;ev=true}MP.hadBm=!!P.beam; // the Verdict beam
     for(const q of pshots)if(!q._sent){q._sent=true;(msg.s||(msg.s=[])).push(vsShotOut(q,[Math.round(q.x),Math.round(q.y),Math.round(q.vx),Math.round(q.vy),q.r,Math.max(0,PKIND.indexOf(q.kind)),Math.min(99,q.pierce|0)]))}
     for(const e of echoes)if(!e._sent){e._sent=true;(msg.e||(msg.e=[])).push([Math.round(e.x),Math.round(e.y),Math.round(e.ang*100)||0,e.k||e.ai,e.ai,e.s.col,e.s.r,e.s.crown?1:0,e.owner])}
-    for(const z of zones)if(z.mine&&!z.rem&&!z._sent){z._sent=true;const a=[Math.round(z.x),Math.round(z.y),z.r,Math.round(z.dur*100)];if(z.sx!==undefined)a.push(Math.round(z.sx),Math.round(z.sy));else if(VS)a.push(-1,-1);if(VS)a.push(Math.round(z.dmg*100)/100,z.stun||0);(msg.z||(msg.z=[])).push(a)}
+    for(const z of zones)if(z.mine&&!z.rem&&!z._sent){z._sent=true;const a=[Math.round(z.x),Math.round(z.y),z.r,Math.round(z.dur*100)];if(z.sx!==undefined)a.push(Math.round(z.sx),Math.round(z.sy));else if(VS)a.push(-1,-1);if(VS)a.push(Math.round(z.dmg*100)/100,z.stun||0,z.pet?1:0);(msg.z||(msg.z=[])).push(a)}
     for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;(msg.f||(msg.f=[])).push(VS?[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100),Math.round(f.dmg*100)/100,f.slow?1:0]:[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)])}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
     if(VS&&VP.ev.length){msg.v=VP.ev;VP.ev=[]}
@@ -3017,9 +3017,9 @@ MP.begin=mpBegin;MP.end=mpEnd;
 //
 // THE conversion: a blow of raw damage D (the number a monster would take) costs a hero  D / GREF(n) x PHP(n) x VSK.K  health (n: the match's floor), times the attacker's and the victim's class factor (VSK.cls, all 1 unless tuned),
 //   halved by a stone skin, half again as much on a marked hero, and never more than VSK.cap of the victim's health in one blow. Creatures' blows on heroes go through the same rule.
-//   Creature against creature, and hero against creature: the raw number comes off the creature's health as it is (the pets' own scale), times VSK.cre.
+//   Creature against creature: the raw number comes off the creature's health as it is (the pets' own rule). A hero's blow on a creature: the same, times VSK.cre.
 // Versus-only rules (VRULES says them on the pick screen): healing at VSK.heal; no more than VSK.inv seconds untouchable at a stretch (then VSK.invRest seconds in which nothing protects); a stun or a slow lasts VSK.cc at most
-//   and then none takes hold for VSK.ccImm; fallen pets stay down for the round; thralls and wolves have health (VSK.thr / VSK.wolf of GREF); a blow that was shrugged off or blocked gives no further protection but itself.
+//   and then none takes hold for VSK.ccImm; fallen pets stay down for the round; thralls and wolves have health (VSK.thr / VSK.wolf of GREF); a blow that was shrugged off or blocked gives no further protection but itself, and a shield blocks one blow in VSK.shield seconds at most.
 //
 // Messages:
 //  vs  host -> all: {t,k:'go',n} round n starts | {t,k:'s',ph,n,tl (seconds left x10),w (winner team or -1),sc:[[rounds,kills,dmg,flags 1 down 2 left]...]} four times a second and at once on a change | {t,k:'bye'} back to the lobby
@@ -3032,19 +3032,22 @@ MP.begin=mpBegin;MP.end=mpEnd;
 //      200 px 16 burns around 32 a creature's),boom raw,slow,stun], z:[x,y,r,dur,sx|-1,sy|-1,raw,stun], f:[...,raw per tick,slows], bm:[angle,length,raw], an: a pet's row ends with its three blows, a thrall's with its health
 //  lk  in versus also: au:[radius,raw per tick] the ring of light, tb: a thrall's bite (raw)
 const VFLOORS=[11,31,51,101,151],VNONE=[];
-const VSK={K:1.5,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:1,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,
-  cls:{fighter:[1,1],tank:[1,1],assassin:[1,1],mage:[1,1],ranger:[1,1],healer:[1,1],necro:[1,1]},dev:false};
-// VCLS: the class factors [what its blows on heroes are multiplied by, what the blows it takes are multiplied by] per hero level, found with the versus bots (r9-sim/tune.js)
+const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,
+  cls:{},dev:false};
+// VCLS: placeholder
 const VCLS={};
 const VRULES=['Every blow is scaled to a hero\'s health, and no single blow takes more than '+Math.round(VSK.cap*100)+'% of it.',
   'Healing and lifesteal work at half strength.',
   'Nothing keeps you untouchable for more than '+VSK.inv+' seconds at a stretch.',
   'A stun or a slow lasts '+VSK.cc+' second at most. After it, none takes hold for '+VSK.ccImm+' seconds.',
-  'A pet that falls stays down until the next round. Thralls and wolves can be killed.',
+  'A pet that falls stays down until the next round. Thralls and wolves can be killed. A hero\'s blows count '+VSK.cre+' times on creatures.',
+  'A shield blocks one blow every '+VSK.shield+' seconds at most, and a blocked blow protects from nothing else.',
   'How many fight for you is limited by your mana and by nothing else.',
   'Trophies and their echoes strike heroes. The Owed rise from enemy creatures that die, not from heroes.',
   'When the clock runs out, a ring of fire closes on the centre: sudden death.'];
 const vsLive=()=>VS.phase==='fight'||VS.phase==='sudden';
+// the factors of a build: by class, upgrade and apex path; [1,1] where none is listed
+const vsF=(c,a,x)=>VSK.cls[c+(a?'/'+a:'')+(x?'/'+x:'')]||VSK.cls[c]||VF1,VF1=[1,1];
 const vsHead=()=>'Versus · '+(VS.format==='teams'?'teams':'free-for-all')+' · heroes of floor '+VS.floor+' · first to '+VS.wins+(VS.wins>1?' rounds':' round')+' · '+VS.time+' s a round';
 const vsSide=team=>{const t=VS.teams.find(x=>x.team===team);return t?t.name:'Nobody'};
 const vsFighter=s=>{const c=s.cls&&CLASSES[s.cls];if(!c)return'';return(s.adv&&(c.adv.find(a=>a[0]===s.adv)||[0,c.name])[1]||c.name)+(s.apex&&APEX[s.apex]?' · '+APEX[s.apex].title:'')};
@@ -3056,13 +3059,13 @@ function vsBegin(cfg){
   const o=cfg.vs&&typeof cfg.vs==='object'?cfg.vs:{},teams=o.format==='teams',fl=Math.floor(+o.floor)||11;let floor=11;for(const f of VFLOORS)if(fl>=f)floor=f;
   const wins=Math.max(1,Math.min(9,Math.floor(+o.wins)||3)),time=Math.max(5,Math.min(600,+o.time||90)),cm=Array.isArray(cfg.members)?cfg.members:[];
   MP.mode='versus';
-  if(!VSK.dev){const T=VCLS[floor]||{};for(const c in VSK.cls)VSK.cls[c]=(T[c]||[1,1]).slice()} // the class factors of this hero level (dev: a test has set its own)
+  if(!VSK.dev){VSK.cls=VCLS[floor]||{};VSK.kf=VSK.cls.k||1} // the factors of this hero level (dev: a test has set its own)
   for(const m of MP.members){const s=cm.find(x=>x&&''+x.id===m.id)||{};m.team=teams?(s.team===0||s.team===1?s.team:m.idx%2):m.idx}
   const me=MP.members.find(m=>m.id===MP.myId),n=floor-1;
   VS=MP.vs={format:teams?'teams':'ffa',floor,wins,time,round:0,phase:'pick',t:VSK.pick,ring:null,
     score:MP.members.map(m=>({id:m.id,name:m.name,team:m.team,idx:m.idx,rounds:0,kills:0,dmg:0,down:false,left:false,cls:null,adv:null,apex:null})),
     myTeam:me.team,myIdx:me.idx,winner:null,teams:[],colors:MP.members.map(m=>teams?MP.teamColors[m.team]:MP.colors[m.idx%MP.colors.length]),teamColors:MP.teamColors,rules:VRULES};
-  VP={n,k:PHP(n)/GREF(n),pick:null,ready:new Set(),mine:false,hold:true,frozen:true,scr:'',q:[],ev:[],dm:new Map(),tVh:0,tVs:0,tFl:0,sid:1,invRun:0,invBlk:0,ringK:0,last:-1,lastT:-9,lastTeam:-1,t0:performance.now(),late:false,forced:false,final:false,fl:0,hudT:0,hurtT:0};
+  VP={n,k:PHP(n)/GREF(n),pick:null,ready:new Set(),mine:false,hold:true,frozen:true,scr:'',q:[],ev:[],dm:new Map(),tVh:0,tVs:0,tFl:0,sid:1,invRun:0,invBlk:0,ringK:0,last:-1,lastT:-9,lastTeam:-1,shAt:-9,t0:performance.now(),late:false,forced:false,final:false,fl:0,hudT:0,hurtT:0};
   for(const r of MP.remotes){const m=MP.members.find(x=>x.id===r.id);r.team=m.team;r.foe=m.team!==me.team;r._ev=[];r.hx=r.foe?vsProxy(r):null}
   vsTeams();
   if(!$('vsCss')){const st=document.createElement('style');st.id='vsCss';st.textContent=`
@@ -3182,7 +3185,7 @@ function vsRoundStart(n){
   if(!VP.mine)vsAuto(true);
   const lv=VP.n,D=levelDef(lv);
   VS.round=n;VS.phase='countdown';VS.t=VSK.count;VS.ring=null;VS.winner=null;for(const s of VS.score)s.down=s.left;vsTeams();
-  VP.q=[];VP.ev=[];VP.dm.clear();VP.invRun=VP.invBlk=0;VP.last=-1;VP.lastT=-9;VP.lastTeam=-1;VP.final=false;VP.fl=0;VP.hold=VP.frozen=true;VP.scr='';
+  VP.q=[];VP.ev=[];VP.dm.clear();VP.invRun=VP.invBlk=0;VP.last=-1;VP.lastT=-9;VP.lastTeam=-1;VP.shAt=-9;VP.final=false;VP.fl=0;VP.hold=VP.frozen=true;VP.scr='';
   MP.menu=false;MP.note='';beginTok++;eqSync();S.level=lv;S.mode='play';S.banner=0;S.shake=0;S.stop=0;S.paused=false;
   S.L={title:'Versus',hint:'',kind:'crawler',spec:SPEC.crawler,name:'Round '+n,hue:D.hue,waves:0,mods:[],room:2,floorKind:'versus',band:D.band,bandName:D.bandName,handicap:null,door:null};
   TR=null;DOORS=null;FALLEN.length=0;PG.clear();
@@ -3271,15 +3274,15 @@ const vsDm=(by,nid,got)=>{if(!(got>0))return;const k=by+'|'+nid;VP.dm.set(k,(VP.
 // raw: the damage a monster would have taken. pure: a poison's tick or the like, which nothing blocks. True when the blow landed (also when it was blocked).
 function vsHurt(raw,by,src,pure){
   if(!VS||!P||P.down||S.mode!=='play'||!vsLive()||!(raw>0))return false;
-  const A=VS.score[by],ac=A&&A.cls&&VSK.cls[A.cls]?VSK.cls[A.cls][0]:1,mc=VSK.cls[S.cls]?VSK.cls[S.cls][1]:1;
-  let d=raw*VP.k*VSK.K*ac*mc;
+  const A=VS.score[by],ac=A&&A.cls?vsF(A.cls,A.adv,A.apex)[0]:1,mc=vsF(S.cls,S.adv,S.apex)[1];
+  let d=raw*VP.k*VSK.K*VSK.kf*ac*mc;
   if(!pure){
     if(P.inv>0)return false;
     if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
     if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null}
     if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return true}
     if(rand()*100<Math.min(40,eqv('guard'))){if(S.t-VP.hurtT>.3){VP.hurtT=S.t;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward()}return true}
-    if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return true}
+    if(cls()==='tank'&&P.shield&&!(S.t-VP.shAt<VSK.shield)){VP.shAt=S.t;P.shield=false;P.shT=0;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return true}
     {const G=d<=.2*P.maxHp&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return true}}
   }
   if(P.stoneT>0)d/=2;if(P.vMark>0)d*=1.5;
@@ -3300,10 +3303,10 @@ function vsCC(o,by){
   if(o.mark>0){P.vMark=Math.min(6,o.mark);rings.push({x:P.x,y:P.y,life:.5,max:.5,r:50,fx:true,foe:true});puff(P,'#b8263d',14,120)}
 }
 // one of my creatures is struck: the raw number comes off its health (the pets' own scale)
-function vsHurtPet(a,raw,by,pure){
+function vsHurtPet(a,raw,by,pure,cr){
   if(!VS||!vsLive()||!vsCanHurt(a)||!(raw>0))return false;
   if(a.pet&&!pure&&(a.ward>0||a.inv>0))return false;
-  const d=Math.max(.01,raw*VSK.cre*(a.vMark>0?1.5:1)),got=Math.min(d,a.hp);a.hp-=d;a.flash=.15;vsDm(by,a.nid,got);
+  const d=Math.max(.01,raw*(cr?1:VSK.cre)*(a.vMark>0?1.5:1)),got=Math.min(d,a.hp);a.hp-=d;a.flash=.15;vsDm(by,a.nid,got);
   if(S.t-(a._ft||0)>.3){a._ft=S.t;puff(a,a.s?col(a.s.col):'#e7dfcd',4,110)}
   if(a.hp>0){
     if(!a.pet||a.minion)return true;
@@ -3352,11 +3355,11 @@ function vsStep(dt){
   mons=out;
 }
 // a blast of theirs goes off (called for a zone that was replicated from a hostile member)
-function vsBlast(x,y,R,d,by,skip,stun){
+function vsBlast(x,y,R,d,by,skip,stun,cr){
   if(skip!==P&&!P.down&&Math.hypot(P.x-x,P.y-y)<R+8){if(vsHurt(d,by,'blast')&&stun)vsCC({stun},by)}
-  for(const a of allies)if(a!==skip&&vsCanHurt(a)&&Math.hypot(a.x-x,a.y-y)<R+a.r){if(vsHurtPet(a,d,by)&&stun&&a.pet)a.vStun=Math.min(2,stun*2)}
+  for(const a of allies)if(a!==skip&&vsCanHurt(a)&&Math.hypot(a.x-x,a.y-y)<R+a.r){if(vsHurtPet(a,d,by,false,cr)&&stun&&a.pet)a.vStun=Math.min(2,stun*2)}
 }
-function vsZone(z){if(vsLive()&&S.mode==='play'&&z.vsD>0)vsBlast(z.x,z.y,z.r,z.vsD,z.vsBy,null,z.vsStun)}
+function vsZone(z){if(vsLive()&&S.mode==='play'&&z.vsD>0)vsBlast(z.x,z.y,z.r,z.vsD,z.vsBy,null,z.vsStun,z.vsCr)}
 function vsField(f){
   if(!vsLive()||S.mode!=='play')return;const dom=f.kind==='domain',by=f.vsBy;
   if(!P.down&&dist(P,f)<f.r+8){if(dom)P.vMark=Math.max(P.vMark||0,.7);if(f.vsD>0)vsHurt(f.vsD,by,'field');if(f.vsSlow||dom)vsCC({slow:.8},by)}
@@ -3373,10 +3376,10 @@ function vsEvent(r,e){
 // a hostile bolt against my hero and my creatures; true when it is spent
 function vsShot(r,p){
   const hs=p.hs||(p.hs=new Set()),by=r.idx;
-  const hit=e=>{hs.add(e);const d=p.d*(p.fl&8&&Math.hypot(p.x-p.sx,p.y-p.sy)>200?2:1);
-    if(e===P){if(vsHurt(d,by,'shot')&&(p.slow||p.stun))vsCC({slow:p.slow,stun:p.stun*.7},by)}else if(vsHurtPet(e,d,by)&&p.stun&&e.pet)e.vStun=Math.min(2,p.stun*2);
-    if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true,foe:true});vsBlast(p.x,p.y,85,p.boom,by,null)}
-    if(p.fl&16){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true,foe:true});vsBlast(p.x,p.y,70,d/2,by,e)}
+  const cr=!!(p.fl&32),hit=e=>{hs.add(e);const d=p.d*(p.fl&8&&Math.hypot(p.x-p.sx,p.y-p.sy)>200?2:1);
+    if(e===P){if(vsHurt(d,by,'shot')&&(p.slow||p.stun))vsCC({slow:p.slow,stun:p.stun*.7},by)}else if(vsHurtPet(e,d,by,false,cr)&&p.stun&&e.pet)e.vStun=Math.min(2,p.stun*2);
+    if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true,foe:true});vsBlast(p.x,p.y,85,p.boom,by,null,0,cr)}
+    if(p.fl&16){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true,foe:true});vsBlast(p.x,p.y,70,d/2,by,e,0,cr)}
     if(p.pierce>0){p.pierce--;return false}return true};
   if(!P.down&&!hs.has(P)&&P.inv<=0&&dist(P,p)<p.r+12&&hit(P))return true;
   for(const a of allies)if(!hs.has(a)&&vsCanHurt(a)&&dist(a,p)<a.r+p.r+3&&hit(a))return true;
@@ -3398,14 +3401,14 @@ function vsFoes(dt){
         const tm=a._tm||(a._tm=new Map()),ok=(e,gap,key)=>{const l=tm.get(key||e);return l===undefined||t-l>=gap};
         if(a.st!=='leap'&&a.st!=='dazed'){const d=a.helper?a.du[0]:a.du[a.st==='charge'||a.st==='lunge'?2:0],gap=a.helper?.7:1;
           if(!P.down&&dist(a,P)<a.r+11&&ok(P,gap)&&vsHurt(d,by,'touch'))tm.set(P,t);
-          for(const b of mine)if(dist(a,b)<a.r+b.r-4&&ok(b,gap)&&vsHurtPet(b,d,by))tm.set(b,t)}
+          for(const b of mine)if(dist(a,b)<a.r+b.r-4&&ok(b,gap)&&vsHurtPet(b,d,by,false,true))tm.set(b,t)}
         if(a.beam&&a.beam.on){const w=a.beam.w,d=a.du[1];
           for(const ry of a.beam.rays){if(!P.down&&segDist(P,a.x,a.y,ry.a,ry.len)<w+9&&ok(P,1,'bP')&&vsHurt(d,by,'beam'))tm.set('bP',t);
-            for(const b of mine)if(segDist(b,a.x,a.y,ry.a,ry.len)<w+b.r*.6&&ok(b,1,b.nid+'b')&&vsHurtPet(b,d,by))tm.set(b.nid+'b',t)}}
+            for(const b of mine)if(segDist(b,a.x,a.y,ry.a,ry.len)<w+b.r*.6&&ok(b,1,b.nid+'b')&&vsHurtPet(b,d,by,false,true))tm.set(b.nid+'b',t)}}
         if(tm.size>60)tm.clear()}
       else if(a.kind==='thrall'||a.kind==='wolf'){if((a._bcd=(a._bcd||0)-dt)>0||!(a.hp>0))continue;
         let tg=null,bd=1e9;if(!P.down){const d=dist(a,P)-11;if(d<bd){bd=d;tg=P}}for(const b of mine){const d=dist(a,b)-b.r;if(d<bd){bd=d;tg=b}}
-        if(tg&&bd<a.r+5){const d=(r._tb||0)*(a.kind==='wolf'?2:1);a._bcd=.7;if(tg===P)vsHurt(d,by,'bite');else vsHurtPet(tg,d,by)}}}
+        if(tg&&bd<a.r+5){const d=(r._tb||0)*(a.kind==='wolf'?2:1);a._bcd=.7;if(tg===P)vsHurt(d,by,'bite');else vsHurtPet(tg,d,by,false,true)}}}
   }
 }
 /* --- my attacks on the stand-ins --- */
@@ -3489,7 +3492,7 @@ function vsOnMe(r,msg,now,c){
   if(msg.s)for(const a of msg.s)if(r.pshots.length<400){const vx=+a[2]||0,vy=+a[3]||0,x=+a[0]||0,y=+a[1]||0;
     r.pshots.push({x,y,vx,vy,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0,g:0,d:+a[7]||0,fl:a[8]|0,boom:+a[9]||0,slow:+a[10]||0,stun:+a[11]||0,sx:x,sy:y,hs:null})}
   if(S.mode!=='play')return;
-  if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsStun:+a[7]||0,vsBy:r.idx};if(a[4]>=0&&a[5]>=0&&a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
+  if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsStun:+a[7]||0,vsCr:!!a[8],vsBy:r.idx};if(a[4]>=0&&a[5]>=0&&a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
   if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push({kind:FKIND[a[0]]||'rain',x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsSlow:!!a[7],vsBy:r.idx});
   if(msg.r)for(const a of msg.r){if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true,foe:r.foe})}if(r.foe&&a[4]>0&&r._ev.length<200)r._ev.push({t:due,a:['k',a[0],a[1],a[2],a[4]]})}
   if(msg.v&&r.foe)for(const a of msg.v)if(Array.isArray(a)&&r._ev.length<200)r._ev.push({t:due,a});
