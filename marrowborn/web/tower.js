@@ -449,7 +449,9 @@ function measure(){
   // the boss bar: in the block with the health (small screens) or on its own in the top middle (roomy ones)
   var top=(fixed?ra.bottom:Math.max(ra.bottom,rb.bottom))-sr.top,mid=fixed?rb.bottom-sr.top:top;
   var hd=doc.querySelector('header');if(hd&&hd.offsetParent!==null)mid=Math.max(mid,hd.getBoundingClientRect().bottom-sr.top);
-  setVar(stage,'--hud-top',Math.round(top+gap));setVar(stage,'--hud-mid',Math.round(mid+gap+2));
+  setVar(stage,'--hud-top',Math.round(top+gap));// the hint is centred but wide: on anything narrower than a wide monitor it would reach the left block, so it clears that too
+  if(sr.width<1500*(parseFloat(getComputedStyle(doc.documentElement).fontSize)||16)/16)mid=Math.max(mid,top);
+  setVar(stage,'--hud-mid',Math.round(mid+gap+2));
   var t2=top+gap;if(hud&&!hud.hidden){var rh=hud.getBoundingClientRect();if(rh.height&&rh.left<sr.left+sr.width/2)t2=rh.bottom-sr.top+gap}
   setVar(stage,'--hud-top2',Math.round(t2));
 }
