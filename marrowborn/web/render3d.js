@@ -1641,6 +1641,7 @@ function txSetup(){
   const scorch=fxTex(64,(g,h)=>{ // a charred sole with an ember edge: black stays black under the tint, the white rim takes the colour
     g.fillStyle='rgba(255,255,255,.9)';g.beginPath();g.ellipse(h*.2,0,h*.5,h*.3,0,0,TAU);g.ellipse(-h*.5,0,h*.26,h*.24,0,0,TAU);g.fill();
     g.fillStyle='rgba(0,0,0,.92)';g.beginPath();g.ellipse(h*.2,0,h*.42,h*.22,0,0,TAU);g.ellipse(-h*.5,0,h*.19,h*.17,0,0,TAU);g.fill();
+    g.fillStyle='rgba(255,255,255,.3)';g.beginPath();g.ellipse(h*.2,0,h*.3,h*.13,0,0,TAU);g.fill();
     g.fillStyle='#fff';for(const[x,y]of[[.1,.05],[.36,-.08],[-.5,.03]]){g.beginPath();g.arc(h*x,h*y,h*.035,0,TAU);g.fill()}});
   const ice=ST.toon(0xcfeeff,{emissive:0x4aa8e8,emissiveIntensity:.55}),sg=new THREE.OctahedronGeometry(1,0);
   TX={paw,scorch,
@@ -1650,8 +1651,8 @@ function txSetup(){
 }
 function trailAt(ap,x,z,a,side,foe){const T=txSetup(),paw=ap==='beasts',o=T.trail.spawn(paw?1.5:2.6),m=o.material,tex=paw?T.paw:T.scorch;
   if(m.map!==tex){m.map=tex;m.blending=paw?THREE.AdditiveBlending:THREE.NormalBlending}
-  m.color.setHex(foe?PAL.foe:paw?0x5fe07a:0xff7a2a);o.userData.k=paw?.7:.95;m.opacity=0;
-  o.position.set(x-Math.sin(a)*side*6,.47,z+Math.cos(a)*side*6);o.rotation.y=-a;o.scale.set(paw?17:20,1,paw?17:13)}
+  m.color.setHex(foe?PAL.foe:paw?0x5fe07a:0xff7a2a);o.userData.k=paw?.95:1;m.opacity=0;
+  o.position.set(x-Math.sin(a)*side*7,.47,z+Math.cos(a)*side*7);o.rotation.y=-a;o.scale.set(paw?22:27,1,paw?22:17)}
 function shatterAt(x,z,r,low){const o=txSetup().shard.spawn(.6);o.position.set(x,0,z);o.userData.r=Math.max(10,Math.min(60,r));o.rotation.y=(x*.7+z*.3)%TAU;upShard(o,0);
   flashAt(x,r,z,r*1.2,r*5,0xdff4ff,.22,.9);if(!low)burstAt(x,r,z,r*2,r*6.5,0x8fd8ff,.26)}
 // an apex ally arriving (out = 0) or going when its time is up (out = 1)

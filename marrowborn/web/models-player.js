@@ -602,7 +602,7 @@ const APEX_NEW={
     for(const l of['shinL','shinR'])b.bx(l,GrD,0,-1.4,1.7,4.6,4.2,3.2);
     s.ahead.position.set(0,hy-2.2,0);b.bx('ahead',Gr,0,-.4,3.7,7.8,1.9,2.6,-.2);b.fine=true;b.bx('ahead',Fi,0,-.4,5.05,3,.5,.3,-.2);b.fine=false;
     for(let i=0;i<4;i++){const sl='it'+i,a=i*TAU/4+PI/4;s[sl].position.set(Math.cos(a)*28,0,Math.sin(a)*28);s[sl].rotation.y=HP-a;
-      b.bx(sl,i%2?Gr:GrL,0,13.5,0,9.6,27,3.6,0,0,(i%2?.04:-.05));b.bx(sl,GrD,.6,28,0,7.4,3.2,3.2,0,0,.12);b.bx(sl,GrD,-3.4,1.6,.4,4.4,3.2,4.4,0,.3,0);
+      b.bx(sl,i%2?Gr:GrL,0,13.5,0,9.6,27,3.6,0,0,(i%2?.04:-.05));b.bx(sl,i%2?Gr:GrL,.6,28,0,7.4,3.2,3.2,0,0,.12);b.bx(sl,i%2?Gr:GrL,-3.4,1.6,.4,4.4,3.2,4.4,0,.3,0);
       b.fine=true;for(const z of[1.95,-1.95]){b.bx(sl,Fi,0,15.5,z,.75,12.5,.3);b.bx(sl,Fi,1.7,20,z,3.2,.65,.3,0,0,.6);b.bx(sl,Fi,-1.7,20,z,3.2,.65,.3,0,0,-.6);b.bx(sl,Fi,0,9.6,z,3.8,.65,.3)}b.fine=false;
       fdisc(b,sl,glow(gp,.3),0,0,9,.7,12,5.5)}
     const D=decal(0x050408,.72),pts=[],N=7;
@@ -618,7 +618,7 @@ const APEX_NEW={
     s.items.position.set(0,HIP+7,-3);
     const PHI=[.32,-.32,.95,-.95,1.6,-1.6];
     for(let i=0;i<6;i++){const sl='it'+i,p=PHI[i];s[sl].position.set(Math.sin(p)*9,0,-Math.cos(p)*9);s[sl].rotation.set(-.62,-p,0);
-      b.cy(sl,Gm,0,4.2,0,.75,.75,4.6,0,0,0,1,6);b.sp(sl,Gd,0,1.5,0,1.05);b.bx(sl,Gd,0,6.9,0,6.6,1.05,1.4);
+      b.cy(sl,Gd,0,4.2,0,.7,.7,4.6,0,0,0,1,6);b.sp(sl,Gd,0,1.5,0,1.05);b.bx(sl,Gd,0,6.9,0,6.6,1.05,1.4);
       b.bx(sl,St,0,20.5,0,2.7,26,.75);b.spike(sl,St,0,33.5,0,0,1,0,5.5,1.35,.28);
       b.fine=true;b.bx(sl,Ed,1.5,20.5,0,.45,26,.85);b.bx(sl,Ed,-1.5,20.5,0,.45,26,.85);b.fine=false;
       b.bx(sl,Gl,0,22,0,7,33,.3)}
@@ -682,7 +682,7 @@ function apexAnim(ud,s,P,t,dt,show,mb,dl,ab,yv){
     q=(t*.25)%1;w=28+34*q;s.awave.scale.set(w,1,w);W.opacity=.4*(1-q)*(1-q);
   }else if(ap==='blade'){
     n=cnt(P.blades,4,6);const e=ab*ab*(3-2*ab);
-    s.items.rotation.set(e*1.75-mb*.14-dl*.3,Math.sin(t*.9)*.07-yv*.5,0);s.items.position.set(0,HIP+7+e*5,-3+e*4);
+    s.items.rotation.set(e*1.3-mb*.14-dl*.3,Math.sin(t*.9)*.07-yv*.5,0);s.items.position.set(0,HIP+7+e*5,-3+e*4);
     for(i=0;i<6;i++){const o=s['it'+i];o.visible=i<n;o.rotation.x=-.62*(1-e*.75)+Math.sin(t*1.7+i*1.3)*.04;o.position.y=Math.sin(t*2+i*1.9)*.9}
     q=(t/.9)%1;w=Math.floor(t/.9)*2.4;s.awave.rotation.y=w;s.awave.position.set(Math.sin(w*1.7)*8,0,Math.cos(w*2.3)*8);w=40*Math.min(1,q*5);s.awave.scale.set(w,1,w*.6+3);W.opacity=.85*(1-q)*(1-q);
   }else if(ap==='tide'){

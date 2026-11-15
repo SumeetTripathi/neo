@@ -160,22 +160,81 @@ const SKILLS={
   ['pact','Dark Pact',25,'Unmake your thralls. Each one heals a tenth of your health, up to half.',[['pact']],'thrall']],
 };
 const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
-/* ---------- the apex tier: above the class and its upgrade, chosen once after floor 100 (S.apex: 'dominion' or 'order') ---------- */
-// dominion (the Tithe): what you kill rises for you (the Owed, see shadeRise), pets and familiars hold DOMHOLD of the mana they held, your thralls and wolves hit DOMSUM times as hard and pets, familiars and trophies DOMPET times.
-// order (the White Marrow): ORDD times the damage, ORDLIFE times the health, mana back ORDMANA times as fast, skills at ORDCOST of their cost, a ring of light ORDR wide that burns for ORDAURA of your damage twice a second,
-//   and every pet or familiar kept but not sent out lends ORDRESK damage, up to ORDRESN of them.
+/* ---------- the apex tier: above the class and its upgrade, chosen once after floor 100 (S.apex: one of the ten ids of APEX) ---------- */
+// Ten paths on two sides. Side 'dominion' (you command others): pets and familiars hold DOMHOLD of the mana they held, thralls and wolves hit DOMSUM times as hard, pets, familiars and trophies DOMPET times.
+// Side 'order' (you are the weapon): mana back ORDMANA times as fast, skills at ORDCOST of their cost, every pet or familiar kept but not sent out lends ORDRESK damage (up to ORDRESN of them),
+//   and each path of that side has its own share of damage and health (AX.st).
+// dominion (the Tithe): what you kill rises for you (the Owed, see shadeRise).
+// order (the White Marrow): ORDD times the damage, ORDLIFE times the health, a ring of light ORDR wide that burns for ORDAURA of your damage twice a second.
+// The eight paths of round 10 (beasts, frost, plague, flame; storm, stone, blade, tide) are in the section "the further apex paths"; their numbers are AX.
 // From floor 110 on a guardian has APEXHP times the health and its blows are APEXDMG (not BOSSDMG) times an ordinary blow: the step that makes the apex tier needed.
 // Every other monster from floor 101 on has APEXORD times the health, so an apex hero's ordinary fights still last.
 const SHLIFE=10,SHK=.32,DOMHOLD=.75,DOMSUM=1.5,DOMPET=1.15,ORDD=1.6,ORDLIFE=1.25,ORDMANA=1.5,ORDCOST=.8,ORDR=120,ORDAURA=.7,ORDRESK=.02,ORDRESN=10,APEXHP=2.3,APEXDMG=1.5,APEXORD=1.5;
+// AX: every number of the eight further paths. Damage of the dominion side is in U (see UD: one hundredth of the health of the reference monster of the floor, so it keeps pace with the tower as the Owed do);
+// damage of the order side is in multiples of your own damage (dmgMul), or a share of the damage your own blows have just done.
+const AX={
+ st:{order:[ORDD,ORDLIFE],storm:[1.42,1.1],stone:[1.38,1.4],blade:[1.32,1.15],tide:[1.42,1.3]}, // order side: [damage, health]
+ col:{packbeast:'#5fe07a',icewight:'#8fd8ff',cinder:'#ff6a1e',beasts:'#5fe07a',frost:'#8fd8ff',plague:'#b7c61f',flame:'#ff6a1e',storm:'#ffe74a',stone:'#c9a26b',blade:'#8fa0ff',tide:'#19d3c5'},
+ // beasts: cap0 beasts, one more every capK floors (capMax at most); each lasts `life` s and another answers every t s. A bite is `bite` U, syn more for every other beast alive, every cd s.
+ beast:{cap0:3,capK:30,capMax:5,life:24,t:4,bite:.24,syn:.1,cd:.75,spd:265,howl:6,runK:4,huntN:4,huntT:10},
+ // frost: a blow of yours chills (hit, once per icd s per monster; a floor's own monster takes bossK of any chill); at full chill it is frozen (frz s; frzB a floor's own), takes `more` times the damage, and when it thaws or dies
+ // it shatters for shat U (shatK of that to everything within shatR, which is chilled by shatCh); then nothing chills it for thaw s (thawB). wights: how many ice-wights, each for wlife s, another every wt s; a slam is wd U within wr, chilling by wch, every wcd s.
+ frost:{hit:.2,icd:.3,bossK:.5,hold:2.5,frz:2.5,frzB:1.2,more:1.25,shat:11,shatK:.6,shatR:95,shatCh:.4,thaw:3.5,thawB:6,slowK:.45,wights:2,wlife:30,wt:8,wd:4.2,wr:95,wch:.35,wcd:2.6,wspd:125,wreach:300,
+  rimeR:130,rimeT:6,rimeD:.8,rimeCh:.22,skF:14,skA:6,skC:6,ultR:330,ultT:4},
+ // plague: a blow of yours adds a stack of rot (once per icd s per monster, 5 at most, t s unless renewed). Every half second rot does d U x stacks x (1 + ramp per stack past the first); a rotting monster takes `more` more damage per stack and is slowK slower per stack.
+ // Every sp s a monster with two stacks or more gives one to the nearest within spR that has fewer. One that dies rotting passes its stacks to all within leap and leaves a cloud (cloudR, cloudT s). auraR: the miasma round you (a stack every auraT s).
+ plague:{icd:1,t:6,d:.11,ramp:.25,more:.03,slowK:.04,sp:1.5,spR:150,leap:170,cloudR:70,cloudT:4,auraR:105,auraT:1.5,blightR:120,blightT:7,blightD:.3,fester:2.5,ultT:10},
+ // flame: a cinder kindles every t s (cap0 at a time, one more every capK floors, capMax at most; each lasts `life` s) and dives at the nearest monster within reach: bd U within br, which burn (burn U every half second for burnT s),
+ // and the ground burns (patch U twice a second within patchR for patchT s). A blow of yours sets its target burning for hitT s. A monster that dies burning leaves burning ground.
+ flame:{cap0:3,capK:25,capMax:5,life:14,t:2.6,reach:380,spd:520,bd:2.6,br:75,burn:.3,burnT:4,hitT:3,patch:.22,patchR:58,patchT:3,pyreR:120,pyreT:6,pyreD:.6,coals:6,ultR:150,ultT:6,ultD:.8,ultB:4},
+ // storm: every blow of yours builds haste (gain, fading by decay a second): at full haste you move mv and strike as faster. Every icd s (icdS in a surge) the damage your blows have done since the last one, times k, leaps as lightning
+ // to the monster you struck and on to `jumps` more within reach (each leap `fall` of the last); what it strikes is shocked (shock s; not again for imm s, immB a floor's own).
+ storm:{gain:.07,decay:.14,mv:.22,as:.22,icd:.7,icdS:.3,k:.27,sparkT:2,sparkD:2,sparkR:320,jumps:3,reach:190,fall:.8,shock:.35,imm:1.2,immB:2.5,boltD:9,boltN:5,boltFall:.6,surge:5,tempT:4,tempK:.25,tempD:4.5},
+ // stone: `plates` guard plates, each takes one blow whole and answers with a shockwave (cd x your damage within cr, stunning lesser things cstun s); one grows back every regrow s. Every `every`-th blow of yours is a crushing one:
+ // crush of the damage your blows have done since the last, to everything within crushR of the target.
+ stone:{plates:3,regrow:11,cd:5,cr:120,cstun:.6,every:4,crush:.3,crushR:70,quakeT:3,quakeD:3,quakeR:65,quakeReach:320,fisLen:400,fisW:30,fisT:3.2,fisK:.4,fisD:2.4,standT:5,monoR:115,monoD:20,monoLen:190},
+ // blade: n0 blades of light (one more every nK floors, six at most). Every blow of yours is followed by a cut worth `per` of it for each blade; every `combo`-th cut on the same monster is a great cut worth comboK of all your blows on it since the last;
+ // a lesser monster below `exec` of its health dies to any blow of yours.
+ blade:{n0:4,nK:25,per:.03,autoT:2,autoD:.4,autoR:280,combo:8,comboK:.22,comboT:3,exec:.2,fanD:4,walkD:2.6,ultN:24,ultK:.16,ultD:1.5,ultEnd:14},
+ // tide: every regenT s you mend `regen` of your health. Every t s a wave rolls from you at the nearest monster within reach: wd x your damage, it carries lesser things along (a floor's own a little) and leaves what it touches drenched for soak s
+ // (drenched: soakSlow slower, and it takes soakMore more damage).
+ tide:{regen:.02,regenT:2,t:5,reach:420,wr:70,wd:5.5,wlen:400,wspd:270,soak:5,soakSlow:.25,soakMore:.2,gr:105,gd:8,glen:560,pullR:340,ud:3.5,uheal:.04,uhealMax:.2,floodT:6,floodK:.25,fd:5},
+};
+const APEXIDS=['dominion','beasts','frost','plague','flame','order','storm','stone','blade','tide'];
 const APEX={
- dominion:{name:'The Tithe',title:'Tithe-Taker',sub:'Command what you kill',
+ dominion:{side:'dominion',name:'The Tithe',title:'Tithe-Taker',sub:'Command what you kill',blurb:'What you kill owes you: the slain rise as the Owed and fight at your side.',
   lore:'The Spire has always kept a share of whatever dies inside it. Past the hundredth floor you stop paying that tithe and start collecting it. What you kill owes you, and the Owed stand up to work it off.',
   text:'Monsters that die, other than a floor\'s own, rise as the Owed and fight for you for '+SHLIFE+' seconds as the monsters they were: up to 4 at once, one more every ten floors, 10 at most. They cost nothing and cannot be hurt. Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills of command join your ten.'},
- order:{name:'The White Marrow',title:'Whitemarrow',sub:'Be the weapon',
+ beasts:{side:'dominion',name:'The Feral Vow',title:'Vowkeeper',sub:'Run with a pack',blurb:'A pack of pale beasts hunts beside you, and every beast bites harder for each other one alive.',
+  lore:'Before the Spire kept people it kept animals, and their bones lie under everyone else\'s. Past the hundredth floor you swear to them: hunt for me and I will carry you up. They keep their side of it.',
+  text:'A pack of '+AX.beast.cap0+' beasts runs with you, one more every '+AX.beast.capK+' floors, '+AX.beast.capMax+' at most. They cost nothing and cannot be hurt; each fades after '+AX.beast.life+' seconds and another answers within '+AX.beast.t+'. Every beast bites '+Math.round(AX.beast.syn*100)+'% harder for each other beast alive, and the pack goes for whatever you struck last.'},
+ frost:{side:'dominion',name:'The Still Winter',title:'Winterbound',sub:'Stop everything',blurb:'Your blows chill, the chilled freeze solid, and the frozen shatter; ice-wights stand guard over you.',
+  lore:'High in the Spire the cold is not weather. It is what is left when the last warm thing has gone. You let it into the marrow, and now it does what you tell it.',
+  text:'Your blows chill what they hit, and a chilled monster slows. At full chill it freezes solid ('+AX.frost.frz+' seconds, '+AX.frost.frzB+' for a floor\'s own monster), takes '+Math.round((AX.frost.more-1)*100)+'% more damage, and shatters when it thaws or dies: a heavy blow to it and to everything near it, which is chilled in turn. '+AX.frost.wights+' ice-wights stand with you, slow and heavy; they slam the ground and chill what they hit.'},
+ plague:{side:'dominion',name:'The Slow Rot',title:'Rotwright',sub:'Let it spread',blurb:'A rot that grows, weakens what carries it and passes from monster to monster, most of all when one dies.',
+  lore:'Nothing in the Spire is ever thrown away, so everything in it rots, slowly. Past the hundredth floor you learn to hurry that along, and to point it.',
+  text:'Your blows, and the miasma that hangs round you, lay rot on monsters: up to 5 layers, each lasting '+AX.plague.t+' seconds unless renewed. Rot eats at a monster twice a second, far faster with every layer; a rotting monster takes '+Math.round(AX.plague.more*100)+'% more damage per layer and slows. Rot creeps to the nearest monster with less of it, and a monster that dies rotting passes all its layers to everything near and leaves a cloud that rots what walks into it.'},
+ flame:{side:'dominion',name:'The Last Pyre',title:'Pyrekeeper',sub:'Burn what is left',blurb:'Living cinders kindle beside you and hurl themselves at monsters, and the ground they strike keeps burning.',
+  lore:'You were ash before you were anything. Past the hundredth floor you find the ash is still warm, and warm ash will carry a flame anywhere you send it.',
+  text:'A cinder kindles beside you every '+AX.flame.t+' seconds, up to '+AX.flame.cap0+' waiting at once (one more every '+AX.flame.capK+' floors). Each throws itself at the nearest monster and bursts: everything near is hurt and set burning for '+AX.flame.burnT+' seconds, and the ground burns for '+AX.flame.patchT+'. Your own blows set their target burning, and a monster that dies burning leaves burning ground.'},
+ order:{side:'order',name:'The White Marrow',title:'Whitemarrow',sub:'Be the weapon',blurb:'The power is your own: you hit far harder, and a ring of light burns everything near you.',
   lore:'You began as ash and bare bone and took a body back piece by piece. Past the hundredth floor there is nothing left to take, so you burn what you have. The marrow goes white, and the light gets out through the skin.',
   text:'You hit '+Math.round((ORDD-1)*100)+'% harder and have '+Math.round((ORDLIFE-1)*100)+'% more health. Mana comes back '+Math.round((ORDMANA-1)*100)+'% faster and skills cost '+Math.round((1-ORDCOST)*100)+'% less. A ring of light, '+ORDR+' wide, burns everything near you twice a second and slows all but a floor\'s own monster. Nothing rises for you. Every pet or familiar you keep but do not send out lends '+Math.round(ORDRESK*100)+'% damage, up to '+ORDRESN+' of them. Three skills of judgement join your ten.'},
+ storm:{side:'order',name:'The Split Sky',title:'Skysplit',sub:'Be faster than it',blurb:'Every blow makes you quicker, and your blows leap on as lightning from monster to monster.',
+  lore:'Above the hundredth floor the Spire has holes in it, and the sky comes in. You stand in one until the lightning knows your bones. After that it comes when it is called.',
+  text:'You hit '+Math.round((AX.st.storm[0]-1)*100)+'% harder and have '+Math.round((AX.st.storm[1]-1)*100)+'% more health. Every blow you land builds haste: at full haste you move and strike '+Math.round(AX.storm.mv*100)+'% faster. Every '+AX.storm.sparkT+' seconds a spark leaps from you to the nearest monster. About once a second your blows discharge: '+Math.round(AX.storm.k*100)+'% of the damage they have just done strikes again as lightning and leaps to '+AX.storm.jumps+' more monsters, each of them shocked still for a moment.'},
+ stone:{side:'order',name:'The Standing Stone',title:'Stonesworn',sub:'Do not move',blurb:'Guard plates take blows whole and answer with a shockwave, and every fourth blow of yours crushes.',
+  lore:'The Spire grew a bone for every body it kept, and bone is only slow stone. Past the hundredth floor you stop running. Let them break on you.',
+  text:'You hit '+Math.round((AX.st.stone[0]-1)*100)+'% harder and have '+Math.round((AX.st.stone[1]-1)*100)+'% more health. '+AX.stone.plates+' guard plates circle you: each takes one blow whole, breaks, and answers with a shockwave that hurts and staggers everything near. A plate grows back every '+AX.stone.regrow+' seconds. Every '+AX.stone.quakeT+' seconds the ground cracks under the nearest monster. Every fourth blow you land is a crushing one: '+Math.round(AX.stone.crush*100)+'% of what the four did lands again on the target and everything beside it.'},
+ blade:{side:'order',name:'The Thousandth Cut',title:'Edgewalker',sub:'Never miss',blurb:'Blades of light hang at your back, cut wherever you strike, and finish whatever is nearly dead.',
+  lore:'A thousand cuts taught you where things come apart. Past the hundredth floor the next one no longer needs your hand: the blades hang in the air and follow the first.',
+  text:'You hit '+Math.round((AX.st.blade[0]-1)*100)+'% harder and have '+Math.round((AX.st.blade[1]-1)*100)+'% more health. '+AX.blade.n0+' blades of light follow you, one more every '+AX.blade.nK+' floors, six at most. Each blade cuts the nearest monster on its own every '+AX.blade.autoT+' seconds. Every blow you land is followed by a cut worth '+Math.round(AX.blade.per*100)+'% of it for each blade. Every '+AX.blade.combo+'th cut on the same monster is a great cut. A lesser monster below '+Math.round(AX.blade.exec*100)+'% of its health dies to any blow of yours.'},
+ tide:{side:'order',name:'The Returning Tide',title:'Tidecaller',sub:'Wear it all down',blurb:'Waves roll out of you, carry monsters off and leave them drenched and weak, while your wounds keep closing.',
+  lore:'Under the Spire there is water, older than the dark, and it climbs when you ask. It pushes, it pulls back, it closes wounds, and it never gets tired.',
+  text:'You hit '+Math.round((AX.st.tide[0]-1)*100)+'% harder and have '+Math.round((AX.st.tide[1]-1)*100)+'% more health, and you mend '+Math.round(AX.tide.regen*100)+'% of it every '+AX.tide.regenT+' seconds. Every '+AX.tide.t+' seconds a wave rolls from you at the nearest monster: it hurts what it touches, carries lesser monsters along with it, and leaves everything drenched for '+AX.tide.soak+' seconds. A drenched monster is slower and takes '+Math.round(AX.tide.soakMore*100)+'% more damage from everything.'},
 };
-// the three skills of each path, the same for every class: skills 10, 11 and 12. Rows as in SKILLS, with the mana cost in place.
+for(const k in APEX)if(k!=='dominion'&&k!=='order')APEX[k].text+=APEX[k].side==='dominion'?' Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills join your ten.':' Mana comes back '+Math.round((ORDMANA-1)*100)+'% faster and skills cost '+Math.round((1-ORDCOST)*100)+'% less. Every pet or familiar you keep but do not send out lends '+Math.round(ORDRESK*100)+'% damage, up to '+ORDRESN+' of them. Three skills join your ten.';
+// the three skills of each path, the same for every class: skills 10, 11 and 12. Rows as in SKILLS, with the mana cost in place. (needs may also be a function of the nearest monster.)
 const APEXSK={
  dominion:[
   ['rollcall','Roll Call',30,'Up to eight of the monsters that died on this floor rise as the Owed for 8 seconds, over and above your usual number. Where fewer than three have died, husks of the Spire fill the ranks.',[['rollcall'],['ring',150]],null,40],
@@ -185,7 +244,42 @@ const APEXSK={
   ['verdict','Verdict',12,'A beam of white light sweeps a wide arc in front of you. Every monster it crosses is hit once, very hard, and enemy bolts in its path burn away.',[['verdict']],null,26],
   ['ascend','Ascension',40,'For 4 seconds nothing can hurt you, and your ring of light is half again as wide and burns twice as hard.',[['buff','inv',4],['buff','ascT',4],['ring',180]],null,40],
   ['sever','Sever',16,'Appear at the nearest monster and cut. A lesser monster below half its health dies outright. A floor\'s own monster below a fifth of its health takes triple damage.',[['tele'],['sever']],'t',26]],
+ beasts:[
+  ['howl','Hunting Howl',22,'The pack is made whole at once, and for '+AX.beast.howl+' seconds every beast runs faster and bites twice as often.',[['howl'],['ring',160]],null,28],
+  ['rundown','Run Down',12,'Name the prey: the nearest monster. It is marked for 5 seconds (it takes 50% more damage) and slowed, and every beast is on it at once with a bite four times as hard.',[['rundown']],'t',22],
+  ['longhunt','The Long Hunt',40,'Ultimate. '+AX.beast.huntN+' more beasts join the pack for '+AX.beast.huntT+' seconds, over and above your usual number, and every beast alive makes the others stronger.',[['longhunt'],['ring',200]],null,40]],
+ frost:[
+  ['rime','Rimefall',14,'The ground under your target freezes over for '+AX.frost.rimeT+' seconds. Monsters on it are hurt and chilled, twice a second, until they freeze.',[['rime']],null,26],
+  ['shatterall','Shatter',10,'Every frozen monster in the room is struck through the ice, very hard, and the splinters hit everything beside it. Every monster that is only chilled takes a lesser blow and grows colder.',[['shatterall']],m=>mons.some(o=>!o.hidden&&(o.frozen>0||o.chill>0)),22],
+  ['winter','Deep Winter',40,'Ultimate. Everything within a wide ring of you freezes solid at once, whatever it has shaken off before, and your ice-wights slam the ground.',[['winter'],['ring',AX.frost.ultR]],null,40]],
+ plague:[
+  ['blight','Blight',12,'A cloud of rot settles on your target for '+AX.plague.blightT+' seconds. Monsters in it are worn down and gain a layer of rot every second.',[['blight']],null,22],
+  ['fester','Fester',14,'Every rotting monster in the room bursts open where it stands: it takes a blow for each layer of rot it carries, keeps its layers, and gains one more.',[['fester']],m=>mons.some(o=>!o.hidden&&o.rot>0),26],
+  ['sickness','The Long Sickness',40,'Ultimate. Every monster in the room rots through at once: five layers, and they hold for '+AX.plague.ultT+' seconds.',[['sickness'],['ring',320]],null,40]],
+ flame:[
+  ['pyre','Pyre',12,'The ground under your target burns for '+AX.flame.pyreT+' seconds. Monsters on it are hurt twice a second and set burning.',[['pyre']],null,24],
+  ['coals','Scatter the Coals',16,AX.flame.coals+' cinders kindle round you at once and throw themselves at the nearest monsters.',[['coals'],['ring',90]],'t',26],
+  ['burndown','Burn Down',40,'Ultimate. You become the pyre for '+AX.flame.ultT+' seconds: fire bursts out of you and then walks with you, burning everything near, and every hit on you does half damage.',[['burndown']],null,40]],
+ storm:[
+  ['skyfall','Skyfall',8,'Lightning falls on the nearest monster, very hard, and leaps on to five more.',[['skyfall']],'t',18],
+  ['stride','Stormstride',18,'For '+AX.storm.surge+' seconds you are at full haste and 40% faster again on foot, and your blows discharge three times a second.',[['stride'],['ring',70]],null,24],
+  ['skycomes','The Sky Comes In',40,'Ultimate. For '+AX.storm.tempT+' seconds lightning falls on a monster four times a second, and each bolt leaps on to another.',[['skycomes'],['ring',260]],'t',40]],
+ stone:[
+  ['fissure','Fissure',10,'A fissure tears open from your feet toward your target and stays for 3 seconds. Monsters on it are hurt again and again, and all but a floor\'s own are slowed.',[['fissure']],null,22],
+  ['standfast','Stand Fast',24,'All your guard plates return at once, and for '+AX.stone.standT+' seconds every hit that gets past them does half damage.',[['standfast'],['ring',70]],null,28],
+  ['monolith','Monolith',40,'Ultimate. A standing stone comes down on your target after a moment: a crushing blow to everything under it, which is stunned, and four fissures crack outward from where it lands.',[['monolith']],null,40]],
+ blade:[
+  ['bladefan','Bladefan',9,'Your blades fly out in a fan. Each passes through everything in its path and hits hard.',[['bladefan']],null,20],
+  ['edgewalk','Edgewalk',14,'Appear behind the nearest monster, untouchable for a moment, and every blade cuts it at once.',[['tele'],['edgewalk']],'t',24],
+  ['lastcut','The Last Cut',40,'Ultimate. Your blades take one monster apart: '+AX.blade.ultN+' cuts in four seconds, and a last one that kills a lesser monster below half its health and hits a floor\'s own very hard.',[['lastcut']],'t',40]],
+ tide:[
+  ['greatwave','Great Wave',9,'A great wave rolls out toward your target. It hits hard, carries lesser monsters a long way and leaves everything drenched.',[['greatwave']],null,20],
+  ['undertow','Undertow',16,'Everything near you is dragged to your feet, hurt and drenched, and you mend a little for every monster caught, up to a fifth of your health.',[['undertow'],['ring',AX.tide.pullR]],'t',24],
+  ['floodtide','Flood Tide',40,'Ultimate. Waves roll out of you in every direction, now and again in 3 seconds, and for '+AX.tide.floodT+' seconds your wounds close four times as fast.',[['floodtide'],['ring',200]],null,40]],
 };
+// the side of the hero's path, and what the order side gives this path: [damage, health]
+const apxSide=()=>S.apex&&APEX[S.apex]?APEX[S.apex].side:null,DOMS=()=>apxSide()==='dominion',ORDS=()=>apxSide()==='order',apxSt=()=>AX.st[S.apex]||AX.st.order;
+const apexOk=id=>typeof id==='string'&&Object.prototype.hasOwnProperty.call(APEX,id);
 const skD=(c,si)=>si<10?SKILLS[c][si]:S.apex?APEXSK[S.apex][si-10]:null;
 /* ---------- mana: what skills are paid with, from the day you have a class ---------- */
 // MANA0: the pool of each class. MCOST: what each skill costs, in the order of SKILLS (it is copied onto the skill row as its seventh entry).
@@ -337,7 +431,7 @@ function dropItem(n,o){
   return item(c,slot,r,0,0,slot==='trinket'&&r>0&&CASTER[c]&&rnd()<.4?1:0);
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,well:0,spec:0});
-// apex: the apex path ('dominion' | 'order'). tr: trials passed (each is worth TMANA maximum mana). door: {id, n} the door chosen at a crossroads for floor n.
+// apex: the apex path (one of the ten ids of APEX). tr: trials passed (each is worth TMANA maximum mana). door: {id, n} the door chosen at a crossroads for floor n.
 const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,apex:null,tr:0,door:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[],echoes=[];
 // Every monster, enemy bolt, enemy blast and morsel carries an id, and every ally a nid, so that each can be named across the network in multiplayer.
@@ -345,7 +439,7 @@ let NEXTID=1;const nid=()=>NEXTID++;
 // Multiplayer (MB.mp; the code is in the multiplayer section near the end). Everything about it is off unless MP.on.
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
 const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
-  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[]};
+  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],hsKey:''};
 let REM=null;
 // VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
 let VS=null,VP=null,GEO=0;
@@ -370,16 +464,16 @@ const stReset=()=>{for(const k in ST)ST[k]=0};
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
 const adv=k=>(ADV[S.adv]||{})[k];
-const dmgMul=()=>(S.apex==='order'?ORDD*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
-const cdMul=()=>1/((P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
+const dmgMul=()=>(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
+const cdMul=()=>1/((P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>{const k=Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
 const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)):0};
 const skRise=()=>1+MRISE*Math.max(0,S.level-8);
-const skCost=si=>{const c=cls(),d=c&&skD(c,si);return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1)*(S.apex==='order'?ORDCOST:1))):0};
+const skCost=si=>{const c=cls(),d=c&&skD(c,si);return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1)*(ORDS()?ORDCOST:1))):0};
 const num=v=>Math.round(v).toLocaleString('en-US');
 const manaRoom=()=>P?Math.max(0,P.maxMana-P.resv):0;
-const manaRate=()=>hcap('nomana')?0:manaRoom()*MREGEN*(1+Math.min(MWELLRMAX,MWELLR*S.b.well))*(S.adv==='saint'?1.25:1)*(S.apex==='order'?ORDMANA:1);
+const manaRate=()=>hcap('nomana')?0:manaRoom()*MREGEN*(1+Math.min(MWELLRMAX,MWELLR*S.b.well))*(S.adv==='saint'?1.25:1)*(ORDS()?ORDMANA:1);
 function manaGive(v){if(!P||!P.maxMana||hcap('nomana'))return;P.mana=Math.min(manaRoom(),P.mana+v)}
 function manaSync(){if(!P)return;MANA.cur=Math.floor(P.mana+1e-6);MANA.max=P.maxMana;MANA.reserved=P.resv;MANA.drawing=P.drawK>0&&P.mana<manaRoom()-.01;MANA.regen=P.maxMana&&P.mana<manaRoom()-.01?Math.round(manaRate()*(1+(MDRAW-1)*P.drawK)*10)/10:0}
 // a skill that was asked for and cannot be paid: a soft sound and a flag for the HUD (which button, when), and nothing else
@@ -789,6 +883,7 @@ function hurtM(m,d,quiet){
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
   if(m.markT>0)d*=1.5;
+  if(m.frozen>0)d*=AX.frost.more;if(m.soak>0)d*=1+AX.tide.soakMore;if(m.rot>0)d*=1+AX.plague.more*m.rot;
   // (the three-phase bosses shed morsels as their health falls: the Hollow at every fifth, the King and the tyrants at every eighth, because their fight is long and their blows are heavy)
   const before=m.hp;m.hp-=d;if(!REM)ST.dmgDealt+=Math.max(0,Math.min(d,before));
   if(byPet)petFed(Math.max(0,Math.min(d,before))); // 2% of its health, at most once in four seconds, 16% in a level: the monsters' own rule
@@ -804,7 +899,7 @@ function hurtM(m,d,quiet){
   if(m.hp<=0){
     mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P)manaGive(P.maxMana*MKILL);
     if(m.boss)floorClear();
-    else{if(has('taste')&&rand()<.35){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m)}
+    else{if(has('taste')&&rand()<.35){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m)}
   }
 }
 // a vampiric boss feeds when it wounds a hero
@@ -819,6 +914,7 @@ function hurtP(d,src){
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
   if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
+  if(P.plates>0&&S.apex==='stone')return plateBreak();
   if(P.stoneT>0)d=Math.ceil(d/2);
   ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(CL())mpQ(['vp']);else vamp();
@@ -860,7 +956,7 @@ function strike(pt){
   GEO++;for(const m of[...mons]){
     if(m.hidden||!mons.includes(m))continue;const d=dist(m,P);
     if(d<M[2]+m.r){const da=Math.atan2(Math.sin(angTo(P,m)-a),Math.cos(angTo(P,m)-a));
-      if(Math.abs(da)<M[3]||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy)mPush(m,Math.cos(a)*26,Math.sin(a)*26);hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg*.6);if(!decoy&&(!hitM||m.boss))hitM=m;if(decoy)break}}
+      if(Math.abs(da)<M[3]||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy)mPush(m,Math.cos(a)*26,Math.sin(a)*26);hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg*.6);if(S.apex&&!decoy)apexHit(m,twice?dmg*1.6:dmg);if(!decoy&&(!hitM||m.boss))hitM=m;if(decoy)break}}
   }GEO--;
   if(hitM&&c)troStrike(hitM,amb);
 }
@@ -903,6 +999,7 @@ function cast(op,x){
   case'collect':collect(t,D);break;
   case'verdict':P.bmT=1;P.bmA=ta-.6;P.bmHit=new Set();noise(.9,.25,3000,6000);break;
   case'sever':sever(t,D);break;
+  default:{const f=APXOP[o];if(f)f(x,op)}break;
   case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);healP(Math.min(.5,.1*th.length));break}
   }
 }
@@ -911,7 +1008,7 @@ function skill(si){
   if(P.mana<cost){noMana(si);return false} // not enough mana: nothing happens and the cooldown does not start
   let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
   // nothing to use it on: keep the skill ready instead of wasting the cooldown
-  if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')){SND.fizzle();return false}
+  if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')||typeof need==='function'&&!need(t)){SND.fizzle();return false}
   const x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()};
   P.mana-=cost;P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
   for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam'||op[0]==='collect'||op[0]==='sever')&&!mons.includes(t))continue;cast(op,x)}
@@ -949,7 +1046,7 @@ function roomStep(dt){
     if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
 }
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1):1);
+  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
@@ -1027,13 +1124,13 @@ function petHp0(e){
 const petHp=e=>Math.max(6,Math.round(petHp0(e)*GREF(petLe(e))/GREF(e.lv)*petLvl(e)*(S.adv==='lich'?1.4:1)));
 // what its blows do: [a brush, a bolt or a beam, a telegraphed blow]
 function petDu(e){
-  const k=PETK*GREF(petLe(e))/PHP(e.lv)*petLvl(e)*(1+eqv('thr')/100)*(S.cls==='necro'?1+.04*S.b.spec:1)*(S.adv==='reaper'?2:1)*(S.apex==='dominion'?DOMPET:1);
+  const k=PETK*GREF(petLe(e))/PHP(e.lv)*petLvl(e)*(1+eqv('thr')/100)*(S.cls==='necro'?1+.04*S.b.spec:1)*(S.adv==='reaper'?2:1)*(DOMS()?DOMPET:1);
   return[-1,0,1].map(h=>Math.max(.05,Math.round(blowAt(e.lv,h)*k*100)/100));
 }
 // what one of them holds while it is out, and what it costs to raise it again after it fell (dearer each time within a level)
 const petCost=e=>{const f=resvForm();if(!f)return 0;
-  if(f==='familiar')return Math.max(1,Math.round((e.crown?PCROWN:PCOST).familiar*(S.adv==='archmage'?.8:1)*(S.apex==='dominion'?DOMHOLD:1)));
-  return Math.max(PMIN,Math.round(C0(S.level)*petRel(e)*(S.adv==='lich'||S.adv==='beastmaster'?.8:1)*(S.apex==='dominion'?DOMHOLD:1)))};
+  if(f==='familiar')return Math.max(1,Math.round((e.crown?PCROWN:PCOST).familiar*(S.adv==='archmage'?.8:1)*(DOMS()?DOMHOLD:1)));
+  return Math.max(PMIN,Math.round(C0(S.level)*petRel(e)*(S.adv==='lich'||S.adv==='beastmaster'?.8:1)*(DOMS()?DOMHOLD:1)))};
 const reviveCost=e=>Math.round(petCost(e)*REVK*Math.pow(REVUP,e.revN||0));
 const petInfo=e=>({power:petPower(e),cost:petCost(e),revive:reviveCost(e),hp:petHp(e),hit:petDu(e),lv:e.lv,at:petLe(e)});
 const petCap=()=>resvForm()?1e9:form()?1:0;
@@ -1046,7 +1143,7 @@ const petHeld=(on=petOn())=>{let s=0;for(const e of on)s+=petCost(e);return s};
 // can this entry be sent out as things stand: is there unheld mana for it
 const petFits=e=>!resvForm()?petOn().length<1:petHeld()+petCost(e)<=manaMax();
 // the reserve follows who is in the field: called whenever that changes
-function resvSync(){if(!P)return;P.resB=S.apex==='order'&&resvForm()?Math.min(ORDRESN,Math.max(0,PETS.roster.length-petOn().length))*ORDRESK:0;P.resv=P.maxMana?Math.min(P.maxMana,petHeld()):0;if(P.mana>manaRoom())P.mana=manaRoom();manaSync()}
+function resvSync(){if(!P)return;P.resB=ORDS()&&resvForm()?Math.min(ORDRESN,Math.max(0,PETS.roster.length-petOn().length))*ORDRESK:0;P.resv=P.maxMana?Math.min(P.maxMana,petHeld()):0;if(P.mana>manaRoom())P.mana=manaRoom();manaSync()}
 // at the start of a level: if the pool can no longer hold everyone on the active list, the weakest wait, and you are told
 function petTrim(){
   if(!resvForm())return[];const R=PETS.roster,M=manaMax(),out=[];let A=PETS.active.filter(i=>R[i]),sum=0;for(const i of A)sum+=petCost(R[i]);
@@ -1238,7 +1335,7 @@ const form=()=>petOwner()?'pet':S.cls&&FORM[S.cls]||null;
 const TRX={technique:3,ward:14,venom:7,familiar:7.5,arrowhead:3.5,guardian:8},TRT={familiar:3.5,guardian:4};
 const TCOL={fighter:'#ffa64d',tank:'#6ea3e0',assassin:'#b6e04a',mage:'#b88cff',ranger:'#7fe0c0',healer:'#ffe08a'};
 let TSRC=[]; // for the forms that are not entities: one stand-in per active trophy, so damage, minions and levelling have something to hang on
-const troPow=a=>(S.apex==='dominion'?DOMPET:1)*(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(a.form==='ward'?Math.min(3,Math.max(1,(P.trW||0)/2.5)):1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
+const troPow=a=>(DOMS()?DOMPET:1)*(TRX[a.form]||1)*(a.k||1)*dmgMul()*(a.tm?1/cdMul():1)*(a.form==='familiar'?1+.08*S.b.spec:1)*(a.form==='ward'?Math.min(3,Math.max(1,(P.trW||0)/2.5)):1)*(1+.02*a.e.plv)*(a.e.perk?1.1:1)*(a.e.crown?1.1:1);
 const troBolts=(a,g,D,n=3)=>{for(let i=0;i<n;i++)petShot(a,g+(i-(n-1)/2)*.07,600,D,4)};
 // one firing per monster kind: (source, target, angle to it, damage of one unit). Returns true when the attack lands on the target itself, so its echo is drawn beside the target.
 const TRO={
@@ -1484,7 +1581,7 @@ function sever(t,D){puff(t,'#ffffff',16,240);rings.push({x:t.x,y:t.y,life:.35,ma
   if(!t.boss&&t.hp<=t.maxHp*.5)hurtM(t,1e9);else hurtM(t,9*D*(t.boss&&t.hp<=t.maxHp*.2?3:1))}
 // the White Marrow's ring of light (every half second) and the Verdict beam (a sweep of 1.2 radians in one second; each monster it crosses is hit once)
 function apexStep(dt,held){
-  if(S.apex!=='order'||!cls()){P.auraR=0;if(P.beam)P.beam=null;return}
+  if(S.apex!=='order'||!cls()){P.auraR=0;if(P.beam)P.beam=null;const f=cls()&&APXSTEP[S.apex];if(f&&P.ax)f(dt,held);return}
   if(P.ascT>0)P.ascT-=dt;
   P.auraR=P.ascT>0?ORDR*1.5:ORDR;
   if((P.auraK-=dt)<=0&&S.mode==='play'&&!held){P.auraK=.5;const d=ORDAURA*(P.ascT>0?2:1)*dmgMul();
@@ -1496,7 +1593,331 @@ function apexStep(dt,held){
     if(P.bmT<=0)P.beam=null}
   else if(P.beam)P.beam=null;
 }
-const apexInfo=()=>S.apex?{path:S.apex,name:APEX[S.apex].name,title:APEX[S.apex].title,lore:APEX[S.apex].lore}:null;
+/* ---------- the further apex paths (round 10): beasts, frost, plague, flame on the dominion side; storm, stone, blade, tide on the order side ---------- */
+// What they share:
+//  statuses on monsters (stApply, run by the host in co-op; a client asks with the hit op 'ap'): m.chill 0..1, m.frozen (s), m.rot 0..5 with m.rotT (s), m.burn (s), m.shock (s), m.soak (s). In versus a status on a hero becomes a slow, a stun or a poison (vsSt).
+//  fields of their own (fieldA; f.ax): 'ice', 'rot', 'fire' (discs), 'wave' (a disc that moves: vx, vy) and 'quake' (a line: x2, y2, half-width w, no r). A field with `follow` stays on its owner.
+//  free allies (apxAlly; a.apexAlly): 'packbeast', 'icewight', 'cinder'. They cost nothing, cannot be hurt by monsters, and go when their time is up. In versus they have health and can be killed.
+//  arcs (MB.arcs): short-lived lightning segments, for the eye only.
+//  the hero's own state: P.pack, P.plates, P.blades, P.haste, and P.ax for everything else of the path.
+let arcs=[];
+// U: one hundredth of the health of the floor's reference monster, with the thrall-and-pet trinket: what the dominion side's damage is counted in
+const UD=()=>GREF(S.level)*.01*(1+eqv('thr')/100);
+function arc(x1,y1,x2,y2,c){if(arcs.length>90)arcs.shift();arcs.push({x1,y1,x2,y2,life:.26,max:.26,col:c||AX.col.storm});if(MP.on&&MP.aq.length<40)MP.aq.push([Math.round(x1),Math.round(y1),Math.round(x2),Math.round(y2)])}
+const trail=(a,b,c,n=5)=>{for(let k=1;k<=n;k++)bits.push({x:a.x+(b.x-a.x)*k/n,y:a.y+(b.y-a.y)*k/n,vx:0,vy:0,life:.3,max:.3,c,r:2.5})};
+// how far a point is from the line of a fissure
+const quakeD=(e,f)=>{const dx=f.x2-f.x,dy=f.y2-f.y,l2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((e.x-f.x)*dx+(e.y-f.y)*dy)/l2));return Math.hypot(e.x-f.x-dx*t,e.y-f.y-dy*t)};
+/* --- statuses --- */
+const STK=['chill','freeze','rot','burn','shock','soak'];
+function stFreeze(m,t,d){
+  if(m.frozen>0)return;m.frozen=t;m.chill=1;m.stun=Math.max(m.stun||0,t);m.beam=null;m.shatD=d||m.shatD||0;m.frzRem=REM;
+  puff(m,'#dff4ff',12,150);rings.push({x:m.x,y:m.y,life:.35,max:.35,r:m.r+26,fx:true});sfx(1800,.14,'triangle',.12,700)}
+// the host's (or the lone player's) own doing. k: the status, v: how much (chill 0..1, rot stacks) or how long (s), d: the damage that goes with it (a shatter, a tick of rot per stack, a tick of fire)
+function stApply(m,k,v,d){
+  if(!m||m.vs||m.decoy||m.hidden||!(v>0)||m.hp<=0)return;d=d>0?d:0;
+  if(m.ward>0&&k!=='soak')return;
+  if(k==='chill'){const F=AX.frost;if(m.frozen>0||m.thawT>0)return;m.chill=Math.min(1,(m.chill||0)+v*(m.boss?F.bossK:1)*(m.soak>0?1.5:1));m.chillT=F.hold;if(d>(m.shatD||0))m.shatD=d;if(m.chill>=1)stFreeze(m,m.boss?F.frzB:F.frz,m.shatD)}
+  else if(k==='freeze'){m.thawT=0;stFreeze(m,m.boss?v*.5:v,d)}
+  else if(k==='rot'){const G=AX.plague,n=Math.round(v);m.rot=Math.min(5,(m.rot||0)+n);m.rotT=Math.max(m.rotT||0,n>=5?G.ultT:G.t);if(d>=(m.rotD||0)){m.rotD=d;m.rotRem=REM}if(!(m.rotK>0))m.rotK=.5}
+  else if(k==='burn'){m.burn=Math.max(m.burn||0,v);if(d>=(m.burnD||0)){m.burnD=d;m.burnRem=REM}if(!(m.burnK>0))m.burnK=.5}
+  else if(k==='shock'){if(m.shockI>0)return;m.shock=v;m.shockI=m.boss?AX.storm.immB:AX.storm.imm;m.stun=Math.max(m.stun||0,m.boss?v*.5:v)}
+  else if(k==='soak')m.soak=Math.max(m.soak||0,v);
+}
+// what an attack calls: alone and on the host it happens; a client asks the host; a hostile hero or creature gets what a hero can get
+function mSt(m,k,v,d){
+  if(!m)return;if(m.vs)return vsSt(m,k,v,d||0);
+  if(CL()){if(!m.hidden&&!m.decoy)mpQ(['ap',m.id,STK.indexOf(k),Math.round(v*100)/100,Math.round((d||0)*100)/100]);return}
+  stApply(m,k,v,d)}
+// thawing or dying frozen: a blow to it (if it lives) and a lesser one to everything near, which is chilled
+function shatter(m,dead){
+  const F=AX.frost,D=m.shatD||0,was=REM;m.frozen=0;m.chill=0;m.shatD=0;m.thawT=m.boss?F.thawB:F.thaw;
+  rings.push({x:m.x,y:m.y,life:.4,max:.4,r:F.shatR,fx:true});puff(m,'#dff4ff',18,240);sfx(1500,.2,'triangle',.16,420);noise(.12,.2,6000,2500);
+  if(!(D>0))return;REM=m.frzRem||null;
+  for(const o of[...mons])if(o!==m&&!o.hidden&&!o.decoy&&mons.includes(o)&&dist(o,m)<F.shatR+o.r){hurtM(o,D*F.shatK,true);if(mons.includes(o))stApply(o,'chill',F.shatCh,D)}
+  if(!dead&&mons.includes(m))hurtM(m,D,true);
+  REM=was}
+function rotSpread(m){
+  const G=AX.plague;if(m.rot<2)return;let b=null,bd=G.spR;for(const o of mons){if(o===m||o.hidden||o.decoy||o.ward>0||(o.rot||0)>=m.rot)continue;const d=dist(o,m)-o.r;if(d<bd){bd=d;b=o}}
+  if(b){const was=REM;REM=m.rotRem||null;stApply(b,'rot',1,m.rotD);REM=was;trail(m,b,AX.col.plague,6)}}
+// every step, for a monster that carries any of them. True when it died of one.
+function stStep(m,dt){
+  if(m.thawT>0)m.thawT-=dt;if(m.shockI>0)m.shockI-=dt;if(m.soak>0)m.soak-=dt;if(m.shock>0)m.shock-=dt;
+  if(m.frozen>0){if((m.frozen-=dt)<=0){shatter(m);if(!mons.includes(m))return true}}
+  else if(m.chill>0&&(m.chillT-=dt)<=0)m.chill=Math.max(0,m.chill-dt*.4);
+  if(m.burn>0){m.burn-=dt;if((m.burnK-=dt)<=0){m.burnK=.5;REM=m.burnRem||null;hurtM(m,m.burnD,true);REM=null;if(!mons.includes(m))return true}if(m.burn<=0){m.burn=0;m.burnD=0}}
+  if(m.rot>0){const G=AX.plague,n=m.rot;m.rotT-=dt;
+    if((m.rotK-=dt)<=0){m.rotK=.5;REM=m.rotRem||null;hurtM(m,m.rotD*n*(1+G.ramp*(n-1)),true);REM=null;if(!mons.includes(m))return true}
+    if((m.rotS=(m.rotS>0?m.rotS:G.sp)-dt)<=0)rotSpread(m);
+    if(m.rotT<=0){m.rot=0;m.rotD=0;m.rotT=0}}
+  return false}
+// a lesser monster died carrying one: the ice shatters, the rot leaps and leaves a cloud, the fire stays on the ground
+function stDeath(m){
+  const was=REM;
+  if(m.frozen>0){REM=m.frzRem||null;shatter(m,true)}
+  if(m.rot>0){const G=AX.plague,n=m.rot;REM=m.rotRem||null;
+    for(const o of[...mons])if(!o.hidden&&!o.decoy&&dist(o,m)<G.leap+o.r&&(o.rot||0)<n){stApply(o,'rot',n-(o.rot||0),m.rotD);trail(m,o,AX.col.plague,6)}
+    if(!fields.some(f=>f.kind==='rot'&&!f.follow&&Math.hypot(f.x-m.x,f.y-m.y)<45)&&fields.length<50)fieldA('rot',m.x,m.y,G.cloudR,G.cloudT,1,0,{sd:m.rotD})}
+  if(m.burn>0&&m.burnD>0){REM=m.burnRem||null;const C=AX.flame;
+    if(!fields.some(f=>f.kind==='fire'&&!f.follow&&Math.hypot(f.x-m.x,f.y-m.y)<40)&&fields.length<50)fieldA('fire',m.x,m.y,C.patchR,C.patchT,.5,m.burnD*.75,{sd:m.burnD})}
+  REM=was}
+/* --- fields --- */
+const FKX={ice:1,rot:1,fire:1,wave:1,quake:1};
+function fieldA(kind,x,y,r,dur,every,dmg,o){
+  const f=Object.assign({kind,x,y,r,t:0,dur,every,tick:0,dmg:dmg||0,slow:kind==='ice'||kind==='quake',ax:true},o||{});
+  if(kind==='quake'){f.w=r;delete f.r}else if(!f.follow&&kind!=='wave')clamp(f,10);
+  fields.push(f);return f}
+function wave(x,y,g,r,d,len,o){
+  const T=AX.tide,f=fieldA('wave',x+Math.cos(g)*18,y+Math.sin(g)*18,r,len/T.wspd,.5,d,Object.assign({vx:Math.cos(g)*T.wspd,vy:Math.sin(g)*T.wspd,hit:new Set(),soak:T.soak,pk:0,push:1},o||{}));
+  sfx(140,.5,'sine',.14,60);noise(.5,.12,900,300);return f}
+// one of the new fields, every step (mine, a team-mate's copy, or a foe's in versus)
+function fieldX(f,dt){
+  f.t+=dt;const k=f.kind;
+  if(f.follow){const o=f.own?f.own.P:P;if(f.own&&(f.own.dead||f.own.away||!MP.remotes.includes(f.own))){f.t=f.dur;return}if(o){f.x=o.x;f.y=o.y}}
+  if(k==='wave'){
+    f.x+=f.vx*dt;f.y+=f.vy*dt;if(f.x<WALL-10||f.x>W-WALL+10||f.y<WALL-10||f.y>H-WALL+10){f.t=f.dur;return}
+    if(rand()<dt*24)bits.push({x:f.x+rand()*f.r*1.4-f.r*.7,y:f.y+rand()*f.r*1.4-f.r*.7,vx:f.vx*.3,vy:f.vy*.3,life:.4,max:.4,c:rand()<.5?AX.col.tide:'#d8fff8',r:2.5});
+    if(f.rem){if(f.foe&&VS)vsWave(f);return}
+    const go=(f.pk-=dt)<=0;if(go)f.pk=.1;
+    GEO++;for(const m of[...mons]){if(m.hidden||!mons.includes(m)||dist(m,f)>f.r+m.r)continue;
+      if(!f.hit.has(m)){f.hit.add(m);mSt(m,'soak',f.soak);hurtM(m,f.dmg)}
+      if(go&&mons.includes(m)&&!m.vs&&!m.decoy&&m.st!=='leap'){const q=(m.boss?.22:1)*f.push*.1;mPush(m,f.vx*q,f.vy*q)}}GEO--;
+    return}
+  if((f.tick-=dt)>0)return;f.tick=f.every;f.n=!f.n;
+  {const c=k==='ice'?'#bfe9ff':k==='rot'?AX.col.plague:k==='fire'?(rand()<.5?'#ff8a4c':'#ffd95e'):AX.col.stone;
+    for(let i=0;i<(k==='quake'?4:5);i++){let x,y;if(k==='quake'){const u=rand();x=f.x+(f.x2-f.x)*u+rand()*16-8;y=f.y+(f.y2-f.y)*u+rand()*16-8}else{const a=rand()*TAU,d=rand()*f.r;x=f.x+Math.cos(a)*d;y=f.y+Math.sin(a)*d}
+      bits.push({x,y,vx:0,vy:k==='fire'?-50:k==='rot'?-14:-26,life:.5,max:.5,c,r:2.5})}}
+  if(f.rem){if(f.foe&&VS)vsField(f);return}
+  GEO++;for(const m of[...mons]){if(m.hidden||!mons.includes(m))continue;if(k==='quake'?quakeD(m,f)>=f.w+m.r:dist(m,f)>=f.r+m.r)continue;
+    if(k==='ice')mSt(m,'chill',f.st||.2,f.sd);else if(k==='rot')mSt(m,'rot',1,f.sd);else if(k==='fire')mSt(m,'burn',2.5,f.sd);else if(!m.boss)mSlow(m,.8);
+    if(f.dmg>0&&mons.includes(m))hurtM(m,f.dmg,true)}GEO--;
+}
+/* --- an area blow of mine at a point: everything within r takes d. In versus it travels with its ring (me.r) and the victim decides --- */
+function burst(x,y,r,d,o){
+  o=o||{};rings.push({x,y,life:.4,max:.4,r,fx:true});
+  if(MP.on)MP.rq.push(VS?[Math.round(x),Math.round(y),Math.round(r),40,Math.round(d*100)/100]:[Math.round(x),Math.round(y),Math.round(r),40]);
+  GEO++;for(const m of[...mons]){if(m.hidden||!mons.includes(m)||Math.hypot(m.x-x,m.y-y)>=r+m.r)continue;if(o.fn)o.fn(m);if(d>0&&mons.includes(m))hurtM(m,d,o.quiet)}GEO--;
+}
+/* --- the free allies --- */
+function apxAlly(kind,life,o){
+  o=o||{};const g=rand()*TAU,a={nid:nid(),kind,apexAlly:true,over:!!o.over,x:o.x===undefined?P.x+Math.cos(g)*44:o.x,y:o.y===undefined?P.y+Math.sin(g)*44:o.y,r:kind==='packbeast'?13:kind==='icewight'?19:8,hp:1,maxHp:1,st:'idle',t:0,ang:g,face:g,flash:.25,life,max:life,
+    walk:rand()*6,flip:false,moving:false,cd:o.cd===undefined?.3+rand()*.5:o.cd,seed:rand()*9};
+  clamp(a,a.r);if(obstacles.length)collide(a,a.r,kind!=='cinder');allies.push(a);puff(a,AX.col[kind],8,130);return a}
+const packCap=()=>Math.min(AX.beast.capMax,AX.beast.cap0+Math.max(0,Math.floor((S.level-100)/AX.beast.capK)));
+const cinderCap=()=>Math.min(AX.flame.capMax,AX.flame.cap0+Math.max(0,Math.floor((S.level-100)/AX.flame.capK)));
+const bladeCap=()=>Math.min(6,AX.blade.n0+Math.max(0,Math.floor((S.level-100)/AX.blade.nK)));
+const packBite=()=>UD()*AX.beast.bite*(1+AX.beast.syn*Math.max(0,(P.pack||1)-1));
+function cinderBurst(a){
+  const C=AX.flame,sd=UD()*C.burn;a.life=0;puff(a,'#ffd27a',16,240);S.shake=Math.max(S.shake,.1);noise(.18,.25,800,200);sfx(160,.2,'sawtooth',.14,70);
+  burst(a.x,a.y,C.br,UD()*C.bd,{quiet:true,fn:m=>mSt(m,'burn',C.burnT,sd)});
+  if(fields.length<50)fieldA('fire',a.x,a.y,C.patchR,C.patchT,.5,UD()*C.patch,{sd})}
+function allyX(a,dt){
+  a.life-=dt;a.moving=false;if(a.flash>0)a.flash-=dt;if(a.cd>0)a.cd-=dt;
+  if(a.life<=0){puff(a,AX.col[a.kind],8,120);return}
+  if(a.vStun>0){a.vStun-=dt;return}
+  const k=a.kind,X=P.ax||{};
+  const go=(g,sp,d)=>{if(a.avT>0)a.avT-=dt;if(obstacles.length&&k!=='cinder')g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;a.moving=true;a.face=g;clamp(a,a.r);if(obstacles.length)collide(a,a.r,k!=='cinder')};
+  if(k==='packbeast'){const B=AX.beast,fr=X.howl>0;
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='lunge';a.t=.12}return}
+    if(a.st==='lunge'){a.x+=Math.cos(a.ang)*420*dt;a.y+=Math.sin(a.ang)*420*dt;clamp(a,a.r);a.moving=true;a.face=a.ang;
+      if((a.t-=dt)<=0){a.st='idle';a.cd=B.cd*(fr?.5:1);const m=a.tg;a.tg=null;if(m&&mons.includes(m)&&!m.hidden&&dist(a,m)<m.r+a.r+30){GEO++;hurtM(m,packBite(),true);GEO--}}return}
+    const t=X.prey&&mons.includes(X.prey)&&!X.prey.hidden&&!(X.prey.ward>.3)?X.prey:petTarget(a);
+    if(t){const d=dist(a,t),g=angTo(a,t);if(d>t.r+a.r+8)go(g+Math.sin(S.t*2+a.seed)*.3,B.spd*(fr?1.4:1),d);else a.face=g;
+      if(d<t.r+a.r+34&&a.cd<=0){a.st='wind';a.t=.16;a.ang=g;a.tg=t}}
+    else{const d=dist(a,P);if(d>58+a.r)go(angTo(a,P),235,d)}
+    return}
+  if(k==='icewight'){const F=AX.frost;
+    if(a.st==='wind'){if((a.t-=dt)<=0){a.st='cast';a.t=.3;a.cd=F.wcd;const sd=UD()*F.shat;burst(a.x,a.y,F.wr,UD()*F.wd,{quiet:true,fn:m=>mSt(m,'chill',F.wch,sd)});S.shake=Math.max(S.shake,.12);sfx(90,.25,'square',.2,45);puff(a,'#dff4ff',12,200)}return}
+    if(a.st==='cast'){if((a.t-=dt)<=0)a.st='idle';return}
+    let tg=null,bd=F.wreach;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,P)-m.r+(m.ward>.3?2000:0);if(d<bd){bd=d;tg=m}} // it guards: whatever is nearest to you
+    if(tg){const d=dist(a,tg),g=angTo(a,tg);if(d>tg.r+F.wr*.55)go(g,F.wspd,d);else a.face=g;if(d<tg.r+F.wr*.8&&a.cd<=0){a.st='wind';a.t=.55;a.ang=g}}
+    else{const d=dist(a,P);if(d>74)go(angTo(a,P),F.wspd,d)}
+    return}
+  const C=AX.flame; // a cinder: it hangs by you, then throws itself at the nearest monster
+  if(a.st==='charge'){let m=a.tg;if(!m||!mons.includes(m)||m.hidden)m=a.tg=petTarget(a);if(m)a.ang=angTo(a,m);
+    a.x+=Math.cos(a.ang)*C.spd*dt;a.y+=Math.sin(a.ang)*C.spd*dt;a.face=a.ang;a.moving=true;const wall=clamp(a,a.r);
+    if(rand()<dt*40)bits.push({x:a.x,y:a.y,vx:0,vy:-20,life:.3,max:.3,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5});
+    if((a.t-=dt)<=0||wall||m&&dist(a,m)<m.r+a.r+6)cinderBurst(a);return}
+  {const g=S.t*1.7+a.seed*2.1,px=P.x+Math.cos(g)*36,py=P.y+Math.sin(g)*26-8,q=Math.min(1,dt*6);a.x+=(px-a.x)*q;a.y+=(py-a.y)*q;a.face=g+1.57;a.walk+=dt*8}
+  if(a.cd<=0&&S.mode==='play'){let m=null,bd=C.reach;for(const o of mons){if(o.hidden||o.decoy)continue;const d=dist(o,P)-o.r+(o.ward>.3?2000:0);if(d<bd){bd=d;m=o}}
+    if(m){a.st='charge';a.t=1.6;a.tg=m;a.ang=angTo(a,m);sfx(700,.14,'sawtooth',.08,240)}}
+}
+/* --- lightning: from (x,y) to m, then on to up to n more within reach, each leap `fall` of the one before --- */
+function chain(x,y,m,d,n,reach,fall){
+  const Z=AX.storm,hit=new Set();let px=x,py=y,cur=m,k=0;fall=fall||Z.fall;
+  while(cur&&k<=n){hit.add(cur);arc(px,py,cur.x,cur.y);px=cur.x;py=cur.y;
+    mSt(cur,'shock',Z.shock);if(mons.includes(cur))hurtM(cur,d*Math.pow(fall,k)*(cur.soak>0?1.3:1),k>0);
+    let nx=null,bd=reach;for(const o of mons){if(hit.has(o)||o.hidden||o.decoy)continue;const q=Math.hypot(o.x-px,o.y-py)-o.r;if(q<bd){bd=q;nx=o}}cur=nx;k++}
+  sfx(1900,.1,'sawtooth',.09,300);noise(.08,.12,5000,1500)}
+const skyBolt=(m,d,n,fall)=>{S.shake=Math.max(S.shake,.12);chain(m.x+rand()*40-20,m.y-230,m,d,n,220,fall)};
+/* --- blades --- */
+// one cut of the blades on m, worth d; every AX.blade.combo-th on the same monster is a great cut
+function bladeCut(m,d,own){
+  const B=AX.blade,X=P.ax;if(!mons.includes(m))return;
+  if(S.t-(X.cutAt||0)>.09){X.cutAt=S.t;const g=rand()*TAU;trail({x:m.x+Math.cos(g)*(m.r+22),y:m.y+Math.sin(g)*(m.r+22)},{x:m.x-Math.cos(g)*(m.r+22),y:m.y-Math.sin(g)*(m.r+22)},rand()<.5?AX.col.blade:'#eef2ff',6)}
+  if(S.t-(m.cutT||0)>B.comboT){m.cuts=0;m.cutD=0}m.cutT=S.t;m.cuts=(m.cuts||0)+1;m.cutD=(m.cutD||0)+(own||d);
+  hurtM(m,d,true);
+  if(m.cuts>=B.combo&&mons.includes(m)){const g=m.cutD*B.comboK;m.cuts=0;m.cutD=0;rings.push({x:m.x,y:m.y,life:.3,max:.3,r:m.r+44,fx:true});puff(m,'#eef2ff',12,220);sfx(2400,.1,'triangle',.12,900);hurtM(m,g)}
+}
+// the nearest monster above ground within reach of the hero (nothing warded while there is a choice)
+function nearM(reach){let b=null,bd=reach;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,P)-m.r+(m.ward>.3?2000:0);if(d<bd){bd=d;b=m}}return b}
+/* --- what a path does every step (called while the hero stands; held: the banner is up or a versus round has not begun) --- */
+const APXSTEP={
+ beasts(dt,held){const X=P.ax,B=AX.beast;let n=0,all=0;for(const a of allies)if(a.kind==='packbeast'&&a.life>0){all++;if(!a.over)n++}P.pack=all;
+   if(X.howl>0)X.howl-=dt;if(held||S.mode!=='play')return;const cap=packCap();
+   if(X.first){X.first=false;for(let i=n;i<cap;i++)apxAlly('packbeast',B.life*(.55+.45*(i+1)/cap));X.t=B.t;return} // (they do not all fade in the same breath)
+   if(n<cap&&(X.t-=dt)<=0){X.t=B.t;apxAlly('packbeast',B.life);sfx(260,.25,'sawtooth',.08,130)}},
+ frost(dt,held){const X=P.ax,F=AX.frost;if(held||S.mode!=='play')return;let n=0;for(const a of allies)if(a.kind==='icewight'&&a.life>0)n++;const cap=F.wights+(S.level>=150?1:0);
+   if(X.first){X.first=false;for(let i=n;i<cap;i++)apxAlly('icewight',F.wlife*(.55+.45*(i+1)/cap));X.t=F.wt;return}
+   if(n<cap&&(X.t-=dt)<=0){X.t=F.wt;apxAlly('icewight',F.wlife);sfx(900,.3,'sine',.08,300)}},
+ plague(dt,held){const X=P.ax,G=AX.plague;if(S.mode!=='play')return;
+   if(!X.mia||!fields.includes(X.mia))X.mia=fieldA('rot',P.x,P.y,G.auraR,1e9,G.auraT,0,{follow:true});X.mia.sd=UD()*G.d},
+ flame(dt,held){const X=P.ax,C=AX.flame;if(held||S.mode!=='play')return;let n=0;for(const a of allies)if(a.kind==='cinder'&&a.life>0&&!a.over&&a.st!=='charge')n++;
+   if(n<cinderCap()&&(X.t-=dt)<=0){X.t=C.t;apxAlly('cinder',C.life,{cd:.6});sfx(500,.12,'triangle',.06,900)}},
+ storm(dt,held){const X=P.ax,Z=AX.storm;if(X.surge>0){X.surge-=dt;P.haste=1}else if(P.haste>0)P.haste=Math.max(0,P.haste-Z.decay*dt);if(X.ch>0)X.ch-=dt;
+   if(S.mode==='play'&&!held&&(X.t-=dt)<=0){const m=nearM(Z.sparkR);if(m){X.t=Z.sparkT;const g=GEO;GEO=0;chain(P.x,P.y-12,m,Z.sparkD*dmgMul(),1,Z.reach);GEO=g}}
+   if(X.temp>0&&S.mode==='play'&&!held){X.temp-=dt;if((X.tk-=dt)<=0){X.tk=Z.tempK;let L=0;for(const m of mons)if(!m.hidden&&!m.decoy)L++;
+     if(L){let i=Math.floor(rand()*L);for(const m of mons){if(m.hidden||m.decoy)continue;if(!i--){skyBolt(m,Z.tempD*dmgMul(),1);break}}}}}},
+ stone(dt,held){const X=P.ax,Q=AX.stone;if(P.plates<Q.plates){if((X.t-=dt)<=0){P.plates++;X.t=Q.regrow;sfx(300,.08,'triangle',.1,500)}}else X.t=Q.regrow;
+   if(S.mode==='play'&&!held&&(X.qk=(X.qk===undefined?Q.quakeT:X.qk)-dt)<=0){const m=nearM(Q.quakeReach);if(m){X.qk=Q.quakeT;puff(m,AX.col.stone,8,160);sfx(70,.2,'square',.16,35);burst(m.x,m.y,Q.quakeR,Q.quakeD*dmgMul(),{quiet:true})}}},
+ blade(dt,held){const X=P.ax,B=AX.blade;P.blades=bladeCap();
+   if(S.mode==='play'&&!held&&(X.t-=dt)<=0){const m=nearM(B.autoR);if(m){X.t=B.autoT/Math.max(1,P.blades);trail({x:P.x,y:P.y-30},m,AX.col.blade,5);const g=GEO;GEO=0;bladeCut(m,B.autoD*dmgMul());GEO=g}}
+   if(X.cutN>0&&S.mode==='play'&&!held&&(X.cutK-=dt)<=0){const m=X.cutM;if(!mons.includes(m)||m.hidden)X.cutN=0;
+     else{X.cutK=B.ultK;X.cutN--;const g=GEO;GEO=0;bladeCut(m,B.ultD*dmgMul());
+       if(!X.cutN&&mons.includes(m)){puff(m,'#ffffff',18,260);rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});S.shake=Math.max(S.shake,.25);hurtM(m,!m.boss&&m.hp<=m.maxHp*.5?1e9:B.ultEnd*dmgMul())}GEO=g}}},
+ tide(dt,held){const X=P.ax,T=AX.tide;if(S.mode!=='play'||held)return;
+   if(X.flood>0){X.flood-=dt;if(X.fl2>0&&(X.fl2-=dt)<=0)waveRing()}
+   if((X.rg=(X.rg||0)+dt)>=T.regenT*(X.flood>0?T.floodK:1)){X.rg=0;if(P.hp<P.maxHp){healP(T.regen);puff(P,AX.col.tide,4,70)}}
+   if((X.t-=dt)<=0){const m=petTarget(P);if(m&&dist(m,P)<T.reach+m.r){X.t=T.t;wave(P.x,P.y,angTo(P,m),T.wr,T.wd*dmgMul(),T.wlen)}}},
+};
+function waveRing(){const T=AX.tide;for(let i=0;i<8;i++)wave(P.x,P.y,i*TAU/8+.2,T.wr,T.fd*dmgMul(),T.wlen)}
+// what the path's state is at the start of a floor
+function apxBody(){
+  P.plates=0;P.blades=0;P.haste=0;P.pack=0;P.ax={first:true,t:0,n:0,acc:0,ch:0};const a=act2()&&S.cls?S.apex:null;
+  if(a==='stone'){P.plates=AX.stone.plates;P.ax.t=AX.stone.regrow}else if(a==='blade')P.blades=bladeCap();else if(a==='tide')P.ax.t=1.5;else if(a==='flame')P.ax.t=.8}
+/* --- a blow of my own has landed on m for d (a strike, or a bolt, arrow, spear or orb of mine): what the path adds --- */
+const APXHIT={
+ beasts(m){P.ax.prey=m},
+ frost(m){if(S.t<(m.chI||0))return;m.chI=S.t+AX.frost.icd;mSt(m,'chill',AX.frost.hit,UD()*AX.frost.shat)},
+ plague(m){if(S.t<(m.rotI||0))return;m.rotI=S.t+AX.plague.icd;mSt(m,'rot',1,UD()*AX.plague.d)},
+ flame(m){if(S.t<(m.buI||0))return;m.buI=S.t+.5;mSt(m,'burn',AX.flame.hitT,UD()*AX.flame.burn)},
+ storm(m,d){const X=P.ax,Z=AX.storm;P.haste=Math.min(1,P.haste+Z.gain);X.acc+=d;if(X.ch>0)return;X.ch=X.surge>0?Z.icdS:Z.icd;const q=X.acc*Z.k;X.acc=0;chain(P.x,P.y-12,m,q,Z.jumps+(P.haste>=.99?1:0),Z.reach)},
+ stone(m,d){const X=P.ax,Q=AX.stone;X.acc+=d;if(++X.n<Q.every)return;X.n=0;const q=X.acc*Q.crush;X.acc=0;puff(m,AX.col.stone,10,200);S.shake=Math.max(S.shake,.1);sfx(80,.16,'square',.2,40);burst(m.x,m.y,Q.crushR,q,{fn:o=>{if(!o.boss)mStun(o,Q.cstun)}})},
+ blade(m,d){const B=AX.blade;if(P.blades>0)bladeCut(m,d*B.per*P.blades,d);if(mons.includes(m)&&!m.boss&&!m.hero&&m.hp<=m.maxHp*B.exec){puff(m,'#eef2ff',10,200);hurtM(m,1e9)}},
+};
+function apexHit(m,d){
+  const f=APXHIT[S.apex];if(!f||!cls()||!P.ax||m.decoy||m.hidden)return;
+  if(!mons.includes(m)){if(S.apex!=='storm')return;let b=null,bd=AX.storm.reach;for(const o of mons){if(o.hidden||o.decoy)continue;const q=dist(o,m)-o.r;if(q<bd){bd=q;b=o}}P.ax.acc+=d;if(!b)return;m=b;d=0} // the blow killed it: the lightning goes on from there
+  const g=GEO;GEO=0;try{f(m,d)}finally{GEO=g}}
+// a guard plate takes the blow
+function plateBreak(vs){
+  const Q=AX.stone;P.plates--;if(!vs)P.inv=.5;puff(P,AX.col.stone,14,200);SND.block();haptic(30);floats.push({x:P.x,y:P.y-44,txt:'Plate',life:.7,c:AX.col.stone});
+  const g=GEO;GEO=0;burst(P.x,P.y,Q.cr,Q.cd*dmgMul(),{fn:m=>{if(!m.boss)mStun(m,Q.cstun)}});GEO=g;S.shake=Math.max(S.shake,.2)}
+/* --- the skills (one building block each, run by cast) --- */
+const APXOP={
+ howl(){const X=P.ax,B=AX.beast;X.howl=B.howl;let n=0;for(const a of allies)if(a.kind==='packbeast'&&a.life>0&&!a.over){n++;a.cd=0}for(let i=n;i<packCap();i++)apxAlly('packbeast',B.life);X.t=B.t;X.first=false;sfx(196,.7,'sawtooth',.16,392);sfx(294,.6,'triangle',.1,523,.1)},
+ rundown(x){const t=x.t,B=AX.beast;if(!mons.includes(t))return;debuff(t,{mark:5,slow:2},x.D);P.ax.prey=t;let i=0;
+   for(const a of allies){if(a.kind!=='packbeast'||a.life<=0||!mons.includes(t))continue;const g=i++*2.4+a.seed;trail(a,t,AX.col.packbeast,6);a.x=t.x+Math.cos(g)*(t.r+a.r+4);a.y=t.y+Math.sin(g)*(t.r+a.r+4);clamp(a,a.r);a.face=g+Math.PI;a.flash=.25;a.st='idle';a.cd=.4;hurtM(t,packBite()*B.runK,true)}
+   sfx(220,.3,'sawtooth',.16,110)},
+ longhunt(){const B=AX.beast;for(let i=0;i<B.huntN;i++)apxAlly('packbeast',B.huntT,{over:true,cd:.2});sfx(147,.8,'sawtooth',.16,294)},
+ rime(x){const F=AX.frost;fieldA('ice',x.at.x,x.at.y,F.rimeR,F.rimeT,.5,UD()*F.rimeD,{st:F.rimeCh,sd:UD()*F.shat});sfx(1200,.5,'sine',.12,400)},
+ shatterall(){const F=AX.frost,u=UD();S.shake=Math.max(S.shake,.25);sfx(1500,.25,'triangle',.18,300);noise(.2,.25,6000,2000);
+   for(const m of[...mons]){if(m.hidden||m.decoy||!mons.includes(m))continue;
+     if(m.frozen>0){puff(m,'#dff4ff',16,240);burst(m.x,m.y,F.shatR,u*F.skA,{quiet:true,fn:o=>{if(o!==m)mSt(o,'chill',F.shatCh,u*F.shat)}});if(mons.includes(m))hurtM(m,u*(F.skF-F.skA))}
+     else if(m.chill>0){puff(m,'#bfe9ff',8,160);hurtM(m,u*F.skC*Math.max(.34,m.chill),true);if(mons.includes(m))mSt(m,'chill',.3,u*F.shat)}}},
+ winter(){const F=AX.frost,u=UD();for(const m of[...mons])if(!m.hidden&&!m.decoy&&dist(m,P)<F.ultR+m.r)mSt(m,'freeze',F.ultT,u*F.shat*1.5);for(const a of allies)if(a.kind==='icewight'&&a.st==='idle'){a.st='wind';a.t=.4}S.shake=Math.max(S.shake,.3)},
+ blight(x){const G=AX.plague;fieldA('rot',x.at.x,x.at.y,G.blightR,G.blightT,1,UD()*G.blightD,{sd:UD()*G.d});sfx(140,.5,'sawtooth',.1,90)},
+ fester(){const G=AX.plague,u=UD();S.shake=Math.max(S.shake,.2);sfx(110,.4,'sawtooth',.18,55);for(const m of[...mons]){if(m.hidden||!(m.rot>0)||!mons.includes(m))continue;puff(m,AX.col.plague,12,200);rings.push({x:m.x,y:m.y,life:.3,max:.3,r:m.r+36,fx:true});hurtM(m,u*G.fester*m.rot);if(mons.includes(m))mSt(m,'rot',1,u*G.d)}},
+ sickness(){const u=UD()*AX.plague.d;for(const m of[...mons])if(!m.hidden&&!m.decoy){mSt(m,'rot',5,u);puff(m,AX.col.plague,10,160)}sfx(98,.8,'sawtooth',.18,49)},
+ pyre(x){const C=AX.flame;fieldA('fire',x.at.x,x.at.y,C.pyreR,C.pyreT,.5,UD()*C.pyreD,{sd:UD()*C.burn});sfx(160,.5,'sawtooth',.14,80);noise(.4,.14,500,1500)},
+ coals(){const C=AX.flame;for(let i=0;i<C.coals;i++){const g=i*TAU/C.coals;apxAlly('cinder',6,{over:true,cd:.15+i*.07,x:P.x+Math.cos(g)*30,y:P.y+Math.sin(g)*30})}},
+ burndown(){const C=AX.flame,X=P.ax,sd=UD()*C.burn;P.stoneT=Math.max(P.stoneT||0,C.ultT);S.shake=Math.max(S.shake,.3);burst(P.x,P.y,C.ultR,UD()*C.ultB,{fn:m=>mSt(m,'burn',C.burnT,sd)});X.pyre=fieldA('fire',P.x,P.y,C.ultR,C.ultT,.5,UD()*C.ultD,{follow:true,sd})},
+ skyfall(x){if(mons.includes(x.t))skyBolt(x.t,AX.storm.boltD*x.D,AX.storm.boltN,AX.storm.boltFall)},
+ stride(){const Z=AX.storm;P.ax.surge=Z.surge;P.haste=1;P.fleetT=Math.max(P.fleetT||0,Z.surge);puff(P,AX.col.storm,16,220)},
+ skycomes(){P.ax.temp=AX.storm.tempT;P.ax.tk=0},
+ fissure(x){const Q=AX.stone,g=x.t?x.ta:P.face,len=Math.min(Q.fisLen,rayLen(P.x,P.y,g));fieldA('quake',P.x,P.y,Q.fisW,Q.fisT,Q.fisK,Q.fisD*x.D,{x2:P.x+Math.cos(g)*len,y2:P.y+Math.sin(g)*len});S.shake=Math.max(S.shake,.25);sfx(60,.5,'square',.3,30);noise(.4,.3,300,80)},
+ standfast(){const Q=AX.stone;P.plates=Q.plates;P.ax.t=Q.regrow;P.stoneT=Math.max(P.stoneT||0,Q.standT);puff(P,AX.col.stone,16,200)},
+ monolith(x){const Q=AX.stone;meteor(x.at,Q.monoR,.7,Q.monoD*x.D,{stun:1.5});zones[zones.length-1].fis=Q.fisD*x.D},
+ bladefan(x){const B=AX.blade,n=Math.max(1,P.blades);for(let k=0;k<n;k++)pshot(x.ta+(k-(n-1)/2)*.15,660,B.fanD*x.D,5,'bolt',99);sfx(2000,.12,'triangle',.12,700)},
+ edgewalk(x){const t=x.t,B=AX.blade;if(!mons.includes(t))return;for(let i=0;i<Math.max(1,P.blades)&&mons.includes(t);i++)bladeCut(t,B.walkD*x.D);sfx(2200,.14,'triangle',.14,600)},
+ lastcut(x){const X=P.ax,B=AX.blade;if(!mons.includes(x.t))return;debuff(x.t,{mark:4},x.D);X.cutM=x.t;X.cutN=B.ultN;X.cutK=0},
+ greatwave(x){const T=AX.tide;wave(P.x,P.y,x.t?x.ta:P.face,T.gr,T.gd*x.D,T.glen,{soak:T.soak+1,push:1.6})},
+ undertow(x){const T=AX.tide;cast(['pull',T.pullR],x);let n=0;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<T.pullR+m.r+60){n++;mSt(m,'soak',T.soak);hurtM(m,T.ud*x.D,true)}if(n&&P.hp<P.maxHp)healP(Math.min(T.uhealMax,T.uheal*n));puff(P,AX.col.tide,16,220);sfx(120,.6,'sine',.18,50)},
+ floodtide(){const X=P.ax,T=AX.tide;X.flood=T.floodT;X.fl2=3;waveRing()},
+};
+// a Monolith has landed: four fissures crack outward
+function fisBurst(z){const Q=AX.stone;for(let i=0;i<4;i++){const g=i*TAU/4+.5,len=Math.min(Q.monoLen,rayLen(z.x,z.y,g));if(len>30)fieldA('quake',z.x,z.y,Q.fisW,Q.fisT,Q.fisK,z.fis,{x2:z.x+Math.cos(g)*len,y2:z.y+Math.sin(g)*len})}}
+/* --- versus: what the new paths' statuses and waves are to a hero --- */
+function vsSt(m,k,v,d){
+  if(!VS||!vsLive()||!m.own)return;const now=S.t;if(k!=='rot'&&k!=='burn'&&now-(m._stAt||0)<.25)return;m._stAt=now;
+  const dot=k==='rot'?d*Math.min(5,v):k==='burn'?d:0;
+  VP.q.push(['db',m.own.idx,m.nid|0,k==='chill'||k==='soak'?1:0,k==='freeze'||k==='shock'?v:0,dot?Math.round(dot*1000)/1000:0,0])}
+function vsWave(f){
+  if(!vsLive()||S.mode!=='play')return;const by=f.vsBy,sh=e=>{e.x+=f.vx*.3;e.y+=f.vy*.3};
+  if(!P.down&&!f.hit.has(P)&&dist(P,f)<f.r+8){f.hit.add(P);if(vsHurt(f.vsD,by,'wave')&&!(P.dashT>0)){sh(P);clamp(P,14);collide(P,14,true);P.safeX=P.x;P.safeY=P.y;vsCC({slow:1},by)}}
+  for(const a of allies)if(!f.hit.has(a)&&vsCanHurt(a)&&dist(a,f)<f.r+a.r){f.hit.add(a);if(vsHurtPet(a,f.vsD,by)){sh(a);clamp(a,a.r)}}}
+// a field of another member arrives (me.f). vs: the row carries its damage and whether it slows
+function mpFieldIn(r,a,vs){
+  const kind=FKIND[a[0]]||'rain',f={kind,x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true};
+  if(vs){f.foe=r.foe;f.vsD=r.foe?+a[6]||0:0;f.vsSlow=!!a[7];f.vsBy=r.idx}
+  if(FKX[kind]){const o=vs?8:6;f.ax=true;
+    if(kind==='quake'){f.w=Math.max(4,Math.min(80,f.r));delete f.r;f.x2=+a[o]||f.x;f.y2=+a[o+1]||f.y}
+    else if(kind==='wave'){f.vx=Math.max(-900,Math.min(900,+a[o]||0));f.vy=Math.max(-900,Math.min(900,+a[o+1]||0));f.hit=new Set()}
+    if(a[o+2]){f.follow=true;f.own=r;f.dur=Math.min(1e9,(+a[4]||100)/100>=599?1e9:(+a[4]||100)/100)}}
+  return f}
+/* --- the 2D fallback --- */
+function drawFieldX(f){
+  const k=f.kind,p=.5+.5*Math.sin(S.t*6),fade=Math.min(1,Math.max(0,(f.dur-f.t)/.4),f.t/.2+.3),foe=f.foe;ctx.save();ctx.globalAlpha=fade;
+  if(k==='quake'){ctx.lineCap='round';ctx.strokeStyle=foe?'rgba(184,38,61,.35)':'rgba(201,162,107,.3)';ctx.lineWidth=f.w*2;line(f.x,f.y,f.x2,f.y2);ctx.strokeStyle='#15121b';ctx.lineWidth=7;line(f.x,f.y,f.x2,f.y2);
+    ctx.strokeStyle=foe?'#ff5b6e':'#e0a84a';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(f.x,f.y);const n=8,dx=(f.x2-f.x)/n,dy=(f.y2-f.y)/n,l=Math.hypot(dx,dy)||1;for(let i=1;i<=n;i++){const s=i<n?(i%2?1:-1)*7:0;ctx.lineTo(f.x+dx*i-dy/l*s,f.y+dy*i+dx/l*s)}ctx.stroke()}
+  else if(k==='wave'){const g=Math.atan2(f.vy,f.vx);ctx.lineCap='round';ctx.strokeStyle=foe?'rgba(255,91,110,.5)':'rgba(25,211,197,.45)';ctx.lineWidth=14;ctx.beginPath();ctx.arc(f.x-Math.cos(g)*f.r*.4,f.y-Math.sin(g)*f.r*.4,f.r,g-1.05,g+1.05);ctx.stroke();
+    ctx.strokeStyle=foe?'#ffb3bf':'#d8fff8';ctx.lineWidth=3;ctx.beginPath();ctx.arc(f.x-Math.cos(g)*f.r*.4,f.y-Math.sin(g)*f.r*.4,f.r+6,g-.95,g+.95);ctx.stroke()}
+  else{const c=foe?[255,91,110]:k==='ice'?[143,216,255]:k==='rot'?[183,198,31]:[255,106,30];circ(f.x,f.y,f.r);ctx.fillStyle=`rgba(${c},${k==='fire'?.16+.08*p:.16})`;ctx.fill();ctx.strokeStyle=`rgba(${c},.65)`;ctx.lineWidth=1.5;if(k==='rot')ctx.setLineDash([5,7]);ctx.stroke();ctx.setLineDash([]);
+    if(k==='ice'){ctx.strokeStyle='rgba(242,251,255,.5)';ctx.lineWidth=1.2;for(let i=0;i<3;i++){const g=i*TAU/6+.3;line(f.x-Math.cos(g)*f.r*.8,f.y-Math.sin(g)*f.r*.8,f.x+Math.cos(g)*f.r*.8,f.y+Math.sin(g)*f.r*.8)}}
+    else if(k==='fire'){circ(f.x,f.y,f.r*(.45+.1*p));ctx.fillStyle='rgba(255,210,122,.14)';ctx.fill()}}
+  ctx.restore()}
+function drawArcs(){
+  ctx.lineCap='round';ctx.lineJoin='round';
+  for(const a of arcs){const k=Math.max(0,a.life/a.max),dx=a.x2-a.x1,dy=a.y2-a.y1,l=Math.hypot(dx,dy)||1,n=Math.max(2,Math.round(l/26)),c=a.foe?'#ff5b6e':a.col||AX.col.storm;
+    ctx.globalAlpha=k;ctx.beginPath();ctx.moveTo(a.x1,a.y1);for(let i=1;i<n;i++){const s=Math.sin(i*12.9898+a.x1*.31+a.y2*.17+Math.floor(a.life*30))*11;ctx.lineTo(a.x1+dx*i/n-dy/l*s,a.y1+dy*i/n+dx/l*s)}ctx.lineTo(a.x2,a.y2);
+    ctx.strokeStyle=c;ctx.lineWidth=5;ctx.stroke();ctx.strokeStyle='#fff';ctx.lineWidth=1.8;ctx.stroke()}
+  ctx.globalAlpha=1}
+// what a monster carries, drawn over it
+function drawSt(m){
+  if(m.hidden)return;const r=m.r,x=m.x,y=m.y-(m.lift||0)*46;ctx.save();
+  if(m.soak>0){ctx.strokeStyle='rgba(25,211,197,.75)';ctx.lineWidth=2;ctx.setLineDash([3,6]);circ(x,y,r+4);ctx.stroke();ctx.setLineDash([])}
+  if(m.burn>0){ctx.strokeStyle=`rgba(255,138,76,${.6+.3*Math.sin(S.t*18+m.seed)})`;ctx.lineWidth=3;circ(x,y,r+2);ctx.stroke();ctx.fillStyle='#ffd95e';for(let i=0;i<3;i++){const g=S.t*3+i*2.1+m.seed;circ(x+Math.cos(g)*r*.8,y-r*.5+Math.sin(g*1.7)*r*.3,2.5);ctx.fill()}}
+  if(m.rot>0){ctx.fillStyle='#4a4a22';for(let i=0;i<m.rot;i++){const g=i*1.26+m.seed;circ(x+Math.cos(g)*r*.6,y+Math.sin(g)*r*.6,r*.17);ctx.fill()}ctx.fillStyle=AX.col.plague;for(let i=0;i<m.rot;i++){const g=i*1.26+m.seed;circ(x+Math.cos(g)*r*.6,y+Math.sin(g)*r*.6,r*.08);ctx.fill()}}
+  if(m.frozen>0){circ(x,y,r+5);ctx.fillStyle='rgba(191,233,255,.55)';ctx.fill();ctx.strokeStyle='#f2fbff';ctx.lineWidth=2.5;ctx.stroke();ctx.strokeStyle='rgba(242,251,255,.7)';ctx.lineWidth=1.2;line(x-r*.5,y-r*.7,x+r*.1,y);line(x+r*.1,y,x-r*.2,y+r*.7);line(x+r*.1,y,x+r*.7,y+r*.2)}
+  else if(m.chill>0){ctx.strokeStyle='rgba(143,216,255,.9)';ctx.lineWidth=3;ctx.beginPath();ctx.arc(x,y,r+4,-Math.PI/2,-Math.PI/2+TAU*Math.min(1,m.chill));ctx.stroke()}
+  if(m.shock>0){ctx.strokeStyle='#ffe74a';ctx.lineWidth=2;for(let i=0;i<3;i++){const g=m.seed+i*2.1+Math.floor(S.t*20);ctx.beginPath();ctx.moveTo(x+Math.cos(g)*r*.3,y+Math.sin(g)*r*.3);ctx.lineTo(x+Math.cos(g+.5)*r*.8,y+Math.sin(g+.5)*r*.8);ctx.lineTo(x+Math.cos(g)*r*1.3,y+Math.sin(g)*r*1.3);ctx.stroke()}}
+  ctx.restore()}
+function drawApxAlly(a){
+  const c=a.foe?'#ff5b6e':AX.col[a.kind],[cr,cg,cb]=rgb(c),k=Math.max(0,Math.min(1,a.life/1.2)),O='#15121b',r=a.r;
+  ctx.save();ctx.globalAlpha=k;ctx.lineCap='round';
+  ctx.strokeStyle=`rgba(${cr},${cg},${cb},.8)`;ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(a.x,a.y+r*.8,r*1.2,r*.45,0,0,TAU);ctx.stroke();
+  ctx.translate(a.x+(a.st==='wind'?Math.sin(S.t*60)*1.5:0),a.y);
+  if(a.kind==='packbeast'){if(a.flip)ctx.scale(-1,1);const b=Math.sin(a.walk)*2.5,lean=a.st==='lunge'?5:a.st==='wind'?-3:0;ctx.translate(lean,0);
+    ctx.strokeStyle=O;ctx.lineWidth=4.4;for(const x of[-7,-3,4,8])line(x,3,x+(x%2?b:-b),11);ctx.fillStyle=O;ctx.beginPath();ctx.ellipse(0,0,14,7.6,0,0,TAU);ctx.fill();circ(11,-6,7);ctx.fill();
+    ctx.fillStyle=a.flash>0?'#fff':`rgba(${cr},${cg},${cb},.85)`;ctx.beginPath();ctx.ellipse(0,0,12.4,6.2,0,0,TAU);ctx.fill();circ(11,-6,5.7);ctx.fill();
+    ctx.strokeStyle='#ece4d2';ctx.lineWidth=1.6;line(8,-11,5,-18);line(13,-11,15,-18);line(-4,-5,4,-5);line(-2,-2,-2,3);line(2,-2,2,3);ctx.fillStyle='#fff';circ(13,-7,1.3);ctx.fill()}
+  else if(a.kind==='icewight'){const up=a.st==='cast'?-4:a.st==='wind'?-8:0;
+    ctx.fillStyle=O;ctx.beginPath();ctx.moveTo(0,-r*2.1+up);ctx.lineTo(r*.95,-r*.5);ctx.lineTo(r*.7,r*.8);ctx.lineTo(-r*.7,r*.8);ctx.lineTo(-r*.95,-r*.5);ctx.closePath();ctx.fill();
+    ctx.fillStyle=a.flash>0?'#fff':`rgba(${cr},${cg},${cb},.8)`;ctx.beginPath();ctx.moveTo(0,-r*1.9+up);ctx.lineTo(r*.78,-r*.45);ctx.lineTo(r*.55,r*.65);ctx.lineTo(-r*.55,r*.65);ctx.lineTo(-r*.78,-r*.45);ctx.closePath();ctx.fill();
+    ctx.strokeStyle='rgba(242,251,255,.8)';ctx.lineWidth=1.4;line(0,-r*1.9+up,0,r*.6);line(-r*.5,-r*.3,r*.5,-r*.3);ctx.fillStyle='#f2fbff';circ(-r*.25,-r*.9,2);ctx.fill();circ(r*.25,-r*.9,2);ctx.fill()}
+  else{const p=1+.2*Math.sin(S.t*14+a.seed),g=ctx.createRadialGradient(0,-6,1,0,-6,r*2.4);g.addColorStop(0,`rgba(${cr},${cg},${cb},.7)`);g.addColorStop(1,`rgba(${cr},${cg},${cb},0)`);ctx.fillStyle=g;circ(0,-6,r*2.4);ctx.fill();
+    circ(0,-6,r*.9*p);ctx.fillStyle=a.foe?'#ff8497':'#ffd27a';ctx.fill();ctx.strokeStyle=c;ctx.lineWidth=2;ctx.stroke();circ(0,-6,r*.35);ctx.fillStyle='#fff';ctx.fill()}
+  ctx.restore()}
+// the path's mark on a hero: plates, blades, haste, the pack's ring (q: a hero's P; ap: its path)
+function drawApxHero(q,ap){
+  if(!ap||ap==='dominion'||ap==='order'||!AX.col[ap]||q.down)return;const c=AX.col[ap],[cr,cg,cb]=rgb(c);ctx.save();ctx.lineCap='round';
+  ctx.strokeStyle=`rgba(${cr},${cg},${cb},.5)`;ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(q.x,q.y+27,26,9,0,0,TAU);ctx.stroke();
+  if(q.plates>0)for(let i=0;i<q.plates;i++){const g=S.t*1.1+i*TAU/4,x=q.x+Math.cos(g)*30,y=q.y-4+Math.sin(g)*13;ctx.fillStyle='#15121b';ctx.fillRect(x-6,y-9,12,18);ctx.fillStyle=c;ctx.fillRect(x-4.5,y-7.5,9,15)}
+  if(q.blades>0)for(let i=0;i<q.blades;i++){const g=-Math.PI/2+(i-(q.blades-1)/2)*.42,x=q.x+Math.cos(g)*30,y=q.y-20+Math.sin(g)*30+Math.sin(S.t*3+i)*1.5;ctx.strokeStyle='#15121b';ctx.lineWidth=5;line(x,y,x+Math.cos(g)*15,y+Math.sin(g)*15);ctx.strokeStyle='#eef2ff';ctx.lineWidth=2.6;line(x,y,x+Math.cos(g)*15,y+Math.sin(g)*15)}
+  if(q.haste>.05&&q.moving){const g=Math.atan2(q.vy||0,q.vx||0)+Math.PI;ctx.strokeStyle=`rgba(${cr},${cg},${cb},${.3+.5*q.haste})`;ctx.lineWidth=2;for(const o of[-9,0,9])line(q.x+Math.cos(g)*16-Math.sin(g)*o,q.y-6+Math.sin(g)*16+Math.cos(g)*o,q.x+Math.cos(g)*(30+18*q.haste)-Math.sin(g)*o,q.y-6+Math.sin(g)*(30+18*q.haste)+Math.cos(g)*o)}
+  ctx.restore()}
+const apexInfo=()=>S.apex&&APEX[S.apex]?{path:S.apex,side:APEX[S.apex].side,name:APEX[S.apex].name,title:APEX[S.apex].title,lore:APEX[S.apex].lore}:null;
+// MB.apexPaths: the ten, dominion side first, for the screens that list them
+let APXLIST=null;const apexPaths=()=>APXLIST||(APXLIST=APEXIDS.map(id=>{const A=APEX[id];return{id,side:A.side,name:A.name,title:A.title,sub:A.sub,blurb:A.blurb,lore:A.lore,text:A.text,skills:APEXSK[id].map(d=>({id:d[0],name:d[1],text:d[3],cd:d[2],mana:d[6]}))}}));
 // what a hero knows: the base skills learned so far, and the three apex skills once a path is chosen
 const learned=()=>{const o=[];for(let i=0,k=known();i<k;i++)o.push(i);if(S.apex&&cls())o.push(10,11,12);return o};
 const skInfo=si=>{const c=S.cls,d=skD(c,si);return si<10?CLASSES[c].skills[si]:{id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d,c,si),level:101}};
@@ -1509,12 +1930,20 @@ function doorScreen(next){
 }
 function apexScreen(next){
   show({wide:true,cls:'apexPanel',kick:'A hundred floors are behind you. Ashes below, the apex above.',title:'Choose what you become',
-    body:'Past the hundredth floor a class is no longer enough. Take one of two paths. It lasts for the rest of the climb, on top of your class and its upgrade.',
-    cards:['dominion','order'].map(id=>{const A=APEX[id];return{title:A.name,sub:A.title+' · '+A.sub,body:A.lore+' '+A.text,cls:'apexCard apex'+cap1(id),data:{apex:id},fn:()=>{S.apex=id;resvSync();hud();apexLearn(next)}}})});
+    body:'Past the hundredth floor a class is no longer enough. Take one of ten paths: five that command others, five that make a weapon of you. It lasts for the rest of the climb, on top of your class and its upgrade. Pick one to read it in full.',
+    cards:apexCards(id=>apexConfirm(id,next))});
+}
+// the ten cards (dominion side first): name, title, one sentence, and the three skills as the last line
+const apexCards=fn=>APEXIDS.map(id=>{const A=APEX[id];return{title:A.name,sub:A.title,body:A.blurb,cls:'apexCard apexSide-'+A.side+' apexPath-'+id,data:{apex:id,skills:APEXSK[id].map(d=>d[1]).join(' · ')},fn:()=>fn(id)}});
+// one path in full, before it is taken for good
+function apexConfirm(id,next){
+  const A=APEX[id];
+  show({wide:true,cls:'apexPanel apexPath-'+id+' apexSide-'+A.side,kick:A.title+' · '+A.sub,title:A.name,body:A.lore+' '+A.text,keys:'Its skills: '+APEXSK[id].map(d=>d[1]).join(', ')+'. This choice lasts for the rest of the climb.',
+    btns:[['Take this path',()=>{S.apex=id;if(P)apxBody();resvSync();hud();apexLearn(next)}],['Back to the ten',()=>apexScreen(next)]]});
 }
 function apexLearn(next){
   const A=APEX[S.apex],sk=[10,11,12].map(skInfo);
-  show({wide:true,cls:'apexPanel apex'+cap1(S.apex),kick:A.title+' · three new skills',title:A.name,body:sk.map(s=>s.name+'. '+s.text).join('  '),keys:'Boons and equipment can shorten the cooldowns of these three by half at most. You carry six skills, and can change them later from the pause screen.',
+  show({wide:true,cls:'apexPanel apexPath-'+S.apex+' apexSide-'+A.side,kick:A.title+' · three new skills',title:A.name,body:sk.map(s=>s.name+'. '+s.text).join('  '),keys:'Boons and equipment can shorten the cooldowns of these three by half at most. You carry six skills, and can change them later from the pause screen.',
     btns:[['Carry all three (slots 4 to 6)',()=>{const keep=S.load.filter(v=>v<10).slice(0,3);S.load=[...keep,10,11,12];syncSkills();next()}],['Choose my six',()=>loadout(next,10)],['Keep my six',next]]});
 }
 
@@ -1526,7 +1955,7 @@ function apexLearn(next){
 const SEAS=.85,SEASLOAD={fighter:[0,3,6,5,1,2],tank:[0,7,3,5,1,2],assassin:[0,1,3,5,4,2],mage:[3,7,2,5,1,0],ranger:[0,3,2,5,6,4],healer:[0,3,8,5,1,2],necro:[0,4,8,5,6,1]},
   SEASB=['might','spec','haste','vigor','might','focus','well','might','vigor','haste','fleet'];
 function seasonedRun(N,o){
-  o=o||{};const n=N-1,c=o.cls,C=CLASSES[c],adv=N>50?(C.adv.some(a=>a[0]===o.adv)?o.adv:C.adv[0][0]):null,apex=N>100?(o.apex==='dominion'?'dominion':'order'):null;
+  o=o||{};const n=N-1,c=o.cls,C=CLASSES[c],adv=N>50?(C.adv.some(a=>a[0]===o.adv)?o.adv:C.adv[0][0]):null,apex=N>100?(apexOk(o.apex)?o.apex:'order'):null;
   const b=noBoons();let k=Math.round(SEAS*(Math.max(0,N-12)-(N>50?1:0)));
   for(let i=0,g=0;k>0&&g<9999;g++){let id=SEASB[i++%SEASB.length];const cap=id==='spec'?C.boon[2]:BOONS.find(x=>x.id===id).cap||99;if(b[id]>=cap)id=i%3?'might':'vigor';b[id]++;k--}
   let s=(N*2654435761^c.length*40503^c.charCodeAt(0)*7919)>>>0||1;const rnd=()=>{s^=s<<13;s>>>=0;s^=s>>>17;s^=s<<5;s>>>=0;return s/4294967296};
@@ -1539,11 +1968,11 @@ function seasonedRun(N,o){
   return{cls:c,adv,apex,b,eq,scrap:0,load,pets,pet:[],rev:1,st:{bestLevel:n},level:n,tr,door:null};
 }
 function startAt(N,o){
-  N=Math.floor(+N);if(MP.on||!(N>=1)||!TOWER.checkpoints.includes(N))return false;
+  N=Math.floor(+N);if(MP.on||!(N>=1)||!(TOWER.checkpoints.includes(N)||SET.testUnlock&&N>=11&&N<=9999))return false;
   if(S.paused){S.paused=false;const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed','false')}
   if(N===1){newRun();begin(0);return true}
   if(!o||typeof o.cls!=='string'||!own(CLASSES,o.cls))return false;
-  const n=N-1,r=seasonedRun(N,o);newRun();applyRun(r,n);S.level=n;ST.bestLevel=n;
+  const n=N-1,r=seasonedRun(N,o);newRun();applyRun(r,n);S.level=n;ST.bestLevel=SET.testUnlock?0:n;
   // who goes along: the strongest that half the pool can hold (pets), every familiar that fits, or the newest trophy
   const R=PETS.roster;PETS.active=[];
   if(R.length){if(resvForm()){const M=manaMax()*(form()==='pet'?.5:1),ord=R.map((e,i)=>i).sort((a,b)=>petRank(R[b])-petRank(R[a]));let sum=0;for(const i of ord){const cst=petCost(R[i]);if(sum+cst<=M){PETS.active.push(i);sum+=cst}}}else PETS.active=[0]}
@@ -1594,6 +2023,7 @@ function step(dt){
   for(const r of rings)r.life-=dt;rings=rings.filter(r=>r.life>0);
   for(const f of floats){f.y-=34*dt;f.life-=dt}floats=floats.filter(f=>f.life>0);
   if(echoes.length){for(const e of echoes)e.life-=dt;echoes=echoes.filter(e=>e.life>0)}
+  if(arcs.length){for(const a of arcs)a.life-=dt;arcs=arcs.filter(a=>a.life>0)}
   if(S.mode==='clear'&&(S.clearT-=dt)<=0)return reward();
   if(S.mode!=='play'&&S.mode!=='clear')return;
   if(VS)vsStep(dt);
@@ -1602,7 +2032,7 @@ function step(dt){
     if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
-      p.hit.add(m);if(p.slow)mSlow(m,p.slow);if(p.stun)mStun(m,m.boss?p.stun*.7:p.stun*2);byPet=p.pet||null;hurtM(m,d,!!p.pet);byPet=null;
+      p.hit.add(m);if(p.slow)mSlow(m,p.slow);if(p.stun)mStun(m,m.boss?p.stun*.7:p.stun*2);byPet=p.pet||null;hurtM(m,d,!!p.pet);byPet=null;if(S.apex&&!p.pet)apexHit(m,d);
       if(p.kind==='arrow'&&!p.pet&&TSRC.length&&TSRC[0].form==='arrowhead'&&++P.trN>=6){P.trN=0;P.trQ=1;P.trT=m}
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
@@ -1613,14 +2043,14 @@ function step(dt){
   if(S.mode!=='play'||S.banner>1.5)return;
   if(VS&&VP.frozen)return; // (versus: nothing moves before the countdown is over)
   trophyTick(dt);if(PETS.fielded.length)petGrid();
-  for(const a of allies){if(a.pet){petStep(a,dt);continue}if(a.shade){a.life-=dt;petStep(a,dt);continue}if(a.trophy){trophyStep(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
+  for(const a of allies){if(a.pet){petStep(a,dt);continue}if(a.shade){a.life-=dt;petStep(a,dt);continue}if(a.trophy){trophyStep(a,dt);continue}if(a.apexAlly){allyX(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
-    else if(t&&a.cd<=0){a.cd=.7;GEO++;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(S.apex==='dominion'?DOMSUM:1),true);GEO--;leech()}
+    else if(t&&a.cd<=0){a.cd=.7;GEO++;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(DOMS()?DOMSUM:1),true);GEO--;leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
   if(PETS.fallen.length)reviveStep(dt);
-  for(const f of fields){f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
+  for(const f of fields){if(f.ax){fieldX(f,dt);continue}f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
     const fc=f.kind==='frost'?'#8fd3ff':f.kind==='halo'?'#ffe08a':f.kind==='domain'?'#a98bff':'#e7dfcd';for(let i=0;i<5;i++){const a=rand()*TAU,d=rand()*f.r;bits.push({x:f.x+Math.cos(a)*d,y:f.y+Math.sin(a)*d,vx:0,vy:f.kind==='rain'?60:-30,life:.5,max:.5,c:fc,r:2.5})}
     GEO++;if(!f.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.kind==='domain'){mMark(m,.7);if(!m.boss)mSlow(m,.8)}else if(f.slow)mSlow(m,.8);hurtM(m,f.dmg,true)}GEO--;
     if(f.foe){if(VS)vsField(f);continue}
@@ -1638,7 +2068,8 @@ function step(dt){
     if(m.markT>0)m.markT-=dt;
     if(m.dotT>0){m.dotT-=dt;if((m.dotK-=dt)<=0){m.dotK=.5;REM=m.dotRem||null;hurtM(m,m.dotD,true);REM=null;if(!mons.includes(m))continue}}
     if(m.venT>0){m.venT-=dt;if((m.venK-=dt)<=0){m.venK=.5;puff(m,TCOL.assassin,4,80);byPet=m.venRem?null:m.venBy||true;REM=m.venRem||null;hurtM(m,m.venD,true);byPet=null;REM=null;if(!mons.includes(m))continue}}
-    let k=aiK(m);if(m.slow>0){m.slow-=dt;k*=.5}
+    if((m.chill>0||m.frozen>0||m.rot>0||m.burn>0||m.shock>0||m.soak>0||m.thawT>0||m.shockI>0)&&stStep(m,dt))continue;
+    let k=aiK(m);if(m.slow>0){m.slow-=dt;k*=.5}if(m.chill>0)k*=1-AX.frost.slowK*m.chill;if(m.soak>0)k*=1-AX.tide.soakSlow;if(m.rot>0)k*=1-AX.plague.slowK*m.rot;
     if(m.stun>0){m.stun-=dt;m.beam=null}else if(m.siege&&TR&&TR.obj){siege(m,dt*k);T=P}else{T=foe(m);if(T)AI[m.ai](m,dt*k,angTo(m,T),dist(m,T));else T=P} // T: the hero this monster fights (alone that is you; with no hero standing it waits)
     if(S.mode!=='play')break;if(!mons.includes(m))continue;
     if(obstacles.length&&!m.hidden&&m.st!=='leap'){collide(m,m.r,true);
@@ -1658,7 +2089,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)mStun(m,m.boss?z.stun:z.stun*2);byPet=z.pet||null;hurtM(m,z.dmg,!!z.pet);byPet=null}GEO--;if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){if(z.stun)mStun(m,m.boss?z.stun:z.stun*2);byPet=z.pet||null;hurtM(m,z.dmg,!!z.pet);byPet=null}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24&&!P.down){f.dead=true;healP(.25,3);SND.pickup();haptic(15);if(MP.on)mpMorsel(f)}
   morsels=morsels.filter(f=>!f.dead);
@@ -1943,13 +2374,13 @@ function draw(){
   if(sight&&!act2()){ctx.globalCompositeOperation='lighter';for(const[x,y]of[[WALL,WALL],[W-WALL,WALL],[WALL,H-WALL],[W-WALL,H-WALL]]){const R=210+Math.sin(S.t*9+x)*10,g=ctx.createRadialGradient(x,y,4,x,y,R);g.addColorStop(0,'rgba(255,170,70,.42)');g.addColorStop(1,'rgba(255,120,40,0)');ctx.fillStyle=g;ctx.fillRect(x-R,y-R,R*2,R*2)}ctx.globalCompositeOperation='source-over'}
   if(sight){ctx.fillStyle='rgba(255,236,190,.3)';for(let i=0;i<26;i++){const x=(i*137.5+S.t*(6+i%5))%W,y=(i*89.3+Math.sin(S.t*.4+i)*30+S.t*(3+i%3)+60)%H;circ(x,y,1+(i%3)*.5);ctx.fill()}}
   if(obstacles.length)drawRoom();
-  for(const f of fields){circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':f.kind==='domain'?'rgba(58,47,85,.45)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':f.kind==='domain'?'rgba(169,139,255,.7)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
+  for(const f of fields){if(f.ax){drawFieldX(f);continue}circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':f.kind==='domain'?'rgba(58,47,85,.45)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':f.kind==='domain'?'rgba(169,139,255,.7)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
   if(TR&&TR.obj)drawLamp2d(TR.obj);
   for(const f of morsels){circ(f.x,f.y+Math.sin(S.t*4)*2,8);ctx.fillStyle='#d1213f';ctx.fill();circ(f.x-2,f.y-3+Math.sin(S.t*4)*2,2.5);ctx.fillStyle='#ffb3bf';ctx.fill()}
-  if(!VS){for(const m of mons)drawMon(m);
+  if(!VS){for(const m of mons)drawMon(m);for(const m of mons)if(m.chill>0||m.frozen>0||m.rot>0||m.burn>0||m.shock>0||m.soak>0)drawSt(m);
   drawBeams()}else vsDraw2d(0);
   for(const s of shots){if(sight){circ(s.x,s.y,s.r+5);ctx.fillStyle='rgba(255,138,76,.28)';ctx.fill()}circ(s.x,s.y,s.r);ctx.fillStyle=col('#ff8a4c');ctx.fill();circ(s.x,s.y,s.r*.45);ctx.fillStyle='#fff';ctx.fill()}
-  for(const a of allies)a.pet?drawPet(a):a.shade?drawShade(a):a.trophy?drawTrophy(a):drawAlly(a);
+  for(const a of allies)a.pet?drawPet(a):a.shade?drawShade(a):a.trophy?drawTrophy(a):a.apexAlly?drawApxAlly(a):drawAlly(a);
   if(echoes.length)drawEchoes();
   if(MP.on)mpDraw2d(0);
   for(const p of MP.on?mpAllPshots():pshots){
@@ -1958,10 +2389,12 @@ function draw(){
     else{const o=p.kind==='orb';circ(p.x,p.y,p.r+3);ctx.fillStyle=o?'rgba(255,224,138,.4)':'rgba(143,211,255,.35)';ctx.fill();circ(p.x,p.y,p.r);ctx.fillStyle=o?'#ffe08a':'#8fd3ff';ctx.fill();circ(p.x,p.y,p.r*.45);ctx.fillStyle='#fff';ctx.fill()}}
   if(P&&MANA.drawing&&S.mode==='play'){ctx.globalAlpha=.3+.2*Math.sin(S.t*6);ctx.strokeStyle='#6fe3ff';ctx.lineWidth=1.5;circ(P.x,P.y+4,26+3*Math.sin(S.t*3));ctx.stroke();ctx.globalAlpha=1} // drawing mana in from the room
   if(P&&P.auraR>0&&S.mode!=='title')drawAura(P);
+  if(P&&S.apex&&cls()&&S.mode!=='title')drawApxHero(P,S.apex);
   if(P)drawPlayer();
   if(P&&P.beam)drawBeamP(P);
   if(MP.on)mpDraw2d(1);
   for(const b of bits){ctx.globalAlpha=Math.max(0,b.life/b.max);circ(b.x,b.y,b.r);ctx.fillStyle=b.c;ctx.fill()}
+  if(arcs.length)drawArcs();
   ctx.font='22px "Pirata One",Georgia,serif';ctx.textAlign='center';for(const f of floats){ctx.globalAlpha=Math.min(1,f.life*2.5);ctx.fillStyle='#0d0c11';ctx.fillText(f.txt,f.x+1.5,f.y+1.5);ctx.fillStyle=f.c;ctx.fillText(f.txt,f.x,f.y)}ctx.globalAlpha=1;
   const SR=S.mode==='title'?(sight?0:FOG):sightR();
   if(SR&&P){
@@ -2011,7 +2444,7 @@ function show(o,foreign){
 function hud(){
   const nb=Object.values(S.b).reduce((a,b)=>a+b,0),cn=()=>S.adv?CLASSES[S.cls].adv.find(a=>a[0]===S.adv)[1]:CLASSES[S.cls].name;
   S.rank=rank();tune();
-  const chips=act2()&&S.cls?[['Rank '+S.rank,true],...(S.apex?[[APEX[S.apex].title,true,'chipApex apex'+cap1(S.apex)]]:[]),[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn().length?[[petOn().length>1?petOn().length+' '+tw().pl:cap1(tw().n)+' · '+petTag(petOn()[0]),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
+  const chips=act2()&&S.cls?[['Rank '+S.rank,true],...(S.apex&&APEX[S.apex]?[[APEX[S.apex].title,true,'chipApex apexPath-'+S.apex+' apexSide-'+APEX[S.apex].side]]:[]),[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn().length?[[petOn().length>1?petOn().length+' '+tw().pl:cap1(tw().n)+' · '+petTag(petOn()[0]),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
   $('ledger').textContent='';chips.forEach(([name,on,k])=>{const li=document.createElement('li');li.textContent=name;if(on)li.className='on'+(k?' '+k:'');$('ledger').appendChild(li)});
   if(act2()&&S.cls&&S.eq)for(const sl of SLOTS){const it=S.eq[sl],li=document.createElement('li');li.textContent=itemName(it);li.title=it.rarity+' '+sl+': '+itemLine(it);li.style.cssText='opacity:1;color:'+RAR[it.r][1]+';border-color:'+RAR[it.r][1];$('ledger').appendChild(li)}
   const hp=$('hp');hp.textContent='';
@@ -2023,9 +2456,10 @@ function hud(){
   syncSkills();
 }
 function freshBody(){
-  const c=cls(),maxHp=Math.round((4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0))*(c&&S.apex==='order'?ORDLIFE:1));
+  const c=cls(),maxHp=Math.round((4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0))*(c&&ORDS()?apxSt()[1]:1));
   const maxMana=manaMax();
   P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,mana:maxMana,maxMana,resv:0,still:0,drawK:0,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(13).fill(0),mxS:Array(13).fill(0),ascT:0,auraK:.5,auraR:c&&S.apex==='order'?ORDR:0,beam:null,bmT:0,bmA:0,bmHit:null,resB:0,rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,trW:2.5,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120};
+  apxBody();
 }
 // dev only: __mb.over = {kind, mods, waves, room} replaces parts of a generated level, for testing one thing at a time
 function devDef(L,n){
@@ -2052,7 +2486,7 @@ function startLevel(n){
     L.door=S.door&&S.door.n===n&&L.floorKind==='fight'&&DOOR[S.door.id]?S.door.id:null;if(L.door==='horde')L.waves=2;if(L.door)L.hint=DOOR[L.door].title+'. '+DOOR[L.door].risk}
   TR=trialMake(L);DOORS=null;FALLEN.length=0;PG.clear();
   freshBody();if(L.door==='wound')P.hp=Math.max(1,Math.ceil(P.maxHp/2));if(MP.on)mpSpawnAt();
-  mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];TSRC=[];S.elite=4;
+  mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];arcs=[];TSRC=[];S.elite=4;
   S.paused=false;SND.levelStart();obstacles=buildRoom(n,L.room);boss=null;S.wave=null;
   if(CL()){} // a client's monsters come from the host
   else if(L.floorKind==='survive'||L.floorKind==='guard'){} // no monster of its own: the trial brings its own (trialStep)
@@ -2063,14 +2497,14 @@ function startLevel(n){
   PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
   if(S.note){floats.push({x:P.x,y:P.y-70,txt:S.note,life:4.5,c:'#6fe3ff'});S.note=''}
   if(!S.wave)$('bossName').textContent=L.name;
-  ST.levelTime=0;ST.bestLevel=Math.max(ST.bestLevel,n);
+  ST.levelTime=0;if(!SET.testUnlock||MP.on)ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Floor '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
   if(MP.on)mpLevelStarted();
   emit('levelstart',{level:n,L});emit('floor',{floor:n+1,kind:L.floorKind});if(TR)emit('trial',{kind:TR.kind,state:'start'});
 }
 function reward(){
   haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n),L=S.L;allies=[];TSRC=[];MP.menu=false;emit('reward',{level:n});
-  towerDone(n+1);if(n>=12&&S.cls){if(isTrial(L.floorKind))S.tr++;if(L.door==='lean')S.tr+=3} // a trial passed is worth TMANA maximum mana for good; the Bare Door three times that
+  if(!SET.testUnlock)towerDone(n+1);if(n>=12&&S.cls){if(isTrial(L.floorKind))S.tr++;if(L.door==='lean')S.tr+=3} // a trial passed is worth TMANA maximum mana for good; the Bare Door three times that
   for(const e of PETS.fielded)if(PETS.roster.includes(e))e.plv=Math.min(PLVMAX,e.plv+1);PETS.fielded=[]; // every pet that was sent into this fight grows a little
   if(n===7)return chooseClass();
   P.inv=0;S.level++;S.mode='reward';hud();
@@ -2309,7 +2743,7 @@ function applyRun(r,now=0){
   try{r=r&&typeof r==='object'?r:{};
     S.cls=typeof r.cls==='string'&&own(CLASSES,r.cls)?r.cls:null;S.adv=S.cls&&CLASSES[S.cls].adv.some(a=>a[0]===r.adv)?r.adv:null;
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
-    S.apex=S.cls&&(r.apex==='dominion'||r.apex==='order')?r.apex:null;S.tr=S.cls?Math.min(99999,Math.max(0,Math.floor(+r.tr)||0)):0; // older saves have no apex path and no trials behind them
+    S.apex=S.cls&&apexOk(r.apex)?r.apex:null;S.tr=S.cls?Math.min(99999,Math.max(0,Math.floor(+r.tr)||0)):0; // older saves have no apex path and no trials behind them
     S.door=S.cls&&Array.isArray(r.door)&&own(DOOR,r.door[0])&&Number.isInteger(r.door[1])&&r.door[1]>=12?{id:r.door[0],n:r.door[1]}:null;
     S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
@@ -2333,7 +2767,7 @@ function checkSave(o){
   for(const k in b){const v=k==='well'&&o.b[k]===undefined?0:o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
   let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400)||e.m!==undefined&&e.m!==0&&e.m!==1)return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up,m:e.m?1:0}}}
   const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
-  const apex=o.apex===undefined||o.apex===null?null:o.apex;if(apex!==null&&!(c&&(apex==='dominion'||apex==='order')))return null;if(!apexLoad(load,apex))return null;
+  const apex=o.apex===undefined||o.apex===null?null:o.apex;if(apex!==null&&!(c&&apexOk(apex)))return null;if(!apexLoad(load,apex))return null;
   if(o.tr!==undefined&&!(c&&int(o.tr,0,99999)))return null;
   if(o.door!==undefined&&o.door!==null&&!(c&&Array.isArray(o.door)&&o.door.length===2&&typeof o.door[0]==='string'&&own(DOOR,o.door[0])&&int(o.door[1],12,9998)))return null;
   let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETSANE||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
@@ -2533,8 +2967,12 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden){if(MP.on)m
 //  lv  host -> all: {t,k:'go',n,g,cnt,r,o} the level starts (g: the gate it opens from, cnt: members it is scaled for, r: a retry, o: dev override) | {t,k:'clear',n,g} its boss is dead
 //  rdy member -> all: {t,g} "I am through with my choices"  ·  sync client -> host: "send a full snapshot"
 //  round 8: w.tr:[clock x10, lamp health, lost] the trial as the host has it; mn flag 8: a besieger; me.bm:[angle x100, length] or 0: the Verdict beam; an ally 'p' with flag 32 is one of the Owed (its health field is the seconds it has left);
+//  round 10: w.m flags 2048 frozen, 4096 burning, 8192 shocked, 16384 drenched, bits 15-16 chill in thirds, bits 17-19 layers of rot; hit op ap id status value damage (a status, by its place in STK);
+//        field kinds 4-8: ice, rot, fire, wave, quake (after the usual six entries, and after damage and slow in versus: vx,vy or x2,y2, then 1 when it stays on its owner; a quake's radius is its half-width);
+//        an ally 'b' | 'i' | 'c' (pack-beast, ice-wight, cinder): static [nid,k,r,seconds] (in versus then its health), dynamic [nid,x,y,flags 1 flip 2 moving 8 flash,st,face,seconds x10,health];
+//        me.ar:[[x1,y1,x2,y2]] lightning for the eye; me.hs:[blades,plates,haste x10,pack] when it changes; lk.ab: a pack-beast's bite (versus)
 //        lk.ap: the apex path; lv {k:'door',n,d} the host's choice at a crossroads, and d on 'go' when a door is in force on that floor; hit op mk id seconds (marked); field kind 3: Tally Ground
-const MPHZ=15,MPDELAY=100,STN=['idle','wind','lunge','charge','dazed','leap','under','rise','up','beam','cast'],STI={},PKIND=['bolt','arrow','skull','orb'],FKIND=['frost','halo','rain','domain'];
+const MPHZ=15,MPDELAY=100,STN=['idle','wind','lunge','charge','dazed','leap','under','rise','up','beam','cast'],STI={},PKIND=['bolt','arrow','skull','orb'],FKIND=['frost','halo','rain','domain','ice','rot','fire','wave','quake'],AKIND={b:'packbeast',i:'icewight',c:'cinder'};
 STN.forEach((s,i)=>STI[s]=i);
 const mpName=s=>(''+(s===undefined||s===null?'':s)).replace(/[\u0000-\u001f\u007f]/g,'').trim().slice(0,16)||'Player';
 const mpTxt=(s,n=48)=>(''+(s===undefined||s===null?'':s)).slice(0,n);
@@ -2605,6 +3043,7 @@ function mpOnHit(msg,from){
       else if(k==='st'){const v=+op[2];if(v>0)m.stun=Math.min(8,v)}
       else if(k==='sl'){const v=+op[2];if(v>0)m.slow=Math.max(m.slow||0,Math.min(10,v))}
       else if(k==='mk'){const v=+op[2];if(v>0)m.markT=Math.max(m.markT||0,Math.min(10,v))}
+      else if(k==='ap'){const s=STK[op[2]|0],v=+op[3],d=+op[4]||0;if(s&&v>0)stApply(m,s,Math.min(10,v),Math.max(0,Math.min(1e8,d)))}
       else if(k==='vn'){const v=+op[2];if(v>0){m.venT=3;m.venD=Math.max(m.venD||0,v);m.venK=.5;m.venBy=null;m.venRem=REM;puff(m,TCOL.assassin,10,120)}}
       else if(k==='mv'){if(!m.hidden&&m.st!=='leap')mMove(m,+op[2]||m.x,+op[3]||m.y)}
     }finally{REM=null}
@@ -2613,7 +3052,7 @@ function mpOnHit(msg,from){
 }
 /* --- the host's snapshot of the world --- */
 function mpMonDyn(m){
-  const f=(m.hidden?1:0)|(m.flash>0?2:0)|(m.ward>0?4:0)|(m.rage?8:0)|(m.stun>0?16:0)|(m.slow>0?32:0)|(m.markT>0?64:0)|(m.dotT>0||m.venT>0?128:0)|(m.moving?256:0)|(m.ward>.3?512:0)|(m.side<0?1024:0);
+  const f=(m.hidden?1:0)|(m.flash>0?2:0)|(m.ward>0?4:0)|(m.rage?8:0)|(m.stun>0?16:0)|(m.slow>0?32:0)|(m.markT>0?64:0)|(m.dotT>0||m.venT>0?128:0)|(m.moving?256:0)|(m.ward>.3?512:0)|(m.side<0?1024:0)|(m.frozen>0?2048:0)|(m.burn>0?4096:0)|(m.shock>0?8192:0)|(m.soak>0?16384:0)|(m.chill>0?Math.max(1,Math.round(m.chill*3))<<15:0)|(m.rot>0?Math.min(5,m.rot)<<17:0);
   const st=m.st,a=[m.id,Math.round(m.x),Math.round(m.y),hpR(m.hp),STI[st]||0,f,m.tgt?(m.tgt===P?MP.myIdx:m.tgt._mi):-1,m.ai==='mite'?0:Math.round(m.t*10)||0,
     st==='wind'||st==='charge'||st==='lunge'||st==='dazed'?Math.round(m.ang*100)||0:0,Math.round(m.lift*100)||0,(m.phase||1)-1];
   while(a.length>7&&!a[a.length-1])a.pop();return a}
@@ -2664,6 +3103,7 @@ function mpOnWorld(w,from){
     if(m._gone&&now>m._gone){m._gone=0;m._mine=0}m.hidden=!!(f&1)||m._gone>0;if(f&2&&!(m.flash>0))m.flash=.1;m.ward=f&4?(f&512?.5:.2):0;
     if(f&8){if(!m.rage&&!fresh&&m.ai!=='hollow')enrage(m);m.rage=true}else m.rage=false;
     m.stun=f&16?.2:0;m.slow=f&32?.2:0;m.markT=f&64?.2:0;m.dotT=f&128?.2:0;m.moving=!!(f&256);m.side=f&1024?-1:1;m.tgt=mpHeroAt(a[6]);
+    if(f>2047||m._st){m._st=f>2047;m.frozen=f&2048?.3:0;m.burn=f&4096?.3:0;m.shock=f&8192?.3:0;m.soak=f&16384?.3:0;m.chill=(f>>15&3)/3;m.rot=f>>17&7;m.rotT=m.rot?1:0}
     if(a[7]!==undefined&&m.ai!=='mite')m.t=a[7]/10;if(a[8])m.ang=a[8]/100;
     const ph=(a[10]||0)+1;if(ph>(m.phase||1)){m.phase=ph;if(!fresh)phaseFx(m)}m.phase=ph;
     const bd=w.b&&w.b[m.id];if(bd)beamIn(m,bd);else if(m.beam)m.beam=null;
@@ -2702,12 +3142,14 @@ function mpAllyStatic(a){
   if(a.shade)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.max),32,'shade',0,0,0]; // one of the Owed: sent as a pet with flag 32; where a pet has its health, a shade has the seconds it has left
   if(a.pet)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.maxHp),(a.minion?1:0)|(a.lesser?2:0)|(a.helper?4:0)|(a.trophy?8:0)|(a.crown?16:0),a.owner,a.plv|0,a.mods&&a.mods.length?a.mods:0,a.perk||0];
   if(a.trophy)return[a.nid,a.kind==='familiar'?'f':'g',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,a.tm||1,a.owner,Math.round(a.seed*100)/100,a.s.r];
+  if(a.apexAlly)return[a.nid,a.kind[0]==='p'?'b':a.kind[0],a.r,Math.round(a.max*10)/10];
   return[a.nid,a.kind==='wolf'?'w':'t',a.r]}
 function mpAllyDyn(a){
   const x=Math.round(a.x),y=Math.round(a.y);
   if(a.pet||a.shade){const d=[a.nid,x,y,(a.flip?1:0)|(a.moving?2:0)|(a.hidden?4:0)|(a.flash>0?8:0)|(a.ward>0?16:0)|(a.rage?32:0)|(a.inv>0?64:0),a.shade?hpR(Math.max(.1,a.life)):hpR(a.hp),STI[a.st]||0,Math.round((a.face||0)*100)||0,a.minion?0:Math.round((a.t||0)*10)||0,Math.round((a.lift||0)*100)||0,(a.phase||1)-1];
     while(d.length>6&&!d[d.length-1])d.pop();return d}
   if(a.trophy)return[a.nid,x,y,(a.flip?1:0)|(a.moving?2:0)|(a.flash>0?8:0)|(a.shield?256:0),STI[a.st]||0,Math.round((a.face||0)*100)||0,Math.round((a.t||0)*10)||0];
+  if(a.apexAlly){const d=[a.nid,x,y,(a.flip?1:0)|(a.moving?2:0)|(a.flash>0?8:0),STI[a.st]||0,Math.round((a.face||0)*100)||0,Math.round(Math.max(.1,a.life)*10)];if(VS)d.push(hpR(a.hp||0));return d}
   return VS?[a.nid,x,y,a.flip?1:0,hpR(a.hp||0)]:[a.nid,x,y,a.flip?1:0]}
 function mpSendMe(now,force){
   if(!P)return;MP.tick++;
@@ -2725,11 +3167,14 @@ function mpSendMe(now,force){
     for(const q of pshots)if(!q._sent){q._sent=true;(msg.s||(msg.s=[])).push(vsShotOut(q,[Math.round(q.x),Math.round(q.y),Math.round(q.vx),Math.round(q.vy),q.r,Math.max(0,PKIND.indexOf(q.kind)),Math.min(99,q.pierce|0)]))}
     for(const e of echoes)if(!e._sent){e._sent=true;(msg.e||(msg.e=[])).push([Math.round(e.x),Math.round(e.y),Math.round(e.ang*100)||0,e.k||e.ai,e.ai,e.s.col,e.s.r,e.s.crown?1:0,e.owner])}
     for(const z of zones)if(z.mine&&!z.rem&&!z._sent){z._sent=true;const a=[Math.round(z.x),Math.round(z.y),z.r,Math.round(z.dur*100)];if(z.sx!==undefined)a.push(Math.round(z.sx),Math.round(z.sy));else if(VS)a.push(-1,-1);if(VS)a.push(Math.round(z.dmg*100)/100,z.stun||0,z.pet?1:0);(msg.z||(msg.z=[])).push(a)}
-    for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;(msg.f||(msg.f=[])).push(VS?[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100),Math.round(f.dmg*100)/100,f.slow?1:0]:[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)])}
+    for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;const a=VS?[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100),Math.round(f.dmg*100)/100,f.slow?1:0]:[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)];
+      if(f.ax){const q=f.kind==='quake';a[3]=q?f.w:f.r;a[4]=Math.round(Math.min(600,f.dur)*100);a.push(Math.round(q?f.x2:f.vx||0),Math.round(q?f.y2:f.vy||0),f.follow?1:0)}(msg.f||(msg.f=[])).push(a)}
+    if(MP.aq.length){msg.ar=MP.aq;MP.aq=[]}
+    if(S.apex&&APXSTEP[S.apex]&&cls()){const hs=[P.blades|0,P.plates|0,Math.round((P.haste||0)*10),P.pack|0],k=hs.join();if(k!==MP.hsKey||force){MP.hsKey=k;msg.hs=hs;ev=true}}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
     if(VS&&VP.ev.length){msg.v=VP.ev;VP.ev=[]}
-    if(msg.s||msg.e||msg.z||msg.f||msg.r||msg.v)ev=true;
-  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0;MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
+    if(msg.s||msg.e||msg.z||msg.f||msg.r||msg.v||msg.ar)ev=true;
+  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0;MP.aq.length=0;MP.hsKey='';MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
   // nothing new to say: three times a second is enough
   const key=p.join();if(!ev&&!force&&key===MP.pKey&&now-MP.tSent<320)return;MP.pKey=key;MP.tSent=now;
   nsend(msg);
@@ -2737,7 +3182,7 @@ function mpSendMe(now,force){
 }
 /* --- the other heroes --- */
 function mkRemote(m){
-  const q={x:W/2,y:H-120,face:-Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,swing:0,dashT:0,shield:false,skCd:0,vx:0,vy:0,lift:0,down:false,auraR:0,beam:null,_mi:m.idx};
+  const q={x:W/2,y:H-120,face:-Math.PI/2,moving:false,walk:0,hp:1,maxHp:1,inv:0,atk:0,swing:0,dashT:0,shield:false,skCd:0,vx:0,vy:0,lift:0,down:false,auraR:0,beam:null,blades:0,plates:0,haste:0,pack:0,_mi:m.idx};
   return{id:m.id,name:m.name,idx:m.idx,dead:false,away:true,team:0,P:q,look:{level:8,cls:null,adv:null,apex:null,rank:'',pw:[false,false,false],parts:7,skill0Ready:false},allies:[],pshots:[],echoes:[],_al:new Map(),_clk:{off:1e18},_seen:0}}
 function mpMkAlly(r,a){
   const nid=a[0],k=a[1];if(r._al.has(nid))return;let o;
@@ -2748,12 +3193,14 @@ function mpMkAlly(r,a){
       if(fl&32)Object.assign(o,{kind:'shade',shade:true,pet:false,owner:'shade',minion:false,lesser:false,helper:false,trophy:false,max:o.maxHp,life:o.maxHp,hp:1,maxHp:1})}
     else{const f=k==='f'?'familiar':'guardian';
       o={nid,kind:f,trophy:true,ent:true,form:f,owner:own(CLASSES,a[8])?a[8]:'mage',s:{...base,ai,name,col:c,crown:0,r:Math.max(4,Math.min(60,+a[10]||rr))},ai,name,x:0,y:0,r:rr,tm:+a[7]||1,t:0,seed:+a[9]||0,face:0,st:'idle',stT:0,flash:0,life:1e9,hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false,moving:false,walk:0,flip:false,shield:false,rem:true}}}
+  else if(AKIND[k]){const mx=Math.max(.5,Math.min(600,+a[3]||10));o={nid,kind:AKIND[k],apexAlly:true,x:0,y:0,r:Math.max(4,Math.min(40,+a[2]||10)),hp:1,maxHp:1,st:'idle',t:0,ang:0,face:0,flash:0,life:mx,max:mx,walk:rand()*6,flip:false,moving:false,seed:rand()*9,rem:true}}
   else o={nid,kind:k==='w'?'wolf':'thrall',x:0,y:0,r:+a[2]||9,walk:rand()*6,flip:false,moving:false,life:1e9,cd:0,rem:true};
   o._new=true;if(VS)vsAllyNew(r,o,a);r._al.set(nid,o)}
 function mpAllyIn(o,d,c){
   const x=d[1],y=d[2],f=d[3]|0;if(o._new){o._new=false;o.x=x;o.y=y}
   o.flip=!!(f&1);
   if(o.pet||o.shade){o.moving=!!(f&2);o.hidden=!!(f&4);o.flash=f&8?.1:0;o.ward=f&16?.2:0;o.rage=!!(f&32);o.inv=f&64?.2:0;if(o.shade)o.life=+d[4]||0;else o.hp=+d[4]||0;o.st=STN[d[5]]||'idle';o.face=(d[6]||0)/100;if(o.st==='charge'||o.st==='lunge')o.ang=o.face;if(!o.minion)o.t=(d[7]||0)/10;o.phase=(d[9]||0)+1;sPush(o,c,x,y,(d[8]||0)/100)}
+  else if(o.apexAlly){o.moving=!!(f&2);o.flash=f&8?.1:0;o.st=STN[d[4]]||'idle';o.face=o.ang=(d[5]||0)/100;o.life=(+d[6]||0)/10;if(d[7]!==undefined)o.hp=+d[7]||0;sPush(o,c,x,y,0)}
   else if(o.trophy){o.moving=!!(f&2);o.flash=f&8?.1:0;o.shield=!!(f&256);o.st=STN[d[4]]||'idle';o.face=(d[5]||0)/100;o.t=(d[6]||0)/10;sPush(o,c,x,y,0)}
   else{const s=o._s,n=s?s.length:0;o.moving=n?Math.abs(x-s[n-3])+Math.abs(y-s[n-2])>1:false;if(d[4]!==undefined)o.hp=+d[4]||0;sPush(o,c,x,y,0)}}
 function mpOnMe(msg,from){
@@ -2767,21 +3214,23 @@ function mpOnMe(msg,from){
   if(msg.a){const out=r.allies,seen=++r._seen;out.length=0;for(const d of msg.a){const o=r._al.get(d[0]);if(!o)continue;o._seen=seen;mpAllyIn(o,d,c);out.push(o)}
     if(r._al.size>out.length)for(const[k,o]of r._al)if(o._seen!==seen)r._al.delete(k);
     for(const o of out)if(o.pet){const b=msg.ab&&msg.ab[o.nid];if(b)beamIn(o,b);else if(o.beam)o.beam=null}}
+  if(Array.isArray(msg.hs)){const q=r.P,h=msg.hs;q.blades=Math.max(0,Math.min(6,h[0]|0));q.plates=Math.max(0,Math.min(4,h[1]|0));q.haste=Math.max(0,Math.min(1,(+h[2]||0)/10));q.pack=Math.max(0,Math.min(12,h[3]|0))}
   if(r.away)return;
+  if(msg.ar&&S.mode==='play')for(const a of msg.ar)if(Array.isArray(a)&&arcs.length<90)arcs.push({x1:+a[0]||0,y1:+a[1]||0,x2:+a[2]||0,y2:+a[3]||0,life:.26,max:.26,col:AX.col.storm,rem:true,foe:!!r.foe});
   if(VS)vsOnMe(r,msg,now,c);else if(msg.s)for(const a of msg.s)if(r.pshots.length<400)r.pshots.push({x:+a[0]||0,y:+a[1]||0,vx:+a[2]||0,vy:+a[3]||0,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0});
   if(msg.e)for(const a of msg.e){const base=typeof a[3]==='string'&&own(SPEC,a[3])?SPEC[a[3]]:SPEC.crawler,ow=own(CLASSES,a[8])?a[8]:'mage';
     r.echoes.push({ai:AI[a[4]]?a[4]:'mite',s:{...base,ai:AI[a[4]]?a[4]:'mite',col:typeof a[5]==='string'&&/^#[0-9a-f]{6}$/i.test(a[5])?a[5]:base.col,r:Math.max(4,Math.min(60,+a[6]||base.r)),crown:a[7]?1:0},x:+a[0]||0,y:+a[1]||0,ang:(a[2]||0)/100,life:.6,max:.6,owner:ow,col:TCOL[ow]||'#b88cff'});if(r.echoes.length>10)r.echoes.shift()}
   if(S.mode!=='play'||VS)return;
   // a teammate's blasts, fields and shockwaves are shown here as they are there; they do nothing here, except that hallowed ground mends whoever stands on it
   if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0};if(a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
-  if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push({kind:FKIND[a[0]]||'rain',x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true});
+  if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push(mpFieldIn(r,a,false));
   if(msg.r)for(const a of msg.r)if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true})}
 }
-function mpOnLook(msg,from){const r=MP.rById.get(''+from);if(!r)return;const k=r.look;k.level=Math.max(0,Math.min(9998,msg.lv|0));k.cls=own(CLASSES,msg.cls)?msg.cls:null;k.adv=k.cls&&CLASSES[k.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;k.apex=k.cls&&(msg.ap==='dominion'||msg.ap==='order')?msg.ap:null;r.P.auraR=k.apex==='order'?ORDR:0;k.rank=mpTxt(msg.rk,8);
+function mpOnLook(msg,from){const r=MP.rById.get(''+from);if(!r)return;const k=r.look;k.level=Math.max(0,Math.min(9998,msg.lv|0));k.cls=own(CLASSES,msg.cls)?msg.cls:null;k.adv=k.cls&&CLASSES[k.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;k.apex=k.cls&&apexOk(msg.ap)?msg.ap:null;r.P.auraR=k.apex==='order'?ORDR:0;if(k.apex!=='stone')r.P.plates=0;if(k.apex!=='blade')r.P.blades=0;if(k.apex!=='storm')r.P.haste=0;k.rank=mpTxt(msg.rk,8);
   const w=Array.isArray(msg.pw)?msg.pw:[];k.pw=[!!w[0],!!w[1],!!w[2]];MP.hudKey='';if(VS)vsOnLook(r,msg)}
 function mpRemoteStep(r,dt,now){
   const q=r.P,rt=now-r._clk.off-MPDELAY;sAt(q,rt);if(q.atk>0)q.atk-=dt;if(q.dashT>0)q.dashT-=dt;if(q.moving)q.walk+=dt*11;if(q.beam&&now-q._bm>400)q.beam=null;
-  for(const a of r.allies){sAt(a,rt);if(a.moving)a.walk+=dt*12;if(a.shade&&a.life>0)a.life-=dt}
+  for(const a of r.allies){sAt(a,rt);if(a.moving)a.walk+=dt*12;if((a.shade||a.apexAlly)&&a.life>0)a.life-=dt}
   if(VS)return vsRemote(r,dt,now);
   const ps=r.pshots;if(ps.length){let n=0;for(const p of ps){p.x+=p.vx*dt;p.y+=p.vy*dt;let dead=p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL||obstacles.length&&blocked(p);
     if(!dead)for(const m of mons)if(!m.hidden&&p._h!==m&&dist(m,p)<m.r+p.r+3){if(p.pierce>0){p.pierce--;p._h=m}else dead=true;break}
@@ -2799,7 +3248,7 @@ function mpGo(n,retry){ // host: the level starts for all
 // called by startLevel on every member, before anything is spawned
 function mpSpawnAt(){const n=Math.max(1,MP.slots),i=MP.myIdx%n;P.x=W/2+(i-(n-1)/2)*Math.min(56,420/n);P.safeX=P.x;P.down=false;MP.down=false}
 function mpLevelStarted(){
-  MP.mons.clear();MP.q=[];MP.qd.clear();MP.sd=[];MP.ate.clear();MP.moKey='?';MP.wvKey='?';MP.hadAl=false;MP.menu=false;MP.note='';MP.pKey='';MP.rq.length=0;
+  MP.mons.clear();MP.q=[];MP.qd.clear();MP.sd=[];MP.ate.clear();MP.moKey='?';MP.wvKey='?';MP.hadAl=true;MP.menu=false;MP.note='';MP.pKey='';MP.rq.length=0;MP.aq.length=0;MP.hsKey='';
   if(MP.role==='host'){MP.full=true;MP.wm=0}else{MP.synced=false;boss=null;MP.tSync=0}
   for(const r of MP.remotes){r.pshots.length=0;r.echoes.length=0}
   mpSendMe(performance.now(),true);
@@ -2945,8 +3394,8 @@ let DR=null;
 function mpDraw2d(pass){
   for(const r of MP.remotes){if(r.away)continue;
     if(!pass){
-      if(r.P.auraR>0&&!r.dead)drawAura(r.P);if(r.P.beam)drawBeamP(r.P);
-      for(const a of r.allies){if(a.shade){drawShade(a);continue}if(a.pet){drawPet(a);const b=a.beam;if(b&&!a.hidden){ctx.lineCap='round';for(const q of b.rays){const ex=a.x+Math.cos(q.a)*q.len,ey=a.y+Math.sin(q.a)*q.len;ctx.strokeStyle=b.on?'#8fd3ff':'rgba(143,211,255,.7)';ctx.lineWidth=b.on?b.w*1.4:2;line(a.x,a.y,ex,ey)}}}else if(a.trophy)drawTrophy(a);else drawAlly(a)}
+      if(r.P.auraR>0&&!r.dead)drawAura(r.P);if(r.P.beam)drawBeamP(r.P);if(r.look.apex&&!r.dead)drawApxHero(r.P,r.look.apex);
+      for(const a of r.allies){if(a.shade){drawShade(a);continue}if(a.apexAlly){drawApxAlly(a);continue}if(a.pet){drawPet(a);const b=a.beam;if(b&&!a.hidden){ctx.lineCap='round';for(const q of b.rays){const ex=a.x+Math.cos(q.a)*q.len,ey=a.y+Math.sin(q.a)*q.len;ctx.strokeStyle=b.on?'#8fd3ff':'rgba(143,211,255,.7)';ctx.lineWidth=b.on?b.w*1.4:2;line(a.x,a.y,ex,ey)}}}else if(a.trophy)drawTrophy(a);else drawAlly(a)}
       if(r.echoes.length)drawEchoes(r.echoes);continue}
     const P0=P,c0=S.cls,a0=S.adv,l0=S.level;DR=r;P=r.P;S.cls=r.look.cls;S.adv=r.look.adv;S.level=Math.max(8,r.look.level);
     try{drawPlayer()}finally{P=P0;S.cls=c0;S.adv=a0;S.level=l0;DR=null;ctx.globalAlpha=1}
@@ -2972,7 +3421,7 @@ function mpBegin(cfg){
   const host=''+(cfg.hostId!==undefined&&cfg.hostId!==null?cfg.hostId:N.hostId!==undefined?N.hostId:mem[0].id);
   Object.assign(MP,{on:true,role:host===my?'host':'client',mode:'coop',myId:my,hostId:host,members:mem,count:mem.length,slots:mem.length,cnt:mem.length,myIdx:mem.find(m=>m.id===my).idx,seed:cfg.seed,down:false,away:!!document.hidden,
     phase:'pick',g:0,lv:8,meReady:false,gateT:0,waitLate:false,failT:0,full:false,wm:0,synced:false,over:null,menu:false,under:null,note:'',toast:'',toastT:0,hudKey:'',pKey:'',lookKey:'',hadAl:false,swung:false,dashed:false,atk0:0,dash0:0,
-    tMe:0,tW:0,tQ:0,tSi:0,tOb:0,tHud:0,tSync:0,tLook:0,tSent:0,tick:0,seen:0,hStamp:-1,lastF:performance.now(),moKey:'?',wvKey:'?',q:[],sd:[],rq:[]});
+    tMe:0,tW:0,tQ:0,tSi:0,tOb:0,tHud:0,tSync:0,tLook:0,tSent:0,tick:0,seen:0,hStamp:-1,lastF:performance.now(),moKey:'?',wvKey:'?',q:[],sd:[],rq:[],aq:[],hsKey:''});
   MP.remotes.length=0;MP.rById.clear();MP.byIdx.length=0;MP.ready.clear();MP.mons.clear();MP.qd.clear();MP.ate.clear();MP.hclk.off=1e18;MP.heroes.length=0;
   for(const m of mem)if(m.id!==my){const r=mkRemote(m);MP.remotes.push(r);MP.rById.set(m.id,r);MP.byIdx[m.idx]=r}
   // a co-op run begins at the class choice, whole, and never touches the single-player save
@@ -3057,10 +3506,13 @@ const VRULES=['Every blow is scaled to a hero\'s health, and no single blow take
   'A shield blocks one blow every '+VSK.shield+' seconds at most, and a blocked blow protects from nothing else.',
   'How many fight for you is limited by your mana and by nothing else.',
   'Trophies and their echoes strike heroes. The Owed rise from enemy creatures that die, not from heroes.',
+  'Pack-beasts, ice-wights and cinders can be killed. Chill, shock and a drenching slow or stop a hero as any slow or stun does; rot and fire are poisons.',
   'When the clock runs out, a ring of fire closes on the centre: sudden death.'];
 const vsLive=()=>VS.phase==='fight'||VS.phase==='sudden';
 // the factors of a build: by class, upgrade and apex path; [1,1] where none is listed
-const vsF=(c,a,x)=>VSK.cls[c+(a?'/'+a:'')+(x?'/'+x:'')]||VSK.cls[c]||VF1,VF1=[1,1];
+// (a path of round 10 fights with the factors of the old path of its side, times its own pair in VPATH)
+const VPATH={beasts:[1,1],frost:[1,1],plague:[1,1],flame:[1,1],storm:[1,1],stone:[1,1],blade:[1,1],tide:[1,1]};
+const vsF=(c,a,x)=>{const T=VSK.cls,k=c+(a?'/'+a:'');let f=T[k+(x?'/'+x:'')];if(!f&&x&&APEX[x]&&VPATH[x]){const b=T[k+'/'+APEX[x].side],p=VPATH[x];if(b)f=[b[0]*p[0],b[1]*p[1]]}return f||T[c]||VF1},VF1=[1,1];
 const vsHead=()=>'Versus · '+(VS.format==='teams'?'teams':'free-for-all')+' · heroes of floor '+VS.floor+' · first to '+VS.wins+(VS.wins>1?' rounds':' round')+' · '+VS.time+' s a round';
 const vsSide=team=>{const t=VS.teams.find(x=>x.team===team);return t?t.name:'Nobody'};
 const vsFighter=s=>{const c=s.cls&&CLASSES[s.cls];if(!c)return'';return(s.adv&&(c.adv.find(a=>a[0]===s.adv)||[0,c.name])[1]||c.name)+(s.apex&&APEX[s.apex]?' · '+APEX[s.apex].title:'')};
@@ -3125,7 +3577,7 @@ function vsPickAdv(){
 }
 function vsPickApex(){
   if(VS.floor<=100)return vsPicked();VP.scr='pick';
-  show({wide:true,cls:'vsPanel vsPick apexPanel',kick:vsHead(),title:'Choose what you become',cards:['dominion','order'].map(id=>{const A=APEX[id];return{title:A.name,sub:A.title+' · '+A.sub,body:A.text,cls:'apexCard apex'+cap1(id),data:{apex:id},fn:()=>{VP.pick.apex=id;vsPicked()}}}),btns:[['Back',vsPick]]});
+  show({wide:true,cls:'vsPanel vsPick apexPanel',kick:vsHead(),title:'Choose what you become',cards:apexCards(id=>{VP.pick.apex=id;vsPicked()}),btns:[['Back',vsPick]]});
 }
 // the seasoned hero of the match's floor, as startAt would make it, and nothing stored
 function vsHero(){
@@ -3202,7 +3654,7 @@ function vsRoundStart(n){
   MP.menu=false;MP.note='';beginTok++;eqSync();S.level=lv;S.mode='play';S.banner=0;S.shake=0;S.stop=0;S.paused=false;
   S.L={title:'Versus',hint:'',kind:'crawler',spec:SPEC.crawler,name:'Round '+n,hue:D.hue,waves:0,mods:[],room:2,floorKind:'versus',band:D.band,bandName:D.bandName,handicap:null,door:null};
   TR=null;DOORS=null;FALLEN.length=0;PG.clear();
-  mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];TSRC=[];boss=null;S.wave=null;
+  mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];arcs=[];TSRC=[];boss=null;S.wave=null;
   obstacles=buildRoom(lv,2);freshBody();vsSpawn();P.down=false;MP.down=false;
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
   PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
@@ -3265,7 +3717,7 @@ function vsOnHost(msg,from){
 }
 function vsOnReady(msg,from){
   if(!VS)return;const s=VS.score.find(x=>x.id===''+from);if(!s||s.left)return;
-  if(msg.ok){VP.ready.add(s.id);s.cls=own(CLASSES,msg.cls)?msg.cls:null;s.adv=s.cls&&CLASSES[s.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;s.apex=s.cls&&(msg.ap==='dominion'||msg.ap==='order')?msg.ap:null}else VP.ready.delete(s.id);
+  if(msg.ok){VP.ready.add(s.id);s.cls=own(CLASSES,msg.cls)?msg.cls:null;s.adv=s.cls&&CLASSES[s.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;s.apex=s.cls&&apexOk(msg.ap)?msg.ap:null}else VP.ready.delete(s.id);
   MP.hudKey='';if(VS.phase==='pick'){if(VP.scr==='wait'&&!MP.menu)vsWait();vsHostGate()}
 }
 function vsOnDown(msg,from){
@@ -3281,8 +3733,9 @@ function vsLeft(m){
   if(VS.phase==='pick'&&VP.scr==='wait'&&!MP.menu)vsWait();
 }
 /* --- my hero and my creatures: what hurts them --- */
+const vsAllyHp=a=>Math.max(1,Math.round(GREF(VP.n)*(a.kind==='icewight'?.2:a.kind==='packbeast'?.08:.03)));
 const vsHeal=(f,lo)=>Math.max(.1,Math.round(Math.max(lo,f*P.maxHp)*VSK.heal*10)/10);
-const vsCanHurt=a=>a.life>0&&a.hp>0&&(a.pet?!a.helper&&!a.trophy&&!a.hidden&&a.st!=='leap':a.kind==='thrall'||a.kind==='wolf');
+const vsCanHurt=a=>a.life>0&&a.hp>0&&(a.pet?!a.helper&&!a.trophy&&!a.hidden&&a.st!=='leap':a.kind==='thrall'||a.kind==='wolf'||!!a.apexAlly);
 const vsDm=(by,nid,got)=>{if(!(got>0))return;const k=by+'|'+nid;VP.dm.set(k,(VP.dm.get(k)||0)+got)};
 // raw: the damage a monster would have taken. pure: a poison's tick or the like, which nothing blocks. True when the blow landed (also when it was blocked).
 function vsHurt(raw,by,src,pure){
@@ -3296,6 +3749,7 @@ function vsHurt(raw,by,src,pure){
     if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return true}
     if(rand()*100<Math.min(40,eqv('guard'))){if(S.t-VP.hurtT>.3){VP.hurtT=S.t;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward()}return true}
     if(cls()==='tank'&&P.shield&&!(S.t-VP.shAt<VSK.shield)){VP.shAt=S.t;P.shield=false;P.shT=0;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return true}
+    if(P.plates>0&&S.apex==='stone'&&!(S.t-VP.shAt<VSK.shield)){VP.shAt=S.t;plateBreak(true);return true}
     {const G=d<=.2*P.maxHp&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return true}}
   }
   if(P.stoneT>0)d/=2;if(P.vMark>0)d*=1.5;
@@ -3353,6 +3807,7 @@ function vsStep(dt){
   VP.hold=!live||P.vStun>0;
   for(const a of allies){
     if(a.hp===undefined&&(a.kind==='thrall'||a.kind==='wolf'))a.hp=a.maxHp=Math.max(1,Math.round(GREF(VP.n)*(a.kind==='wolf'?VSK.wolf:VSK.thr)));
+    if(a.apexAlly&&!a._vh){a._vh=1;a.hp=a.maxHp=vsAllyHp(a)}
     if(a.vMark>0)a.vMark-=dt;if(a.vDotT>0){a.vDotT-=dt;if((a.vDotK-=dt)<=0){a.vDotK=.5;vsHurtPet(a,a.vDotD,a.vDotBy,true)}}}
   if(live&&!P.down){
     if(P.vDotT>0){P.vDotT-=dt;if((P.vDotK-=dt)<=0){P.vDotK=.5;puff(P,'#7fd66b',4,80);vsHurt(P.vDotD,P.vDotBy,'dot',true)}}
@@ -3374,9 +3829,9 @@ function vsBlast(x,y,R,d,by,skip,stun,cr){
 }
 function vsZone(z){if(vsLive()&&S.mode==='play'&&z.vsD>0)vsBlast(z.x,z.y,z.r,z.vsD,z.vsBy,null,z.vsStun,z.vsCr)}
 function vsField(f){
-  if(!vsLive()||S.mode!=='play')return;const dom=f.kind==='domain',by=f.vsBy;
-  if(!P.down&&dist(P,f)<f.r+8){if(dom)P.vMark=Math.max(P.vMark||0,.7);if(f.vsD>0)vsHurt(f.vsD,by,'field');if(f.vsSlow||dom)vsCC({slow:.8},by)}
-  for(const a of allies)if(vsCanHurt(a)&&dist(a,f)<f.r+a.r){if(dom)a.vMark=Math.max(a.vMark||0,.7);if(f.vsD>0)vsHurtPet(a,f.vsD,by)}
+  if(!vsLive()||S.mode!=='play')return;const dom=f.kind==='domain',by=f.vsBy,q=f.kind==='quake',In=(e,er)=>q?quakeD(e,f)<f.w+er:dist(e,f)<f.r+er;
+  if(!P.down&&In(P,8)){if(dom)P.vMark=Math.max(P.vMark||0,.7);if(f.vsD>0)vsHurt(f.vsD,by,'field');if(f.vsSlow||dom)vsCC({slow:.8},by)}
+  for(const a of allies)if(vsCanHurt(a)&&In(a,a.r)){if(dom)a.vMark=Math.max(a.vMark||0,.7);if(f.vsD>0)vsHurtPet(a,f.vsD,by)}
 }
 // a swing, a lunge or a shockwave of a hostile hero, when the picture of that hero reaches the moment it happened
 function vsEvent(r,e){
@@ -3419,9 +3874,9 @@ function vsFoes(dt){
           for(const ry of a.beam.rays){if(!P.down&&segDist(P,a.x,a.y,ry.a,ry.len)<w+9&&ok(P,1,'bP')&&vsHurt(d,by,'beam'))tm.set('bP',t);
             for(const b of mine)if(segDist(b,a.x,a.y,ry.a,ry.len)<w+b.r*.6&&ok(b,1,b.nid+'b')&&vsHurtPet(b,d,by,false,true))tm.set(b.nid+'b',t)}}
         if(tm.size>60)tm.clear()}
-      else if(a.kind==='thrall'||a.kind==='wolf'){if((a._bcd=(a._bcd||0)-dt)>0||!(a.hp>0))continue;
+      else if(a.kind==='thrall'||a.kind==='wolf'||a.kind==='packbeast'){if((a._bcd=(a._bcd||0)-dt)>0||!(a.hp>0))continue;
         let tg=null,bd=1e9;if(!P.down){const d=dist(a,P)-11;if(d<bd){bd=d;tg=P}}for(const b of mine){const d=dist(a,b)-b.r;if(d<bd){bd=d;tg=b}}
-        if(tg&&bd<a.r+5){const d=(r._tb||0)*(a.kind==='wolf'?2:1);a._bcd=.7;if(tg===P)vsHurt(d,by,'bite');else vsHurtPet(tg,d,by,false,true)}}}
+        if(tg&&bd<a.r+5){const d=a.apexAlly?r._ab||0:(r._tb||0)*(a.kind==='wolf'?2:1);a._bcd=.7;if(tg===P)vsHurt(d,by,'bite');else vsHurtPet(tg,d,by,false,true)}}}
   }
 }
 /* --- my attacks on the stand-ins --- */
@@ -3474,10 +3929,10 @@ function vsOnCreature(msg,from){
 /* --- the wire: what versus adds to 'me' and 'lk' --- */
 function vsLook(o){
   o.au=P&&P.auraR>0&&!P.down?[P.auraR,Math.round(ORDAURA*(P.ascT>0?2:1)*dmgMul()*100)/100]:0;
-  o.tb=Math.round(dmgMul()*(1+eqv('thr')/100)*(P&&P.legT>0?1.5:1)*(S.apex==='dominion'?DOMSUM:1)*100)/100;
+  o.tb=Math.round(dmgMul()*(1+eqv('thr')/100)*(P&&P.legT>0?1.5:1)*(DOMS()?DOMSUM:1)*100)/100;if(S.apex==='beasts'&&P)o.ab=Math.round(packBite()*100)/100;
 }
 function vsOnLook(r,msg){
-  r.P.auraR=Array.isArray(msg.au)?Math.max(0,Math.min(400,+msg.au[0]||0)):0;r._aud=Array.isArray(msg.au)?+msg.au[1]||0:0;r._tb=+msg.tb||0;
+  r.P.auraR=Array.isArray(msg.au)?Math.max(0,Math.min(400,+msg.au[0]||0)):0;r._aud=Array.isArray(msg.au)?+msg.au[1]||0:0;r._tb=+msg.tb||0;r._ab=+msg.ab||0;
   const s=VS.score[r.idx];if(s&&r.look.cls){s.cls=r.look.cls;s.adv=r.look.adv;s.apex=r.look.apex}
 }
 function vsAllyStatic(a){
@@ -3485,13 +3940,15 @@ function vsAllyStatic(a){
   if(a.shade)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.max),32,'shade',0,0,0,du];
   if(a.pet)return[a.nid,'p',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,hpR(a.maxHp),(a.minion?1:0)|(a.lesser?2:0)|(a.helper?4:0)|(a.trophy?8:0)|(a.crown?16:0),a.owner,a.plv|0,a.mods&&a.mods.length?a.mods:0,a.perk||0,du];
   if(a.trophy)return[a.nid,a.kind==='familiar'?'f':'g',a.sk||a.ai,a.ai,a.name,a.s.col,a.r,a.tm||1,a.owner,Math.round(a.seed*100)/100,a.s.r];
+  if(a.apexAlly)return[a.nid,a.kind[0]==='p'?'b':a.kind[0],a.r,Math.round(a.max*10)/10,hpR(a._vh?a.maxHp:vsAllyHp(a))];
   return[a.nid,a.kind==='wolf'?'w':'t',a.r,hpR(a.hp||Math.max(1,Math.round(GREF(VP.n)*(a.kind==='wolf'?VSK.wolf:VSK.thr))))];
 }
 function vsAllyNew(r,o,a){
   o.foe=r.foe;
   if(o.pet||o.shade){const du=a[13];o.du=Array.isArray(du)?[+du[0]||0,+du[1]||0,+du[2]||0]:[0,0,0]}
   if(o.kind==='thrall'||o.kind==='wolf'){const hp=+a[3]||1;Object.assign(o,{hp,maxHp:hp,s:{name:o.kind==='wolf'?'Wolf':'Thrall',col:'#e7dfcd',r:o.r,eyes:2},ai:'mite',st:'idle',hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false,flash:0})}
-  if(r.foe&&(o.pet&&!o.helper&&!o.trophy||o.kind==='thrall'||o.kind==='wolf')){o.vs=true;o.own=r;o.id='c'+r.idx+'.'+o.nid;o.vx=0;o.vy=0;o.decoy=false}
+  if(o.apexAlly){const hp=+a[4]||1;Object.assign(o,{hp,maxHp:hp,s:{name:o.kind,col:AX.col[o.kind],r:o.r,eyes:2},ai:'mite',hidden:false,lift:0,mods:[],ward:0,beam:null,boss:false})}
+  if(r.foe&&(o.pet&&!o.helper&&!o.trophy||o.kind==='thrall'||o.kind==='wolf'||o.apexAlly)){o.vs=true;o.own=r;o.id='c'+r.idx+'.'+o.nid;o.vx=0;o.vy=0;o.decoy=false}
 }
 function vsShotOut(q,a){
   if(!VS)return a;
@@ -3506,7 +3963,7 @@ function vsOnMe(r,msg,now,c){
     r.pshots.push({x,y,vx,vy,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0,g:0,d:+a[7]||0,fl:a[8]|0,boom:+a[9]||0,slow:+a[10]||0,stun:+a[11]||0,sx:x,sy:y,hs:null})}
   if(S.mode!=='play')return;
   if(msg.z)for(const a of msg.z)if(zones.length<200){const z={x:+a[0]||0,y:+a[1]||0,r:+a[2]||60,t:0,dur:Math.max(.1,(+a[3]||50)/100),mine:true,rem:true,dmg:0,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsStun:+a[7]||0,vsCr:!!a[8],vsBy:r.idx};if(a[4]>=0&&a[5]>=0&&a[4]!==undefined){z.sx=+a[4]||0;z.sy=+a[5]||0}zones.push(z)}
-  if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push({kind:FKIND[a[0]]||'rain',x:+a[1]||0,y:+a[2]||0,r:+a[3]||80,t:0,dur:Math.min(30,(+a[4]||100)/100),every:Math.max(.2,(+a[5]||50)/100),tick:0,dmg:0,slow:false,rem:true,foe:r.foe,vsD:r.foe?+a[6]||0:0,vsSlow:!!a[7],vsBy:r.idx});
+  if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push(mpFieldIn(r,a,true));
   if(msg.r)for(const a of msg.r){if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true,foe:r.foe})}if(r.foe&&a[4]>0&&r._ev.length<200)r._ev.push({t:due,a:['k',a[0],a[1],a[2],a[4]]})}
   if(msg.v&&r.foe)for(const a of msg.v)if(Array.isArray(a)&&r._ev.length<200)r._ev.push({t:due,a});
 }
@@ -3518,7 +3975,7 @@ function vsRemote(r,dt,now){
     if(p.g>0)p.g-=dt;
     else if(!dead){if(mine)dead=vsShot(r,p);
       // for the eye: it stops at whatever else it would hit (someone else's hero or creature that is hostile to its owner)
-      if(!dead)for(const o of MP.remotes){if(o===r||o.team===r.team||o.dead||o.away)continue;let h=null;if(dist(o.P,p)<p.r+12)h=o.P;else for(const a of o.allies)if((a.pet&&!a.helper||a.kind==='thrall'||a.kind==='wolf')&&!a.hidden&&dist(a,p)<a.r+p.r+3){h=a;break}
+      if(!dead)for(const o of MP.remotes){if(o===r||o.team===r.team||o.dead||o.away)continue;let h=null;if(dist(o.P,p)<p.r+12)h=o.P;else for(const a of o.allies)if((a.pet&&!a.helper||a.kind==='thrall'||a.kind==='wolf'||a.apexAlly)&&!a.hidden&&dist(a,p)<a.r+p.r+3){h=a;break}
         if(h&&p._h!==h){if(p.pierce>0){p.pierce--;p._h=h}else dead=true;break}}}
     if(!dead&&!p.dead)ps[n++]=p}ps.length=n}
   const es=r.echoes;if(es.length){let n=0;for(const e of es){e.life-=dt;if(e.life>0)es[n++]=e}es.length=n}
@@ -3549,7 +4006,7 @@ function vsDraw2d(pass){
 
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
-window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door(){return S.door&&DOOR[S.door.id]?{...doorInfo(S.door.id),floor:S.door.n+1}:null},get apex(){return apexInfo()},get sightR(){return S.mode==='title'?0:sightR()},APEX,mp:MP,settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
+window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door(){return S.door&&DOOR[S.door.id]?{...doorInfo(S.door.id),floor:S.door.n+1}:null},get apex(){return apexInfo()},get apexPaths(){return apexPaths()},get arcs(){return arcs},get sightR(){return S.mode==='title'?0:sightR()},APEX,mp:MP,settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
   get P(){return P},get mons(){return VS?VNONE:mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get echoes(){return echoes},get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return VS?null:boss}};
 let last=0;
@@ -3574,13 +4031,13 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=r.apex==='dominion'||r.apex==='order'?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)
     startLevel(n)},mpGo:(n,retry)=>mpGo(n,retry),down:()=>{if(MP.on&&P&&!P.down&&S.mode==='play'){P.hp=0;mpDown();return true}return false},kill:()=>{if(S.mode==='play'&&TR&&!boss&&!S.wave&&TR.dur&&!TR.failed){S.banner=0;TR.t=TR.dur;if(!CL())trialStep(0);return true}if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},
   // r8: floorKind(n), the tower record, the trial as it stands (and trialFail), a seasoned run, a shade, the lamp
-  floorKind,TW:TWR,TK,get TR(){return TR},trialFail:w=>trialFail(w||'The trial is lost'),seasonedRun,shade:(kind,life)=>{const k=SPEC[kind]?kind:'crawler';return shadeRise({s:lesserSpec(k,S.level,1),ai:SPEC[k].ai||k,kind:k,x:P.x+40,y:P.y},life||SHLIFE,true)},lampHit:()=>TR&&TR.obj&&lampHit(TR.obj),rewardEnd,apexScreen,doorScreen,skill:si=>skill(si),reward,loadout,dropScreen,
+  floorKind,TW:TWR,TK,get TR(){return TR},trialFail:w=>trialFail(w||'The trial is lost'),seasonedRun,AX,VPATH,apxAlly:(k,life)=>P&&['packbeast','icewight','cinder'].includes(k)?apxAlly(k,life||10):null,stat:(m,k,v,d)=>{m=m||boss||mons[0];if(m)mSt(m,k,v===undefined?1:v,d===undefined?UD():d);return m},fieldA:(...a)=>fieldA(...a),wave:(g,d)=>wave(P.x,P.y,g||0,70,d||0,400),arc:(...a)=>arc(...a),chain:(m,d)=>chain(P.x,P.y,m||boss||mons[0],d||1,3,200),UD,shade:(kind,life)=>{const k=SPEC[kind]?kind:'crawler';return shadeRise({s:lesserSpec(k,S.level,1),ai:SPEC[k].ai||k,kind:k,x:P.x+40,y:P.y},life||SHLIFE,true)},lampHit:()=>TR&&TR.obj&&lampHit(TR.obj),rewardEnd,apexScreen,doorScreen,skill:si=>skill(si),reward,loadout,dropScreen,
   // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
   // pet(kind, o): o: {plv, lv (the level it was bound on, 0-based; the level you are on when left out), mods:[...] or perk, owner, name}
   pet:(kind,o)=>{const e=window.__mb.petNew(kind,o);if(!e)return null;o=o||{};
