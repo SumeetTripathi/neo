@@ -17,7 +17,15 @@ still say "marrowborn", the game's working title, so existing installs and saves
 | 9 to 12 | You choose a class and get its basic equipment and first two skills. Floor 10 is the first guardian, The Flayed King. |
 | 13 onward | Generated floors in named bands. Most are short, sharp fights against a monster with modest health that hits hard. About three in ten are trials: survive for a time, guard a lamp, beat a clock, fight under a handicap, or choose a door at a crossroads. Every tenth floor is a guardian with high health and power. Each clear gives an equipment drop and a boon. |
 | After 50 | You choose one of two upgrades for your class. |
-| After 100 | You choose one of two apex paths: the Tithe (the dead you make fight for you) or the White Marrow (overwhelming personal power). The climb has no end. |
+| After 100 | You choose one of ten apex paths. Five command others: the Tithe (the dead), the Feral Vow (a pack), the Still Winter (frost), the Slow Rot (plague), the Last Pyre (fire). Five make you the weapon: the White Marrow (light), the Split Sky (lightning), the Standing Stone (earth), the Thousandth Cut (blades), the Returning Tide (water). The climb has no end. |
+
+Multiplayer on a local network has two modes: co-op for up to 8 against the tower, and
+versus (free-for-all or two teams) where everyone fights with an evenly built hero of a
+chosen floor.
+
+For testing, switching on "Checkpoints" in Settings opens every checkpoint, adds a
+"Jump to floor" tool to the tower map and pause menu (any floor, with your hero or a
+ready-made one), and shows a frame-rate readout.
 
 Clearing every tenth floor unlocks the next floor as a checkpoint, from which a new
 climb can start with a ready-made hero. The tower map ("The climb") shows bands,
@@ -144,7 +152,7 @@ several devices.
 - `android/` is a thin WebView wrapper that packages `web/` as an app and can run the relay for hosting.
 - `ios/` is an Xcode project for a WKWebView wrapper, source only and never built; see `ios/README.md`.
 - `dist/` holds the builds: `Marrowborn.apk` is the current single-player release (3.3) and `Marrowborn-3.4-mp1.apk`
-  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.4.apk` is the previous release and
+  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.5.apk` is the previous release and
   `Marrowborn-2.0.apk` the last 2D-only build; `marrowborn-server.jar` with its three launchers is the desktop server.
 
 ## Play in a browser

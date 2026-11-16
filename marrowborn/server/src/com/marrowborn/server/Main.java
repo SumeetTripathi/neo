@@ -22,7 +22,7 @@ import java.util.Set;
  * Without a port it takes 7777, or the next free one. The game's files come from inside the jar unless --web names a folder.
  */
 public final class Main {
-    public static final String VERSION = "3.5";
+    public static final String VERSION = "3.6";
 
     public static void main(String[] args) {
         int port = -1; String web = null; boolean browser = true, window = true, single = false;

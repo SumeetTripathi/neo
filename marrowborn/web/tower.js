@@ -240,7 +240,7 @@ function showMap(){
     }
     if(hasSetting('testUnlock')&&MB.settings.testUnlock){
       // the switch itself is in Settings; here it can only be turned off, so nobody mistakes a test for their own climb
-      p.appendChild(h('p',{class:'mbt-note mbt-testing'},h('b',{text:'Testing. '}),'Every checkpoint up to floor 201 is open. ',btn('Turn off',function(){try{MB.setSetting('testUnlock',false)}catch(e){}if(screen==='map')showMap()},false,{class:'mbt-mini'})));
+      p.appendChild(h('p',{class:'mbt-note mbt-testing'},h('b',{text:'Testing. '}),'Every checkpoint up to floor 201 is open, and Jump to floor reaches any floor up to 9999. ',btn('Turn off',function(){try{MB.setSetting('testUnlock',false)}catch(e){}if(screen==='map')showMap()},false,{class:'mbt-mini'})));
     }
     if(testing())p.appendChild(jumpBox(t,'map'));
     var first=btn(inRun&&!co&&S().paused?'Back':'Close',closeAll,!canStart),bt=h('div',{class:'btns'});

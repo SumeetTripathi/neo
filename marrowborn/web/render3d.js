@@ -1216,22 +1216,46 @@ function fitCamera(){
 // Everything is measured every frame and reallocated only when a target size really changes (window, monitor, zoom, either setting).
 // The overlay is laid out in OV units: OV.u CSS pixels each, chosen so text is neither tiny on a 360 px phone nor huge on a 4K monitor.
 const OV={w:W,h:H,u:1,k:2,bw:0,bh:0,stamp:0},FR={w:0,h:0,pr:1,bw:0,bh:0};
-// Adaptive resolution: a smooth frame rate matters more for control feel than raw sharpness. The renderer times real frames;
-// if they stay slow it lowers its internal resolution in steps (never below half), and climbs back when there is headroom.
-// MB.renderer.auto=false switches it off; MB.renderer.fps and .autoScale report the state.
-const AUTO={k:1,ema:16.7,slow:0,fast:0,last:0,on:true,el:null,shown:0};
+// Resolution and frame rate. The player decides: nothing is lowered automatically unless they ask for that.
+// The renderer times real frames. If the device stays slow during play it offers, once, a small prompt with three choices:
+// lower the resolution one step (the Resolution setting, never below 50%), let the game adjust it automatically from now on,
+// or keep everything as it is. MB.renderer.fps / .autoScale / .auto report and control the state.
+const AUTO={k:1,ema:16.7,slow:0,fast:0,last:0,on:false,el:null,shown:0,ask:null,asked:0,quiet:false,prompt:true};
+try{AUTO.on=localStorage.getItem('marrowborn.autores')==='1';AUTO.quiet=localStorage.getItem('marrowborn.perfquiet')==='1'}catch(e){}
+function perfAsk(){
+  if(AUTO.ask||((AUTO.quiet||!AUTO.prompt||navigator.webdriver)&&!AUTO._force))return;
+  const now=performance.now();if(AUTO.asked&&now-AUTO.asked<90000)return;AUTO.asked=now;
+  const res=Math.max(.5,Math.min(1,num(MB.settings&&MB.settings.res,1))),canRes=res>.5+1e-6&&!!MB.setSetting,canLow=!Q.low&&!!MB.setSetting;
+  const box=document.createElement('div');box.id='mbPerf';box.setAttribute('role','dialog');box.setAttribute('aria-label','Performance');
+  box.style.cssText='position:fixed;left:50%;top:max(18%,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;max-width:min(92vw,460px);box-sizing:border-box;padding:12px 14px;background:rgba(10,12,26,.94);border:1px solid rgba(139,77,255,.7);color:#eeecfb;font:500 14px/1.35 Barlow,Arial,sans-serif;text-align:center';
+  const msg=document.createElement('div');msg.textContent='This device is running the game at about '+Math.round(1000/AUTO.ema)+' frames a second. A lower resolution will make movement smoother.';msg.style.marginBottom='10px';box.appendChild(msg);
+  const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;justify-content:center';box.appendChild(row);
+  const close=()=>{if(AUTO.ask){AUTO.ask.remove();AUTO.ask=null}AUTO.slow=0;AUTO.ema=16.7};
+  const btn=(label,fn,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='min-height:44px;padding:8px 14px;font:600 13px/1 Rajdhani,"Arial Narrow",sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;color:#eeecfb;border:1px solid rgba(184,156,255,.7);background:'+(primary?'#6a35e0':'rgba(16,20,42,.9)');b.addEventListener('click',e=>{e.stopPropagation();try{fn()}catch(_){}close()});row.appendChild(b)};
+  if(canRes)btn('Lower resolution to '+Math.round(Math.max(.5,res-.15)*100)+'%',()=>MB.setSetting('res',Math.max(.5,Math.round((res-.15)*100)/100)),true);
+  else if(canLow)btn('Switch graphics to Low',()=>MB.setSetting('gfx','low'),true);
+  btn('Adjust automatically',()=>{AUTO.on=true;try{localStorage.setItem('marrowborn.autores','1')}catch(_){}});
+  btn('Keep as it is',()=>{AUTO.quiet=true;try{localStorage.setItem('marrowborn.perfquiet','1')}catch(_){}});
+  const note=document.createElement('div');note.textContent='You can change this any time in Settings, under Resolution and Graphics.';note.style.cssText='margin-top:8px;font-size:12px;color:#989bbd';box.appendChild(note);
+  (document.body||document.documentElement).appendChild(box);AUTO.ask=box;
+}
+function perfAskForce(){AUTO.asked=0;AUTO._force=true;perfAsk();AUTO._force=false}
 function autoTick(){
   const now=performance.now(),d=now-AUTO.last;AUTO.last=now;
   if(!(d>0)||d>250||document.hidden){AUTO.slow=AUTO.fast=0;return}
   AUTO.ema+=(d-AUTO.ema)*.06;
-  if(!AUTO.on||(MB.S&&MB.S.mode!=='play')){AUTO.slow=AUTO.fast=0}
-  else if(AUTO.ema>1000/43){AUTO.fast=0;AUTO.slow+=d;if(AUTO.slow>1200&&AUTO.k>.5){AUTO.k=Math.max(.5,AUTO.k-.1);AUTO.slow=0;AUTO.ema=16.7}}
-  else if(AUTO.ema<1000/57){AUTO.slow=0;AUTO.fast+=d;if(AUTO.fast>6000&&AUTO.k<1){AUTO.k=Math.min(1,AUTO.k+.05);AUTO.fast=0}}
+  const playing=!!(MB.S&&MB.S.mode==='play'&&!MB.S.paused);
+  if(!AUTO.on&&AUTO.k!==1)AUTO.k=1;
+  if(!playing){AUTO.slow=AUTO.fast=0;if(AUTO.ask&&MB.S&&MB.S.mode!=='play'){AUTO.ask.remove();AUTO.ask=null}}
+  else if(AUTO.ema>1000/43){AUTO.fast=0;AUTO.slow+=d;
+    if(AUTO.on){if(AUTO.slow>1200&&AUTO.k>.5){AUTO.k=Math.max(.5,AUTO.k-.1);AUTO.slow=0;AUTO.ema=16.7}}
+    else if(AUTO.slow>4000)perfAsk()}
+  else if(AUTO.ema<1000/57){AUTO.slow=0;AUTO.fast+=d;if(AUTO.on&&AUTO.fast>6000&&AUTO.k<1){AUTO.k=Math.min(1,AUTO.k+.05);AUTO.fast=0}}
   else{AUTO.slow=Math.max(0,AUTO.slow-d);AUTO.fast=0}
   // a small frame-rate readout while the testing switch is on
   const want=!!(MB.settings&&MB.settings.testUnlock);
   if(want&&!AUTO.el){const e=document.createElement('div');e.id='mbFps';e.setAttribute('aria-hidden','true');e.style.cssText='position:fixed;left:max(6px,env(safe-area-inset-left,0px));bottom:max(4px,env(safe-area-inset-bottom,0px));z-index:5;font:600 11px/1.2 Rajdhani,"Arial Narrow",sans-serif;letter-spacing:.06em;color:#c4f4ff;background:rgba(7,9,18,.6);padding:2px 6px;pointer-events:none';(document.body||document.documentElement).appendChild(e);AUTO.el=e}
-  if(AUTO.el){AUTO.el.hidden=!want;if(want&&now-AUTO.shown>500){AUTO.shown=now;AUTO.el.textContent=Math.round(1000/AUTO.ema)+' FPS · '+Math.round(AUTO.k*100)+'% · '+FR.bw+'×'+FR.bh}}
+  if(AUTO.el){AUTO.el.hidden=!want;if(want&&now-AUTO.shown>500){AUTO.shown=now;AUTO.el.textContent=Math.round(1000/AUTO.ema)+' FPS · '+Math.round(FR.pr/Math.min(window.devicePixelRatio||1,3)*100)+'% · '+FR.bw+'×'+FR.bh}}
 }
 function resize(){
   const w=cv.clientWidth||glc.clientWidth,h=cv.clientHeight||glc.clientHeight;if(!w||!h)return;
@@ -2668,5 +2692,5 @@ resize();placeCamera(W/2,H/2,fitD);
 R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;
 // frame(): what is being drawn right now: CSS box, pixel ratio and backing size of #gl, the overlay's backing size and unit, the tier, MSAA
 R.frame=()=>({css:[FR.w,FR.h],pr:FR.pr,gl:[FR.bw,FR.bh],pixels:FR.bw*FR.bh,overlay:[OV.bw,OV.bh],unit:OV.u,tier:Q.tier,msaa:aaMade,shadow:Q.low?0:sun.shadow.mapSize.x,aniso:maxAniso});
-Object.defineProperty(R,'fps',{get(){return Math.round(1000/AUTO.ema)},enumerable:true});Object.defineProperty(R,'autoScale',{get(){return AUTO.k},enumerable:true});Object.defineProperty(R,'auto',{get(){return AUTO.on},set(v){AUTO.on=!!v;if(!v)AUTO.k=1},enumerable:true});Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testFields=null;R.testArcs=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
+Object.defineProperty(R,'fps',{get(){return Math.round(1000/AUTO.ema)},enumerable:true});Object.defineProperty(R,'autoScale',{get(){return AUTO.k},enumerable:true});Object.defineProperty(R,'auto',{get(){return AUTO.on},set(v){AUTO.on=!!v;if(!v)AUTO.k=1;try{localStorage.setItem('marrowborn.autores',v?'1':'0')}catch(e){}},enumerable:true});Object.defineProperty(R,'perfPrompt',{get(){return AUTO.prompt},set(v){AUTO.prompt=!!v},enumerable:true});R.perfAsk=()=>perfAskForce();Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testFields=null;R.testArcs=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
 })();

@@ -1050,7 +1050,8 @@ function playerStep(dt){
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
-  P.moving=l>.15;const ox=P.x,oy=P.y;
+  {const ix=P.ix||0,iy=P.iy||0,k=1-Math.exp(-dt/(Math.hypot(mx,my)>Math.hypot(ix,iy)?.05:.035));P.ix=ix+(mx-ix)*k;P.iy=iy+(my-iy)*k;if(Math.abs(P.ix)<.012)P.ix=0;if(Math.abs(P.iy)<.012)P.iy=0;mx=P.ix;my=P.iy}
+  P.moving=Math.hypot(mx,my)>.06;const ox=P.x,oy=P.y;
   if(P.dashT>0){P.dashT-=dt;const v=P.rushHit?780:640;P.x+=P.dx*v*dt;P.y+=P.dy*v*dt;
     if(P.rushHit){GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushStun)mStun(m,m.boss?P.rushStun*.7:P.rushStun*2);if(P.rushD)hurtM(m,P.rushD)}GEO--;if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
     if(rand()<.6)bits.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,c:has('skin')?'#c68863':'#e7dfcd',r:6})}
@@ -2838,10 +2839,19 @@ addEventListener('keyup',e=>{const k=KEY[e.key.length===1?e.key.toLowerCase():e.
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
 cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;if(VS&&P&&P.down)return vsSpectate();const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:((e.clientX-r.left)/(r.width||1)*V2.bw-V2.ox)/V2.k,y:((e.clientY-r.top)/(r.height||1)*V2.bh-V2.oy)/V2.k};e.preventDefault()});
 const pad=$('pad'),knob=$('knob');
-function padMove(e){const r=pad.getBoundingClientRect();let x=(e.clientX-r.left-r.width/2)/40,y=(e.clientY-r.top-r.height/2)/40;const l=Math.hypot(x,y);if(l>1){x/=l;y/=l}joy.x=x;joy.y=y;knob.style.transform=`translate(${x*34}px,${y*34}px)`}
-pad.addEventListener('pointerdown',e=>{pad.setPointerCapture(e.pointerId);padMove(e)});
-pad.addEventListener('pointermove',e=>{if(pad.hasPointerCapture(e.pointerId))padMove(e)});
-const padUp=()=>{joy.x=joy.y=0;knob.style.transform=''};pad.addEventListener('pointerup',padUp);pad.addEventListener('pointercancel',padUp);
+let padO=null; // where the thumb came down, relative to the stick's centre
+function padMove(e,down){
+  const r=pad.getBoundingClientRect(),R=Math.max(24,r.width*.36),cx=r.left+r.width/2,cy=r.top+r.height/2;
+  if(down||!padO){let ox=e.clientX-cx,oy=e.clientY-cy;const lim=Math.max(0,r.width/2-R*.55),ol=Math.hypot(ox,oy);if(ol>lim&&ol>0){ox*=lim/ol;oy*=lim/ol}padO={x:ox,y:oy}}
+  let x=(e.clientX-cx-padO.x)/R,y=(e.clientY-cy-padO.y)/R;let l=Math.hypot(x,y);
+  if(l>1){ // a thumb that slides past the edge drags the centre along, so reversing direction is immediate
+    padO.x+=(x-x/l)*R;padO.y+=(y-y/l)*R;x/=l;y/=l;l=1}
+  const DZ=.14;let m=l<=DZ?0:Math.pow((l-DZ)/(1-DZ),1.15);if(m>1)m=1;
+  joy.x=l>0?x/l*m:0;joy.y=l>0?y/l*m:0;
+  knob.style.transform=`translate(${padO.x+x*R}px,${padO.y+y*R}px)`}
+pad.addEventListener('pointerdown',e=>{try{pad.setPointerCapture(e.pointerId)}catch(_){}padMove(e,true);e.preventDefault()});
+pad.addEventListener('pointermove',e=>{if(pad.hasPointerCapture(e.pointerId))padMove(e,false)});
+const padUp=()=>{joy.x=joy.y=0;padO=null;knob.style.transform=''};pad.addEventListener('pointerup',padUp);pad.addEventListener('pointercancel',padUp);pad.addEventListener('lostpointercapture',padUp);
 $('bAtk').addEventListener('pointerdown',e=>{want.atk=true;keys.atk=true;e.preventDefault()});
 for(const ev of['pointerup','pointercancel','pointerleave'])$('bAtk').addEventListener(ev,()=>keys.atk=false);
 $('bDash').addEventListener('pointerdown',e=>{want.dash=true;e.preventDefault()});
@@ -4016,12 +4026,12 @@ let last=0;
 let fast=1;
 function tick(dt){if(S.paused){S.t+=dt;return}if(S.mode==='play'){ST.time+=dt;ST.levelTime+=dt}if(S.stop>0&&!MP.on)S.stop-=dt;else step(dt)} // (the short freeze on a heavy blow is left out in multiplayer, where the world must not stop)
 function frame(ts){const real=(ts-last)/1000||0,dt=Math.min(.033,real);last=ts;
-  // alone, a slow device plays in slow motion (one step of at most 33 ms per frame). A shared world has to keep real time: up to six short steps per frame
+  // the game keeps real time on a slow device: several short steps per frame (up to three alone, six in a shared world) instead of slow motion
   if(MP.on){const e=Math.max(0,Math.min(.2,real)),n=Math.max(1,Math.ceil(e/.0334));for(let i=0;i<n*fast;i++)tick(e/n);mpFrame(e)}
-  else for(let i=0;i<fast;i++)tick(dt);
+  else{const e=Math.max(0,Math.min(.1,real)),n=Math.max(1,Math.ceil(e/.0334));for(let i=0;i<n*fast;i++)tick(e/n)}
   skillUi();manaUi();petUi();
   const R=MB.renderer;
-  if(R&&R.ok){try{R.draw(MP.on?Math.max(0,Math.min(.2,real)):dt)}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
+  if(R&&R.ok){try{R.draw(Math.max(0,Math.min(MP.on?.2:.1,real)))}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
   bossBar();requestAnimationFrame(frame)}
 function start(data){
