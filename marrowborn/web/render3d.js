@@ -1216,10 +1216,28 @@ function fitCamera(){
 // Everything is measured every frame and reallocated only when a target size really changes (window, monitor, zoom, either setting).
 // The overlay is laid out in OV units: OV.u CSS pixels each, chosen so text is neither tiny on a 360 px phone nor huge on a 4K monitor.
 const OV={w:W,h:H,u:1,k:2,bw:0,bh:0,stamp:0},FR={w:0,h:0,pr:1,bw:0,bh:0};
+// Adaptive resolution: a smooth frame rate matters more for control feel than raw sharpness. The renderer times real frames;
+// if they stay slow it lowers its internal resolution in steps (never below half), and climbs back when there is headroom.
+// MB.renderer.auto=false switches it off; MB.renderer.fps and .autoScale report the state.
+const AUTO={k:1,ema:16.7,slow:0,fast:0,last:0,on:true,el:null,shown:0};
+function autoTick(){
+  const now=performance.now(),d=now-AUTO.last;AUTO.last=now;
+  if(!(d>0)||d>250||document.hidden){AUTO.slow=AUTO.fast=0;return}
+  AUTO.ema+=(d-AUTO.ema)*.06;
+  if(!AUTO.on||(MB.S&&MB.S.mode!=='play')){AUTO.slow=AUTO.fast=0}
+  else if(AUTO.ema>1000/43){AUTO.fast=0;AUTO.slow+=d;if(AUTO.slow>1200&&AUTO.k>.5){AUTO.k=Math.max(.5,AUTO.k-.1);AUTO.slow=0;AUTO.ema=16.7}}
+  else if(AUTO.ema<1000/57){AUTO.slow=0;AUTO.fast+=d;if(AUTO.fast>6000&&AUTO.k<1){AUTO.k=Math.min(1,AUTO.k+.05);AUTO.fast=0}}
+  else{AUTO.slow=Math.max(0,AUTO.slow-d);AUTO.fast=0}
+  // a small frame-rate readout while the testing switch is on
+  const want=!!(MB.settings&&MB.settings.testUnlock);
+  if(want&&!AUTO.el){const e=document.createElement('div');e.id='mbFps';e.setAttribute('aria-hidden','true');e.style.cssText='position:fixed;left:max(6px,env(safe-area-inset-left,0px));bottom:max(4px,env(safe-area-inset-bottom,0px));z-index:5;font:600 11px/1.2 Rajdhani,"Arial Narrow",sans-serif;letter-spacing:.06em;color:#c4f4ff;background:rgba(7,9,18,.6);padding:2px 6px;pointer-events:none';(document.body||document.documentElement).appendChild(e);AUTO.el=e}
+  if(AUTO.el){AUTO.el.hidden=!want;if(want&&now-AUTO.shown>500){AUTO.shown=now;AUTO.el.textContent=Math.round(1000/AUTO.ema)+' FPS · '+Math.round(AUTO.k*100)+'% · '+FR.bw+'×'+FR.bh}}
+}
 function resize(){
   const w=cv.clientWidth||glc.clientWidth,h=cv.clientHeight||glc.clientHeight;if(!w||!h)return;
   const dpr=window.devicePixelRatio||1,res=Math.max(.5,Math.min(1,num(MB.settings&&MB.settings.res,1)));
   let pr=Math.min(dpr,Q.low?1:Q.ultra?3:2)*res;
+  pr=Math.max(Math.min(.5,pr),pr*AUTO.k); // adaptive: drops when the device cannot hold a smooth frame rate
   const budget=Q.ultra?12.45e6:8.3e6;if(w*h*pr*pr>budget)pr=Math.sqrt(budget/(w*h));
   pr=Math.min(pr,maxRB/w,maxRB/h);
   const bw=Math.max(1,Math.floor(w*pr)),bh=Math.max(1,Math.floor(h*pr));
@@ -2493,6 +2511,7 @@ if(typeof MB.on==='function')try{MB.on('settings',()=>{if(alive&&tierNow()!==Q.t
 let lastSight=null,alive=true;
 function draw(dt){
   if(!alive)return;
+  autoTick();
   const S=MB.S,P=MB.P,t=S.t,trial=trialOf(),dark=!!trial&&MB.has('sight')&&HCAP(trial)==='dark',sight=MB.has('sight')&&!dark;
   fogR=dark?Math.max(FOG,Math.min(520,trial.sight>0?+trial.sight:MB.sightR>0?+MB.sightR:FOG*1.85)):FOG;seeing=sight;
   if(tierNow()!==Q.tier)applyQuality();
@@ -2649,5 +2668,5 @@ resize();placeCamera(W/2,H/2,fitD);
 R.draw=draw;R.screenToGame=screenToGame;R.dispose=dispose;R.info=()=>renderer.info.render;
 // frame(): what is being drawn right now: CSS box, pixel ratio and backing size of #gl, the overlay's backing size and unit, the tier, MSAA
 R.frame=()=>({css:[FR.w,FR.h],pr:FR.pr,gl:[FR.bw,FR.bh],pixels:FR.bw*FR.bh,overlay:[OV.bw,OV.bh],unit:OV.u,tier:Q.tier,msaa:aaMade,shadow:Q.low?0:sun.shadow.mapSize.x,aniso:maxAniso});
-Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testFields=null;R.testArcs=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
+Object.defineProperty(R,'fps',{get(){return Math.round(1000/AUTO.ema)},enumerable:true});Object.defineProperty(R,'autoScale',{get(){return AUTO.k},enumerable:true});Object.defineProperty(R,'auto',{get(){return AUTO.on},set(v){AUTO.on=!!v;if(!v)AUTO.k=1},enumerable:true});Object.defineProperty(R,'needsRestart',{get(){return alive&&wantAA()!==aaMade},enumerable:true});R.settle=()=>{frameWant(seeing);camTarget.x=want.x;camTarget.z=want.z;zoom=want.zoom};R.testObstacles=null;R.testAllies=null;R.testEchoes=null;R.testRemotes=null;R.testTrial=null;R.testApex=null;R.testFields=null;R.testArcs=null;R.testBand=null;R.testVs=null;R.memberColor=memberColor;R.teamColor=t=>cssOf(teamHex(t));R.vsColor=(idx,team)=>cssOf(vsHex(idx,team));R.spectate=spectate;R.scene=scene;R.camera=camera;R.ok=true;
 })();
