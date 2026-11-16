@@ -176,11 +176,11 @@ const AX={
  st:{order:[ORDD,ORDLIFE],storm:[1.42,1.1],stone:[1.38,1.4],blade:[1.32,1.15],tide:[1.42,1.3]}, // order side: [damage, health]
  col:{packbeast:'#5fe07a',icewight:'#8fd8ff',cinder:'#ff6a1e',beasts:'#5fe07a',frost:'#8fd8ff',plague:'#b7c61f',flame:'#ff6a1e',storm:'#ffe74a',stone:'#c9a26b',blade:'#8fa0ff',tide:'#19d3c5'},
  // beasts: cap0 beasts, one more every capK floors (capMax at most); each lasts `life` s and another answers every t s. A bite is `bite` U, syn more for every other beast alive, every cd s.
- beast:{cap0:3,capK:30,capMax:5,life:24,t:4,bite:.24,syn:.1,cd:.75,spd:265,howl:6,runK:4,huntN:4,huntT:10},
+ beast:{cap0:3,capK:30,capMax:5,life:24,t:4,bite:.21,syn:.1,cd:.75,spd:265,howl:6,runK:4,huntN:4,huntT:10},
  // frost: a blow of yours chills (hit, once per icd s per monster; a floor's own monster takes bossK of any chill); at full chill it is frozen (frz s; frzB a floor's own), takes `more` times the damage, and when it thaws or dies
  // it shatters for shat U (shatK of that to everything within shatR, which is chilled by shatCh); then nothing chills it for thaw s (thawB). wights: how many ice-wights, each for wlife s, another every wt s; a slam is wd U within wr, chilling by wch, every wcd s.
  frost:{hit:.2,icd:.3,bossK:.5,hold:2.5,frz:2.5,frzB:1.2,more:1.25,shat:11,shatK:.6,shatR:95,shatCh:.4,thaw:3.5,thawB:6,slowK:.45,wights:2,wlife:30,wt:8,wd:4.2,wr:95,wch:.35,wcd:2.6,wspd:125,wreach:300,
-  rimeR:130,rimeT:6,rimeD:.8,rimeCh:.22,skF:14,skA:6,skC:6,ultR:330,ultT:4},
+  vsChill:.02,vsFrz:.3,rimeR:130,rimeT:6,rimeD:.8,rimeCh:.22,skF:14,skA:6,skC:6,ultR:330,ultT:4},
  // plague: a blow of yours adds a stack of rot (once per icd s per monster, 5 at most, t s unless renewed). Every half second rot does d U x stacks x (1 + ramp per stack past the first); a rotting monster takes `more` more damage per stack and is slowK slower per stack.
  // Every sp s a monster with two stacks or more gives one to the nearest within spR that has fewer. One that dies rotting passes its stacks to all within leap and leaves a cloud (cloudR, cloudT s). auraR: the miasma round you (a stack every auraT s).
  plague:{icd:1,t:6,d:.11,ramp:.25,more:.03,slowK:.04,sp:1.5,spR:150,leap:170,cloudR:70,cloudT:4,auraR:105,auraT:1.5,blightR:120,blightT:7,blightD:.3,fester:2.5,ultT:10},
@@ -195,7 +195,7 @@ const AX={
  stone:{plates:3,regrow:11,cd:5,cr:120,cstun:.6,every:4,crush:.3,crushR:70,quakeT:3,quakeD:3,quakeR:65,quakeReach:320,fisLen:400,fisW:30,fisT:3.2,fisK:.4,fisD:2.4,standT:5,monoR:115,monoD:20,monoLen:190},
  // blade: n0 blades of light (one more every nK floors, six at most). Every blow of yours is followed by a cut worth `per` of it for each blade; every `combo`-th cut on the same monster is a great cut worth comboK of all your blows on it since the last;
  // a lesser monster below `exec` of its health dies to any blow of yours.
- blade:{n0:4,nK:25,per:.03,autoT:2,autoD:.4,autoR:280,combo:8,comboK:.22,comboT:3,exec:.2,fanD:4,walkD:2.6,ultN:24,ultK:.16,ultD:1.5,ultEnd:14},
+ blade:{n0:4,nK:25,per:.025,autoT:2,autoD:.35,autoR:280,combo:8,comboK:.22,comboT:3,exec:.2,fanD:4,walkD:2.6,ultN:24,ultK:.16,ultD:1.5,ultEnd:14},
  // tide: every regenT s you mend `regen` of your health. Every t s a wave rolls from you at the nearest monster within reach: wd x your damage, it carries lesser things along (a floor's own a little) and leaves what it touches drenched for soak s
  // (drenched: soakSlow slower, and it takes soakMore more damage).
  tide:{regen:.02,regenT:2,t:5,reach:420,wr:70,wd:5.5,wlen:400,wspd:270,soak:5,soakSlow:.25,soakMore:.2,gr:105,gd:8,glen:560,pullR:340,ud:3.5,uheal:.04,uhealMax:.2,floodT:6,floodK:.25,fd:5},
@@ -1783,7 +1783,7 @@ const APXSTEP={
    if(S.mode==='play'&&!held&&(X.t-=dt)<=0){const m=nearM(B.autoR);if(m){X.t=B.autoT/Math.max(1,P.blades);trail({x:P.x,y:P.y-30},m,AX.col.blade,5);const g=GEO;GEO=0;bladeCut(m,B.autoD*dmgMul());GEO=g}}
    if(X.cutN>0&&S.mode==='play'&&!held&&(X.cutK-=dt)<=0){const m=X.cutM;if(!mons.includes(m)||m.hidden)X.cutN=0;
      else{X.cutK=B.ultK;X.cutN--;const g=GEO;GEO=0;bladeCut(m,B.ultD*dmgMul());
-       if(!X.cutN&&mons.includes(m)){puff(m,'#ffffff',18,260);rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});S.shake=Math.max(S.shake,.25);hurtM(m,!m.boss&&m.hp<=m.maxHp*.5?1e9:B.ultEnd*dmgMul())}GEO=g}}},
+       if(!X.cutN&&mons.includes(m)){puff(m,'#ffffff',18,260);rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});S.shake=Math.max(S.shake,.25);hurtM(m,!m.boss&&m.hp<=m.maxHp*.5?m.hp+1:B.ultEnd*dmgMul())}GEO=g}}},
  tide(dt,held){const X=P.ax,T=AX.tide;if(S.mode!=='play'||held)return;
    if(X.flood>0){X.flood-=dt;if(X.fl2>0&&(X.fl2-=dt)<=0)waveRing()}
    if((X.rg=(X.rg||0)+dt)>=T.regenT*(X.flood>0?T.floodK:1)){X.rg=0;if(P.hp<P.maxHp){healP(T.regen);puff(P,AX.col.tide,4,70)}}
@@ -1802,7 +1802,7 @@ const APXHIT={
  flame(m){if(S.t<(m.buI||0))return;m.buI=S.t+.5;mSt(m,'burn',AX.flame.hitT,UD()*AX.flame.burn)},
  storm(m,d){const X=P.ax,Z=AX.storm;P.haste=Math.min(1,P.haste+Z.gain);X.acc+=d;if(X.ch>0)return;X.ch=X.surge>0?Z.icdS:Z.icd;const q=X.acc*Z.k;X.acc=0;chain(P.x,P.y-12,m,q,Z.jumps+(P.haste>=.99?1:0),Z.reach)},
  stone(m,d){const X=P.ax,Q=AX.stone;X.acc+=d;if(++X.n<Q.every)return;X.n=0;const q=X.acc*Q.crush;X.acc=0;puff(m,AX.col.stone,10,200);S.shake=Math.max(S.shake,.1);sfx(80,.16,'square',.2,40);burst(m.x,m.y,Q.crushR,q,{fn:o=>{if(!o.boss)mStun(o,Q.cstun)}})},
- blade(m,d){const B=AX.blade;if(P.blades>0)bladeCut(m,d*B.per*P.blades,d);if(mons.includes(m)&&!m.boss&&!m.hero&&m.hp<=m.maxHp*B.exec){puff(m,'#eef2ff',10,200);hurtM(m,1e9)}},
+ blade(m,d){const B=AX.blade;if(P.blades>0)bladeCut(m,d*B.per*P.blades,d);if(mons.includes(m)&&!m.boss&&!m.hero&&m.hp<=m.maxHp*B.exec){puff(m,'#eef2ff',10,200);hurtM(m,m.hp+1)}},
 };
 function apexHit(m,d){
   const f=APXHIT[S.apex];if(!f||!cls()||!P.ax||m.decoy||m.hidden)return;
@@ -1848,9 +1848,12 @@ const APXOP={
 function fisBurst(z){const Q=AX.stone;for(let i=0;i<4;i++){const g=i*TAU/4+.5,len=Math.min(Q.monoLen,rayLen(z.x,z.y,g));if(len>30)fieldA('quake',z.x,z.y,Q.fisW,Q.fisT,Q.fisK,z.fis,{x2:z.x+Math.cos(g)*len,y2:z.y+Math.sin(g)*len})}}
 /* --- versus: what the new paths' statuses and waves are to a hero --- */
 function vsSt(m,k,v,d){
-  if(!VS||!vsLive()||!m.own)return;const now=S.t;if(k!=='rot'&&k!=='burn'&&now-(m._stAt||0)<.25)return;m._stAt=now;
-  const dot=k==='rot'?d*Math.min(5,v):k==='burn'?d:0;
-  VP.q.push(['db',m.own.idx,m.nid|0,k==='chill'||k==='soak'?1:0,k==='freeze'||k==='shock'?v:0,dot?Math.round(dot*1000)/1000:0,0])}
+  if(!VS||!vsLive()||!m.own)return;const now=S.t;
+  if(k==='rot'){const G=AX.plague;if(now-(m._rotAt||0)>G.t)m._rotN=0;m._rotAt=now;const n=m._rotN=Math.min(5,(m._rotN||0)+Math.round(v));VP.q.push(['db',m.own.idx,m.nid|0,0,0,Math.round(d*n*1000)/1000,0]);return} // rot on a hero or its creature: a poison that deepens while it is renewed
+  if(k==='burn'){VP.q.push(['db',m.own.idx,m.nid|0,0,0,Math.round(d*1000)/1000,0]);return}
+  if(now-(m._stAt||0)<.25)return;m._stAt=now;
+  VP.q.push(['db',m.own.idx,m.nid|0,k==='chill'||k==='soak'?1:0,k==='freeze'||k==='shock'?v:0,0,0]);
+  if(d>0&&(k==='chill'||k==='freeze'))VP.q.push(['d',m.own.idx,m.nid|0,Math.round(d*(k==='freeze'?AX.frost.vsFrz:AX.frost.vsChill)*100)/100])} // the cold bites a hero a little where it would have shattered a monster
 function vsWave(f){
   if(!vsLive()||S.mode!=='play')return;const by=f.vsBy,sh=e=>{e.x+=f.vx*.3;e.y+=f.vy*.3};
   if(!P.down&&!f.hit.has(P)&&dist(P,f)<f.r+8){f.hit.add(P);if(vsHurt(f.vsD,by,'wave')&&!(P.dashT>0)){sh(P);clamp(P,14);collide(P,14,true);P.safeX=P.x;P.safeY=P.y;vsCC({slow:1},by)}}
@@ -3226,7 +3229,7 @@ function mpOnMe(msg,from){
   if(msg.f)for(const a of msg.f)if(fields.length<60)fields.push(mpFieldIn(r,a,false));
   if(msg.r)for(const a of msg.r)if(rings.length<300){const l=Math.max(.1,Math.min(2,(+a[3]||40)/100));rings.push({x:+a[0]||0,y:+a[1]||0,life:l,max:l,r:+a[2]||60,fx:true})}
 }
-function mpOnLook(msg,from){const r=MP.rById.get(''+from);if(!r)return;const k=r.look;k.level=Math.max(0,Math.min(9998,msg.lv|0));k.cls=own(CLASSES,msg.cls)?msg.cls:null;k.adv=k.cls&&CLASSES[k.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;k.apex=k.cls&&apexOk(msg.ap)?msg.ap:null;r.P.auraR=k.apex==='order'?ORDR:0;if(k.apex!=='stone')r.P.plates=0;if(k.apex!=='blade')r.P.blades=0;if(k.apex!=='storm')r.P.haste=0;k.rank=mpTxt(msg.rk,8);
+function mpOnLook(msg,from){const r=MP.rById.get(''+from);if(!r)return;const k=r.look;k.level=Math.max(0,Math.min(9998,msg.lv|0));k.cls=own(CLASSES,msg.cls)?msg.cls:null;k.adv=k.cls&&CLASSES[k.cls].adv.some(a=>a[0]===msg.adv)?msg.adv:null;k.apex=k.cls&&apexOk(msg.ap)?msg.ap:null;r.P.auraR=k.apex==='order'?ORDR:0;if(k.apex!=='stone')r.P.plates=0;if(k.apex!=='blade')r.P.blades=0;if(k.apex!=='storm')r.P.haste=0;if(k.apex!=='beasts')r.P.pack=0;k.rank=mpTxt(msg.rk,8);
   const w=Array.isArray(msg.pw)?msg.pw:[];k.pw=[!!w[0],!!w[1],!!w[2]];MP.hudKey='';if(VS)vsOnLook(r,msg)}
 function mpRemoteStep(r,dt,now){
   const q=r.P,rt=now-r._clk.off-MPDELAY;sAt(q,rt);if(q.atk>0)q.atk-=dt;if(q.dashT>0)q.dashT-=dt;if(q.moving)q.walk+=dt*11;if(q.beam&&now-q._bm>400)q.beam=null;
@@ -3511,7 +3514,7 @@ const VRULES=['Every blow is scaled to a hero\'s health, and no single blow take
 const vsLive=()=>VS.phase==='fight'||VS.phase==='sudden';
 // the factors of a build: by class, upgrade and apex path; [1,1] where none is listed
 // (a path of round 10 fights with the factors of the old path of its side, times its own pair in VPATH)
-const VPATH={beasts:[1,1],frost:[1,1],plague:[1,1],flame:[1,1],storm:[1,1],stone:[1,1],blade:[1,1],tide:[1,1]};
+const VPATH={beasts:[1.1,.95],frost:[1.1,.95],plague:[.92,1.05],flame:[.7,1.15],storm:[.95,1.05],stone:[1,1.1],blade:[1,1],tide:[1.05,.97]};
 const vsF=(c,a,x)=>{const T=VSK.cls,k=c+(a?'/'+a:'');let f=T[k+(x?'/'+x:'')];if(!f&&x&&APEX[x]&&VPATH[x]){const b=T[k+'/'+APEX[x].side],p=VPATH[x];if(b)f=[b[0]*p[0],b[1]*p[1]]}return f||T[c]||VF1},VF1=[1,1];
 const vsHead=()=>'Versus · '+(VS.format==='teams'?'teams':'free-for-all')+' · heroes of floor '+VS.floor+' · first to '+VS.wins+(VS.wins>1?' rounds':' round')+' · '+VS.time+' s a round';
 const vsSide=team=>{const t=VS.teams.find(x=>x.team===team);return t?t.name:'Nobody'};
