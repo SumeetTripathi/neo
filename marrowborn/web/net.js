@@ -488,7 +488,11 @@ function modes(cur,pick){
 /* ---- versus: words and colours ---- */
 var VS_LAB={format:'Format',floor:'Hero level',wins:'Rounds to win',time:'Round time'};
 function vsWord(k,v){return k==='format'?(v==='teams'?'Teams':'Free-for-all'):k==='floor'?'Floor '+v:k==='wins'?'First to '+v:v+' s'}
-var TEAM_NAME=['Team A','Team B'],TEAM_COL=['#2f9dff','#ffb21e'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
+var TEAM_NAME=['Team A','Team B'],TEAM_COL=['#2f9dff','#ffb21e'],MEMBER_COL=['#4fd8ff','#ff9f1a','#7dff5a','#b46cff','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'];
+/* (round 11) the fourth member colour was a pink that sat too close to the crimson everything hostile is drawn in: it is violet now. The game's own list
+   (MB.mp.colors, in game.js) is brought into line here until that file carries the new value itself. */
+function fixColors(){try{var c=MB.mp&&MB.mp.colors;if(c&&typeof c[3]==='string'&&c[3].toLowerCase()==='#ff5ad2')c[3]=MEMBER_COL[3]}catch(e){}}
+fixColors();
 function hex(c){if(typeof c==='number'&&c>=0)c='#'+('000000'+Math.floor(c).toString(16)).slice(-6);return typeof c==='string'&&/^#[0-9a-f]{3,8}$/i.test(c)?c:''}
 /* the colours the arena uses, so that the lobby, the HUD and the rings round the heroes agree: the renderer's own when it offers them, else the game's member colours */
 function teamColor(t){
@@ -511,12 +515,14 @@ function optRow(k,canEdit){
   });
   return h('div',{class:'mbn-opt'},h('span',{class:'lab',text:VS_LAB[k]}),box);
 }
-function memberRow(m,col){
+/* (round 11) to: with teams, the side the HOST may send this player to from here (any player, ready or not: the host owns the sides) */
+function memberRow(m,col,to){
   var tags=[];
   if(m.isHost)tags.push(h('span',{class:'lab mbn-tag host',text:'Host'}));
   else tags.push(h('span',{class:'lab mbn-tag'+(m.ready?' ok':''),text:m.ready?'Ready':'Not ready'}));
   var row=h('div',{class:'mbn-li'+(m.id===MBNet.id?' me':'')+(col?' col':'')},
     h('span',{class:'mbn-name',text:m.name+(m.id===MBNet.id?' (you)':'')}),tags,
+    MBNet.isHost&&(to===0||to===1)?btn(to?'To B \u203a':'\u2039 To A',function(){notice='';MBNet.setTeam(to,m.id)},false,{class:'mbn-mv','data-k':'mv-'+m.id,'aria-label':'Move '+m.name+' to '+TEAM_NAME[to],title:'Move to '+TEAM_NAME[to]}):null,
     MBNet.isHost&&!m.isHost?btn('Remove',function(){MBNet.kick(m.id)},false,{class:'mbn-x','data-k':'kick-'+m.id,'aria-label':'Remove '+m.name}):null);
   if(col)row.style.setProperty('--tc',col);
   return row;
@@ -647,7 +653,7 @@ function showLobby(){
           if(t!==mine)hd.appendChild(btn('Join',function(){notice='';MBNet.setTeam(t)},false,{'data-k':'team-join','aria-label':'Join '+TEAM_NAME[t],disabled:!MBNet.isHost&&!!me.ready,title:!MBNet.isHost&&me.ready?'Press Not ready to change team':null}));
           else hd.appendChild(h('span',{class:'lab mbn-tag mbn-yours',text:'Your team'}));
           col.appendChild(hd);
-          var l=h('div',{class:'mbn-list'});its.forEach(function(m){l.appendChild(memberRow(m))});
+          var l=h('div',{class:'mbn-list'});its.forEach(function(m){l.appendChild(memberRow(m,null,1-t))});
           if(!its.length)l.appendChild(h('p',{class:'dim',text:'Nobody yet.'}));
           col.appendChild(l);cols.appendChild(col);
         });
@@ -661,10 +667,10 @@ function showLobby(){
     var status=notice||(MBNet.isHost?(block?block:MBNet.members.length<2?'Waiting for players. You can also start alone.':waiting?'Waiting for '+waiting+(waiting>1?' players':' player')+' to be ready.':'Everyone is ready.')
       :me.ready?'Waiting for the host to start.':teams?'Pick your team, then press Ready.':'Press Ready when you are set.');
     p.appendChild(msgLine(status,!!notice));
-    var btns=h('div',{class:'btns'}),first;
+    var btns=h('div',{class:'btns mbn-acts'}),first;
     if(MBNet.isHost)btns.appendChild(first=btn('Start',function(){notice='';MBNet.start()},true,{disabled:waiting>0||!!block,'data-k':'start'}));
     else btns.appendChild(first=btn(me.ready?'Not ready':'Ready',function(){notice='';MBNet.setReady(!me.ready)},!me.ready,{'data-k':'ready','aria-pressed':me.ready?'true':'false'}));
-    if(MBNet.isHost&&teams){var tc=teamCount();btns.appendChild(btn('Balance teams',function(){notice='';MBNet.balance()},false,{'data-k':'balance',disabled:Math.abs(tc[0]-tc[1])<2}))}
+    if(MBNet.isHost&&teams){var tc=teamCount();btns.appendChild(btn('Balance',function(){notice='';MBNet.balance()},false,{'data-k':'balance','aria-label':'Balance teams',title:'Balance teams',disabled:Math.abs(tc[0]-tc[1])<2}))}
     btns.appendChild(btn('Leave',function(){notice='';MBNet.leave();showMenu()},false,{'data-k':'leave'}));
     p.appendChild(btns);
     return touch()?p:first;
@@ -687,7 +693,7 @@ var WHY={
 
 // keep the open screen in step with the room
 ['net:join','net:leave','net:ready','net:name','net:mode','net:vs'].forEach(function(t){MBNet.on(t,function(){if(screen==='lobby'&&MBNet.state==='lobby')showLobby()})});
-MBNet.on('net:start',function(){notice='';hideLayer()});
+MBNet.on('net:start',function(){notice='';fixColors();hideLayer()});
 MBNet.on('net:error',function(e){
   if(e.code==='nogame'||e.code==='begin'){notice=e.msg;if(MBNet.isHost)MBNet.end('no-game');else if(MBNet.state==='playing'&&e.code==='begin')MBNet.leave()}
   else if(screen==='lobby'){notice=e.msg||'';showLobby()}

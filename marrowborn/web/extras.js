@@ -73,7 +73,7 @@ function closeLayer(){
   if(!layer)return;
   layer.hidden=true;view=null;panel.textContent='';
   var ov=$('ov');if(ov){try{ov.inert=false}catch(e){}
-    if(!ov.hidden&&!isTouch()){var b=ov.querySelector('#ovBtns button,#ovCards button');if(b)try{b.focus({preventScroll:true})}catch(e){}}}
+    if(!ov.hidden&&!isTouch()){var nb=$('ovBtns'),b=nb&&nb.dataset.nodef==='1'?null:ov.querySelector('#ovBtns button,#ovCards button');if(b)try{b.focus({preventScroll:true})}catch(e){}}} // (a screen with no default action, the versus waiting screen, gets no focused button: Enter must not choose there)
 }
 function heading(kick,title){return [kick?h('p',{class:'kick',text:kick}):null,title?h('h2',{text:title}):null]}
 function button(label,fn,primary){return h('button',{type:'button',class:primary?'primary':'',text:label,onclick:function(e){e.stopPropagation();blip();fn()}})}

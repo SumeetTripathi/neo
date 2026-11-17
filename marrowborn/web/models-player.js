@@ -116,7 +116,7 @@ Builder.prototype={
       const mesh=new T.Mesh(G,b.m),gl=NOL.has(b.m);mesh.castShadow=!gl;mesh.receiveShadow=false;mesh.userData.part=true;if(gl||b.fine)mesh.userData.noOutline=true;this.slots[b.slot].add(mesh)}
     this.bins.clear()}
 };
-function clearSlots(slots){for(const k in slots){const s=slots[k];for(let i=s.children.length-1;i>=0;i--){const c=s.children[i];if(c.userData.part){s.remove(c);c.geometry.dispose()}}}}
+function clearSlots(slots){for(const k in slots){const s=slots[k];for(let i=s.children.length-1;i>=0;i--){const c=s.children[i];if(c.userData.part){s.remove(c);c.geometry.dispose();if(c.isInstancedMesh)c.dispose()}}}}
 function mkSlots(root,tree){const s={};for(const[name,parent]of tree){const g=new T.Group();g.name=name;s[name]=g;(parent?s[parent]:root).add(g)}return s}
 
 /* ================= PLAYER ================= */
@@ -128,7 +128,7 @@ const P_TREE=[['aura'],['ready'],['slash'],['rig'],['hips','rig'],['legL','hips'
   // apex: dominion floor + its spreading wave, two shard orbits, the crown; order aura + its pulse, the halo behind the shoulders and its two wings
   ['dom'],['domW'],['orbA'],['orbB'],['crown','head'],['oaura'],['oaura2','oaura'],['oauraW'],['nimbus','torso'],['nring','nimbus'],['wingL','nimbus'],['wingR','nimbus'],
   // round 10: what the eight newer paths hang their looks on (empty groups for everyone else)
-  ['aground'],['aground2'],['awave'],['awave2'],['aorb'],['aorb2'],['items'],['it0','items'],['it1','items'],['it2','items'],['it3','items'],['it4','items'],['it5','items'],
+  ['aground'],['aground2'],['awave'],['awave2'],['aorb'],['aorb2'],['items'],['it0','items'],['it1','items'],['it2','items'],['it3','items'],['it4','items'],['it5','items'],['itI','items'],
   ['ahead','head'],['ahead2','head'],['aback','torso'],['aback2','aback']];
 // a lean build about 6.4 heads tall: hip height, leg and arm segment lengths, shoulder and neck heights above the hips
 const HIP=30.5,UL=15,LL=15.5,UA=10.5,FA=9,SH=17.3,SX=7.5,NECK=20.2,HEADY=4.9;
@@ -378,7 +378,11 @@ function buildHuman(b,s,ud,st,c,adv,tier,apex){
     b.fine=true;for(const k of[-1,1]){b.bx('torso',st,k*2.3,9.4,4.3,1.7,15.5,.5,0,0,k*.05);b.bx('hips',st,k*2.6,-4,3.9,1.7,9,.5,-.06);b.spike('hips',st,k*2.6,-8.4,3.7,0,-1,0,2.4,.9,.3)}
     b.to('head',lit(acc,K),0,6.9,-.2,4.75,.5,1,0,HP-.2);b.co('head',lit(acc,K+.3),0,7.3,4.6,.8,2.2,PI,0,0,4);b.fine=false;
     for(const f of['foreL','foreR']){b.cy(f,H1,0,-6,0,1.8,2.7,4.8);b.fine=true;b.to(f,tr,0,-8.3,0,2.7,.34);b.fine=false}
-    const hl=lit(acc,1.3,0xfff0c0),R=adv==='saint'?7.4:6.2;s.halo.position.set(0,12.6,-2.6);ud.haloY=12.6;
+    // (round 11) with an apex head piece the halo no longer tumbles through it: it stands still behind the head and turns in its own plane (1);
+    // round the Tithe's crown it lies flat as a wider ring about the crown's foot (2); under the White Marrow's great ring it lies flat above the head (3)
+    const hm=!apex?0:apex==='dominion'?2:apex==='order'?3:1;ud.haloM=hm;
+    const hl=lit(acc,1.3,0xfff0c0),R=hm===2?(adv==='saint'?9.2:8.6):adv==='saint'?7.4:6.2;s.halo.position.set(0,12.6,-2.6);ud.haloY=12.6;
+    if(hm===1){s.halo.position.z=-5.6;if(apex==='tide')ud.haloY=14.1}else if(hm===2)s.halo.position.z=-.5;else if(hm===3){s.halo.position.z=0;ud.haloY=16.8}
     b.fine=true;for(let i=0;i<4;i++){b.to('halo',hl,0,0,0,R,.55,1,1.2,HP,0,i*HP+.18)}
     for(let i=0;i<(adv==='saint'?8:4);i++){const a=i*TAU/(adv==='saint'?8:4)+PI/4;b.spike('halo',hl,Math.cos(a)*(R+.6),0,Math.sin(a)*(R+.6),Math.cos(a),0,Math.sin(a),adv==='saint'?4.4:2.8,.75,.5)}b.fine=false;
     b.to('halo',glow(acc,.22),0,0,0,R,1.9);
@@ -414,7 +418,7 @@ function buildApex(b,s,ud,c,apex,tier){
   if(APEX_NEW[apex]){const A=APX[apex];APEX_NEW[apex](b,s,ud,c,A,ud.foe?gp:A.a,ud.foe?gp2:A.h,W);return}
   if(apex==='dominion'){
     // the crown: a dark band that hovers over the head, ringed with upturned finger-bones of uneven height, one violet splinter turning above it
-    const Bd=mat(0x241d33),Bn=mat(C.bone),V=lit(pw,1.7,0xc9a8ff),cy=c==='mage'?12.4:c==='tank'?12:c==='healer'?11.6:11,cr=c==='mage'?5.3:6;
+    const Bd=mat(0x241d33),Bn=mat(C.bone),V=lit(pw,1.7,0xc9a8ff),cy=c==='mage'?17.6:c==='tank'?12:c==='healer'?11.6:ud.adv==='lich'?13.8:11,cr=c==='mage'?5.3:6;   // (round 11: the mage's crown rides above the bent point of the hat, a lich's above its own spikes)
     ud.crownY=cy;s.crown.position.set(0,cy,-.5);
     b.to('crown',Bd,0,0,0,cr,.62,1);
     const hs=[11.5,6,8.6,5,7.4,5.6,9.6];
@@ -482,14 +486,15 @@ const APEX_NEW={
   // The Feral Vow: antlers of bone, a mantle of hide and claws, the floor raked by claws, one paw-print circling for each beast of the pack
   beasts(b,s,ud,c,A,gp,gp2,W){
     const Bn=mat(C.bone),Fur=mat(0x8a6a3c),FurD=mat(0x5a4426),G1=lit(A.a,1.5,0xd8ffd0),hy=headY(c);
-    s.ahead.position.set(0,hy-2.6,-.6);
-    for(const k of[-1,1]){
-      b.bone('ahead',Bn,k*3,0,0,k*9,7,-1.5,1.9,2,1.8);b.bone('ahead',Bn,k*9,7,-1.5,k*13.5,16,-.5,1.6,0,1.5);b.bone('ahead',Bn,k*13.5,16,-.5,k*11.5,25,.8,1.3,0,0);
-      b.spike('ahead',Bn,k*11.5,25,.8,-k*.2,1,.2,6.5,1.3);
-      b.spike('ahead',Bn,k*6,3.6,-.8,k*.25,.9,.9,8,1.4);b.spike('ahead',Bn,k*10,9.5,-1.3,k*1,.7,.1,10,1.4);
-      b.spike('ahead',Bn,k*13.4,15.5,-.6,k*1,.55,-.2,9.5,1.3);b.spike('ahead',Bn,k*12.6,20,0,-k*.9,.9,0,7.5,1.2);
-      b.fine=true;b.sp('ahead',G1,k*11.2,31.6,1.4,1.2);b.sp('ahead',G1,k*21,20.6,-2.3,1.1);b.sp('ahead',G1,k*17.6,15.4,-.2,1.1);b.fine=false;
-      
+    // (round 11) the antlers root where the headgear lets them: on the brim outside a mage's hat, outside the fins of a tank's helm
+    const ax=c==='mage'?2.4:c==='tank'&&ud.adv!=='berserker'?2.5:0;
+    s.ahead.position.set(0,c==='mage'?hy-1.2:hy-2.6,-.6);
+    for(const k of[-1,1]){const o=k*ax;
+      b.bone('ahead',Bn,o+k*3,0,0,o+k*9,7,-1.5,1.9,2,1.8);b.bone('ahead',Bn,o+k*9,7,-1.5,o+k*13.5,16,-.5,1.6,0,1.5);b.bone('ahead',Bn,o+k*13.5,16,-.5,o+k*11.5,25,.8,1.3,0,0);
+      b.spike('ahead',Bn,o+k*11.5,25,.8,-k*.2,1,.2,6.5,1.3);
+      b.spike('ahead',Bn,o+k*6,3.6,-.8,k*.25,.9,.9,8,1.4);b.spike('ahead',Bn,o+k*10,9.5,-1.3,k*1,.7,.1,10,1.4);
+      b.spike('ahead',Bn,o+k*13.4,15.5,-.6,k*1,.55,-.2,9.5,1.3);b.spike('ahead',Bn,o+k*12.6,20,0,-k*.9,.9,0,7.5,1.2);
+      b.fine=true;b.sp('ahead',G1,o+k*11.2,31.6,1.4,1.2);b.sp('ahead',G1,o+k*21,20.6,-2.3,1.1);b.sp('ahead',G1,o+k*17.6,15.4,-.2,1.1);b.fine=false;
     }
     for(const[x,y,z,r]of[[0,19.2,-3,4.8],[5.6,18.6,-1.6,4.4],[-5.6,18.6,-1.6,4.4],[9.4,17.2,-.6,3.5],[-9.4,17.2,-.6,3.5],[3,18.4,2.2,2.6],[-3,18.4,2.2,2.6]])b.sp('aback',Fur,x,y,z,r,1,.72,1);
     for(let i=0;i<9;i++){const a=(i-4)*.36;b.spike('aback',i%2?FurD:Fur,Math.sin(a)*9.8,17.4,-2.6-Math.cos(a)*2.2,Math.sin(a)*.5,-1,-.5,5.5+(i%3),1.8,.6)}
@@ -514,7 +519,9 @@ const APEX_NEW={
     b.put('aorb',glow(A.a,.12),gRing(.3,24,0,TAU),0,-.5,0,-HP,0,0,38,38,1);
     for(const k of[-1,1]){b.spike('aback',Ice,k*7.6,18,0,k*.5,1,-.2,9,1.8);b.spike('aback',IceD,k*9.6,17.4,-1,k*1,.6,-.3,6.5,1.5);b.spike('aback',Ice,k*6,18.4,-2,k*.1,1,-.7,6,1.4);b.sp('aback',Wh,k*7.6,18.3,0,2.9,1,.5,1)}
     s.ahead.position.set(0,hy-1.8,-.5);
-    for(let i=0;i<5;i++){const x=(i-2)*2.2;b.spike('ahead',i%2?IceD:Ice,x,0,-2,x*.12,1,-.35,5+(2-Math.abs(i-2))*1.6,1.15)}
+    // (round 11) the crest: a row over the back of the head; on a mage it stands round the back of the hat's band and stays under the bent point, on a tank it sits ahead of the helm's fins
+    if(c==='mage')for(let i=0;i<5;i++){const a=(i-2)*.52,x=Math.sin(a)*5.7,z=-.7-Math.cos(a)*5.7;b.spike('ahead',i%2?IceD:Ice,x,-.3-Math.cos(a)*1.2,z,Math.sin(a)*.4,1,-Math.cos(a)*.4,i===2?4.4:i%2?7.6:6,1.15)}
+    else{const z0=c==='tank'&&ud.adv!=='berserker'?1.3:-2;for(let i=0;i<5;i++){const x=(i-2)*2.2;b.spike('ahead',i%2?IceD:Ice,x,0,z0,x*.12,1,-.35,5+(2-Math.abs(i-2))*1.6,1.15)}}
     b.fine=true;for(const f of['foreL','foreR'])b.to(f,Wh,0,-7,0,2.4,.5);for(const l of['shinL','shinR'])b.to(l,Wh,0,-9.5,0,2.3,.5);b.fine=false;
     const gl=glow(gp,.5),gl2=glow(gp2,.6);
     b.put('aground',decal(0xbfe4ff,.14),gRing(.01,6,0,TAU),0,.5,0,-HP,0,0,44,44,1);b.put('aground',glow(gp,.45),gRing(.95,6,0,TAU),0,.58,0,-HP,0,0,44,44,1);
@@ -535,9 +542,25 @@ const APEX_NEW={
     b.cy('aback',Drip,10.4,15.4,2.9,.35,.5,6);b.sp('aback',Drip,10.4,12.2,2.9,.85,1,1.3,1);b.cy('aback',Drip,14.8,18.4,.8,.3,.4,5);b.sp('aback',Drip,14.8,15.8,.8,.7);
     b.fine=false;
     
+    // round 11: the growth has fruited. Four crooked stalks of bone climb out of it, each under a bruise-violet cap with bile light in its gills,
+    // slime hanging off the rims; they sway behind the hero (aback2), breathe spores (wingL, this hero's second pulsing material) and a swarm circles them (items)
+    const STK=[[13.5,30,-2.5,19.5,43,-5,17.5,55,-4.5,5],[15.5,25,-1,24.5,34,-2,27,44,-1.5,4.1],[10,27,-6,12,39,-10,14,49,-10.5,3.5],[-6,17,-4.5,-12,27,-6.5,-11.5,36,-6,3.2]];
+    const Cap=mat(0x6b3a7a,{emissive:0x4a1c66,emissiveIntensity:.55}),Hz=glow(A.a,.2),W2=ud.apexMat2;
+    s.wingL.position.set(12,44,-5);
+    STK.forEach(([x0,y0,z0,x1,y1,z1,x2,y2,z2,R],i)=>{
+      b.bone('aback2',Bn,x0,y0,z0,x1,y1,z1,1.55,0,1.9);b.bone('aback2',BnD,x1,y1,z1,x2,y2,z2,1.15,0,0);
+      b.sp('aback2',Cap,x2,y2,z2,R,1,.5,1);b.sp('aback2',Bn,x2,y2-R*.3,z2,R*.42,1,.8,1);
+      b.fine=true;b.to('aback2',Pu,x2,y2-R*.16,z2,R*.74,R*.17);b.sp('aback2',Pu,x2+R*.3,y2+R*.36,z2+R*.2,R*.26);b.sp('aback2',Dk,x2-R*.4,y2+R*.3,z2-R*.2,R*.2,1,.5,1);
+      const dl=4+i*1.4;b.cy('aback2',Drip,x2-R*.55,y2-R*.2-dl/2,z2+R*.3,.3,.42,dl);b.sp('aback2',Drip,x2-R*.55,y2-R*.2-dl,z2+R*.3,.8,1,1.3,1);b.fine=false;
+      b.sp('aback2',Hz,x2,y2,z2,R*1.55);
+      if(W2)for(let j=0;j<3;j++){const a=i*2.1+j*2.3;b.sp('wingL',W2,x2-12+Math.cos(a)*R*.7,y2-44+R*.5+j*2.6,z2+5+Math.sin(a)*R*.7,1.5-j*.3)}});
+    s.items.position.set(5,57,-2);
+    for(let i=0;i<9;i++){const a=i*TAU/9+hr(i+80)*.5,R=17+hr(i+90)*6,y=(hr(i+95)-.5)*9;
+      b.put('items',glow(i%3?A.a:A.h,.85),gSph(),Math.cos(a)*R,y,Math.sin(a)*R,0,-a,0,.8,.8,3.4-hr(i)*1.4)}
+    b.sp('aorb',glow(A.a,.05),0,38,0,30,1,1.2,1);
     s.ahead.position.set(0,hy-3,0);b.sp('ahead',Bn,3.6,.6,1.2,2.5,1,.9,1);b.spike('ahead',BnD,4.4,1.6,.6,.6,1,-.2,6,.95);b.spike('ahead',BnD,2.2,2,0,.1,1,-.4,4,.75);b.fine=true;b.sp('ahead',Pu,4.8,.4,3.1,.85);b.fine=false;
-    for(let i=0;i<5;i++){const a=i*2.4+.5,R=14+hr(i)*11,y=12+i*9.5;b.sp('aorb',glow(A.a,.8),Math.cos(a)*R,y,Math.sin(a)*R,1.3);b.sp('aorb',glow(A.a,.2),Math.cos(a)*R,y,Math.sin(a)*R,3)}
-    for(let i=0;i<4;i++){const a=i*1.7+2,R=18+hr(i+20)*9,y=8+i*12;b.sp('aorb2',glow(A.h,.7),Math.cos(a)*R,y,Math.sin(a)*R,1);b.sp('aorb2',glow(0x6b3a7a,.5),Math.cos(a)*R,y,Math.sin(a)*R,2.2)}
+    for(let i=0;i<5;i++){const a=i*2.4+.5,R=14+hr(i)*11,y=12+i*9.5;b.sp('aorb',glow(A.a,.8),Math.cos(a)*R,y,Math.sin(a)*R,1.9);b.sp('aorb',glow(A.a,.2),Math.cos(a)*R,y,Math.sin(a)*R,4.4)}
+    for(let i=0;i<4;i++){const a=i*1.7+2,R=18+hr(i+20)*9,y=8+i*12;b.sp('aorb2',glow(A.h,.7),Math.cos(a)*R,y,Math.sin(a)*R,1.5);b.sp('aorb2',glow(0x6b3a7a,.5),Math.cos(a)*R,y,Math.sin(a)*R,3.2)}
     const D=decal(0x141a05,.55),D2=decal(0x283008,.34);
     ud.blots=[[0,0,27],[21,9,16],[-19,-13,15],[7,-25,11],[-27,10,9],[30,-8,7],[-6,29,8],[38,14,4],[-34,-24,4.5],[16,-38,3.5],[-14,40,3]];
     ud.blots.forEach(([x,z,r],i)=>{fdisc(b,'aground',D2,x,z,r*1.2,.5,14);fdisc(b,'aground',D,x,z,r,.52,14,r*.92);
@@ -549,7 +572,7 @@ const APEX_NEW={
   flame(b,s,ud,c,A,gp,gp2,W){
     const Ch=mat(0x1a1210),Em=lit(A.a,1.7,0xffd27a),F1=glow(A.a,.8),F2=glow(0xffd27a,.9),F3=glow(0xff3a10,.45),hy=headY(c);
     b.to('head',Ch,0,hy-1.6,-.3,5.3,.85,1);b.fine=true;for(let i=0;i<6;i++){const a=i*TAU/6+.5;b.sp('head',Em,Math.cos(a)*5.3,hy-1.6,-.3+Math.sin(a)*5.3,.75)}b.fine=false;
-    s.ahead.position.set(0,hy-1.4,-.3);s.ahead2.position.set(0,hy-1.4,-.3);
+    {const fy=c==='mage'?hy+.8:hy-1.4;s.ahead.position.set(0,fy,-.3);s.ahead2.position.set(0,fy,-.3)}   // (round 11: on a mage the fire stands on the crown of the hat, not inside it)
     const tongue=(sl,x,z,H,r)=>{b.co(sl,F3,x,H*.42,z,r*1.35,H*.84,0,0,0,5);b.co(sl,F1,x,H/2,z,r,H,0,0,0,5);b.co(sl,F2,x,H*.3,z,r*.5,H*.6,0,0,0,5)};
     tongue('ahead',0,0,21,3);tongue('ahead',3.4,-.8,13,2.2);tongue('ahead',-3.4,-.8,13,2.2);
     tongue('ahead2',1.8,1.9,10,1.9);tongue('ahead2',-1.9,1.7,11,1.9);tongue('ahead2',0,-2.8,16,2.4);tongue('ahead2',4.6,1,7.5,1.5);tongue('ahead2',-4.6,1,7.5,1.5);
@@ -573,7 +596,7 @@ const APEX_NEW={
   // a forked scorch that stutters on the floor
   storm(b,s,ud,c,A,gp,gp2,W){
     const Y=lit(A.a,1.8,0xfffbe0),Yg=glow(A.a,.45),Wh=glow(0xfffbe0,.95),Sl=mat(0xc9d2f0,{emissive:0x6a78c8,emissiveIntensity:.35}),hy=headY(c);
-    s.ahead.position.set(0,hy-2.8,-1);
+    s.ahead.position.set(0,c==='mage'?hy-1.3:hy-2.8,-1);   // (round 11: over a mage's brim, not through it)
     for(const[x,y,l,r]of[[0,2,15,2.1],[2.6,1.2,12,1.8],[-2.6,1.2,12,1.8],[1.3,-.6,10,1.6],[-1.3,-.6,10,1.6],[4.2,-.8,8,1.4],[-4.2,-.8,8,1.4]])b.spike('ahead',Y,x,y,-1,x*.05,.3,-1,l,r,.6);
     s.aback.position.set(0,17.6,-4.2);s.aback2.position.set(0,-1.6,-15);
     for(const k of[-1,1]){b.bx('aback',Sl,k*4.6,-.8,-7.5,2.2,.5,15.4,.1,k*-.1,0);b.bx('aback2',Sl,k*5.6,-.4,-7,1.7,.4,14.5,-.04,k*-.12,0);b.spike('aback2',Sl,k*6.4,-.1,-14,k*.15,0,-1,8,.9,.2);b.spike('aback2',Sl,k*7.2,-.1,-12,k*.5,0,-1,6,.7,.2);
@@ -617,7 +640,10 @@ const APEX_NEW={
     const St=lit(0xeef2ff,1.1,0xf4f6ff),Ed=lit(A.a,1.7,0xdfe4ff),Gm=mat(0x2a2e44),Gd=lit(C.gold,.5),Gl=glow(A.a,.22);
     s.items.position.set(0,HIP+7,-3);
     const PHI=[.32,-.32,.95,-.95,1.6,-1.6];
-    for(let i=0;i<6;i++){const sl='it'+i,p=PHI[i];s[sl].position.set(Math.sin(p)*9,0,-Math.cos(p)*9);s[sl].rotation.set(-.62,-p,0);
+    // (round 11) the six swords are one sword drawn six times: built once into itI and instanced (rebuildPlayer turns its meshes into instanced ones,
+    // apexAnim writes each sword's place from the empty it0..it5, which still carry the motion). Same shapes, same ink, same shadows; 9 draw calls where there were 54.
+    for(let i=0;i<6;i++){const sl='it'+i,p=PHI[i];s[sl].position.set(Math.sin(p)*9,0,-Math.cos(p)*9);s[sl].rotation.set(-.62,-p,0)}
+    {const sl='itI';
       b.cy(sl,Gd,0,4.2,0,.7,.7,4.6,0,0,0,1,6);b.sp(sl,Gd,0,1.5,0,1.05);b.bx(sl,Gd,0,6.9,0,6.6,1.05,1.4);
       b.bx(sl,St,0,20.5,0,2.7,26,.75);b.spike(sl,St,0,33.5,0,0,1,0,5.5,1.35,.28);
       b.fine=true;b.bx(sl,Ed,1.5,20.5,0,.45,26,.85);b.bx(sl,Ed,-1.5,20.5,0,.45,26,.85);b.fine=false;
@@ -659,7 +685,10 @@ function apexAnim(ud,s,P,t,dt,show,mb,dl,ab,yv){
     q=(t*.3)%1;w=12+52*q;s.awave.scale.set(w,1,w);W.opacity=.5*(1-q);
   }else if(ap==='plague'){
     s.aorb.rotation.y=t*.5;s.aorb.position.y=Math.sin(t*.8)*2;s.aorb2.rotation.set(.08*Math.sin(t*.6),-t*.33,0);s.aorb2.position.y=Math.sin(t*.63+2)*2.5;
-    const f=1+.025*Math.sin(t*3.1);s.aback.scale.set(f,f,f);
+    const f=1+.045*Math.sin(t*3.1);s.aback.scale.set(f,f,f);
+    s.aback2.rotation.set(.05*Math.sin(t*.9)+mb*.14+dl*.2,0,.06*Math.sin(t*.7+1)-yv*.7);
+    s.items.rotation.set(.42+.1*Math.sin(t*.8),-t*2.3,.12*Math.sin(t*1.1));s.items.position.y=57+Math.sin(t*1.3)*2.5;
+    q=(t*.42)%1;w=.7+.9*q;s.wingL.position.y=44+q*17;s.wingL.scale.set(w,w,w);s.wingL.visible=show;ud.apexMat2.opacity=.85*Math.sin(q*PI);
     const bl=ud.blots,k=Math.floor(t*.6)%5;q=(t*.6)%1;w=bl[k][2]*(.3+.95*q);s.awave.position.set(bl[k][0],0,bl[k][1]);s.awave.scale.set(w,1,w);W.opacity=.55*(1-q);
   }else if(ap==='flame'){
     s.ahead.scale.set(1+.08*Math.sin(t*13),1+.2*Math.sin(t*11)+.1*Math.sin(t*23.7),1+.08*Math.sin(t*17));
@@ -684,6 +713,8 @@ function apexAnim(ud,s,P,t,dt,show,mb,dl,ab,yv){
     n=cnt(P.blades,4,6);const e=ab*ab*(3-2*ab);
     s.items.rotation.set(e*1.3-mb*.14-dl*.3,Math.sin(t*.9)*.07-yv*.5,0);s.items.position.set(0,HIP+7+e*5,-3+e*4);
     for(i=0;i<6;i++){const o=s['it'+i];o.visible=i<n;o.rotation.x=-.62*(1-e*.75)+Math.sin(t*1.7+i*1.3)*.04;o.position.y=Math.sin(t*2+i*1.9)*.9}
+    const IM=ud.imB;if(IM){for(i=0;i<n;i++){const o=s['it'+i];o.updateMatrix();for(q=0;q<IM.length;q++)IM[q].setMatrixAt(i,o.matrix)}
+      for(q=0;q<IM.length;q++){const m=IM[q],l=m.userData.mbLineMesh;m.count=n;m.instanceMatrix.needsUpdate=true;if(l)l.count=n}}
     q=(t/.9)%1;w=Math.floor(t/.9)*2.4;s.awave.rotation.y=w;s.awave.position.set(Math.sin(w*1.7)*8,0,Math.cos(w*2.3)*8);w=40*Math.min(1,q*5);s.awave.scale.set(w,1,w*.6+3);W.opacity=.85*(1-q)*(1-q);
   }else if(ap==='tide'){
     s.aorb.rotation.y=t*1.3;s.aorb2.rotation.y=-t*1+1;s.aorb.position.y=Math.sin(t*1.7)*1.2;s.aorb2.position.y=Math.sin(t*1.5+2)*1.2;
@@ -731,13 +762,13 @@ function rebuildPlayer(g,MB){
   for(const k in s){if(k!=='rig'&&k!=='hips'){s[k].position.set(0,0,0)}s[k].rotation.set(0,0,0);s[k].scale.set(1,1,1);s[k].visible=true}
   s.hips.position.set(0,HIP,0);s.legL.position.set(2.9,0,0);s.legR.position.set(-2.9,0,0);s.shinL.position.set(0,-UL,0);s.shinR.position.set(0,-UL,0);
   s.foreL.position.set(0,-UA,0);s.foreR.position.set(0,-UA,0);s.handL.position.set(0,-FA,0);s.handR.position.set(0,-FA,0);
-  ud.cls=c;ud.adv=adv;ud.apex=apex;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.bowH=13;
+  ud.cls=c;ud.adv=adv;ud.apex=apex;ud.skin=skin;ud.robe=false;ud.tier=tier;ud.shY=9.4;ud.haloY=12.6;ud.haloM=0;ud.bowH=13;
   // versus: an opponent's marks on the floor (upgrade aura, skill-ready ring, the apex ground and aura) are laid in the foe palette; the body is untouched
   const foe=MB.foe===true;ud.foe=foe;
   const AXP=APX[apex],b=new Builder(s),pw=foe?pal('foe',0xff2d55):AXP?AXP.a:pal('power',0x8b4dff),pw2=foe?pal('foe2',0xffb0a0):AXP?AXP.h:pal('power2',0xc4f4ff),acc=c?(adv&&ACC2[adv])||ACC[c]:C.bone; // (a newer path: the upgrade aura and the ready ring take its colours)
   if(skin)buildHuman(b,s,ud,st,c,adv,tier,apex);else buildSkeleton(b,s,!!(st&1));
   if(apex){const W=ud.apexMat||(ud.apexMat=slashMat()),AX=APX[apex];W.color.setHex(foe?pal('foe',0xff2d55):AX?AX.a:apex==='dominion'?pal('power',0x8b4dff):pal('power2',0xc4f4ff));
-    if(apex==='tide'){const W2=ud.apexMat2||(ud.apexMat2=slashMat());W2.color.copy(W.color)}
+    if(apex==='tide'||apex==='plague'){const W2=ud.apexMat2||(ud.apexMat2=slashMat());W2.color.copy(W.color)}
     buildApex(b,s,ud,c,apex,tier)}
   buildWeapon(b,s,ud,skin,c,adv,tier);
   // ground effects: upgrade aura, skill-ready ring, melee slash arc
@@ -748,6 +779,11 @@ function rebuildPlayer(g,MB){
   if(full){b.put('slash',SLASH,gRing(.93,48,0,TAU),0,0,0,-HP,0,0,R,R,1);b.put('slash',SLASH,gRing(.975,40,0,TAU),0,0,0,-HP,0,0,R*.8,R*.8,1)}else b.put('slash',SLASH,gRing(.62,14,-HP-1.15,2.3),0,0,0,-HP,0,0,R,R,1);
   s.slash.position.set(0,32,0);
   b.flush();
+  // the Thousandth Cut: the one sword built into itI becomes instanced meshes (same geometry and material objects, six places)
+  ud.imB=null;
+  if(apex==='blade'){const src=s.itI.children.slice();ud.imB=[];
+    for(const m of src){if(!m.userData.part)continue;const im=new T.InstancedMesh(m.geometry,m.material,6);im.count=0;im.frustumCulled=false;im.castShadow=m.castShadow;im.receiveShadow=false;
+      im.userData.part=true;if(m.userData.noOutline)im.userData.noOutline=true;im.instanceMatrix.setUsage(T.DynamicDrawUsage);s.itI.remove(m);s.itI.add(im);ud.imB.push(im)}}
   ud.shieldMeshes.length=0;ud.shieldOn=null;
   for(const m of s.shield.children)if(m.userData.part)ud.shieldMeshes.push(m,m.material,dimOf(m.material));
   // power wisps: more of them with an upgrade and with every rank
@@ -765,7 +801,7 @@ const player={
   create(MB){
     const g=new T.Group();g.name='player';const s=mkSlots(g,P_TREE);
     g.userData={s,key:'',rot:null,mb:0,ab:0,k:1,dl:0,yv:0,atkDur:.16,lastAtk:0,cls:null,adv:null,skin:false,robe:false,wtype:'club',full:false,shieldMeshes:[],slashMat:slashMat(),shieldOn:null,
-      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,bowH:13,apex:null,apexMat:null,apexMat2:null,crownY:11,auraK:0,ascK:0,hsK:0};
+      wisps:[],nw:0,tier:0,shY:9.4,haloY:12.6,haloM:0,bowH:13,apex:null,apexMat:null,apexMat2:null,imB:null,crownY:11,auraK:0,ascK:0,hsK:0};
     for(let i=0;i<6;i++)s['it'+i].rotation.order='YXZ';
     // rising wisps of power: a fixed handful of shared-geometry meshes, placed in update()
     const wg=new T.Group();wg.name='wisps';g.add(wg);
@@ -848,7 +884,11 @@ const player={
     if(wt==='staff'){const f=1+.55*ab+Math.sin(t*5)*.04;s.orb.scale.set(f,f,f);
       if(c==='necro'){s.orb.position.y=25.4;s.orb.rotation.y=0}else if(c==='healer')s.spin.rotation.z=t;else{s.orb.position.y=27.6+Math.sin(t*2.6)*.5;s.orb.rotation.y=t*1.6;s.spin.rotation.y=t*1.2}}
     if(wt==='bow'){const H=ud.bowH,p=atk?(1-k)*9:0,L=Math.sqrt(H*H+p*p),a=Math.atan2(p,H);s.strA.scale.y=L;s.strB.scale.y=L;s.strA.rotation.x=a;s.strB.rotation.x=-a}
-    if(c==='healer'){s.halo.position.y=ud.haloY+Math.sin(t*2)*.5;s.halo.rotation.set(HP-.35,0,t*.6)}
+    if(c==='healer'){const hm=ud.haloM;
+      if(!hm){s.halo.position.y=ud.haloY+Math.sin(t*2)*.5;s.halo.rotation.set(HP-.35,0,t*.6)}
+      else if(hm===1){s.halo.position.y=ud.haloY+Math.sin(t*2)*.5;s.halo.rotation.set(HP-.16,t*.6,0)}
+      else if(hm===2){s.halo.position.y=ud.crownY+.9+Math.sin(t*1.7)*.45;s.halo.rotation.set(0,-t*.6,0)}
+      else{s.halo.position.y=ud.haloY+Math.sin(t*2)*.4;s.halo.rotation.set(0,t*.6,0)}}
     if(ud.adv){s.aura.rotation.y=t*.6;const f=1+.05*Math.sin(t*3);s.aura.scale.set(f,1,f)}
     // apex: the crown hovers and turns, the shards orbit, the domain breathes and throws its wave; or the halo turns, the wings fan and the aura pulses
     if(ud.apex==='dominion'){

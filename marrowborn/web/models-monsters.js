@@ -745,13 +745,106 @@ function shadeUpdate(g,m,u,t,dt,r){
   // its time is nearly up: the body goes to thin violet light and flickers (the material belongs to this one shade)
   var life=typeof m.life==='number'?m.life:9,end=m.max>0?min(1.6,m.max*.3):1.6;
   if(life<end){
-    if(!u.wane){u.wane=new T.MeshBasicMaterial({color:0x9a6cff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});u.own.push(u.wane);
+    if(!u.wane){shadeSplit(u,true);u.wane=new T.MeshBasicMaterial({color:0x9a6cff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});u.own.push(u.wane);
       for(i=0;i<u.meshes.length;i++)u.meshes[i].material=u.wane;if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=false}
     q=max(0,life/end);u.wane.opacity=(.25+.6*q)*(.8+.2*sin(t*(14+16*(1-q))+seed));
   }else if(u.wane){ // given more time: back to its body
     for(i=0;i<u.meshes.length;i++)u.meshes[i].material=u.mats[i];if(u.p.glows)for(i=0;i<u.p.glows.length;i++)u.p.glows[i].visible=true;
-    i=u.own.indexOf(u.wane);if(i>=0)u.own.splice(i,1);u.wane.dispose();u.wane=null;u.mode=0;
+    i=u.own.indexOf(u.wane);if(i>=0)u.own.splice(i,1);u.wane.dispose();u.wane=null;u.mode=0;shadeSplit(u,false);
   }
+}
+/* ---------- round 11: a shade's still parts are drawn as one mesh per (parent, material) ----------
+   A shade is a full monster body, one mesh per part, and a dominion hero fields a legion of them. Most of those parts never move on their own
+   (they ride a limb or the body). Which ones is found by trying, not by reading the twelve bodies: the first shade of a build (ai + its spec numbers)
+   has its animation run through every state at several moments while every mesh is watched; a mesh whose own position, turn, size, visibility,
+   material and geometry never change, that has no children and that nothing in the part table points at, is still. Still meshes that share a parent
+   and a material are baked into one geometry (cached per build and shared by every shade of it, never disposed). Everything is put back as it was
+   after the trial, so the look and the motion are the same; only the number of draw calls falls. Any surprise (an animation that throws, a build
+   that differs from the cached plan) simply leaves that body unmerged. */
+var SPLAN={},PROBE_ST=['idle','wind','charge','lunge','cast','beam','dazed','leap','rise','under','up','walk'],_m4=new T.Matrix4();
+function refsOf(v,set,d){
+  if(!v||typeof v!=='object'||d>4)return;
+  if(v.isObject3D){set.add(v);return}
+  if(v.isMaterial||v.isBufferGeometry||v.isTexture)return;
+  if(Array.isArray(v)){for(var i=0;i<v.length;i++)refsOf(v[i],set,d+1);return}
+  for(var k in v)refsOf(v[k],set,d+1);
+}
+function primsOf(o,out,d){
+  for(var k in o){var v=o[k],ty=typeof v;
+    if(ty==='number'||ty==='boolean'||ty==='string'||v===undefined||v===null)out.push(o,k,v);
+    else if(d>0&&ty==='object'&&!v.isObject3D&&!v.isMaterial&&!v.isBufferGeometry&&!v.isTexture){
+      if(Array.isArray(v)){for(var i=0;i<v.length;i++){var e=v[i],te=typeof e;if(te==='number'||te==='boolean'||te==='string')out.push(v,i,e);else if(e&&te==='object'&&!e.isObject3D&&!e.isMaterial)primsOf(e,out,d-1)}}
+      else primsOf(v,out,d-1)}}
+}
+function shadePlan(u,m,key){
+  var ms=u.meshes,n=ms.length,i,j,k,o,all=[],snap,dyn=new Uint8Array(n),refs=new Set(),prims=[],plan=[];
+  refsOf(u.p,refs,0);
+  u.root.traverse(function(q){all.push(q)});
+  snap=new Float64Array(all.length*11);var mat0=[],geo0=[];
+  for(i=0;i<all.length;i++){o=all[i];k=i*11;snap[k]=o.position.x;snap[k+1]=o.position.y;snap[k+2]=o.position.z;snap[k+3]=o.quaternion.x;snap[k+4]=o.quaternion.y;snap[k+5]=o.quaternion.z;snap[k+6]=o.quaternion.w;
+    snap[k+7]=o.scale.x;snap[k+8]=o.scale.y;snap[k+9]=o.scale.z;snap[k+10]=o.visible?1:0;mat0.push(o.material);geo0.push(o.geometry)}
+  primsOf(u.p,prims,2);for(k in u){o=u[k];j=typeof o;if(j==='number'||j==='boolean'||j==='string'||o===undefined||o===null)prims.push(u,k,o)}
+  var ix=new Map();for(i=0;i<all.length;i++)ix.set(all[i],i);
+  var ok=true,mm=Object.create(m),TS=[.37,1.91,5.3,11.77,23.4];
+  try{
+    for(var si=0;si<PROBE_ST.length&&ok;si++)for(var ti=0;ti<TS.length;ti++){
+      var t=TS[ti],st=PROBE_ST[si];mm.st=st==='walk'?'idle':st;mm.t=ti%2?.7:.15;mm.lift=st==='leap'?.25+.15*ti:0;mm.ang=ti*1.3;mm.ba=ti*.9;mm.side=ti%2?1:-1;mm.x=(m.x||0)+ti*7;mm.y=(m.y||0)-ti*5;
+      u.mv=st==='walk'||ti%2?1:0;u.ma=ti;
+      ANIM[u.ai](u.p,mm,t,t+ti*3.1,mm.st,ti%2?.8:-.8,u,1/60);
+      for(i=0;i<n;i++){if(dyn[i])continue;o=ms[i];j=ix.get(o);if(j===undefined){dyn[i]=1;continue}k=j*11;
+        if(Math.abs(o.position.x-snap[k])>1e-9||Math.abs(o.position.y-snap[k+1])>1e-9||Math.abs(o.position.z-snap[k+2])>1e-9||Math.abs(o.quaternion.x-snap[k+3])>1e-9||Math.abs(o.quaternion.y-snap[k+4])>1e-9||
+          Math.abs(o.quaternion.z-snap[k+5])>1e-9||Math.abs(o.quaternion.w-snap[k+6])>1e-9||Math.abs(o.scale.x-snap[k+7])>1e-9||Math.abs(o.scale.y-snap[k+8])>1e-9||Math.abs(o.scale.z-snap[k+9])>1e-9||
+          (o.visible?1:0)!==snap[k+10]||o.material!==mat0[j]||o.geometry!==geo0[j])dyn[i]=1}
+    }
+  }catch(e){ok=false}
+  // put everything back exactly as it was built
+  for(i=0;i<all.length;i++){o=all[i];k=i*11;o.position.set(snap[k],snap[k+1],snap[k+2]);o.quaternion.set(snap[k+3],snap[k+4],snap[k+5],snap[k+6]);o.scale.set(snap[k+7],snap[k+8],snap[k+9]);o.visible=snap[k+10]===1;
+    if(o.material!==mat0[i])o.material=mat0[i];if(o.geometry!==geo0[i])o.geometry=geo0[i]}
+  for(i=0;i<prims.length;i+=3)prims[i][prims[i+1]]=prims[i+2];
+  for(k in u)if(!(k in SHK))delete u[k];
+  if(ok){
+    var groups=new Map();
+    for(i=0;i<n;i++){o=ms[i];
+      if(dyn[i]||refs.has(o)||o.children.length||!o.visible||!o.parent||!o.geometry.attributes.normal||Array.isArray(o.material)||o.material.map||o.material.transparent||o.material.depthWrite===false)continue;   // (see-through parts keep their own place in the draw order)
+      k=o.parent.uuid+'|'+o.material.uuid+'|'+(o.castShadow?1:0)+'|'+(o.userData.noOutline?1:0)+'|'+o.renderOrder;
+      j=groups.get(k);if(!j)groups.set(k,j=[]);j.push(i)}
+    groups.forEach(function(idx){if(idx.length<2)return;
+      var parts=[],cnt=0,sum=0,q,g,a,b,c,v;
+      for(q=0;q<idx.length;q++){o=ms[idx[q]];o.updateMatrix();g=o.geometry.index?o.geometry.toNonIndexed():o.geometry.clone();g.applyMatrix4(o.matrix);
+        if(o.matrix.determinant()<0){a=g.attributes.position.array;b=g.attributes.normal.array;   // a mirrored part: keep its faces turned the same way
+          for(v=0;v<a.length;v+=9)for(c=0;c<3;c++){var w=a[v+3+c];a[v+3+c]=a[v+6+c];a[v+6+c]=w;w=b[v+3+c];b[v+3+c]=b[v+6+c];b[v+6+c]=w}}
+        parts.push(g);cnt+=g.attributes.position.count;sum+=o.position.x*1.7+o.position.y*2.3+o.position.z*3.1+o.scale.x+o.scale.y*.7+o.scale.z*.3+o.quaternion.w}
+      var pos=new Float32Array(cnt*3),nor=new Float32Array(cnt*3);k=0;
+      for(q=0;q<parts.length;q++){pos.set(parts[q].attributes.position.array,k);nor.set(parts[q].attributes.normal.array,k);k+=parts[q].attributes.position.count*3;parts[q].dispose()}
+      var bg=new T.BufferGeometry();bg.setAttribute('position',new T.BufferAttribute(pos,3));bg.setAttribute('normal',new T.BufferAttribute(nor,3));bg.computeBoundingSphere();
+      plan.push({idx:idx,geo:bg,sum:sum})});
+  }
+  return SPLAN[key]={n:n,plan:plan};
+}
+var SHK=null;
+function shadeMerge(u,m){
+  var s=m.s||{},key=u.ai+'|'+s.eyes+'|'+s.legs+'|'+s.spikes+'|'+(m.boss?1:0)+'|'+(m.minion?1:0)+'|'+(u.foe?1:0)+'|'+u.meshes.length,pl=SPLAN[key],ms=u.meshes,i,q,o,g,gone=null;
+  if(!pl){SHK={};for(i in u)SHK[i]=1;pl=shadePlan(u,m,key);SHK=null}
+  if(pl.n!==ms.length||!pl.plan.length)return;
+  var all=ms.slice(),allMats=u.mats.slice(),G2=[];
+  for(g=0;g<pl.plan.length;g++){var P=pl.plan[g],idx=P.idx,f=ms[idx[0]],sum=0,same=true;
+    for(q=0;q<idx.length;q++){o=ms[idx[q]];if(!o||o.parent!==f.parent||o.material!==f.material||o.children.length){same=false;break}
+      sum+=o.position.x*1.7+o.position.y*2.3+o.position.z*3.1+o.scale.x+o.scale.y*.7+o.scale.z*.3+o.quaternion.w}
+    if(!same||Math.abs(sum-P.sum)>1e-6)continue;
+    var mg=new T.Mesh(P.geo,f.material);mg.castShadow=f.castShadow;mg.renderOrder=f.renderOrder;if(f.userData.noOutline)mg.userData.noOutline=true;f.parent.add(mg);
+    var parts=[];
+    for(q=0;q<idx.length;q++){o=ms[idx[q]];o.layers.mask=0;o.castShadow=false;parts.push(o);ms[idx[q]]=null}   // the parts stay in the tree (nothing that counts a limb's children is thrown off) but on no layer, so they are not drawn, whatever sets their .visible
+    ms[idx[0]]=mg;G2.push({m:mg,p:parts});gone=true}
+  if(gone){for(i=0,q=0;i<ms.length;i++)if(ms[i])ms[q++]=ms[i];ms.length=q;u.mats.length=0;for(i=0;i<q;i++)u.mats.push(ms[i].material);
+    u.mg={on:false,g:G2,all:all,allMats:allMats,ms:ms,mats:u.mats}}
+}
+// While a shade thins to light (its last second and a half, or its death) its body is see-through, and see-through things are drawn in order of distance,
+// part by part. So for that short time the shade goes back to its separate parts, exactly as it was drawn before; the merged meshes wait unseen.
+function shadeSplit(u,on){
+  var M=u.mg,i,j,g;if(!M||M.on===on)return;M.on=on;
+  for(i=0;i<M.g.length;i++){g=M.g[i];g.m.layers.mask=on?0:1;for(j=0;j<g.p.length;j++)g.p[j].layers.mask=on?1:0}
+  if(on){u.meshes=M.all;u.mats=M.allMats}
+  else{u.meshes=M.ms;u.mats=M.mats;for(i=0;i<M.ms.length;i++)M.ms[i].material=M.mats[i]}
 }
 function mk0(geo,mat,par,x,y,z,sx,sy,sz){var o=new T.Mesh(geo,mat);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;par.add(o);return o}
 
@@ -776,7 +869,7 @@ function create(m,MB){
     fx:grp(g),f:{},top:cfg.top*(cfg.k||1),extra:0,rage:!!m.rage,phase:m.phase||1,burst:0,px:m.x||0,pz:m.y||0,mv:0,ma:0,auraCol:m.s.col,rageMats:null,
     pv:pv,foe:foe,own:null,born:0,ghost:null,fa:0,hx:m.x||0,hz:m.y||0,rl:0,crown:null,lw:r<14?.7:m.boss&&!pv&&ai!=='mimic'?1.25:1};
   u.fx.scale.setScalar(r);
-  if(pv==='shade'){u.own=[];shadeDress(u,g,m)}
+  if(pv==='shade'){u.own=[];try{shadeMerge(u,m)}catch(e){}shadeDress(u,g,m)}
   else if(pv){u.own=[];petDress(u,g,m,pv)}
   else if(m.boss&&!spec&&ai!=='mimic'){
     var au=new T.Mesh(G.aura,auraMat(m.s.col));au.scale.setScalar(r*2.3);au.position.y=.8;au.renderOrder=1;au.userData.noOutline=true;g.add(au);u.aura=au;
@@ -830,6 +923,7 @@ function fade(g,q){
   var u=g&&g.userData&&g.userData.mb;if(!u)return;
   var i,k,r=u.r,necro=u.pv!=='beast';q=q<0?0:q>1?1:q;
   if(!u.ghost){
+    shadeSplit(u,true);
     if(u.puffs)u.puffs.visible=false;
     u.ghost=u.wane||new T.MeshBasicMaterial({color:u.foe?0xff4a5c:u.pv==='shade'?0x9a6cff:necro?0x4be070:0xbfe2ff,transparent:true,opacity:.8,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false});
     if(!u.own)u.own=[];if(u.ghost!==u.wane)u.own.push(u.ghost);

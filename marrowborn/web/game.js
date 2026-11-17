@@ -36,6 +36,10 @@ const LEVELS=[
 // Every tenth level is a boss level: the Flayed King on level 10, a tyrant on 20, 30, 40... Only those have high health and fight in three phases (and the Hollow, the end of the crypt, in a small way).
 // Every other level is a short, sharp fight: modest health, heavy blows.
 const tenth=n=>(n+1)%10===0;
+// LNG: the sturdy classes hit harder the longer a fight lasts (round 11): P.zeal counts the seconds of the fight, a blocked hit (tank) or a wound closed (healer) adds `ev` seconds to it, and they hit k x zeal harder, `cap` at most. Not in versus.
+// base: what the class hits harder from the first second; paladin, saint...: the same for an upgrade (the two slowest builds of the game hit harder outright).
+const LNG={tank:{k:.006,cap:.6,ev:4,base:1},healer:{k:.006,cap:.6,ev:1.5,base:1},paladin:1.65,saint:1.25,berserker:1,inquisitor:.9};
+const lngText=(c,how)=>' The longer a fight lasts the harder you hit: '+Math.round(LNG[c].cap*100)+'% harder after '+Math.round(LNG[c].cap/LNG[c].k)+' seconds, and every '+how+' brings that '+LNG[c].ev+' seconds nearer.';
 const CLASSES={
  fighter:{name:'Fighter',gear:'Greatsword, headband',hp:5,text:'A fast, heavy blade, no defence but your feet, and wounds that close a little faster than most. 15 health. Bosses you kill teach you a technique.',pows:[
   ['Cleave','Your swing becomes a full circle with a longer reach.'],
@@ -45,11 +49,11 @@ const CLASSES={
   ['Twin Fangs','Every strike lands twice. The second cut does 60% of the first.'],
   ['Shadowstep','A new skill. Appear behind the nearest monster and stab it for heavy damage.'],
   ['Vanish','Your dash recharges almost twice as fast.']]},
- healer:{name:'Healer',gear:'Sun staff, white robe',hp:2,text:'Orbs of light at range, and your wounds close every 4 seconds instead of every 7. 12 health. A boss you kill can be called back as a guardian.',pows:[
+ healer:{name:'Healer',gear:'Sun staff, white robe',hp:2,text:'Orbs of light at range, and your wounds close every 4 seconds instead of every 7. 12 health.'+lngText('healer','wound you close')+' A boss you kill can be called back as a guardian.',pows:[
   ['Sanctuary','Your wounds close every 2.5 seconds.'],
   ['Mend','A new skill. Heal 5 health at once and throw back everything near you.'],
   ['Smite','Your orbs hit 60% harder.']]},
- tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds, and a blocked hit gives back some mana. Slowest on foot. Bosses you kill leave you a ward.',pows:[
+ tank:{name:'Tank',gear:'Sword, shield, plate',hp:6,text:'16 health and a heavy sword that hits twice as hard. Your shield blocks one hit every 6 seconds, and a blocked hit gives back some mana. Slowest on foot.'+lngText('tank','blocked hit')+' Bosses you kill leave you a ward.',pows:[
   ['Bulwark','Your shield recharges in 3.5 seconds, and a blocked hit throws a shockwave that hurts everything near you.'],
   ['Earthsplitter','A new skill. Slam the ground to hit everything around you hard and wipe out nearby bolts.'],
   ['Iron Heart','4 more health, your wounds close twice as fast, and you hit 25% harder.']]},
@@ -70,8 +74,8 @@ const CLASSES={
 const EXTRA={
  fighter:{boon:['Fury','Swing 8% faster.',5],adv:[['champion','Champion','Raw power','Hit 50% harder and gain 6 health.'],['duelist','Duelist','Footwork','Swing 50% faster and move 15% faster.']]},
  assassin:{boon:['Ambush','Your strike after a dash hits even harder.',5],adv:[['nightblade','Nightblade','Sharper','Every strike hits 60% harder.'],['phantom','Phantom','Unseen','Shadowstep recharges more than twice as fast and costs half the mana, and you move 10% faster.']]},
- healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health. Your mana comes back a quarter faster.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
- tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health and gives back twice the mana, and your shield recharges much faster.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
+ healer:{boon:['Grace','You mend 12% faster.',5],adv:[['saint','Saint','Second life','Once per level, a killing blow leaves you standing at half health. Your mana comes back a quarter faster, and you hit '+Math.round((LNG.saint-1)*100)+'% harder.'],['inquisitor','Inquisitor','Judgement','Orbs pass through everything and hit 60% harder.']]},
+ tank:{boon:['Rampart','Your shield recharges 15% faster.',5],adv:[['paladin','Paladin','Holy shield','Every blocked hit heals a tenth of your health and gives back twice the mana, and your shield recharges much faster. You hit '+Math.round((LNG.paladin-1)*100)+'% harder.'],['berserker','Berserker','No shield','You throw the shield away. Swing 60% faster and hit 50% harder.']]},
  mage:{boon:['Split','One more bolt in every cast.',4],adv:[['archmage','Archmage','Mastery','Two more bolts in every cast, your skills recharge twice as fast and cost a fifth less mana, and each familiar holds less of your mana.'],['pyromancer','Pyromancer','Fire','Bolts explode on impact and burn everything near the target.']]},
  ranger:{boon:['Barbs','Arrows pass through one more enemy.',5],adv:[['sharpshooter','Sharpshooter','Precision','Arrows pass through everything and hit 75% harder.'],['beastmaster','Beastmaster','A wolf','A wolf fights beside you in every level, never tires and costs nothing. Bosses you kill can be tamed and fight for you as well, as many as your mana can hold, and a tamed beast holds a fifth less mana than a bound one. Arrowheads you have carved become tamed beasts.']]},
  necro:{boon:['Legion','One more thrall at your side, and your bound pets hit 4% harder.',5],adv:[['lich','Lich','Undeath','Three more thralls, your thralls no longer crumble with time, and your bound pets have 40% more health and hold less of your mana.'],['reaper','Reaper','Harvest','Bone spears pass through everything and hit twice as hard. So do your thralls and your bound pets.']]},
@@ -181,18 +185,21 @@ const AX={
  // it shatters for shat U (shatK of that to everything within shatR, which is chilled by shatCh); then nothing chills it for thaw s (thawB). wights: how many ice-wights, each for wlife s, another every wt s; a slam is wd U within wr, chilling by wch, every wcd s.
  frost:{hit:.2,icd:.3,bossK:.5,hold:2.5,frz:2.5,frzB:1.2,more:1.25,shat:11,shatK:.6,shatR:95,shatCh:.4,thaw:3.5,thawB:6,slowK:.45,wights:2,wlife:30,wt:8,wd:4.2,wr:95,wch:.35,wcd:2.6,wspd:125,wreach:300,
   vsChill:.02,vsFrz:.3,rimeR:130,rimeT:6,rimeD:.8,rimeCh:.22,skF:14,skA:6,skC:6,ultR:330,ultT:4},
- // plague: a blow of yours adds a stack of rot (once per icd s per monster, 5 at most, t s unless renewed). Every half second rot does d U x stacks x (1 + ramp per stack past the first); a rotting monster takes `more` more damage per stack and is slowK slower per stack.
+ // plague: a blow of yours adds a stack of rot (once per icd s per monster, 5 at most). Rot must be FED: only your own blows and your skills (Blight, Fester, the Long Sickness) hold it, for t s from the last of them; after that a layer falls away every `fade` s.
+ // What spreads by itself (the miasma, rot creeping from a neighbour, a rotting death and its cloud: status 'rotp') adds layers but does not hold them (a first layer lasts tp s), and cannot lift a floor's own monster above bossCap layers. Every half second rot does d U x stacks x (1 + ramp per stack past the first); a rotting monster takes `more` more damage per stack and is slowK slower per stack.
  // Every sp s a monster with two stacks or more gives one to the nearest within spR that has fewer. One that dies rotting passes its stacks to all within leap and leaves a cloud (cloudR, cloudT s). auraR: the miasma round you (a stack every auraT s).
- plague:{icd:1,t:6,d:.11,ramp:.25,more:.03,slowK:.04,sp:1.5,spR:150,leap:170,cloudR:70,cloudT:4,auraR:105,auraT:1.5,blightR:120,blightT:7,blightD:.3,fester:2.5,ultT:10},
+ plague:{icd:1,t:6,tp:2.5,fade:1.2,bossCap:2,d:.11,ramp:.25,more:.03,slowK:.04,sp:1.5,spR:150,leap:170,cloudR:70,cloudT:4,auraR:105,auraT:1.5,blightR:120,blightT:7,blightD:.3,fester:2.5,ultT:10},
  // flame: a cinder kindles every t s (cap0 at a time, one more every capK floors, capMax at most; each lasts `life` s) and dives at the nearest monster within reach: bd U within br, which burn (burn U every half second for burnT s),
  // and the ground burns (patch U twice a second within patchR for patchT s). A blow of yours sets its target burning for hitT s. A monster that dies burning leaves burning ground.
  flame:{cap0:3,capK:25,capMax:5,life:14,t:2.6,reach:380,spd:520,bd:2.6,br:75,burn:.3,burnT:4,hitT:3,patch:.22,patchR:58,patchT:3,pyreR:120,pyreT:6,pyreD:.6,coals:6,ultR:150,ultT:6,ultD:.8,ultB:4},
  // storm: every blow of yours builds haste (gain, fading by decay a second): at full haste you move mv and strike as faster. Every icd s (icdS in a surge) the damage your blows have done since the last one, times k, leaps as lightning
  // to the monster you struck and on to `jumps` more within reach (each leap `fall` of the last); what it strikes is shocked (shock s; not again for imm s, immB a floor's own).
  storm:{gain:.07,decay:.14,mv:.22,as:.22,icd:.7,icdS:.3,k:.27,sparkT:2,sparkD:2,sparkR:320,jumps:3,reach:190,fall:.8,shock:.35,imm:1.2,immB:2.5,boltD:9,boltN:5,boltFall:.6,surge:5,tempT:4,tempK:.25,tempD:4.5},
- // stone: `plates` guard plates, each takes one blow whole and answers with a shockwave (cd x your damage within cr, stunning lesser things cstun s); one grows back every regrow s. Every `every`-th blow of yours is a crushing one:
+ // stone: `plates` guard plates (`start` of them at the start of a floor). A plate breaks a HEAVY blow (a charge, a lunge, a ground blast: anything above a bolt): only `leak` of it reaches you, and the plate answers with a shockwave
+ // (cd x your damage within cr, stunning lesser things cstun s). A light blow (a brush, a bolt, a beam, a trap) is not stopped: it lands (`chip` lighter for every plate standing; 0 as shipped), and no plate breaks. One plate grows back every regrow s, and every crushing blow of yours takes `grow` s off that wait.
+ // Every `every`-th blow of yours is a crushing one:
  // crush of the damage your blows have done since the last, to everything within crushR of the target.
- stone:{plates:3,regrow:11,cd:5,cr:120,cstun:.6,every:4,crush:.3,crushR:70,quakeT:3,quakeD:3,quakeR:65,quakeReach:320,fisLen:400,fisW:30,fisT:3.2,fisK:.4,fisD:2.4,standT:5,monoR:115,monoD:20,monoLen:190},
+ stone:{plates:3,start:3,regrow:11,chip:0,leak:.4,grow:1,cd:5,cr:120,cstun:.6,every:4,crush:.3,crushR:70,quakeT:3,quakeD:3,quakeR:65,quakeReach:320,fisLen:400,fisW:30,fisT:3.2,fisK:.4,fisD:2.4,standT:5,monoR:115,monoD:20,monoLen:190},
  // blade: n0 blades of light (one more every nK floors, six at most). Every blow of yours is followed by a cut worth `per` of it for each blade; every `combo`-th cut on the same monster is a great cut worth comboK of all your blows on it since the last;
  // a lesser monster below `exec` of its health dies to any blow of yours.
  blade:{n0:4,nK:25,per:.025,autoT:2,autoD:.35,autoR:280,combo:8,comboK:.22,comboT:3,exec:.2,fanD:4,walkD:2.6,ultN:24,ultK:.16,ultD:1.5,ultEnd:14},
@@ -204,7 +211,7 @@ const APEXIDS=['dominion','beasts','frost','plague','flame','order','storm','sto
 const APEX={
  dominion:{side:'dominion',name:'The Tithe',title:'Tithe-Taker',sub:'Command what you kill',blurb:'What you kill owes you: the slain rise as the Owed and fight at your side.',
   lore:'The Spire has always kept a share of whatever dies inside it. Past the hundredth floor you stop paying that tithe and start collecting it. What you kill owes you, and the Owed stand up to work it off.',
-  text:'Monsters that die, other than a floor\'s own, rise as the Owed and fight for you for '+SHLIFE+' seconds as the monsters they were: up to 4 at once, one more every ten floors, 10 at most. They cost nothing and cannot be hurt. Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills of command join your ten.'},
+  text:'Monsters that die, other than a floor\'s own, rise as the Owed and fight for you for '+SHLIFE+' seconds as the monsters they were: up to 4 at once, one more every ten floors, 10 at most. They cost nothing and cannot be hurt. Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana for their power. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills of command join your ten.'},
  beasts:{side:'dominion',name:'The Feral Vow',title:'Vowkeeper',sub:'Run with a pack',blurb:'A pack of pale beasts hunts beside you, and every beast bites harder for each other one alive.',
   lore:'Before the Spire kept people it kept animals, and their bones lie under everyone else\'s. Past the hundredth floor you swear to them: hunt for me and I will carry you up. They keep their side of it.',
   text:'A pack of '+AX.beast.cap0+' beasts runs with you, one more every '+AX.beast.capK+' floors, '+AX.beast.capMax+' at most. They cost nothing and cannot be hurt; each fades after '+AX.beast.life+' seconds and another answers within '+AX.beast.t+'. Every beast bites '+Math.round(AX.beast.syn*100)+'% harder for each other beast alive, and the pack goes for whatever you struck last.'},
@@ -213,7 +220,7 @@ const APEX={
   text:'Your blows chill what they hit, and a chilled monster slows. At full chill it freezes solid ('+AX.frost.frz+' seconds, '+AX.frost.frzB+' for a floor\'s own monster), takes '+Math.round((AX.frost.more-1)*100)+'% more damage, and shatters when it thaws or dies: a heavy blow to it and to everything near it, which is chilled in turn. '+AX.frost.wights+' ice-wights stand with you, slow and heavy; they slam the ground and chill what they hit.'},
  plague:{side:'dominion',name:'The Slow Rot',title:'Rotwright',sub:'Let it spread',blurb:'A rot that grows, weakens what carries it and passes from monster to monster, most of all when one dies.',
   lore:'Nothing in the Spire is ever thrown away, so everything in it rots, slowly. Past the hundredth floor you learn to hurry that along, and to point it.',
-  text:'Your blows, and the miasma that hangs round you, lay rot on monsters: up to 5 layers, each lasting '+AX.plague.t+' seconds unless renewed. Rot eats at a monster twice a second, far faster with every layer; a rotting monster takes '+Math.round(AX.plague.more*100)+'% more damage per layer and slows. Rot creeps to the nearest monster with less of it, and a monster that dies rotting passes all its layers to everything near and leaves a cloud that rots what walks into it.'},
+  text:'Your blows, and the miasma that hangs round you, lay rot on monsters, up to 5 layers. Rot eats at a monster twice a second, far faster with every layer; a rotting monster takes '+Math.round(AX.plague.more*100)+'% more damage per layer and slows. Rot must be fed: it holds for '+AX.plague.t+' seconds after your last blow or skill on that monster, then falls away a layer at a time. Rot creeps to the nearest monster with less of it, and a monster that dies rotting passes its layers to everything near and leaves a cloud that rots what walks into it; rot that spreads by itself does not hold, and cannot lift a floor\'s own monster above '+AX.plague.bossCap+' layers.'},
  flame:{side:'dominion',name:'The Last Pyre',title:'Pyrekeeper',sub:'Burn what is left',blurb:'Living cinders kindle beside you and hurl themselves at monsters, and the ground they strike keeps burning.',
   lore:'You were ash before you were anything. Past the hundredth floor you find the ash is still warm, and warm ash will carry a flame anywhere you send it.',
   text:'A cinder kindles beside you every '+AX.flame.t+' seconds, up to '+AX.flame.cap0+' waiting at once (one more every '+AX.flame.capK+' floors). Each throws itself at the nearest monster and bursts: everything near is hurt and set burning for '+AX.flame.burnT+' seconds, and the ground burns for '+AX.flame.patchT+'. Your own blows set their target burning, and a monster that dies burning leaves burning ground.'},
@@ -223,9 +230,9 @@ const APEX={
  storm:{side:'order',name:'The Split Sky',title:'Skysplit',sub:'Be faster than it',blurb:'Every blow makes you quicker, and your blows leap on as lightning from monster to monster.',
   lore:'Above the hundredth floor the Spire has holes in it, and the sky comes in. You stand in one until the lightning knows your bones. After that it comes when it is called.',
   text:'You hit '+Math.round((AX.st.storm[0]-1)*100)+'% harder and have '+Math.round((AX.st.storm[1]-1)*100)+'% more health. Every blow you land builds haste: at full haste you move and strike '+Math.round(AX.storm.mv*100)+'% faster. Every '+AX.storm.sparkT+' seconds a spark leaps from you to the nearest monster. About once a second your blows discharge: '+Math.round(AX.storm.k*100)+'% of the damage they have just done strikes again as lightning and leaps to '+AX.storm.jumps+' more monsters, each of them shocked still for a moment.'},
- stone:{side:'order',name:'The Standing Stone',title:'Stonesworn',sub:'Do not move',blurb:'Guard plates take blows whole and answer with a shockwave, and every fourth blow of yours crushes.',
+ stone:{side:'order',name:'The Standing Stone',title:'Stonesworn',sub:'Do not move',blurb:'Guard plates break heavy blows and answer with a shockwave, and every fourth blow of yours crushes.',
   lore:'The Spire grew a bone for every body it kept, and bone is only slow stone. Past the hundredth floor you stop running. Let them break on you.',
-  text:'You hit '+Math.round((AX.st.stone[0]-1)*100)+'% harder and have '+Math.round((AX.st.stone[1]-1)*100)+'% more health. '+AX.stone.plates+' guard plates circle you: each takes one blow whole, breaks, and answers with a shockwave that hurts and staggers everything near. A plate grows back every '+AX.stone.regrow+' seconds. Every '+AX.stone.quakeT+' seconds the ground cracks under the nearest monster. Every fourth blow you land is a crushing one: '+Math.round(AX.stone.crush*100)+'% of what the four did lands again on the target and everything beside it.'},
+  text:'You hit '+Math.round((AX.st.stone[0]-1)*100)+'% harder and have '+Math.round((AX.st.stone[1]-1)*100)+'% more health. '+AX.stone.plates+' guard plates circle you: each breaks one heavy blow (a charge, a lunge, a blast from the ground) so that only '+Math.round(AX.stone.leak*100)+'% of it reaches you, and answers with a shockwave that hurts and staggers everything near. Lighter blows (a brush, a bolt, a beam) get through. A plate grows back every '+AX.stone.regrow+' seconds, sooner with every crushing blow you land. Every '+AX.stone.quakeT+' seconds the ground cracks under the nearest monster. Every fourth blow you land is a crushing one: '+Math.round(AX.stone.crush*100)+'% of what the four did lands again on the target and everything beside it.'},
  blade:{side:'order',name:'The Thousandth Cut',title:'Edgewalker',sub:'Never miss',blurb:'Blades of light hang at your back, cut wherever you strike, and finish whatever is nearly dead.',
   lore:'A thousand cuts taught you where things come apart. Past the hundredth floor the next one no longer needs your hand: the blades hang in the air and follow the first.',
   text:'You hit '+Math.round((AX.st.blade[0]-1)*100)+'% harder and have '+Math.round((AX.st.blade[1]-1)*100)+'% more health. '+AX.blade.n0+' blades of light follow you, one more every '+AX.blade.nK+' floors, six at most. Each blade cuts the nearest monster on its own every '+AX.blade.autoT+' seconds. Every blow you land is followed by a cut worth '+Math.round(AX.blade.per*100)+'% of it for each blade. Every '+AX.blade.combo+'th cut on the same monster is a great cut. A lesser monster below '+Math.round(AX.blade.exec*100)+'% of its health dies to any blow of yours.'},
@@ -233,7 +240,7 @@ const APEX={
   lore:'Under the Spire there is water, older than the dark, and it climbs when you ask. It pushes, it pulls back, it closes wounds, and it never gets tired.',
   text:'You hit '+Math.round((AX.st.tide[0]-1)*100)+'% harder and have '+Math.round((AX.st.tide[1]-1)*100)+'% more health, and you mend '+Math.round(AX.tide.regen*100)+'% of it every '+AX.tide.regenT+' seconds. Every '+AX.tide.t+' seconds a wave rolls from you at the nearest monster: it hurts what it touches, carries lesser monsters along with it, and leaves everything drenched for '+AX.tide.soak+' seconds. A drenched monster is slower and takes '+Math.round(AX.tide.soakMore*100)+'% more damage from everything.'},
 };
-for(const k in APEX)if(k!=='dominion'&&k!=='order')APEX[k].text+=APEX[k].side==='dominion'?' Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills join your ten.':' Mana comes back '+Math.round((ORDMANA-1)*100)+'% faster and skills cost '+Math.round((1-ORDCOST)*100)+'% less. Every pet or familiar you keep but do not send out lends '+Math.round(ORDRESK*100)+'% damage, up to '+ORDRESN+' of them. Three skills join your ten.';
+for(const k in APEX)if(k!=='dominion'&&k!=='order')APEX[k].text+=APEX[k].side==='dominion'?' Pets and familiars hold '+Math.round((1-DOMHOLD)*100)+'% less mana for their power. Thralls and wolves hit '+Math.round((DOMSUM-1)*100)+'% harder, pets, familiars and trophies '+Math.round((DOMPET-1)*100)+'%. Three skills join your ten.':' Mana comes back '+Math.round((ORDMANA-1)*100)+'% faster and skills cost '+Math.round((1-ORDCOST)*100)+'% less. Every pet or familiar you keep but do not send out lends '+Math.round(ORDRESK*100)+'% damage, up to '+ORDRESN+' of them. Three skills join your ten.';
 // the three skills of each path, the same for every class: skills 10, 11 and 12. Rows as in SKILLS, with the mana cost in place. (needs may also be a function of the nearest monster.)
 const APEXSK={
  dominion:[
@@ -266,7 +273,7 @@ const APEXSK={
   ['skycomes','The Sky Comes In',40,'Ultimate. For '+AX.storm.tempT+' seconds lightning falls on a monster four times a second, and each bolt leaps on to another.',[['skycomes'],['ring',260]],'t',40]],
  stone:[
   ['fissure','Fissure',10,'A fissure tears open from your feet toward your target and stays for 3 seconds. Monsters on it are hurt again and again, and all but a floor\'s own are slowed.',[['fissure']],null,22],
-  ['standfast','Stand Fast',24,'All your guard plates return at once, and for '+AX.stone.standT+' seconds every hit that gets past them does half damage.',[['standfast'],['ring',70]],null,28],
+  ['standfast','Stand Fast',24,'All your guard plates return at once, and for '+AX.stone.standT+' seconds every hit that reaches you does half damage.',[['standfast'],['ring',70]],null,28],
   ['monolith','Monolith',40,'Ultimate. A standing stone comes down on your target after a moment: a crushing blow to everything under it, which is stunned, and four fissures crack outward from where it lands.',[['monolith']],null,40]],
  blade:[
   ['bladefan','Bladefan',9,'Your blades fly out in a fan. Each passes through everything in its path and hits hard.',[['bladefan']],null,20],
@@ -339,9 +346,9 @@ const SPEC={
  mimic:{name:'The Mimic',r:22,hp:17,col:'#3fa596',eyes:3,mask:1},
  hollow:{name:'The Hollow',r:38,hp:110,col:'#4a3a66',eyes:2,void:1,spikes:9},
  knight:{name:'Carrion Knight',ai:'hound',r:26,hp:115,col:'#7d8a99',eyes:2,spikes:8},
- lich:{name:'Bog Lich',ai:'witch',r:22,hp:220,col:'#5f9a6a',eyes:3,hood:1},
- wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:125,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
- king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1000,col:'#8c2f39',eyes:3,void:1,spikes:11},
+ lich:{name:'Bog Lich',ai:'witch',r:22,hp:250,col:'#5f9a6a',eyes:3,hood:1},
+ wyrm:{name:'Stone Wyrm',ai:'burrower',r:30,hp:140,col:'#9a8f86',eyes:0,teeth:1,spikes:6},
+ king:{name:'The Flayed King',ai:'hollow',crown:1,r:40,hp:1150,col:'#8c2f39',eyes:3,void:1,spikes:11},
  mite:{name:'Mite',r:10,hp:2,col:'#d07f98',eyes:1,legs:4},
  // generated levels only: a toad that lobs bombs, a caller that hides behind its husks, an eye that sweeps a beam
  bomber:{name:'Cinder Toad',r:27,hp:240,col:'#c9642f',eyes:2,pust:1},
@@ -439,7 +446,7 @@ let NEXTID=1;const nid=()=>NEXTID++;
 // Multiplayer (MB.mp; the code is in the multiplayer section near the end). Everything about it is off unless MP.on.
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
 const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
-  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],hsKey:''};
+  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],owe:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],hsKey:''};
 let REM=null;
 // VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
 let VS=null,VP=null,GEO=0;
@@ -464,7 +471,12 @@ const stReset=()=>{for(const k in ST)ST[k]=0};
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
 const adv=k=>(ADV[S.adv]||{})[k];
-const dmgMul=()=>(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
+const zealK=()=>{const L=P&&!VS&&LNG[S.cls];return L&&act2()?(L.base||1)*(LNG[S.adv]||1)*(1+Math.min(L.cap,L.k*(P.zeal||0))):1};
+// AXK: per-build factors of the apex tier (round 11; measured, see r11-balance/NOTES.md): what a build's own damage and its path's damage (UD) are multiplied by, per side and, for the few that still stood out, per path. Not in versus.
+const AXK={side:{dominion:{archmage:.85,beastmaster:.9,berserker:1.1,duelist:1.1,lich:.8,paladin:1.1,phantom:1.1,reaper:.8,saint:1.1},order:{archmage:.85,duelist:1.15,inquisitor:.9,phantom:1.15,reaper:.8}},path:{tide:{lich:.8}}};
+const axK=()=>{if(!S.apex||VS||!APEX[S.apex])return 1;const a=S.adv,p=AXK.path[S.apex];return(AXK.side[APEX[S.apex].side][a]||1)*(p&&p[a]||1)};
+const zealAdd=()=>{const L=P&&LNG[S.cls];if(L)P.zeal=(P.zeal||0)+L.ev};
+const dmgMul=()=>zealK()*axK()*(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
 const cdMul=()=>1/((P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>{const k=Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
@@ -498,9 +510,9 @@ const PHP=n=>n<1?4:n<2?7:n<8?10:14+.85*Math.max(0,n-11);
 const SHARE=[.1,.19,.31],BOSSDMG=1.1;
 const blowAt=(n,heavy)=>{if(n<8){const b=n<3?1:2;return heavy>0?Math.round(b*1.5+.01):heavy<0?Math.max(1,Math.round(b*.6)):b}
   return Math.max(1,Math.round(PHP(n)*SHARE[heavy>0?2:heavy<0?0:1]*(tenth(n)?(n>=109?APEXDMG:BOSSDMG):1)))};
-const blow=heavy=>blowAt(S.level,heavy);
+const blow=heavy=>{const k=S.level>=12?trialBlow():1;return k===1?blowAt(S.level,heavy):Math.max(1,Math.round(blowAt(S.level,heavy)*k))};
 // healing scales with your health: f is a share of maximum health, never less than lo
-const healP=(f,lo=1)=>{let v=Math.max(lo,Math.round(f*P.maxHp));if(VS)v=vsHeal(f,lo);if(hcap('halfheal'))v=Math.max(1,Math.round(v/2));P.hp=Math.min(P.maxHp,P.hp+v);hud()};
+const healP=(f,lo=1)=>{let v=Math.max(lo,Math.round(f*P.maxHp));if(VS)v=vsHeal(f,lo);if(hcap('halfheal'))v=Math.max(1,Math.round(v/2));if(S.cls==='healer'&&P.hp<P.maxHp)zealAdd();P.hp=Math.min(P.maxHp,P.hp+v);hud()};
 // rank climbs with the levels once you have a trade: E at level 9, S by level 50, then S+1, S+2... every ten levels
 const RANKS=[[50,'S'],[41,'A'],[32,'B'],[23,'C'],[15,'D'],[9,'E']];
 // an apex hero stands in a band of its own above S: X from floor 101, X+1 from 110, X+2 from 120...
@@ -910,11 +922,11 @@ function hurtP(d,src){
   if(P.inv>0||S.mode!=='play'||P.down||MP.away)return;
   if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
   if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null} // hit, blocked or shrugged off: the ward answers
-  if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return}
+  if(P.guardT>0){zealAdd();P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
-  if(cls()==='tank'&&P.shield){P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
+  if(cls()==='tank'&&P.shield){zealAdd();P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
-  if(P.plates>0&&S.apex==='stone')return plateBreak();
+  if(P.plates>0&&S.apex==='stone'){if(d>blow(0)){plateBreak();d=Math.round(d*AX.stone.leak);if(d<1)return}else d=Math.max(1,Math.round(d*(1-AX.stone.chip*P.plates)))} // a plate breaks a heavy blow: only `leak` of it reaches you; a light one gets through
   if(P.stoneT>0)d=Math.ceil(d/2);
   ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(CL())mpQ(['vp']);else vamp();
@@ -946,7 +958,7 @@ function strike(pt){
   if(c==='mage'){P.atk=.14;P.cd=.45*H;const n=1+(pw(1)?2:0)+S.b.spec+(S.adv==='archmage'?2:0);
     for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}SND.bolt();return}
   if(c==='ranger'){P.atk=.1;P.cd=(pw(1)?.17:.28)*H;pshot(a,720,D,3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow();return}
-  if(c==='necro'){P.atk=.14;P.cd=.48*H;pshot(a,400,1.8*D,5,'skull',S.adv==='reaper');SND.skull();return}
+  if(c==='necro'){P.atk=.14;P.cd=.48*H;pshot(a,400,NEC.skull*D,5,'skull',S.adv==='reaper');SND.skull();return}
   if(c==='healer'){P.atk=.14;P.cd=.38*H;pshot(a,560,2.2*D,6,'orb',S.adv==='inquisitor');SND.orb();return}
   const M={tank:[2.2,.4,80,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.15,.22,68,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
   let dmg=M[0]*D,amb=false,hitM=null;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0;amb=true}
@@ -1048,7 +1060,7 @@ function roomStep(dt){
 function playerStep(dt){
   const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
-  if(VS){if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
+  if(VS){if(!VP.hold&&P.atk>0&&c&&!melee(c)){mx*=VSK.shootSlow;my*=VSK.shootSlow}if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
   {const ix=P.ix||0,iy=P.iy||0,k=1-Math.exp(-dt/(Math.hypot(mx,my)>Math.hypot(ix,iy)?.05:.035));P.ix=ix+(mx-ix)*k;P.iy=iy+(my-iy)*k;if(Math.abs(P.ix)<.012)P.ix=0;if(Math.abs(P.iy)<.012)P.iy=0;mx=P.ix;my=P.iy}
   P.moving=Math.hypot(mx,my)>.06;const ox=P.x,oy=P.y;
@@ -1064,12 +1076,13 @@ function playerStep(dt){
   manaStep(dt);
   if(VS)vsInv(dt);
   const held=S.banner>1.5||!!VS&&VP.hold; // the monster stands frozen while the level banner is up, so you cannot hit it either
+  if(!held&&S.mode==='play'&&LNG[c])P.zeal=(P.zeal||0)+dt;
   if(S.apex||P.auraR)apexStep(dt,held);
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
   if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){
-    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink()}
-    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash()}
+    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;SND.blink();if(VS)VP.dodgeT=VSK.dodge}
+    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash();if(VS)VP.dodgeT=VSK.dodge}
     haptic(10)}
   want.dash=false;
   if(want.skill)want.sk[0]=true;want.skill=false;
@@ -1106,6 +1119,13 @@ const PETS={roster:[],active:[],down:false,dmg:0,fielded:[],fallen:[],auto:true,
 // PCROWNK: a tyrant or the King also hits a tenth harder (BOSSDMG) and has several times the health. PMODK: what the modifiers that add damage are worth.
 const PATK={crawler:2.2,hound:.7,witch:.95,fist:1.4,mother:1,burrower:2.3,bomber:1.75,summoner:1,beamer:.95,mimic:.95,hollow:2.7,mite:.3},PCROWNK=1.45,PMODK={swift:1.1,burning:1.12};
 const petK=n=>Math.pow(Math.max(1,n),-.55); // familiars only: several share the work (pets do not)
+// NEC: the Necromancer's numbers (round 11). thD, thN, thE: a thrall's blow is thD x your damage, and past thN thralls standing (lichN more for a Lich) each hits (thN/thralls)^thE of that, so a crowd of thralls shares the work as familiars do. skull: a bone spear, in multiples of your damage.
+// petOwnK(): what the owner adds to a bound pet's blows over the monster's own power (the thrall-and-pet trinket, Legion, Reaper). hold: a pet holds mana in proportion to its power, and that includes what the owner adds:
+// its hold is multiplied by petOwnK()^hold (1: in full; 0: as before round 11, when a Reaper's field of doubled pets cost no more than anyone's).
+// owed, ud: how much of petOwnK() the Owed, and of the trinket the damage of the dominion paths (UD), get, as exponents (0: none, the same for a Necromancer as for every other class; 1: all of it, as before round 11).
+const NEC={thD:1,thN:4,lichN:3,thE:.6,hold:1.3,owed:0,ud:0,skull:2.1};
+const petOwnK=()=>(1+eqv('thr')/100)*(S.cls==='necro'?1+.04*S.b.spec:1)*(S.adv==='reaper'?2:1);
+const thrallK=()=>{let n=0;for(const a of allies)if(a.kind==='thrall'&&a.life>0)n++;return NEC.thD*Math.pow(Math.min(1,(NEC.thN+(S.adv==='lich'?NEC.lichN:0))/Math.max(1,n)),NEC.thE)};
 const GREF=n=>{const g=560*genMul(Math.max(12,n));return n>=12?g:n<=11?STREF:STREF+(g-STREF)*(n-11)};
 const petScale=n=>PETK*GREF(n)/PHP(n); // what one point of a blow in the player's measure is on the monsters' scale, on level n
 const C0=n=>16+.45*Math.max(0,n-8);
@@ -1124,14 +1144,14 @@ function petHp0(e){
 }
 const petHp=e=>Math.max(6,Math.round(petHp0(e)*GREF(petLe(e))/GREF(e.lv)*petLvl(e)*(S.adv==='lich'?1.4:1)));
 // what its blows do: [a brush, a bolt or a beam, a telegraphed blow]
-function petDu(e){
-  const k=PETK*GREF(petLe(e))/PHP(e.lv)*petLvl(e)*(1+eqv('thr')/100)*(S.cls==='necro'?1+.04*S.b.spec:1)*(S.adv==='reaper'?2:1)*(DOMS()?DOMPET:1);
+function petDu(e,own){
+  const k=PETK*GREF(petLe(e))/PHP(e.lv)*petLvl(e)*(own===undefined?petOwnK():own)*(DOMS()?DOMPET:1);
   return[-1,0,1].map(h=>Math.max(.05,Math.round(blowAt(e.lv,h)*k*100)/100));
 }
 // what one of them holds while it is out, and what it costs to raise it again after it fell (dearer each time within a level)
 const petCost=e=>{const f=resvForm();if(!f)return 0;
   if(f==='familiar')return Math.max(1,Math.round((e.crown?PCROWN:PCOST).familiar*(S.adv==='archmage'?.8:1)*(DOMS()?DOMHOLD:1)));
-  return Math.max(PMIN,Math.round(C0(S.level)*petRel(e)*(S.adv==='lich'||S.adv==='beastmaster'?.8:1)*(DOMS()?DOMHOLD:1)))};
+  return Math.max(PMIN,Math.round(C0(S.level)*petRel(e)*(S.adv==='lich'||S.adv==='beastmaster'?.8:1)*Math.pow(petOwnK()*(DOMS()?DOMPET:1),NEC.hold)*(DOMS()?DOMHOLD:1)))};
 const reviveCost=e=>Math.round(petCost(e)*REVK*Math.pow(REVUP,e.revN||0));
 const petInfo=e=>({power:petPower(e),cost:petCost(e),revive:reviveCost(e),hp:petHp(e),hit:petDu(e),lv:e.lv,at:petLe(e)});
 const petCap=()=>resvForm()?1e9:form()?1:0;
@@ -1436,12 +1456,20 @@ const SURVT=32,GUARDT=34,RACET=28,DARKR=245,TMANA=8;
 // TK: the trials' numbers. raceHp: the monster of a race has this share of its usual health (and is enraged). survGap: seconds between packs; survHp: a pack's lesser monsters have this many times a wave's (times survLate from floor 51, where a class has its upgrade);
 // survMax: no new pack while this many monsters stand. lamp: the blows the lamp can take. siegeHp: a besieger's health against a wave's lesser monster; siegeGap: seconds between besiegers at the start
 // (siegeGap2 at the end); siegeSpd: how fast they walk; siegeRest: seconds between a besieger's blows.
-const TK={raceHp:.7,survGap:4,survHp:3,survLate:1.4,survMax:22,lamp:12,siegeHp:.7,siegeGap:2.8,siegeGap2:1.9,siegeSpd:80,siegeRest:1.3};
+const TK={raceHp:.7,survGap:4,survHp:3,survLate:1.4,survMax:22,lamp:11,siegeHp:.7,siegeGap:2.8,siegeGap2:1.9,siegeSpd:80,siegeRest:1.3,
+  // round 11: survRamp (+survRampK per floor past 13, 1 at most): by the end of an Onslaught every blow is this much heavier (it grows with the clock); survLateK: past floor 51 a pack's lesser monsters gain this much health per floor (up to 2.6 times).
+  // raceDmg, ordDmg (+ordDmgK per floor past 24, +.5 at most): how much heavier the blows of an Hourglass monster and of an Ordeal's are.
+  // raceAt, raceK, raceMin: after raceAt s of an Hourglass the glass is cut to raceK x the time the kill would take at the damage done so far, never below raceMin s and never above RACET (alone only; in co-op the clock stays).
+  // siegeHit: a besieger's blow also lands on a hero within this reach of it (a heavy blow, telegraphed like any other). miteGap, miteN: mites come for you this often in a Vigil, this many at a time. h2From: from this floor an Ordeal carries a second handicap.
+  survRamp:.15,survRampK:.012,survLateK:.02,raceDmg:1.15,ordDmg:1.25,ordDmgK:.008,raceAt:4,raceK:2,raceMin:10,siegeHit:46,miteGap:7,miteN:3,h2From:60};
 const HCAPS=['dark','halfheal','nomana','swift','alone'];
-const HRULE={nomana:'Your mana does not come back on this floor.',dark:'The dark is back: you see only what is near you.',alone:'Your pets, familiars and trophies stay behind on this floor.',halfheal:'All healing is halved on this floor.',swift:'Everything on this floor moves and strikes a fifth faster.'};
+const HRULE={nomana:'Your mana does not come back on this floor.',dark:'The dark is back: you see only what is near you.',alone:'Your pets, familiars and trophies stay behind on this floor, and so does everything your path would send to fight for you.',halfheal:'All healing is halved on this floor.',swift:'Everything on this floor moves and strikes a fifth faster.'};
 const HNAME={nomana:'Dry',dark:'Dark',alone:'Alone',halfheal:'Thin blood',swift:'Swift'};
 const TRIALS={survive:{title:'The Onslaught',rule:'Stay alive for '+SURVT+' seconds.'},guard:{title:'The Vigil',rule:'Keep the Vigil Lamp burning for '+GUARDT+' seconds.'},race:{title:'The Hourglass',rule:'It is enraged: kill it within '+RACET+' seconds.'},ordeal:{title:'The Ordeal',rule:''}};
 const handicapOf=n=>{const i=trialIdx(n+1);return i>=0&&TKIND[trialK(i)]==='ordeal'?HCAPS[sameBefore(i)%HCAPS.length]:null};
+// the second, lesser handicap of an Ordeal from floor TK.h2From on: one of the three that do not change what you bring (never the same as the first)
+const H2=['swift','halfheal','dark'];
+const handicap2=(n,h)=>{if(n+1<TK.h2From||!h)return null;const l=H2.filter(x=>x!==h);return l[n%l.length]};
 // Doors: what a crossroads offers for the floor after it. Each is a risk on that floor and a reward for clearing it.
 const DOOR={
  wrath:{title:'The Red Door',risk:'Its monster is enraged from the start.',reward:'Its drop is rare or better.'},
@@ -1473,14 +1501,16 @@ const TOWER={name:TNAME,premise:TPREMISE,get floor(){return towerFloor()},get be
 
 /* ---------- trials: the state of the floor's trial (MB.trial), run by the host in co-op ---------- */
 let TR=null;
-const hcap=k=>!!TR&&TR.handicap===k;
+const hcap=k=>!!TR&&(TR.handicap===k||TR.handicap2===k);
+// how much heavier blows are on this floor because of its trial (see TK)
+const trialBlow=()=>!TR||TR.cleared?1:TR.kind==='survive'?1+Math.min(1,TK.survRamp+TK.survRampK*Math.max(0,S.level-12))*Math.min(1,TR.t/TR.dur):TR.kind==='race'?TK.raceDmg:TR.kind==='ordeal'?TK.ordDmg+Math.min(.5,TK.ordDmgK*Math.max(0,S.level-23)):1;
 // how far you see: FOG before you have eyes, DARKR in the returning dark, 0 when sight has no limit
 const sightR=()=>!has('sight')?FOG:TR&&TR.sight?TR.sight:0;
 const FALLEN=[]; // the monsters (not the floor's own) that have died on this floor, for the Tithe
 function trialMake(L){
   const k=L.floorKind;if(!isTrial(k))return null;
-  const h=k==='ordeal'?L.handicap||'dark':null,d=k==='survive'?SURVT:k==='guard'?GUARDT:k==='race'?RACET:0,lamp=TK.lamp+3*(MP.on?Math.max(0,MP.cnt-1):0);
-  return{kind:k,title:TRIALS[k].title,rule:k==='ordeal'?HRULE[h]:TRIALS[k].rule,t:0,dur:d,goal:0,progress:0,handicap:h,failed:false,cleared:false,sight:h==='dark'?DARKR:0,
+  const h=k==='ordeal'?L.handicap||'dark':null,h2=handicap2(S.level,h),d=k==='survive'?SURVT:k==='guard'?GUARDT:k==='race'?RACET:0,lamp=TK.lamp+3*(MP.on?Math.max(0,MP.cnt-1):0);
+  return{kind:k,title:TRIALS[k].title,rule:k==='ordeal'?HRULE[h]+(h2?' '+HRULE[h2]:''):TRIALS[k].rule,t:0,dur:d,goal:0,progress:0,handicap:h,handicap2:h2,failed:false,cleared:false,sight:h==='dark'||h2==='dark'?DARKR:0,
     obj:k==='guard'?{x:W/2,y:H/2,r:26,hp:lamp,maxHp:lamp,flash:0,name:'The Vigil Lamp'}:null,pk:0,nextT:k==='guard'?5:0,spT:0,failT:0};
 }
 // a floor is cleared: its monster died, or a trial without one was held to the end
@@ -1500,12 +1530,12 @@ function trialFail(why){
 // The Onslaught: a pack, then a bigger one every SURVGAP seconds (sooner when the room is empty), until the time is up
 function trialPack(i){
   const n=S.level,py=MP.on?mpPartyY():P.y,far=py>H/2?150:H-150,big=1+Math.min(3,Math.floor((i+1)/2)),small=4+Math.min(4,i)+(MP.on?mpPack():0);
-  for(let j=0;j<big;j++){const kind=LESSER[(n+i*2+j*3)%LESSER.length];const m=lesser(kind,W/2+(j-(big-1)/2)*170,far,GENHP[kind]*genMul(n)*.085*TK.survHp*(n>=50?TK.survLate:1));if(i>1)m.spdK=1}
+  for(let j=0;j<big;j++){const kind=LESSER[(n+i*2+j*3)%LESSER.length];const m=lesser(kind,W/2+(j-(big-1)/2)*170,far,GENHP[kind]*genMul(n)*.085*TK.survHp*(n>=50?Math.min(2.6,TK.survLate+TK.survLateK*(n-50)):1));if(i>1)m.spdK=1}
   for(let j=0;j<small;j++){const m=spawn('mite',W/2+(j-(small-1)/2)*70,far+(py>H/2?60:-60));m.t=1}
   floats.push({x:W/2,y:far-50,txt:'Pack '+(i+1),life:1.4,c:'#d6a544'});sfx(150,.4,'sawtooth',.2,90);
 }
 // The Vigil: besiegers come in from the corners and the sides, more at a time as it goes on, and now and then a few mites come for you
-const GATES=[[80,90],[880,510],[880,90],[80,510],[70,300],[890,300]],SIEGERS=['crawler','hound','fist'];
+const GATES=[[80,90],[880,510],[880,90],[80,510],[70,300],[890,300],[480,70],[480,530]],SIEGERS=['crawler','hound','fist'];
 function siegeSpawn(i){
   const n=S.level,g=GATES[(i*5+n)%GATES.length],kind=SIEGERS[(n+i)%SIEGERS.length],m=lesser(kind,g[0],g[1],GENHP[kind]*genMul(n)*.085*TK.siegeHp);
   m.siege=true;m.spdK=1;m.t=.5;return m;
@@ -1513,7 +1543,7 @@ function siegeSpawn(i){
 // a besieger: it walks to the lamp, winds up (the usual tell) and strikes it; a blow that starts in reach and ends out of it (it was thrown back) misses
 function siege(m,dt){
   const o=TR.obj,a=angTo(m,o),d=dist(m,o);
-  if(m.st==='wind'){if((m.t-=dt)<=0){m.st='idle';m.t=TK.siegeRest;if(dist(m,o)<o.r+m.r+18)lampHit(o)}}
+  if(m.st==='wind'){if((m.t-=dt)<=0){m.st='idle';m.t=TK.siegeRest;if(dist(m,o)<o.r+m.r+18)lampHit(o);if(!CL()&&S.mode==='play'&&!P.down&&dist(m,P)<m.r+TK.siegeHit)hurtP(blow(1),'siege')}}
   else if(d>o.r+m.r+5){m.st='idle';T=o;move(m,a,TK.siegeSpd,dt)}
   else if((m.t-=dt)<=0){m.st='wind';m.t=.7;m.ang=a}
 }
@@ -1528,7 +1558,10 @@ function trialStep(dt){
   if(t.cleared)return;
   t.t+=dt;t.progress=t.dur?Math.min(t.dur,t.t):t.t;
   if(t.kind==='ordeal'||CL())return; // (a client's trial is the host's: its clock and its lamp come with the world)
-  if(t.kind==='race'){if(t.t>=t.dur&&boss&&boss.hp>0)trialFail('The hourglass ran out');return}
+  if(t.kind==='race'){
+    if(!t.cut&&!MP.on&&boss&&t.t>=TK.raceAt){t.cut=true;const done=boss.maxHp-boss.hp,d=done>0?Math.max(TK.raceMin,Math.min(t.dur,Math.round(TK.raceK*t.t*boss.maxHp/done))):t.dur; // the glass is cut to the hero's measure
+      if(d<t.dur){t.dur=d;t.rule='It is enraged: kill it within '+d+' seconds.';floats.push({x:W/2,y:H/2-90,txt:'The glass narrows: '+d+' seconds',life:2.2,c:'#d6a544'});sfx(880,.3,'triangle',.14,440)}}
+    if(t.t>=t.dur&&boss&&boss.hp>0)trialFail('The hourglass ran out');return}
   if(t.t>=t.dur)return floorClear();
   if(t.kind==='survive'){
     if(!mons.length&&t.nextT-t.t>1.2)t.nextT=t.t+1.2;
@@ -1536,7 +1569,7 @@ function trialStep(dt){
   }else{
     let n=0;for(const m of mons)if(m.siege)n++;
     if((t.spT-=dt)<=0&&n<2+Math.floor(t.t/12)+(MP.on?mpPack():0)&&t.t<t.dur-2){t.spT=(TK.siegeGap+(TK.siegeGap2-TK.siegeGap)*t.t/t.dur)/(1+.5*(MP.on?Math.max(0,MP.cnt-1):0));siegeSpawn(t.pk++)}
-    if(t.t>=t.nextT){t.nextT=t.t+9;for(let j=0;j<2+(MP.on?mpPack():0);j++)if(mons.length<12){const g=GATES[(t.pk+j*3)%GATES.length],m=spawn('mite',g[0],g[1]);m.t=1}}
+    if(t.t>=t.nextT){t.nextT=t.t+TK.miteGap;for(let j=0;j<TK.miteN+(MP.on?mpPack():0);j++)if(mons.length<12){const g=GATES[(t.pk+j*3)%GATES.length],m=spawn('mite',g[0],g[1]);m.t=1}}
   }
 }
 
@@ -1546,19 +1579,20 @@ function trialStep(dt){
 const shadeCap=()=>Math.min(10,4+Math.max(0,Math.floor((S.level+1-100)/10)));
 function shadeMine(m){
   if(S.apex!=='dominion'||!P||P.down||S.mode!=='play')return false;if(!MP.on)return true;
-  const d=dist(m,P);for(const r of MP.remotes)if(!r.dead&&!r.away&&r.look.apex==='dominion'&&dist(m,r.P)<d)return false;return true;
+  // Co-op: every page must name the same hero, so it cannot go by distance (each page sees the others a moment late, and two could both be the nearest, or neither): the Tithe-takers standing take the kills in turn, by the monster's id.
+  const l=[MP.myIdx];for(const r of MP.remotes)if(!r.dead&&!r.away&&r.look.apex==='dominion')l.push(r.idx);l.sort((a,b)=>a-b);return l[((m.id|0)>>>0)%l.length]===MP.myIdx;
 }
 function fallen(m){
   if(m.decoy||m.boss)return;FALLEN.push({s:m.s,ai:m.ai,kind:m.kind,x:m.x,y:m.y});if(FALLEN.length>24)FALLEN.shift();
   if(shadeMine(m))shadeRise(m,SHLIFE,false);
 }
 function shadeRise(d,life,over){
-  if(!P||P.down||S.mode!=='play')return null;
+  if(!P||P.down||S.mode!=='play'||hcap('alone'))return null;
   let n=0;for(const a of allies)if(a.shade&&(over||!a.over))n++;if(n>=(over?24:shadeCap()))return null;
   const s0=d.s,ai=AI[d.ai||s0.ai]?(d.ai||s0.ai):'mite',e={kind:d.kind||ai,ai,lv:S.level,plv:0,mods:[],crown:0},g=rand()*TAU;
   const a={nid:nid(),sk:d.kind||ai,kind:'shade',shade:true,pet:false,over:!!over,owner:'shade',e,k:1,slot:0,s:{...s0,ai,crown:0},ai,name:'Owed '+s0.name.replace(/^Lesser /,''),plv:0,x:d.x,y:d.y,r:s0.r,hp:1,maxHp:1,
     st:'idle',t:.5+rand()*.4,n:0,ang:g,face:g,flash:.2,ring:0,hits:0,hidden:false,lift:0,seed:rand()*9,life,max:life,walk:0,flip:false,inv:0,side:rand()<.5?-1:1,mods:[],ward:0,beam:null,boss:false,moving:false,
-    du:petDu(e).map(v=>v*SHK),touch:new Map(),rage:false,phase:1,spdK:1};
+    du:petDu(e,Math.pow(petOwnK(),NEC.owed)).map(v=>v*SHK),touch:new Map(),rage:false,phase:1,spdK:1};
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,true);allies.push(a);puff(a,'#3a2f55',12,150);rings.push({x:a.x,y:a.y,life:.4,max:.4,r:a.r+26,fx:true});return a;
 }
 // Roll Call: the fallen of this floor stand up, and husks of the Spire fill the ranks where fewer than three have died
@@ -1568,12 +1602,13 @@ function rollCall(){
   sfx(98,.6,'sawtooth',.2,196);
 }
 // Collect: the target is marked, you strike it, and everything that fights for you strikes it at once
+const COLK=1.2; // Collect: each of them strikes with COLK of its heaviest blow (2 before round 11, when a large field made the skill worth more than everything else on the path)
 function collect(t,D){
   debuff(t,{mark:5},D);const line=a=>{for(let k=1;k<=5;k++)bits.push({x:a.x+(t.x-a.x)*k/5,y:a.y+(t.y-a.y)*k/5,vx:0,vy:0,life:.35,max:.35,c:'#a98bff',r:3})};
   for(const a of[...allies]){if(!mons.includes(t))break;if(a.life<=0)continue;
-    if(a.shade||a.pet&&!a.helper&&a.du){line(a);a.flash=.2;petHit(t,a.du[2]*2,a.par||a)}
+    if(a.shade||a.pet&&!a.helper&&a.du){line(a);a.flash=.2;petHit(t,a.du[2]*COLK,a.par||a)}
     else if(a.trophy&&a.ent){a.t=0}
-    else if(a.kind==='thrall'||a.kind==='wolf'){line(a);a.cd=.7;hurtM(t,(a.kind==='wolf'?4:2)*D*(1+eqv('thr')/100)*DOMSUM,true)}}
+    else if(a.kind==='thrall'||a.kind==='wolf'){line(a);a.cd=.7;hurtM(t,(a.kind==='wolf'?2:thrallK())*COLK*D*(1+eqv('thr')/100)*DOMSUM,true)}}
   if(TSRC.length){P.trQ=1;P.trT=t;P.trCd=0}
   if(mons.includes(t)){puff(t,'#a98bff',14,200);hurtM(t,5*D)}
 }
@@ -1603,13 +1638,13 @@ function apexStep(dt,held){
 //  the hero's own state: P.pack, P.plates, P.blades, P.haste, and P.ax for everything else of the path.
 let arcs=[];
 // U: one hundredth of the health of the floor's reference monster, with the thrall-and-pet trinket: what the dominion side's damage is counted in
-const UD=()=>GREF(S.level)*.01*(1+eqv('thr')/100);
+const UD=()=>GREF(S.level)*.01*Math.pow(1+eqv('thr')/100,NEC.ud)*axK();
 function arc(x1,y1,x2,y2,c){if(arcs.length>90)arcs.shift();arcs.push({x1,y1,x2,y2,life:.26,max:.26,col:c||AX.col.storm});if(MP.on&&MP.aq.length<40)MP.aq.push([Math.round(x1),Math.round(y1),Math.round(x2),Math.round(y2)])}
 const trail=(a,b,c,n=5)=>{for(let k=1;k<=n;k++)bits.push({x:a.x+(b.x-a.x)*k/n,y:a.y+(b.y-a.y)*k/n,vx:0,vy:0,life:.3,max:.3,c,r:2.5})};
 // how far a point is from the line of a fissure
 const quakeD=(e,f)=>{const dx=f.x2-f.x,dy=f.y2-f.y,l2=dx*dx+dy*dy||1,t=Math.max(0,Math.min(1,((e.x-f.x)*dx+(e.y-f.y)*dy)/l2));return Math.hypot(e.x-f.x-dx*t,e.y-f.y-dy*t)};
 /* --- statuses --- */
-const STK=['chill','freeze','rot','burn','shock','soak'];
+const STK=['chill','freeze','rot','burn','shock','soak','rotp']; // rotp: rot that spread by itself (see AX.plague)
 function stFreeze(m,t,d){
   if(m.frozen>0)return;m.frozen=t;m.chill=1;m.stun=Math.max(m.stun||0,t);m.beam=null;m.shatD=d||m.shatD||0;m.frzRem=REM;
   puff(m,'#dff4ff',12,150);rings.push({x:m.x,y:m.y,life:.35,max:.35,r:m.r+26,fx:true});sfx(1800,.14,'triangle',.12,700)}
@@ -1619,7 +1654,9 @@ function stApply(m,k,v,d){
   if(m.ward>0&&k!=='soak')return;
   if(k==='chill'){const F=AX.frost;if(m.frozen>0||m.thawT>0)return;m.chill=Math.min(1,(m.chill||0)+v*(m.boss?F.bossK:1)*(m.soak>0?1.5:1));m.chillT=F.hold;if(d>(m.shatD||0))m.shatD=d;if(m.chill>=1)stFreeze(m,m.boss?F.frzB:F.frz,m.shatD)}
   else if(k==='freeze'){m.thawT=0;stFreeze(m,m.boss?v*.5:v,d)}
-  else if(k==='rot'){const G=AX.plague,n=Math.round(v);m.rot=Math.min(5,(m.rot||0)+n);m.rotT=Math.max(m.rotT||0,n>=5?G.ultT:G.t);if(d>=(m.rotD||0)){m.rotD=d;m.rotRem=REM}if(!(m.rotK>0))m.rotK=.5}
+  else if(k==='rot'||k==='rotp'){const G=AX.plague,n=Math.round(v),own=k==='rot',had=m.rot||0,cap=own||!m.boss?5:Math.max(had,G.bossCap);m.rot=Math.min(cap,had+n);if(!(m.rot>0))return;
+    if(own)m.rotT=Math.max(m.rotT||0,n>=5?G.ultT:G.t);else if(!had)m.rotT=Math.max(m.rotT||0,G.tp); // only your own doing holds it
+    if(d>=(m.rotD||0)){m.rotD=d;m.rotRem=REM}if(!(m.rotK>0))m.rotK=.5}
   else if(k==='burn'){m.burn=Math.max(m.burn||0,v);if(d>=(m.burnD||0)){m.burnD=d;m.burnRem=REM}if(!(m.burnK>0))m.burnK=.5}
   else if(k==='shock'){if(m.shockI>0)return;m.shock=v;m.shockI=m.boss?AX.storm.immB:AX.storm.imm;m.stun=Math.max(m.stun||0,m.boss?v*.5:v)}
   else if(k==='soak')m.soak=Math.max(m.soak||0,v);
@@ -1639,7 +1676,7 @@ function shatter(m,dead){
   REM=was}
 function rotSpread(m){
   const G=AX.plague;if(m.rot<2)return;let b=null,bd=G.spR;for(const o of mons){if(o===m||o.hidden||o.decoy||o.ward>0||(o.rot||0)>=m.rot)continue;const d=dist(o,m)-o.r;if(d<bd){bd=d;b=o}}
-  if(b){const was=REM;REM=m.rotRem||null;stApply(b,'rot',1,m.rotD);REM=was;trail(m,b,AX.col.plague,6)}}
+  if(b){const was=REM;REM=m.rotRem||null;stApply(b,'rotp',1,m.rotD);REM=was;trail(m,b,AX.col.plague,6)}}
 // every step, for a monster that carries any of them. True when it died of one.
 function stStep(m,dt){
   if(m.thawT>0)m.thawT-=dt;if(m.shockI>0)m.shockI-=dt;if(m.soak>0)m.soak-=dt;if(m.shock>0)m.shock-=dt;
@@ -1649,14 +1686,14 @@ function stStep(m,dt){
   if(m.rot>0){const G=AX.plague,n=m.rot;m.rotT-=dt;
     if((m.rotK-=dt)<=0){m.rotK=.5;REM=m.rotRem||null;hurtM(m,m.rotD*n*(1+G.ramp*(n-1)),true);REM=null;if(!mons.includes(m))return true}
     if((m.rotS=(m.rotS>0?m.rotS:G.sp)-dt)<=0)rotSpread(m);
-    if(m.rotT<=0){m.rot=0;m.rotD=0;m.rotT=0}}
+    if(m.rotT<=0){m.rotT=0;if((m.rotF=(m.rotF>0?m.rotF:G.fade)-dt)<=0&&--m.rot<=0){m.rot=0;m.rotD=0}}else m.rotF=0} // unfed, it falls away a layer at a time
   return false}
 // a lesser monster died carrying one: the ice shatters, the rot leaps and leaves a cloud, the fire stays on the ground
 function stDeath(m){
   const was=REM;
   if(m.frozen>0){REM=m.frzRem||null;shatter(m,true)}
   if(m.rot>0){const G=AX.plague,n=m.rot;REM=m.rotRem||null;
-    for(const o of[...mons])if(!o.hidden&&!o.decoy&&dist(o,m)<G.leap+o.r&&(o.rot||0)<n){stApply(o,'rot',n-(o.rot||0),m.rotD);trail(m,o,AX.col.plague,6)}
+    for(const o of[...mons])if(!o.hidden&&!o.decoy&&dist(o,m)<G.leap+o.r&&(o.rot||0)<n){stApply(o,'rotp',n-(o.rot||0),m.rotD);trail(m,o,AX.col.plague,6)}
     if(!fields.some(f=>f.kind==='rot'&&!f.follow&&Math.hypot(f.x-m.x,f.y-m.y)<45)&&fields.length<50)fieldA('rot',m.x,m.y,G.cloudR,G.cloudT,1,0,{sd:m.rotD})}
   if(m.burn>0&&m.burnD>0){REM=m.burnRem||null;const C=AX.flame;
     if(!fields.some(f=>f.kind==='fire'&&!f.follow&&Math.hypot(f.x-m.x,f.y-m.y)<40)&&fields.length<50)fieldA('fire',m.x,m.y,C.patchR,C.patchT,.5,m.burnD*.75,{sd:m.burnD})}
@@ -1689,7 +1726,7 @@ function fieldX(f,dt){
       bits.push({x,y,vx:0,vy:k==='fire'?-50:k==='rot'?-14:-26,life:.5,max:.5,c,r:2.5})}}
   if(f.rem){if(f.foe&&VS)vsField(f);return}
   GEO++;for(const m of[...mons]){if(m.hidden||!mons.includes(m))continue;if(k==='quake'?quakeD(m,f)>=f.w+m.r:dist(m,f)>=f.r+m.r)continue;
-    if(k==='ice')mSt(m,'chill',f.st||.2,f.sd);else if(k==='rot')mSt(m,'rot',1,f.sd);else if(k==='fire')mSt(m,'burn',2.5,f.sd);else if(!m.boss)mSlow(m,.8);
+    if(k==='ice')mSt(m,'chill',f.st||.2,f.sd);else if(k==='rot')mSt(m,f.fed?'rot':'rotp',1,f.sd);else if(k==='fire')mSt(m,'burn',2.5,f.sd);else if(!m.boss)mSlow(m,.8);
     if(f.dmg>0&&mons.includes(m))hurtM(m,f.dmg,true)}GEO--;
 }
 /* --- an area blow of mine at a point: everything within r takes d. In versus it travels with its ring (me.r) and the victim decides --- */
@@ -1700,6 +1737,7 @@ function burst(x,y,r,d,o){
 }
 /* --- the free allies --- */
 function apxAlly(kind,life,o){
+  if(hcap('alone')&&!VS)return null; // the Ordeal 'alone': nothing of the path comes along
   o=o||{};const g=rand()*TAU,a={nid:nid(),kind,apexAlly:true,over:!!o.over,x:o.x===undefined?P.x+Math.cos(g)*44:o.x,y:o.y===undefined?P.y+Math.sin(g)*44:o.y,r:kind==='packbeast'?13:kind==='icewight'?19:8,hp:1,maxHp:1,st:'idle',t:0,ang:g,face:g,flash:.25,life,max:life,
     walk:rand()*6,flip:false,moving:false,cd:o.cd===undefined?.3+rand()*.5:o.cd,seed:rand()*9};
   clamp(a,a.r);if(obstacles.length)collide(a,a.r,kind!=='cinder');allies.push(a);puff(a,AX.col[kind],8,130);return a}
@@ -1794,7 +1832,7 @@ function waveRing(){const T=AX.tide;for(let i=0;i<8;i++)wave(P.x,P.y,i*TAU/8+.2,
 // what the path's state is at the start of a floor
 function apxBody(){
   P.plates=0;P.blades=0;P.haste=0;P.pack=0;P.ax={first:true,t:0,n:0,acc:0,ch:0};const a=act2()&&S.cls?S.apex:null;
-  if(a==='stone'){P.plates=AX.stone.plates;P.ax.t=AX.stone.regrow}else if(a==='blade')P.blades=bladeCap();else if(a==='tide')P.ax.t=1.5;else if(a==='flame')P.ax.t=.8}
+  if(a==='stone'){P.plates=Math.min(AX.stone.plates,AX.stone.start);P.ax.t=AX.stone.regrow}else if(a==='blade')P.blades=bladeCap();else if(a==='tide')P.ax.t=1.5;else if(a==='flame')P.ax.t=.8}
 /* --- a blow of my own has landed on m for d (a strike, or a bolt, arrow, spear or orb of mine): what the path adds --- */
 const APXHIT={
  beasts(m){P.ax.prey=m},
@@ -1802,7 +1840,7 @@ const APXHIT={
  plague(m){if(S.t<(m.rotI||0))return;m.rotI=S.t+AX.plague.icd;mSt(m,'rot',1,UD()*AX.plague.d)},
  flame(m){if(S.t<(m.buI||0))return;m.buI=S.t+.5;mSt(m,'burn',AX.flame.hitT,UD()*AX.flame.burn)},
  storm(m,d){const X=P.ax,Z=AX.storm;P.haste=Math.min(1,P.haste+Z.gain);X.acc+=d;if(X.ch>0)return;X.ch=X.surge>0?Z.icdS:Z.icd;const q=X.acc*Z.k;X.acc=0;chain(P.x,P.y-12,m,q,Z.jumps+(P.haste>=.99?1:0),Z.reach)},
- stone(m,d){const X=P.ax,Q=AX.stone;X.acc+=d;if(++X.n<Q.every)return;X.n=0;const q=X.acc*Q.crush;X.acc=0;puff(m,AX.col.stone,10,200);S.shake=Math.max(S.shake,.1);sfx(80,.16,'square',.2,40);burst(m.x,m.y,Q.crushR,q,{fn:o=>{if(!o.boss)mStun(o,Q.cstun)}})},
+ stone(m,d){const X=P.ax,Q=AX.stone;X.acc+=d;if(++X.n<Q.every)return;X.n=0;const q=X.acc*Q.crush;X.acc=0;if(P.plates<Q.plates)X.t-=Q.grow;puff(m,AX.col.stone,10,200);S.shake=Math.max(S.shake,.1);sfx(80,.16,'square',.2,40);burst(m.x,m.y,Q.crushR,q,{fn:o=>{if(!o.boss)mStun(o,Q.cstun)}})},
  blade(m,d){const B=AX.blade;if(P.blades>0)bladeCut(m,d*B.per*P.blades,d);if(mons.includes(m)&&!m.boss&&!m.hero&&m.hp<=m.maxHp*B.exec){puff(m,'#eef2ff',10,200);hurtM(m,m.hp+1)}},
 };
 function apexHit(m,d){
@@ -1826,7 +1864,7 @@ const APXOP={
      if(m.frozen>0){puff(m,'#dff4ff',16,240);burst(m.x,m.y,F.shatR,u*F.skA,{quiet:true,fn:o=>{if(o!==m)mSt(o,'chill',F.shatCh,u*F.shat)}});if(mons.includes(m))hurtM(m,u*(F.skF-F.skA))}
      else if(m.chill>0){puff(m,'#bfe9ff',8,160);hurtM(m,u*F.skC*Math.max(.34,m.chill),true);if(mons.includes(m))mSt(m,'chill',.3,u*F.shat)}}},
  winter(){const F=AX.frost,u=UD();for(const m of[...mons])if(!m.hidden&&!m.decoy&&dist(m,P)<F.ultR+m.r)mSt(m,'freeze',F.ultT,u*F.shat*1.5);for(const a of allies)if(a.kind==='icewight'&&a.st==='idle'){a.st='wind';a.t=.4}S.shake=Math.max(S.shake,.3)},
- blight(x){const G=AX.plague;fieldA('rot',x.at.x,x.at.y,G.blightR,G.blightT,1,UD()*G.blightD,{sd:UD()*G.d});sfx(140,.5,'sawtooth',.1,90)},
+ blight(x){const G=AX.plague;fieldA('rot',x.at.x,x.at.y,G.blightR,G.blightT,1,UD()*G.blightD,{sd:UD()*G.d,fed:true});sfx(140,.5,'sawtooth',.1,90)},
  fester(){const G=AX.plague,u=UD();S.shake=Math.max(S.shake,.2);sfx(110,.4,'sawtooth',.18,55);for(const m of[...mons]){if(m.hidden||!(m.rot>0)||!mons.includes(m))continue;puff(m,AX.col.plague,12,200);rings.push({x:m.x,y:m.y,life:.3,max:.3,r:m.r+36,fx:true});hurtM(m,u*G.fester*m.rot);if(mons.includes(m))mSt(m,'rot',1,u*G.d)}},
  sickness(){const u=UD()*AX.plague.d;for(const m of[...mons])if(!m.hidden&&!m.decoy){mSt(m,'rot',5,u);puff(m,AX.col.plague,10,160)}sfx(98,.8,'sawtooth',.18,49)},
  pyre(x){const C=AX.flame;fieldA('fire',x.at.x,x.at.y,C.pyreR,C.pyreT,.5,UD()*C.pyreD,{sd:UD()*C.burn});sfx(160,.5,'sawtooth',.14,80);noise(.4,.14,500,1500)},
@@ -1850,7 +1888,7 @@ function fisBurst(z){const Q=AX.stone;for(let i=0;i<4;i++){const g=i*TAU/4+.5,le
 /* --- versus: what the new paths' statuses and waves are to a hero --- */
 function vsSt(m,k,v,d){
   if(!VS||!vsLive()||!m.own)return;const now=S.t;
-  if(k==='rot'){const G=AX.plague;if(now-(m._rotAt||0)>G.t)m._rotN=0;m._rotAt=now;const n=m._rotN=Math.min(5,(m._rotN||0)+Math.round(v));VP.q.push(['db',m.own.idx,m.nid|0,0,0,Math.round(d*n*1000)/1000,0]);return} // rot on a hero or its creature: a poison that deepens while it is renewed
+  if(k==='rot'||k==='rotp'){const G=AX.plague;if(now-(m._rotAt||0)>G.t)m._rotN=0;m._rotAt=now;const n=m._rotN=Math.min(5,(m._rotN||0)+Math.round(v));VP.q.push(['db',m.own.idx,m.nid|0,0,0,Math.round(d*n*1000)/1000,0]);return} // rot on a hero or its creature: a poison that deepens while it is renewed
   if(k==='burn'){VP.q.push(['db',m.own.idx,m.nid|0,0,0,Math.round(d*1000)/1000,0]);return}
   if(now-(m._stAt||0)<.25)return;m._stAt=now;
   VP.q.push(['db',m.own.idx,m.nid|0,k==='chill'||k==='soak'?1:0,k==='freeze'||k==='shock'?v:0,0,0]);
@@ -1956,19 +1994,22 @@ function apexLearn(next){
 // Boons: 85% of one per floor from the twelfth on, in a steady spread. Equipment: the drops of 85% of the floors behind (a fixed sequence), worn or melted in with the steady policy.
 // Skills: all the floor has taught, a sensible six carried (and the three apex skills). Mana follows from the floor, the Wellsprings and 85% of the trials behind.
 // Pets and trophies: the monsters of the last few plain floors (four for a pet class, three familiars, one of any other trophy).
+// Round 11: the share is not one number any more. Measured against a hero built floor by floor, 85% of everything was no handicap at floors 11-21 and far too much of one past floor 100 (where pets and familiars were also capped at four and three).
+// seasK(N): the share of boons, drops and trials a seasoned hero of floor N brings, set so that it is 15-20% slower than a built one at every checkpoint. Past floor 100 a pet class brings eight pets to choose from and a mage five familiars.
+const seasK=N=>N<20?0:N<30?.65:N<60?.83:N<=100?.9:.92; // (floor 11: the plain equipment of the class; with two floors behind it there is little else to be behind in)
 const SEAS=.85,SEASLOAD={fighter:[0,3,6,5,1,2],tank:[0,7,3,5,1,2],assassin:[0,1,3,5,4,2],mage:[3,7,2,5,1,0],ranger:[0,3,2,5,6,4],healer:[0,3,8,5,1,2],necro:[0,4,8,5,6,1]},
   SEASB=['might','spec','haste','vigor','might','focus','well','might','vigor','haste','fleet'];
 function seasonedRun(N,o){
   o=o||{};const n=N-1,c=o.cls,C=CLASSES[c],adv=N>50?(C.adv.some(a=>a[0]===o.adv)?o.adv:C.adv[0][0]):null,apex=N>100?(apexOk(o.apex)?o.apex:'order'):null;
-  const b=noBoons();let k=Math.round(SEAS*(Math.max(0,N-12)-(N>50?1:0)));
+  const SK2=seasK(N),b=noBoons();let k=Math.round(SK2*(Math.max(0,N-12)-(N>50?1:0)));
   for(let i=0,g=0;k>0&&g<9999;g++){let id=SEASB[i++%SEASB.length];const cap=id==='spec'?C.boon[2]:BOONS.find(x=>x.id===id).cap||99;if(b[id]>=cap)id=i%3?'might':'vigor';b[id]++;k--}
   let s=(N*2654435761^c.length*40503^c.charCodeAt(0)*7919)>>>0||1;const rnd=()=>{s^=s<<13;s>>>=0;s^=s>>>17;s^=s<<5;s>>>=0;return s/4294967296};
-  const E=basicSet(c);for(let f=8;f<n;f++){if(f%7===3)continue;const d=dropItem(f,{rnd,cls:c}),cur=E[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)E[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
+  const E=basicSet(c),skip=SK2>0?Math.max(2,Math.round(1/(1-SK2))):1;for(let f=8;f<n;f++){if(f%skip===skip-1)continue;const d=dropItem(f,{rnd,cls:c}),cur=E[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)E[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
   const eq={};for(const sl of SLOTS)eq[sl]={r:E[sl].r,lvl:E[sl].lvl,up:Math.round(E[sl].up*1000)/1000,m:E[sl].m?1:0};
-  let tr=0;for(let f=12;f<n;f++)if(isTrial(floorKind(f)))tr++;tr=Math.round(tr*SEAS);
+  let tr=0;for(let f=12;f<n;f++)if(isTrial(floorKind(f)))tr++;tr=Math.round(tr*SK2);
   const kn=SKLV.filter(l=>N>=l).length;let load=SEASLOAD[c].filter(i=>i<kn);for(let v=0;load.length<NSK;v++)if(!load.includes(v))load.push(v);load=load.slice(0,NSK);if(apex)load=[...load.slice(0,3),10,11,12];
-  const petCls=c==='necro'||adv==='beastmaster',want=petCls?4:c==='mage'?3:1,pets=[];
-  for(let f=n-1;f>=8&&pets.length<want;f--){const fk=floorKind(f);if(fk==='guardian'||fk==='survive'||fk==='guard')continue;const L=levelDef(f);if(L.kind==='mimic')continue;const e=petEntry(f,L);e.plv=Math.min(PLVMAX,Math.round((n-1-f)*SEAS));pets.push(e)}
+  const petCls=c==='necro'||adv==='beastmaster',want=petCls?(N>100?8:4):c==='mage'?(N>100?5:3):1,pets=[];
+  for(let f=n-1;f>=8&&pets.length<want;f--){const fk=floorKind(f);if(fk==='guardian'||fk==='survive'||fk==='guard')continue;const L=levelDef(f);if(L.kind==='mimic')continue;const e=petEntry(f,L);e.plv=Math.min(PLVMAX,Math.round((n-1-f)*SK2));pets.push(e)}
   return{cls:c,adv,apex,b,eq,scrap:0,load,pets,pet:[],rev:1,st:{bestLevel:n},level:n,tr,door:null};
 }
 function startAt(N,o){
@@ -2050,7 +2091,7 @@ function step(dt){
   for(const a of allies){if(a.pet){petStep(a,dt);continue}if(a.shade){a.life-=dt;petStep(a,dt);continue}if(a.trophy){trophyStep(a,dt);continue}if(a.apexAlly){allyX(a,dt);continue}a.life-=dt;a.cd-=dt;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,a)-(m.boss?140:0)+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}
     const to=t||P,d=dist(to,a),stop=t?t.r+a.r:46;
     if(d>stop){let g=angTo(a,to);const sp=a.kind==='wolf'?250:200;if(a.avT>0)a.avT-=dt;if(obstacles.length)g=steer(a,g,d);a.x+=Math.cos(g)*sp*dt;a.y+=Math.sin(g)*sp*dt;a.walk+=dt*12;a.flip=Math.cos(g)<0;clamp(a,a.r);if(obstacles.length)collide(a,a.r,true)}
-    else if(t&&a.cd<=0){a.cd=.7;GEO++;hurtM(t,(a.kind==='wolf'?2:1)*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(DOMS()?DOMSUM:1),true);GEO--;leech()}
+    else if(t&&a.cd<=0){a.cd=.7;GEO++;hurtM(t,(a.kind==='wolf'?2:thrallK())*dmgMul()*(1+eqv('thr')/100)*(P.legT>0?1.5:1)*(DOMS()?DOMSUM:1),true);GEO--;leech()}
     if(a.life<=0)puff(a,'#e7dfcd',6)}
   allies=allies.filter(a=>a.life>0);
   if(PETS.fallen.length)reviveStep(dt);
@@ -2439,8 +2480,8 @@ function show(o,foreign){
     for(const[tag,txt]of[['b',c.title],['small',c.sub],['span',c.body]]){const x=document.createElement(tag);x.textContent=txt;e.appendChild(x)}
     if(c.col)e.children[1].style.color=c.col;if(c.cls)e.className=c.cls;if(c.data)for(const k in c.data)e.dataset[k]=c.data[k];
     e.onclick=()=>{audio();sfx(520,.1,'triangle',.2,780);haptic(20);c.fn()};cd.appendChild(e)});
-  const b=$('ovBtns');b.textContent='';b.hidden=!o.btns;
-  (o.btns||[]).forEach(([label,fn],i)=>{const e=document.createElement('button');e.type='button';e.textContent=label;if(!i)e.className='primary';e.onclick=()=>{audio();sfx(440,.06,'triangle',.18,660);haptic(10);fn()};b.appendChild(e)});
+  const b=$('ovBtns');b.textContent='';b.hidden=!o.btns;b.dataset.nodef=o.nodef?'1':''; // nodef: a screen with no default action (Enter does nothing, no button is marked as the first choice): the versus waiting screen
+  (o.btns||[]).forEach(([label,fn],i)=>{const e=document.createElement('button');e.type='button';e.textContent=label;if(!i&&!o.nodef)e.className='primary';e.onclick=()=>{audio();sfx(440,.06,'triangle',.18,660);haptic(10);fn()};b.appendChild(e)});
   $('ovPanel').className='panel'+(o.wide?' wide':'')+(o.cls?' '+o.cls:''); // cls: a class for the page to style a kind of screen by (apexPanel, doorPanel, trialPanel)
   if(!o.doors&&!foreign)DOORS=null;
   $('ov').className=o.soft?'soft':'';$('ov').hidden=false;if(keep){cd.scrollTop=keep[0];$('ovPanel').scrollTop=keep[1]}
@@ -2657,7 +2698,10 @@ function petsScreen(back,note){
 // every boss from level 9 on drops one item for your class: melt it into what you carry, wear it instead, or break it for scrap
 function dropScreen(n,rk,next,second){
   if(!S.eq)S.eq=basicSet(S.cls);
-  const L=S.L,luck=isTrial(L.floorKind),d=dropItem(n,{luck,min:L.door==='wrath'?1:0}),cur=S.eq[d.slot],after={...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]},go=f=>()=>{f();eqSync();hud();next()};
+  // the dice of a drop are seeded with the floor and the hero as it stands (class, upgrade, boons, equipment, scrap): leaving on the reward screen and clearing the floor again brings the same drop, not a new roll
+  let sd=2166136261;for(const ch of[n,S.cls,S.adv,S.scrap,second?1:0,...SLOTS.map(sl=>S.eq[sl].r+':'+S.eq[sl].lvl),...Object.values(S.b)].join('|'))sd=Math.imul(sd^ch.charCodeAt(0),16777619)>>>0;sd=sd||1;
+  const rnd=()=>{sd^=sd<<13;sd>>>=0;sd^=sd>>>17;sd^=sd<<5;sd>>>=0;return sd/4294967296};for(let i=0;i<4;i++)rnd();
+  const L=S.L,luck=isTrial(L.floorKind),d=dropItem(n,{luck,min:L.door==='wrath'?1:0,rnd}),cur=S.eq[d.slot],after={...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]},go=f=>()=>{f();eqSync();hud();next()};
   show({wide:true,cls:luck?'trialPanel':'',col:RAR[d.r][1],kick:second?second+': '+an(d.rarity)+' '+d.slot:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up '+an(d.rarity)+' '+d.slot:L.spec.name+' dropped '+an(d.rarity)+' '+d.slot,title:d.name,body:itemLine(d)+'. You carry '+itemName(cur)+' ('+cur.rarity+'): '+itemLine(cur)+'.',keys:rk,cards:[
     {title:'Upgrade',sub:itemName(cur)+' to +'+after.lvl,col:RAR[cur.r][1],body:'Melt the drop into what you carry. A '+d.rarity+' drop adds '+Math.round(RAR[d.r][3]*100)+'% of its base stats. It becomes: '+itemLine(after)+'.',fn:go(()=>{S.eq[d.slot]=after})},
     {title:'Replace',sub:d.name,col:RAR[d.r][1],body:'Wear the drop instead. '+itemName(cur)+' is gone for good. You get: '+itemLine(d)+'.',fn:go(()=>{S.eq[d.slot]=d})},
@@ -2828,7 +2872,7 @@ const KEY={ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',ArrowUp:'up',w
 addEventListener('keydown',e=>{
   const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];
   if((e.key==='Escape'||e.key==='p'||e.key==='P')&&!e.repeat&&(S.paused||S.mode==='play'||S.mode==='clear'||MP.on)){e.preventDefault();pause(!S.paused);return}
-  if(e.key==='Enter'&&!$('ov').hidden&&!(e.target&&e.target.tagName==='BUTTON')){$('ovBtns').querySelector('button')?.click();return}
+  if(e.key==='Enter'&&!$('ov').hidden&&!(e.target&&e.target.tagName==='BUTTON')){if($('ovBtns').dataset.nodef!=='1')$('ovBtns').querySelector('button')?.click();return}
   if(VS&&P&&P.down&&!e.repeat&&(k==='atk'||e.key==='Tab')&&S.mode==='play'){e.preventDefault();return vsSpectate()}
   if(!k||e.target.tagName==='BUTTON'&&k==='atk'&&!$('ov').hidden)return;
   if(S.mode==='play'||S.mode==='clear')e.preventDefault();
@@ -3285,11 +3329,13 @@ function mpOnLevel(msg,from){
     if(S.mode==='play'&&S.level===n){
       const b=boss;MP.menu=false;if(b)puff(b,col(b.s.col),50,320);MP.mons.clear();
       mons=[];shots=[];pshots=[];zones=[];fields=[];boss=null;S.mode='clear';S.clearT=1.2;S.shake=.4;SND.bossDeath();haptic([60,40,220]);mpRise();if(TR&&!TR.cleared){TR.cleared=true;TR.failed=false;emit('trial',{kind:TR.kind,state:'clear'})}emit('bossdead',{level:S.level,time:ST.levelTime,cls:S.cls});
-    }
+    }else if(S.mode==='reward'&&!MP.meReady&&S.cls&&n>=8&&S.level<=n&&MP.owe.length<8&&!MP.owe.includes(n))MP.owe.push(n); // the party cleared a floor while I was still choosing: its rewards are owed to me (see mpReady)
   }
 }
 // a member is through with its choices (every reward screen ends in begin(n), which comes here)
 function mpReady(n){
+  // floors the party cleared while I was on my reward screens: their rewards come now, one floor after the other, before I join the others
+  while(MP.owe.length){const f=MP.owe.shift();if(f<S.level||!S.cls||!P)continue;S.level=f;S.L=levelDef(f);S.L.door=S.door&&S.door.n===f?S.door.id:null;MP.toast='Floor '+(f+1)+' was cleared while you chose. Its rewards are yours.';MP.toastT=performance.now()+6000;MP.hudKey='';return reward()}
   if(MP.phase==='run'){if(MP.role==='host')return;S.level=MP.lv;startLevel(MP.lv);nsend({t:'sync'},MP.hostId);return} // the others went ahead: join them
   if(MP.phase!=='pick')S.level=MP.lv;
   MP.meReady=true;MP.ready.add(MP.myId);if(!MP.gateT)MP.gateT=performance.now();
@@ -3435,7 +3481,7 @@ function mpBegin(cfg){
   Object.assign(MP,{on:true,role:host===my?'host':'client',mode:'coop',myId:my,hostId:host,members:mem,count:mem.length,slots:mem.length,cnt:mem.length,myIdx:mem.find(m=>m.id===my).idx,seed:cfg.seed,down:false,away:!!document.hidden,
     phase:'pick',g:0,lv:8,meReady:false,gateT:0,waitLate:false,failT:0,full:false,wm:0,synced:false,over:null,menu:false,under:null,note:'',toast:'',toastT:0,hudKey:'',pKey:'',lookKey:'',hadAl:false,swung:false,dashed:false,atk0:0,dash0:0,
     tMe:0,tW:0,tQ:0,tSi:0,tOb:0,tHud:0,tSync:0,tLook:0,tSent:0,tick:0,seen:0,hStamp:-1,lastF:performance.now(),moKey:'?',wvKey:'?',q:[],sd:[],rq:[],aq:[],hsKey:''});
-  MP.remotes.length=0;MP.rById.clear();MP.byIdx.length=0;MP.ready.clear();MP.mons.clear();MP.qd.clear();MP.ate.clear();MP.hclk.off=1e18;MP.heroes.length=0;
+  MP.remotes.length=0;MP.rById.clear();MP.byIdx.length=0;MP.owe.length=0;MP.ready.clear();MP.mons.clear();MP.qd.clear();MP.ate.clear();MP.hclk.off=1e18;MP.heroes.length=0;
   for(const m of mem)if(m.id!==my){const r=mkRemote(m);MP.remotes.push(r);MP.rById.set(m.id,r);MP.byIdx[m.idx]=r}
   // a co-op run begins at the class choice, whole, and never touches the single-player save
   beginTok++;S.paused=false;const pb=$('pauseB');if(pb){pb.setAttribute('aria-pressed','false');pb.textContent='Menu'}S.stop=0;S.wave=null;
@@ -3494,7 +3540,11 @@ MP.begin=mpBegin;MP.end=mpEnd;
 //      200 px 16 burns around 32 a creature's),boom raw,slow,stun], z:[x,y,r,dur,sx|-1,sy|-1,raw,stun], f:[...,raw per tick,slows], bm:[angle,length,raw], an: a pet's row ends with its three blows, a thrall's with its health
 //  lk  in versus also: au:[radius,raw per tick] the ring of light, tb: a thrall's bite (raw)
 const VFLOORS=[11,31,51,101,151],VNONE=[];
-const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,
+// round 11, counterplay: dodge: for this long after a dash or a blink starts, bolts, arrows, spears and orbs pass through you (a dash already shrugs off everything for its first quarter second; this is the window to close on someone who shoots).
+// shootSlow: a hero who fights at range moves at this share of its speed while it looses a bolt (the moment of the cast), so shooting on the run costs ground. rally: the hero with less of its health left takes less from the one with more:
+// a blow is multiplied by 1 + rally x (victim's share of health - attacker's share), so a fight that is being lost can still turn.
+// braceN, braceT, brace, braceK: the braceN-th blow within braceT seconds braces you: for `brace` seconds every blow does braceK of its damage (many small hits in a row are worth less than they look; one heavy blow is not).
+const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,dodge:.45,braceN:3,braceT:1.2,brace:1.5,braceK:.6,shootSlow:.6,rally:.8,
   cls:{},dev:false};
 // VCLS: per hero level, k (the level's own factor on the conversion) and the factors of every build [what its blows on heroes are multiplied by, what the blows it takes are multiplied by].
 // A build is the class, with its upgrade past floor 50 and its apex path past 100. Found with the versus bots (r9-sim/tuneb.js: every build near 50% over all opponents, a mirror match near 30 s);
@@ -3517,6 +3567,10 @@ const VRULES=['Every blow is scaled to a hero\'s health, and no single blow take
   'A stun or a slow lasts '+VSK.cc+' second at most. After it, none takes hold for '+VSK.ccImm+' seconds.',
   'A pet that falls stays down until the next round. Thralls and wolves can be killed. A hero\'s blows count '+VSK.cre+' times on creatures.',
   'A shield blocks one blow every '+VSK.shield+' seconds at most, and a blocked blow protects from nothing else.',
+  'For '+VSK.dodge+' seconds after a dash or a blink, bolts and arrows pass through you.',
+  'Loosing a bolt, an arrow, a spear or an orb slows your step for the moment of the cast.',
+  'The hero with less health left is hurt less by the one with more, by up to '+Math.round(VSK.rally*100)+'%.',
+  'The '+['','','second','third','fourth','fifth'][VSK.braceN]+' blow within '+VSK.braceT+' seconds braces you: for '+VSK.brace+' seconds blows do '+Math.round((1-VSK.braceK)*100)+'% less.',
   'How many fight for you is limited by your mana and by nothing else.',
   'Trophies and their echoes strike heroes. The Owed rise from enemy creatures that die, not from heroes.',
   'Pack-beasts, ice-wights and cinders can be killed. Chill, shock and a drenching slow or stop a hero as any slow or stun does; rot and fire are poisons.',
@@ -3614,7 +3668,7 @@ function vsWait(){
   if(!VS||VS.phase!=='pick'||!VP.mine||MP.menu)return;VP.scr='wait';
   const wait=VS.score.filter(s=>!s.left&&!VP.ready.has(s.id)),n=wait.length,host=MP.role==='host',late=performance.now()-VP.t0>(VSK.pick+8)*1000;VP.late=late;
   const btns=[['Change my fighter',vsUnready]];if(form())btns.push([cap1(tw().pl),()=>petsScreen(vsWait)]);if(learned().length>NSK)btns.push(['Skills',()=>loadout(vsWait)]);if(host&&late&&n)btns.push(['Start now',vsHostStart]);
-  show({wide:true,cls:'vsPanel vsPick',kick:vsHead(),title:n?'Waiting for '+n+(n>1?' players':' player'):'Starting',body:'You fight as '+an(vsFighter(VS.score[VS.myIdx]))+'. The first round starts when everyone has chosen; whoever has not chosen in time gets the fighter of their last match.',extra:{table:vsTable('pick')},btns});
+  show({wide:true,cls:'vsPanel vsPick',kick:vsHead(),title:n?'Waiting for '+n+(n>1?' players':' player'):'Starting',body:'You fight as '+an(vsFighter(VS.score[VS.myIdx]))+'. The first round starts when everyone has chosen; whoever has not chosen in time gets the fighter of their last match.',extra:{table:vsTable('pick')},btns,nodef:true});
 }
 function vsRoundOver(){
   MP.menu=false;const w=VS.winner,won=w===VS.myTeam;
@@ -3757,15 +3811,18 @@ function vsHurt(raw,by,src,pure){
   let d=raw*VP.k*VSK.K*VSK.kf*ac*mc;
   if(!pure){
     if(P.inv>0)return false;
+    if(src==='shot'&&VP.dodgeT>0)return false; // it passes through a hero who has just dashed
     if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
     if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null}
-    if(P.guardT>0){P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return true}
+    if(P.guardT>0){zealAdd();P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return true}
     if(rand()*100<Math.min(40,eqv('guard'))){if(S.t-VP.hurtT>.3){VP.hurtT=S.t;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward()}return true}
     if(cls()==='tank'&&P.shield&&!(S.t-VP.shAt<VSK.shield)){VP.shAt=S.t;P.shield=false;P.shT=0;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return true}
     if(P.plates>0&&S.apex==='stone'&&!(S.t-VP.shAt<VSK.shield)){VP.shAt=S.t;plateBreak(true);return true}
     {const G=d<=.2*P.maxHp&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return true}}
   }
   if(P.stoneT>0)d/=2;if(P.vMark>0)d*=1.5;
+  if(!pure&&VSK.rally>0){const R=MP.byIdx[by];if(R&&R.P&&R.P.maxHp>0&&!R.dead)d*=Math.max(1-VSK.rally,Math.min(1+VSK.rally,1+VSK.rally*(P.hp/P.maxHp-Math.max(0,R.P.hp)/R.P.maxHp)))}
+  if(!pure){if(VP.braceT>0)d*=VSK.braceK;else{if(!(S.t-VP.hcT<=VSK.braceT)){VP.hc=0;VP.hcT=S.t}if(++VP.hc>=VSK.braceN){VP.hc=0;VP.braceT=VSK.brace;floats.push({x:P.x,y:P.y-58,txt:'Braced',life:.8,c:'#d5dce2'})}}}
   d=Math.max(.01,Math.min(d,VSK.cap*P.maxHp));
   const got=Math.max(0,Math.min(d,P.hp));P.hp-=d;ST.dmgTaken+=got;vsDm(by,0,got);if(window.__mb&&window.__mb.dmgBy)window.__mb.dmgBy[src]=(window.__mb.dmgBy[src]||0)+got;if(by>=0){VP.last=by;VP.lastT=S.t}
   VP.fl+=d;VP.hud=true;S.shake=Math.max(S.shake,.12);if(S.t-VP.hurtT>.25){VP.hurtT=S.t;puff(P,'#b8263d',6);SND.hurt();haptic(40)}
@@ -3810,6 +3867,7 @@ function vsDown(by,ring){
 }
 // no more than VSK.inv seconds untouchable at a stretch, whatever grants it; after that, VSK.invRest seconds in which nothing does
 function vsInv(dt){
+  if(VP.dodgeT>0)VP.dodgeT-=dt;if(VP.braceT>0)VP.braceT-=dt;
   if(VP.invBlk>0){VP.invBlk-=dt;P.inv=0;P.guardT=0;return}
   if(P.inv>0||P.guardT>0){VP.invRun+=dt;if(VP.invRun>=VSK.inv){P.inv=0;P.guardT=0;VP.invRun=0;VP.invBlk=VSK.invRest}}else VP.invRun=0;
 }
@@ -4044,7 +4102,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,NEC,LNG,AXK,vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)

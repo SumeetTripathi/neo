@@ -441,6 +441,27 @@ function runeTexture(R0){ // [colour, half-size in world units, [[radius,width].
   const n=R0[3],rr=R0[4];g.beginPath();for(let i=0;i<=n;i++){const a=i*3/n*TAU-Math.PI/2;g[i?'lineTo':'moveTo'](Math.cos(a)*rr,Math.sin(a)*rr)}g.stroke();
   return new THREE.CanvasTexture(c);
 }
+// (round 11) A big flat sheet with a rectangular hole: the ground, or the water, drawn everywhere EXCEPT under the floor (or the bank) that hides it anyway.
+// The sheets used to be whole, so every pixel of the arena was shaded two or three times over (floor, bank, water), which is what made the Drowned Fen the slowest
+// place to draw. The hole stays `inset` units inside the cover's edge, more than a slanted line of sight can reach under it, so nothing that was visible is cut.
+// Eight triangles round the hole, edges shared corner to corner (no seams). Local coordinates: the mesh sits at (W/2, y, H/2) as the whole sheet did.
+function holedSheet(size,x0,x1,z0,z1){
+  const S=size/2,ax=x0-W/2,bx=x1-W/2,az=z0-H/2,bz=z1-H/2,pos=[],quad=(x1,z1,x2,z2,x3,z3,x4,z4)=>{pos.push(x1,0,z1,x2,0,z2,x3,0,z3,x1,0,z1,x3,0,z3,x4,0,z4)};
+  quad(-S,-S,ax,az,bx,az,S,-S);quad(S,-S,bx,az,bx,bz,S,S);quad(S,S,bx,bz,ax,bz,-S,S);quad(-S,S,ax,bz,ax,az,-S,-S);
+  const n=pos.length/3,nor=new Float32Array(n*3),uv=new Float32Array(n*2);for(let i=0;i<n;i++){nor[i*3+1]=1;uv[i*2]=pos[i*3]/size+.5;uv[i*2+1]=.5-pos[i*3+2]/size}
+  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('normal',new THREE.BufferAttribute(nor,3));g.setAttribute('uv',new THREE.BufferAttribute(uv,2));
+  g.computeBoundingSphere();return g;
+}
+// The same for a slab the floor rests on (a bank, a raft of stone): its top is only ever seen as the strip between the floor's edge and its own, so the
+// part under the floor (a quarter of a unit below it) is left out. The four sides and the bottom stay; uv as slab() lays them.
+function openTop(m,X0,X1,Z0,Z1,y){
+  const bg=m.geometry,ix=bg.index.array,src=bg.toNonIndexed(),P0=src.attributes.position.array,N0=src.attributes.normal.array,U0=src.attributes.uv.array,pp=[],nn=[],uu=[],S1=1/72;
+  for(let i=0;i<ix.length;i++){if(i>=12&&i<18)continue;pp.push(P0[i*3],P0[i*3+1],P0[i*3+2]);nn.push(N0[i*3],N0[i*3+1],N0[i*3+2]);uu.push(U0[i*2],U0[i*2+1])}   // (indices 12..17 of a box are its +y face)
+  const ax=3,bx=W-3,az=3,bz=H-3,q=(x1,z1,x2,z2,x3,z3,x4,z4)=>{for(const[x,z]of[[x1,z1],[x2,z2],[x3,z3],[x1,z1],[x3,z3],[x4,z4]]){pp.push(x,y,z);nn.push(0,1,0);uu.push(x*S1,z*S1)}};
+  q(X0,Z0,ax,az,bx,az,X1,Z0);q(X1,Z0,bx,az,bx,bz,X1,Z1);q(X1,Z1,bx,bz,ax,bz,X0,Z1);q(X0,Z1,ax,bz,ax,az,X0,Z0);
+  const ng=new THREE.BufferGeometry();ng.setAttribute('position',new THREE.Float32BufferAttribute(pp,3));ng.setAttribute('normal',new THREE.Float32BufferAttribute(nn,3));ng.setAttribute('uv',new THREE.Float32BufferAttribute(uu,2));
+  ng.computeBoundingSphere();src.dispose();bg.dispose();m.geometry=ng;
+}
 function buildEnv(key,low,wide){
   OUT_X=wide?1500:620;
   const crypt=key==='crypt',km=crypt?null:/^h(-?[\d.]+)(?:b(\d+))?$/.exec(key),hue=crypt?208:km?+km[1]||0:+key.slice(1)||0,far=!!(km&&km[2]!==undefined),bi=far?+km[2]:0,area=crypt?'crypt':far?'far':AREA_BY_HUE[hue]||'pass';
@@ -474,7 +495,7 @@ function buildEnv(key,low,wide){
     if(stepS)for(let x=6;x<W;x+=stepS*(.7+rnd()*.6))fn(i++,x,H-WALL+8+rnd()*8,1);
     return i};
   const count=(a,b,c)=>{const keep=rnd.s;const n=along(a,b,c,()=>{});rnd.s=keep;return n};
-  const ground=(col,o)=>{const g=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(col,{rim:false,k:.8})));g.position.set(W/2,-.6,H/2);g.receiveShadow=true;root.add(g);return g};
+  const ground=(col,o)=>{const g=noLine(new THREE.Mesh(holedSheet(7000,8,W-8,8,H-8),std(col,{rim:false,k:.8})))/* the floor lies over the hole, .6 above */;g.position.set(W/2,-.6,H/2);g.receiveShadow=true;root.add(g);return g};
   const rocks=(n,col)=>{const im=inst(new THREE.DodecahedronGeometry(1,0),std(col,{flatShading:true,roughness:1}),n);
     for(let i=0;i<n;i++){const p=outside(rnd,60,true),s=6+rnd()*16;put(im,i,p.x,s*.3,p.z,s,s*(.6+rnd()*.8),s,rnd()*3,rnd()*3,rnd()*3)}root.add(im)};
   if(crypt){
@@ -516,9 +537,10 @@ function buildEnv(key,low,wide){
     // the drowned fen: the arena is a mud bank in still black water, reeds and rotten posts around it
     scene.background.setHSL(172/360,.4,.028);
     E.sun.setHex(0xcfeadb);E.sunI=.6;E.hemiI=.34;E.lightI=2.1;E.lightD=430;E.fogFar=820;E.mote=[.72,1,.45];E.moteN=low?10:44;
-    const water=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(172,.5,.07),{rim:false,k:.9})));
+    const water=noLine(new THREE.Mesh(holedSheet(7000,-12,W+12,-12,H+12),std(hslColor(172,.5,.07),{rim:false,k:.9})));   // (the bank stands in the hole: 30 wider on every side, 3.75 above)
     water.position.set(W/2,-4,H/2);water.receiveShadow=true;root.add(water);
     const mud=std(hslColor(120,.18,.07),{roughness:1}),bank=slab(-30,W+30,-9,-.25,-30,H+30,mud);bank.castShadow=false;root.add(bank);
+    openTop(bank,-30,W+30,-30,H+30,-.25);
     blockWall(0x7d9b88,.62,[8,24],[8,20],[5,9]);
     const wood=std(0x2a2219,{flatShading:true,roughness:1}),nP=count(46,52,70),posts=inst(new THREE.CylinderGeometry(.8,1,1,6).translate(0,.5,0),wood,nP);
     along(46,52,70,(i,x,z,e)=>{const h=e===1?8+rnd()*8:22+rnd()*30;put(posts,i,x,-4,z,3.2,h,3.2,(rnd()-.5)*.3,rnd()*3,(rnd()-.5)*.3)});root.add(posts);
@@ -583,7 +605,7 @@ function buildEnv(key,low,wide){
     scene.background.setHSL(340/360,.6,.012);
     E.sun.setHex(0xffd2dc);E.sunI=.56;E.hemiI=.28;E.lightI=2.6;E.lightD=470;E.mote=[1,.35,.5];E.moteN=low?8:40;E.fogFar=2200;
     const rockM=std(hslColor(340,.12,.1),{flatShading:true,roughness:.95});
-    const under=slab(-18,W+18,-70,-.3,-18,H+18,rockM);under.castShadow=false;root.add(under);
+    const under=slab(-18,W+18,-70,-.3,-18,H+18,rockM);under.castShadow=false;root.add(under);openTop(under,-18,W+18,-18,H+18,-.3);
     const nJ=dn(40),jag=inst(new THREE.ConeGeometry(1,1,5).translate(0,.5,0),rockM,nJ,true);
     for(let i=0;i<nJ;i++){const s=i<nJ*.6,x=s?rnd()*W:(rnd()<.5?-10:W+10),z=s?H+6+rnd()*10:rnd()*H,w=14+rnd()*22;put(jag,i,x,-64,z,w,40+rnd()*110,w,Math.PI,rnd()*3,0)}root.add(jag);
     blockWall(0x8a7480,.68,[10,34],[8,26],[5,9]);
@@ -603,14 +625,14 @@ function buildEnv(key,low,wide){
     {const mc=hslColor(ah,.8,.7);E.mote=[mc.r,mc.g,mc.b];E.moteMode=['drift','rise','fall'][(bi+1)%3];E.moteN=low?10:36+(bi%3)*10}
     const rockM=std(hslColor(hue,.14,.11),{flatShading:true,roughness:.95}),hotM=basic(hslColor(ah,.9,.6)),glowAh=hslColor(ah,.9,.55).getHex();
     if(gm===0){ // a raft of stone over nothing
-      const under=slab(-18,W+18,-70,-.3,-18,H+18,rockM);under.castShadow=false;root.add(under);
+      const under=slab(-18,W+18,-70,-.3,-18,H+18,rockM);under.castShadow=false;root.add(under);openTop(under,-18,W+18,-18,H+18,-.3);
       const nJ=dn(36),jag=inst(new THREE.ConeGeometry(1,1,5).translate(0,.5,0),rockM,nJ,true);
       for(let i=0;i<nJ;i++){const s=i<nJ*.6,x=s?rnd()*W:(rnd()<.5?-10:W+10),z=s?H+6+rnd()*10:rnd()*H,w=14+rnd()*22;put(jag,i,x,-64,z,w,40+rnd()*110,w,Math.PI,rnd()*3,0)}root.add(jag);
     }else if(gm===1){ // solid ground running out into the dark
       ground(hslColor(hue,.22,.045));rocks(dn(50),hslColor(hue,.1,.15));
     }else{ // a shelf in a still, faintly lit sea
-      const sea=noLine(new THREE.Mesh(new THREE.PlaneGeometry(7000,7000).rotateX(-Math.PI/2),std(hslColor(ah,.55,.07),{rim:false,k:.9,emissive:hslColor(ah,.8,.025)})));sea.position.set(W/2,-5,H/2);sea.receiveShadow=true;root.add(sea);
-      const bank=slab(-26,W+26,-10,-.25,-26,H+26,rockM);bank.castShadow=false;root.add(bank);
+      const sea=noLine(new THREE.Mesh(holedSheet(7000,-8,W+8,-8,H+8),std(hslColor(ah,.55,.07),{rim:false,k:.9,emissive:hslColor(ah,.8,.025)})));sea.position.set(W/2,-5,H/2);sea.receiveShadow=true;root.add(sea);
+      const bank=slab(-26,W+26,-10,-.25,-26,H+26,rockM);bank.castShadow=false;root.add(bank);openTop(bank,-26,W+26,-26,H+26,-.25);
       const nG=dn(16),gl=flatGlowMat(glowAh,.16),gq=inst(G.quad,gl,nG,true);for(let i=0;i<nG;i++){const p=outside(rnd,60,true),s=120+rnd()*240;put(gq,i,p.x,-4.6,p.z,s,1,s*.5)}root.add(gq);
       E.ticks.push(t=>{gl.opacity=.12+.06*Math.sin(t*.8)});
     }
@@ -1226,18 +1248,32 @@ function perfAsk(){
   if(AUTO.ask||((AUTO.quiet||!AUTO.prompt||navigator.webdriver)&&!AUTO._force))return;
   const now=performance.now();if(AUTO.asked&&now-AUTO.asked<90000)return;AUTO.asked=now;
   const res=Math.max(.5,Math.min(1,num(MB.settings&&MB.settings.res,1))),canRes=res>.5+1e-6&&!!MB.setSetting,canLow=!Q.low&&!!MB.setSetting;
-  const box=document.createElement('div');box.id='mbPerf';box.setAttribute('role','dialog');box.setAttribute('aria-label','Performance');
-  box.style.cssText='position:fixed;left:50%;top:max(18%,env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:6;max-width:min(92vw,460px);box-sizing:border-box;padding:12px 14px;background:rgba(10,12,26,.94);border:1px solid rgba(139,77,255,.7);color:#eeecfb;font:500 14px/1.35 Barlow,Arial,sans-serif;text-align:center';
-  const msg=document.createElement('div');msg.textContent='This device is running the game at about '+Math.round(1000/AUTO.ema)+' frames a second. A lower resolution will make movement smoother.';msg.style.marginBottom='10px';box.appendChild(msg);
-  const row=document.createElement('div');row.style.cssText='display:flex;flex-wrap:wrap;gap:8px;justify-content:center';box.appendChild(row);
-  const close=()=>{if(AUTO.ask){AUTO.ask.remove();AUTO.ask=null}AUTO.slow=0;AUTO.ema=16.7};
-  const btn=(label,fn,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.style.cssText='min-height:44px;padding:8px 14px;font:600 13px/1 Rajdhani,"Arial Narrow",sans-serif;letter-spacing:.08em;text-transform:uppercase;cursor:pointer;color:#eeecfb;border:1px solid rgba(184,156,255,.7);background:'+(primary?'#6a35e0':'rgba(16,20,42,.9)');b.addEventListener('click',e=>{e.stopPropagation();try{fn()}catch(_){}close()});row.appendChild(b)};
+  // (round 11) the look comes from the page's style sheet (#mbPerf, .mbp-row, .mbp-note and the page's own buttons); nothing is styled inline.
+  // Keyboard: the first choice takes the focus (not on a touch screen), Tab stays inside the box, Escape is "Keep as it is", and the game does not see those keys.
+  const box=document.createElement('div');box.id='mbPerf';box.setAttribute('role','dialog');box.setAttribute('aria-modal','false');box.setAttribute('aria-labelledby','mbPerfMsg');box.setAttribute('aria-describedby','mbPerfNote');box.tabIndex=-1;
+  const msg=document.createElement('p');msg.id='mbPerfMsg';msg.textContent='This device is running the game at about '+Math.round(1000/AUTO.ema)+' frames a second. A lower resolution will make movement smoother.';box.appendChild(msg);
+  const row=document.createElement('div');row.className='mbp-row';box.appendChild(row);
+  const was=document.activeElement;
+  const keep=()=>{AUTO.quiet=true;try{localStorage.setItem('marrowborn.perfquiet','1')}catch(_){}};
+  const onKey=e=>{if(AUTO.ask!==box)return;
+    if(e.key==='Escape'){e.preventDefault();e.stopImmediatePropagation();keep();close();return}
+    if(!box.contains(e.target))return;
+    if(e.key==='Tab'){const f=row.querySelectorAll('button'),a=document.activeElement,first=f[0],last=f[f.length-1];
+      if(e.shiftKey&&(a===first||a===box)){e.preventDefault();last.focus()}else if(!e.shiftKey&&a===last){e.preventDefault();first.focus()}}
+    e.stopPropagation()};     // Enter, Space and the arrows pressed on a choice are for the choice, not for the hero
+  const close=()=>{window.removeEventListener('keydown',onKey,true);if(AUTO.ask){AUTO.ask.remove();AUTO.ask=null}AUTO.slow=0;AUTO.ema=16.7;
+    try{if(was&&was!==document.body&&document.contains(was)&&typeof was.focus==='function')was.focus({preventScroll:true})}catch(_){}};
+  AUTO.close=close;
+  const btn=(label,fn,primary)=>{const b=document.createElement('button');b.type='button';b.textContent=label;if(primary)b.className='primary';b.addEventListener('click',e=>{e.stopPropagation();try{fn()}catch(_){}close()});row.appendChild(b);return b};
   if(canRes)btn('Lower resolution to '+Math.round(Math.max(.5,res-.15)*100)+'%',()=>MB.setSetting('res',Math.max(.5,Math.round((res-.15)*100)/100)),true);
   else if(canLow)btn('Switch graphics to Low',()=>MB.setSetting('gfx','low'),true);
   btn('Adjust automatically',()=>{AUTO.on=true;try{localStorage.setItem('marrowborn.autores','1')}catch(_){}});
-  btn('Keep as it is',()=>{AUTO.quiet=true;try{localStorage.setItem('marrowborn.perfquiet','1')}catch(_){}});
-  const note=document.createElement('div');note.textContent='You can change this any time in Settings, under Resolution and Graphics.';note.style.cssText='margin-top:8px;font-size:12px;color:#989bbd';box.appendChild(note);
-  (document.body||document.documentElement).appendChild(box);AUTO.ask=box;
+  btn('Keep as it is',keep);
+  const note=document.createElement('p');note.id='mbPerfNote';note.className='mbp-note';note.textContent='You can change this any time in Settings, under Resolution and Graphics. Escape keeps everything as it is.';box.appendChild(note);
+  (document.querySelector('.wrap')||document.body||document.documentElement).appendChild(box);AUTO.ask=box;
+  window.addEventListener('keydown',onKey,true);
+  let coarse=false;try{coarse=matchMedia('(pointer:coarse)').matches}catch(_){}
+  if(!coarse)try{row.querySelector('button').focus({preventScroll:true})}catch(_){}
 }
 function perfAskForce(){AUTO.asked=0;AUTO._force=true;perfAsk();AUTO._force=false}
 function autoTick(){
@@ -1246,7 +1282,7 @@ function autoTick(){
   AUTO.ema+=(d-AUTO.ema)*.06;
   const playing=!!(MB.S&&MB.S.mode==='play'&&!MB.S.paused);
   if(!AUTO.on&&AUTO.k!==1)AUTO.k=1;
-  if(!playing){AUTO.slow=AUTO.fast=0;if(AUTO.ask&&MB.S&&MB.S.mode!=='play'){AUTO.ask.remove();AUTO.ask=null}}
+  if(!playing){AUTO.slow=AUTO.fast=0;if(AUTO.ask&&MB.S&&MB.S.mode!=='play'){if(AUTO.close)AUTO.close();else{AUTO.ask.remove();AUTO.ask=null}}}
   else if(AUTO.ema>1000/43){AUTO.fast=0;AUTO.slow+=d;
     if(AUTO.on){if(AUTO.slow>1200&&AUTO.k>.5){AUTO.k=Math.max(.5,AUTO.k-.1);AUTO.slow=0;AUTO.ema=16.7}}
     else if(AUTO.slow>4000)perfAsk()}
@@ -1254,7 +1290,7 @@ function autoTick(){
   else{AUTO.slow=Math.max(0,AUTO.slow-d);AUTO.fast=0}
   // a small frame-rate readout while the testing switch is on
   const want=!!(MB.settings&&MB.settings.testUnlock);
-  if(want&&!AUTO.el){const e=document.createElement('div');e.id='mbFps';e.setAttribute('aria-hidden','true');e.style.cssText='position:fixed;left:max(6px,env(safe-area-inset-left,0px));bottom:max(4px,env(safe-area-inset-bottom,0px));z-index:5;font:600 11px/1.2 Rajdhani,"Arial Narrow",sans-serif;letter-spacing:.06em;color:#c4f4ff;background:rgba(7,9,18,.6);padding:2px 6px;pointer-events:none';(document.body||document.documentElement).appendChild(e);AUTO.el=e}
+  if(want&&!AUTO.el){const e=document.createElement('div');e.id='mbFps';e.setAttribute('aria-hidden','true');(document.querySelector('.wrap')||document.body||document.documentElement).appendChild(e);AUTO.el=e}
   if(AUTO.el){AUTO.el.hidden=!want;if(want&&now-AUTO.shown>500){AUTO.shown=now;AUTO.el.textContent=Math.round(1000/AUTO.ema)+' FPS · '+Math.round(FR.pr/Math.min(window.devicePixelRatio||1,3)*100)+'% · '+FR.bw+'×'+FR.bh}}
 }
 function resize(){
@@ -1357,7 +1393,8 @@ function inked(txt,x,y,fill,lw){ctx.lineJoin='round';ctx.lineWidth=lw;ctx.stroke
 // a pet's health bar. idCss = null: one of ours (the pip is in the owner's colour); else the identity colour of the member it belongs to
 function petBar(a,MM,idCss,foe){
   const W=OV.w,H=OV.h;
-  const small=!!a&&foe===true&&!a.pet&&(a.kind==='thrall'||a.kind==='wolf'||(typeof a.kind==='string'&&APX_ALLY[a.kind]===1)); // versus: an opponent's thralls and wolves can be killed, so they show their health too
+  const apx=!!a&&!a.pet&&typeof a.kind==='string'&&APX_ALLY[a.kind]===1; // (round 11) the free allies of the apex paths show their health on either side
+  const small=!!a&&!a.pet&&(apx||(foe===true&&(a.kind==='thrall'||a.kind==='wolf'))); // versus: an opponent's thralls and wolves can be killed, so they show their health too
   if(!a||!(a.pet||small)||a.minion||a.hidden||a.dead||!(a.maxHp>0)||!(a.hp>0))return;
   let top=small?(a.kind==='wolf'||a.kind==='packbeast'?24:a.kind==='icewight'?54:a.kind==='cinder'?30:40):(a.r||16)*2.4;if(!small&&MM&&MM.height)try{top=MM.height(a)}catch(e){}
   toScreen(a.x,top+10+(a.lift||0)*LIFT,a.y);if(!sp.ok)return;
@@ -1367,13 +1404,14 @@ function petBar(a,MM,idCss,foe){
   if(foe){ // versus, an opponent's creature: a slanted bar filled with the owner's colour, no friendly pip
     ctx.beginPath();ctx.moveTo(bx-1,by-2);ctx.lineTo(bx+bw+4,by-2);ctx.lineTo(bx+bw+1,by+7);ctx.lineTo(bx-4,by+7);ctx.closePath();ctx.fillStyle='rgba(8,8,12,.88)';ctx.fill();
     ctx.fillStyle='#2a0c14';ctx.fillRect(bx,by,bw,5);ctx.fillStyle=idCss;ctx.fillRect(bx,by,bw*q,5);ctx.lineWidth=1;ctx.strokeStyle=CSS.foe;ctx.stroke();return}
+  const own=apx?ALLY_CSS[a.kind]:beast?'#cfeaff':'#6fe07a'; // a pack-beast, ice-wight or cinder: the same bar in its path's colour
   ctx.fillStyle='rgba(8,8,12,.82)';ctx.fillRect(bx-2,by-2,bw+4,9);
-  ctx.fillStyle=beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
-  ctx.fillStyle=q<.3?'#e0a23c':beast?'#cfeaff':'#6fe07a';ctx.fillRect(bx,by,bw*q,5);
-  ctx.strokeStyle=beast?'rgba(207,234,255,.9)':'rgba(125,255,140,.85)';ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,8);
+  ctx.fillStyle=apx?'#1a1c26':beast?'#1d3348':'#12301a';ctx.fillRect(bx,by,bw,5);
+  ctx.fillStyle=q<.3?'#e0a23c':own;ctx.fillRect(bx,by,bw*q,5);
+  ctx.strokeStyle=apx?own:beast?'rgba(207,234,255,.9)':'rgba(125,255,140,.85)';ctx.lineWidth=1;ctx.strokeRect(bx-1.5,by-1.5,bw+3,8);
   // a small diamond pip marks it as yours; another member's pet carries a round pip in that member's colour
   if(idCss){ctx.fillStyle=idCss;ctx.beginPath();ctx.arc(bx-9,by+2.5,4,0,TAU);ctx.fill()}
-  else{ctx.fillStyle=beast?'#cfeaff':'#7dff8c';ctx.beginPath();ctx.moveTo(bx-9,by-1);ctx.lineTo(bx-5,by+2.5);ctx.lineTo(bx-9,by+6);ctx.lineTo(bx-13,by+2.5);ctx.closePath();ctx.fill()}
+  else{ctx.fillStyle=apx?own:beast?'#cfeaff':'#7dff8c';ctx.beginPath();ctx.moveTo(bx-9,by-1);ctx.lineTo(bx-5,by+2.5);ctx.lineTo(bx-9,by+6);ctx.lineTo(bx-13,by+2.5);ctx.closePath();ctx.fill()}
   ctx.strokeStyle='rgba(8,8,12,.8)';ctx.stroke();
 }
 function drawOverlay(sight){
@@ -1510,7 +1548,7 @@ class Timed{
 const GHOST_GEO=mergeGeos([new THREE.CapsuleGeometry(6.5,20,3,8).translate(0,33,0),new THREE.SphereGeometry(7,10,8).translate(0,55,1),new THREE.CylinderGeometry(3,2.4,22,6).translate(-4,11,0),new THREE.CylinderGeometry(3,2.4,22,6).translate(4,11,0),new THREE.ConeGeometry(11,30,7,1,true).translate(0,24,-3)]);
 const TF={
   slash:new Timed(4,()=>{const g=new THREE.Group(),a=new THREE.Mesh(G.quad,addMat(slashTex,PAL.power)),b=new THREE.Mesh(G.quad,addMat(slashTex,PAL.power2));b.scale.setScalar(.9);b.position.y=.6;a.renderOrder=b.renderOrder=7;g.add(a,b);g.userData.a=a;g.userData.b=b;return g}),
-  ghost:new Timed(8,()=>{const m=new THREE.Mesh(GHOST_GEO,new THREE.MeshBasicMaterial({color:PAL.power,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false,toneMapped:false}));m.renderOrder=6;return m}),
+  ghost:new Timed(14,()=>{const m=new THREE.Mesh(GHOST_GEO,new THREE.MeshBasicMaterial({color:PAL.power,blending:THREE.AdditiveBlending,depthWrite:false,transparent:true,fog:false,toneMapped:false}));m.renderOrder=6;return m}),
   streak:new Timed(3,()=>{const m=new THREE.Mesh(G.quad,flatGlowMat(PAL.power,.8));m.renderOrder=6;return m}),
   flash:new Timed(12,()=>new THREE.Sprite(addMat(flareTex,0xffffff,true))),
   burst:new Timed(5,()=>new THREE.Sprite(addMat(burstTex,0xffffff,true))),
@@ -1579,8 +1617,13 @@ function heroFx(F,P,cls,dt,sight,low,T,ap){
   }
   // the newer apex paths: a Split Sky hero stutters after-images as it runs (more with its speed surge), a Feral Vow hero leaves paw prints and a Last Pyre hero scorched footprints
   if(ap&&sight){
-    if(ap==='storm'){if(!low&&P.moving&&!(P.dashT>0)){const h=P.haste>0?Math.min(1,P.haste):0;F.stT-=dt;if(F.stT<=0){F.stT=.13-.07*h;F.stN++;const o=T.ghost.spawn(.2+.1*h),k=F.stN%2?10:19;
-      o.position.set(P.x-Math.cos(P.face)*k,0,P.y-Math.sin(P.face)*k);o.rotation.set(.12,Math.PI/2-P.face,0,'YXZ');o.userData.k=.2+.22*h;o.material.color.setHex(F.foe?PAL.foe:0xffe74a)}}}
+    // (round 11: after-images are laid by distance run, not by time, so a slow frame rate leaves as many as a fast one; they last long enough to be
+    // seen at 15 frames a second, alternate lightning yellow and white-hot, and a jagged scorch of light is left on the floor between them. Low graphics: half as many.)
+    if(ap==='storm'){if(P.moving&&!(P.dashT>0)&&jump<200*200){const h=P.haste>0?Math.min(1,P.haste):0,step=(low?40:22)-4*h;F.stT+=Math.sqrt(jump);
+      if(F.stT>=step){F.stT=F.stT>step*2?0:F.stT-step;F.stN++;const o=T.ghost.spawn(.46+.16*h),hot=F.stN%3===0,a=Math.atan2(dy,dx);
+        o.position.set(P.x-Math.cos(a)*9,0,P.y-Math.sin(a)*9);o.rotation.set(.12,Math.PI/2-P.face,0,'YXZ');o.userData.k=(hot?.5:.62)+.2*h;o.material.color.setHex(F.foe?(hot?PAL.foe2:PAL.foe):hot?STORM_HOT:STORM_HEX);
+        if(F.stN%2===0||low)trailAt(ap,P.x-Math.cos(a)*14,P.y-Math.sin(a)*14,a,F.stN%4?1:-1,F.foe)}}
+      else if(!P.moving)F.stT=0}
     else if((ap==='beasts'||ap==='flame')&&jump<200*200){F.trD+=Math.sqrt(jump);if(F.trD>(low?46:24)){F.trD=0;F.trN++;trailAt(ap,P.x,P.y,Math.atan2(dy,dx),F.trN%2?1:-1,F.foe)}}
   }
   F.px=P.x;F.py=P.y;
@@ -1652,9 +1695,13 @@ function heroBeam(P,t,foe){const b=P&&P.beam;if(!b||typeof b!=='object'||b.on===
   o.position.set(P.x+Math.cos(a)*len/2,SHOT_Y+8,P.y+Math.sin(a)*len/2);o.rotation.y=-a;
   u.core.scale.set(len,w*.22*fl,w*.5*fl);u.glow.position.y=-SHOT_Y-7.2;u.edge.position.y=-SHOT_Y-7;u.glow.scale.set(len+w*3,1,w*5*fl);u.edge.scale.set(len+w*5,1,w*9)}
 // a pet's beam is the same shape as a monster's, in friendly blue (an opponent's pet in versus: the monsters' own red)
+// (round 11: an opponent's pet used to borrow the monsters' amber beam; it has its own now, crimson with an ember edge like everything else hostile in versus)
+const fpbeamLine=new THREE.MeshBasicMaterial({color:PAL.foe,transparent:true,opacity:.75,depthWrite:false,toneMapped:false,fog:false});
+pools.fpbeam=new Pool(()=>{const g=new THREE.Group(),core=new THREE.Mesh(G.box,fbeamCore),glow=new THREE.Mesh(G.quad,fbeamGlow),line=new THREE.Mesh(G.box,fpbeamLine);
+    glow.position.y=-SHOT_Y+.8;glow.renderOrder=3;line.position.y=-SHOT_Y+1;line.renderOrder=3;core.renderOrder=5;g.add(core,glow,line);g.userData={core,glow,line};return g});
 function allyBeams(allies,t,foe){
   for(let i=0;i<allies.length;i++){const m=allies[i],b=m&&m.beam;if(!b||m.hidden||!b.rays||m.hp<=0)continue;
-    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j];if(!ry)continue;const o=(foe?pools.beam:pools.pbeam).get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12,a=+ry.a||0;
+    for(let j=0;j<b.rays.length;j++){const ry=b.rays[j];if(!ry)continue;const o=(foe?pools.fpbeam:pools.pbeam).get(),u=o.userData,len=Math.max(1,ry.len||0),w=b.w||12,a=+ry.a||0;
       o.position.set(m.x+Math.cos(a)*len/2,SHOT_Y,m.y+Math.sin(a)*len/2);o.rotation.y=-a;
       u.core.visible=u.glow.visible=!!b.on;u.line.visible=!b.on;
       if(b.on){const fl=1+.18*Math.sin(t*47+j);u.core.scale.set(len,w*.55*fl,w*.9*fl);u.glow.scale.set(len+w*3,1,w*5.5*fl)}
@@ -1670,7 +1717,8 @@ function allyBeams(allies,t,foe){
 const APEX_OK={dominion:1,order:1,beasts:1,frost:1,plague:1,flame:1,storm:1,stone:1,blade:1,tide:1},APX_ALLY={packbeast:1,icewight:1,cinder:1};
 const APEX_HEX={dominion:PAL.power,order:PAL.power2,beasts:0x5fe07a,frost:0x8fd8ff,plague:0x9fc414,flame:0xff6a1e,storm:0xffe74a,stone:0xe0a84a,blade:0x8fa0ff,tide:0x19d3c5};
 const APEX_DISC={dominion:.45,plague:.5,stone:.45,flame:.7,beasts:.6,blade:.7};
-const ALLY_HEX={packbeast:0x5fe07a,icewight:0x8fd8ff,cinder:0xff6a1e};
+const ALLY_HEX={packbeast:0x5fe07a,icewight:0x8fd8ff,cinder:0xff6a1e},ALLY_CSS={packbeast:'#5fe07a',icewight:'#8fd8ff',cinder:'#ff6a1e'};
+const STORM_HEX=APEX_HEX.storm,STORM_HOT=0xfffbe0;
 const hsh=i=>{const v=Math.sin(i*12.9898+7.3)*43758.5453;return v-Math.floor(v)};
 let TX=null,ARCG=null;
 function upTrail(o,q){o.material.opacity=o.userData.k*(1-q)*(q<.08?q*12.5:1)}
@@ -1685,15 +1733,21 @@ function txSetup(){
     g.fillStyle='rgba(0,0,0,.92)';g.beginPath();g.ellipse(h*.2,0,h*.42,h*.22,0,0,TAU);g.ellipse(-h*.5,0,h*.19,h*.17,0,0,TAU);g.fill();
     g.fillStyle='rgba(255,255,255,.3)';g.beginPath();g.ellipse(h*.2,0,h*.3,h*.13,0,0,TAU);g.fill();
     g.fillStyle='#fff';for(const[x,y]of[[.1,.05],[.36,-.08],[-.5,.03]]){g.beginPath();g.arc(h*x,h*y,h*.035,0,TAU);g.fill()}});
+  const bolt=fxTex(128,(g,h)=>{ // a forked stroke of lightning lying along x, a soft glow under a hard white line
+    const pts=[[-.96,.1],[-.62,-.22],[-.38,.16],[-.06,-.14],[.22,.2],[.52,-.1],[.96,.06]],fk=[[-.06,-.14],[.12,-.5],[.4,-.62]],fk2=[[.22,.2],[.44,.5]];
+    const run=(a,w,c)=>{g.strokeStyle=c;g.lineWidth=w;g.lineJoin='miter';g.lineCap='round';g.beginPath();g.moveTo(a[0][0]*h,a[0][1]*h);for(let i=1;i<a.length;i++)g.lineTo(a[i][0]*h,a[i][1]*h);g.stroke()};
+    g.shadowColor='#fff';g.shadowBlur=h*.16;run(pts,h*.13,'rgba(255,255,255,.5)');run(fk,h*.08,'rgba(255,255,255,.4)');run(fk2,h*.07,'rgba(255,255,255,.4)');
+    g.shadowBlur=0;run(pts,h*.06,'#fff');run(fk,h*.035,'#fff');run(fk2,h*.03,'#fff')});
   const ice=ST.toon(0xcfeeff,{emissive:0x4aa8e8,emissiveIntensity:.55}),sg=new THREE.OctahedronGeometry(1,0);
-  TX={paw,scorch,
+  TX={paw,scorch,bolt,
     trail:new Timed(56,()=>{const m=noLine(new THREE.Mesh(G.quad,new THREE.MeshBasicMaterial({map:paw,transparent:true,depthWrite:false,toneMapped:false,fog:false})));m.renderOrder=1;return m}),
     shard:new Timed(4,()=>{const g=new THREE.Group();for(let i=0;i<10;i++){const m=noLine(new THREE.Mesh(sg,ice)),a=i*TAU/10+hsh(i)*.6;m.userData={x:Math.cos(a)*(.5+hsh(i+9)*.6),z:Math.sin(a)*(.5+hsh(i+9)*.6),y:.5+hsh(i+20),s:hsh(i+30)-.5,k:.6+hsh(i+40)*.8};g.add(m)}g.userData.r=16;return g})};
   return TX;
 }
-function trailAt(ap,x,z,a,side,foe){const T=txSetup(),paw=ap==='beasts',o=T.trail.spawn(paw?1.5:2.6),m=o.material,tex=paw?T.paw:T.scorch;
-  if(m.map!==tex){m.map=tex;m.blending=paw?THREE.AdditiveBlending:THREE.NormalBlending}
-  m.color.setHex(foe?PAL.foe:paw?0x5fe07a:0xff7a2a);o.userData.k=paw?.95:1;m.opacity=0;
+function trailAt(ap,x,z,a,side,foe){const T=txSetup(),paw=ap==='beasts',bolt=ap==='storm',o=T.trail.spawn(paw?1.5:bolt?.9:2.6),m=o.material,tex=paw?T.paw:bolt?T.bolt:T.scorch,add=paw||bolt;
+  if(m.map!==tex){m.map=tex;m.blending=add?THREE.AdditiveBlending:THREE.NormalBlending}
+  m.color.setHex(foe?PAL.foe:paw?0x5fe07a:bolt?STORM_HEX:0xff7a2a);o.userData.k=paw?.95:1;m.opacity=0;
+  if(bolt){o.position.set(x,.5,z);o.rotation.y=-a+(side>0?0:Math.PI);o.scale.set(58,1,30);return}
   o.position.set(x-Math.sin(a)*side*7,.47,z+Math.cos(a)*side*7);o.rotation.y=-a;o.scale.set(paw?22:27,1,paw?22:17)}
 function shatterAt(x,z,r,low){const o=txSetup().shard.spawn(.6);o.position.set(x,0,z);o.userData.r=Math.max(10,Math.min(60,r));o.rotation.y=(x*.7+z*.3)%TAU;upShard(o,0);
   flashAt(x,r,z,r*1.2,r*5,0xdff4ff,.22,.9);if(!low)burstAt(x,r,z,r*2,r*6.5,0x8fd8ff,.26)}
@@ -1824,10 +1878,10 @@ function drawFields(fs,t,low,sight){
    Identity: each member has one colour (by slot when the data carries one, else by place in the list): a broken ring with a facing notch under
    the hero, a thin ring under each of their allies, the name tag, the pip on their pets' bars and the arrow at the edge of the view.
    None of this exists until the first remote appears, and none of it runs in single-player. */
-const ID_HEX=[0x4fd8ff,0xff9f1a,0x7dff5a,0xff5ad2,0xffe14a,0x6a8cff,0x3df5c0,0xd8c8ff];
+const ID_HEX=[0x4fd8ff,0xff9f1a,0x7dff5a,0xb46cff,0xffe14a,0x6a8cff,0x3df5c0,0xd8c8ff]; // (round 11: the fourth was pink 0xff5ad2, too close to the crimson of everything hostile)
 const cssOf=h=>'#'+('00000'+h.toString(16)).slice(-6);
 // a member's colour by index: the session's own list when it has one (MB.mp.colors, which the party list on the page uses too), else this one
-function memberHex(i){i=i|0;const mp=MB.mp,c=mp&&mp.colors&&mp.colors[i];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);return ID_HEX[((i%8)+8)%8]}
+function memberHex(i){i=i|0;const mp=MB.mp,c=mp&&mp.colors&&mp.colors[i];if(typeof c==='string'&&HEX_RE.test(c)){const h=echoHex(c);return h===0xff5ad2?0xb46cff:h}return ID_HEX[((i%8)+8)%8]}
 function memberColor(i){return cssOf(memberHex(i))}
 const rems=[],remById=new Map(),echoAll=[];
 let TFR=null,auraR=null,idTexH=null,idTexA=null,idTexHF=null,idTexAF=null,remStamp=0,PART_IX=null;
@@ -2029,7 +2083,8 @@ function syncRemotes(list,dt,sight){
     {const im=rm.marks;let n=0,pk=0;
       for(let j=0;j<al.length;j++)if(al[j].kind==='packbeast')pk++;rm.packN=pk;
       for(let j=0;j<al.length&&n<MARKS;j++){const a=al[j];if(a.hidden||a.dead||a.hp<=0)continue;
-        const r0=a.r||12,rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
+        const r0=a.r||12;let rad=a.kind==='guardian'?r0*1.5+7:a.kind==='familiar'?19:a.pet||a.s?(a.minion?r0*1.7+5:r0*2.05+9):r0+8;
+        if(foe&&rad>r0*1.25+22)rad=r0*1.25+22; // (round 11) a thorn ring grows with the creature but no longer runs to twice the width of a very large one
         markAt(im,n++,a.x,a.y,rad*(foe?2.4:2.33),t*(j%2?.5:-.5)+j)}
       im.count=n;im.visible=n>0;if(n)im.instanceMatrix.needsUpdate=true}
     const bc=rm.beacon;bc.visible=f>.05&&!hide;if(bc.visible){bc.position.set(P.x,46,P.y);bc.scale.set(26+4*Math.sin(t*3+i),150,1);bc.material.opacity=(.62+.14*Math.sin(t*3+i))*f}
@@ -2305,7 +2360,7 @@ const specList=[],vsRounds=new Map();
 function vsOf(){const v=R.testVs||(MB.mp&&MB.mp.vs);return v&&typeof v==='object'?v:null}
 // colours: the session's own list per member index when it gives one (vs.colors, which its scoreboards and the page's HUD use too); else the two
 // team colours here (or vs.teamColors / MB.mp.teamColors) in a team match and the member colour otherwise
-function vsListed(i){const v=VS.v,c=v&&v.colors&&v.colors[i];return typeof c==='string'&&HEX_RE.test(c)?echoHex(c):-1}
+function vsListed(i){const v=VS.v,c=v&&v.colors&&v.colors[i];if(typeof c!=='string'||!HEX_RE.test(c))return -1;const h=echoHex(c);return h===0xff5ad2?0xb46cff:h}
 function teamHex(t){const mp=MB.mp,v=VS.v,l=(v&&v.teamColors)||(mp&&mp.teamColors),c=l&&l[t];if(typeof c==='string'&&HEX_RE.test(c))return echoHex(c);
   const sc=v&&Array.isArray(v.score)?v.score:NONE;for(let i=0;i<sc.length;i++){const e=sc[i];if(e&&e.team===t){const h=vsListed(num(e.idx,i));if(h>=0)return h;break}}
   return TEAM_HEX[t===1?1:0]}
@@ -2395,19 +2450,23 @@ function vsFrame(dt){
 }
 /* the closing ring: a wall of fire standing on a white-hot line, the floor outside it burnt dark and red, a cool pale band just inside it.
    One group, built the first time a ring is seen; a new radius only moves and scales it. */
-let RG=null;
-function ringTexture(seed,tall){ // flame tongues, tiling sideways; white-hot at the foot, ember, then crimson thinning to nothing
-  const c=mkCanvas(512,128),g=c.getContext('2d'),rnd=rng(seed);
-  const gr=g.createLinearGradient(0,128,0,0);gr.addColorStop(0,'rgba(255,236,200,.95)');gr.addColorStop(.05,'rgba(255,170,70,.8)');gr.addColorStop(.2,'rgba(255,84,30,.5)');gr.addColorStop(.5,'rgba(255,36,64,.24)');gr.addColorStop(1,'rgba(200,20,70,0)');
-  g.fillStyle=gr;g.fillRect(0,0,512,128);g.globalCompositeOperation='destination-out';
-  for(let x=0;x<512;x+=tall?34:21){const h=(tall?70:34)+rnd()*(tall?52:70),w=(tall?26:17)+rnd()*8,j=rnd()*14-7;
-    for(const ox of[0,512,-512]){g.beginPath();g.moveTo(x+ox-w,0);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+j*1.6,h);g.quadraticCurveTo(x+ox+j,h*.45,x+ox+w,0);g.closePath();g.fill()}}
-  const t=new THREE.CanvasTexture(c);t.wrapS=THREE.RepeatWrapping;return t;
+let RG=null;const RING_F=180;
+function ringTexture(seed,tall){ // (round 11) cel flames, tiling sideways: separate tongues that lean and fork, each with a white-yellow heart, an orange body and a crimson skin;
+  // the gaps between them reach nearly to the foot, so the wall reads as a row of fires and not as a lit band
+  const c=mkCanvas(1024,256),g=c.getContext('2d'),rnd=rng(seed),step=tall?74:46;
+  const tongue=(x,w,h,lean,col,k)=>{g.fillStyle=col;const b=256,t=b-h*k,ww=w*k;g.beginPath();g.moveTo(x-ww,b);
+    g.bezierCurveTo(x-ww*1.15,b-h*k*.38,x-ww*.25+lean*.3,b-h*k*.62,x+lean*k,t);g.bezierCurveTo(x+ww*.2+lean*.5,b-h*k*.6,x+ww*1.1,b-h*k*.3,x+ww,b);g.closePath();g.fill()};
+  for(let pass=0;pass<3;pass++){const col=['rgba(255,34,62,.82)','rgba(255,120,28,.95)','rgba(255,236,170,1)'][pass],k=[1,.74,.42][pass],r2=rng(seed);
+    for(let x=0;x<1024;x+=step){const h=(tall?150:84)+r2()*(tall?100:120),w=(tall?30:19)+r2()*(tall?16:10),lean=(r2()-.5)*(tall?46:30),side=r2()<.6;
+      for(const ox of[0,1024,-1024]){tongue(x+ox,w,h,lean,col,k);if(side)tongue(x+ox+w*1.25,w*.5,h*.5,lean*.6,col,k)}}}
+  // the foot: a low run of embers that keeps the tongues joined, and nothing above it between them
+  const gr=g.createLinearGradient(0,256,0,256-(tall?30:20));gr.addColorStop(0,'rgba(255,214,150,.95)');gr.addColorStop(.5,'rgba(255,96,28,.7)');gr.addColorStop(1,'rgba(255,40,60,0)');g.fillStyle=gr;g.fillRect(0,256-(tall?30:20),1024,tall?30:20);
+  const t=new THREE.CanvasTexture(c);t.wrapS=THREE.RepeatWrapping;t.encoding=THREE.sRGBEncoding;return t;
 }
 function ringSetup(){
   if(RG)return;
   const g=new THREE.Group();g.visible=false;scene.add(g);
-  const add=(tex,op)=>new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:op,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,fog:false});
+  const add=(tex,op)=>new THREE.MeshBasicMaterial({map:tex,transparent:true,opacity:op,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,fog:false});   // (round 11: laid over, not added, so the flames keep their own colours and their dark gaps)
   const t1=ringTexture(71,true),t2=ringTexture(113,false),wallGeo=new THREE.CylinderGeometry(1,1,1,160,1,true).translate(0,.5,0);
   const m1=add(t1,.9),m2=add(t2,.8),w1=noLine(new THREE.Mesh(wallGeo,m1)),w2=noLine(new THREE.Mesh(wallGeo,m2));w1.renderOrder=w2.renderOrder=5;
   // the floor: everything outside is burnt (a wide dark ring and a red wash over it), a hot line where the wall stands, a pale band on the safe side
@@ -2423,7 +2482,12 @@ function ringSetup(){
   for(const m of[w1,w2,burn,wash,hot,line,safe]){m.frustumCulled=false;g.add(m)}
   // sparks climbing off the wall (high graphics)
   const pts=makePoints(128);pts.mat.blending=THREE.AdditiveBlending;pts.mat.uniforms.uScale.value=bitsP.mat.uniforms.uScale.value;pointSets.push(pts);
-  RG={g,w1,w2,m1,m2,t1,t2,burn,wash,hot,line,safe,burnM,washM,hotM,lineM,safeM,pts,r:-1,show:0,geos:[wallGeo,outGeo,inGeo,lineGeo,hotGeo]};
+  // (round 11) flames with body: a ring of cones standing in the wall, each one leaping on its own beat, a small bright one inside every other
+  const fGeo=new THREE.ConeGeometry(1,1,5).translate(0,.5,0),fMat=new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.9,blending:THREE.AdditiveBlending,depthWrite:false,toneMapped:false,fog:false}),
+    fl=noLine(new THREE.InstancedMesh(fGeo,fMat,RING_F));fl.count=0;fl.frustumCulled=false;fl.renderOrder=6;fl.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  for(let i=0;i<RING_F;i++)fl.setColorAt(i,_col.setHex(i%3===2?0xffd27a:i%3?0xff5a1e:0xff2d55).convertSRGBToLinear());
+  g.add(fl);
+  RG={g,w1,w2,m1,m2,t1,t2,burn,wash,hot,line,safe,burnM,washM,hotM,lineM,safeM,pts,fl,fMat,r:-1,show:0,geos:[wallGeo,outGeo,inGeo,lineGeo,hotGeo,fGeo]};
 }
 function syncRing(dt,sight){
   const on=VS.on&&VS.ringOn&&MB.S.mode==='play';
@@ -2433,11 +2497,16 @@ function syncRing(dt,sight){
   if(G0.show<.01&&!on){if(G0.g.visible){G0.g.visible=false;G0.pts.geo.setDrawRange(0,0)}return}
   const r=Math.max(1,VS.rr),a=G0.show,sd=VS.phase==='sudden'?1:.8;
   G0.g.visible=true;G0.g.position.set(VS.rx,0,VS.ry);
-  if(r!==G0.r){G0.r=r;const n=Math.max(4,Math.round(TAU*r/260));G0.t1.repeat.x=n;G0.t2.repeat.x=Math.max(8,Math.round(n*1.7))}
-  const h=(low?64:84)*a,fl=1+.06*Math.sin(t*9)+.04*Math.sin(t*23.7);
+  if(r!==G0.r){G0.r=r;const n=Math.max(3,Math.round(TAU*r/520));G0.t1.repeat.x=n;G0.t2.repeat.x=Math.max(5,Math.round(n*1.6))}
+  const h=(low?70:92)*a,fl=1+.09*Math.sin(t*9)+.06*Math.sin(t*23.7);
+  // the standing flames: about one every 30 units of wall (fewer in low graphics), in the ring's own frame
+  {const im=G0.fl,n=Math.max(8,Math.min(RING_F,Math.round(TAU*r/(low?64:30))));
+    for(let i=0;i<n;i++){const an=i*TAU/n+Math.sin(i*7.3)*.4/n,big=i%3!==2,ph=i*2.399,k=(1+.3*Math.sin(t*(11+i%5)+ph)+.16*Math.sin(t*(23+i%7*2)+ph*1.7))*a,rr=r+(big?0:1.5),w=big?9+3*Math.sin(ph*3.1):4.2,hh=(big?46+18*Math.sin(ph*5.3):30)*k*sd;
+      _d.position.set(Math.cos(an)*rr,.6,Math.sin(an)*rr);_d.scale.set(w,hh,w);_d.rotation.set(.1*Math.sin(t*7+ph),ph,.1*Math.sin(t*5.3+ph*2));_d.updateMatrix();im.setMatrixAt(i,_d.matrix)}
+    im.count=n;im.instanceMatrix.needsUpdate=true;G0.fMat.opacity=.8*a}
   G0.w1.scale.set(r,h*fl,r);G0.w2.scale.set(r*1.004,h*.55*(2-fl),r*1.004);G0.w2.visible=!low;
   G0.t1.offset.x=t*.045;G0.t2.offset.x=-t*.11;
-  G0.m1.opacity=.6*a*sd;G0.m2.opacity=.5*a*sd;
+  G0.m1.opacity=.82*a*sd;G0.m2.opacity=.7*a*sd;
   G0.burn.scale.set(r,1,r);G0.wash.scale.set(r,1,r);G0.hot.scale.set(r,1,r);G0.line.scale.set(r,1,r);G0.safe.scale.set(r,1,r);
   G0.burnM.opacity=.62*a;G0.washM.opacity=(.13+.05*Math.sin(t*2.6))*a;G0.hotM.opacity=(.4+.12*Math.sin(t*7))*a;G0.lineM.opacity=a;G0.safeM.opacity=(.09+.03*Math.sin(t*2))*a;
   G0.safe.visible=r>46;
