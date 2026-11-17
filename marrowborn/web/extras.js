@@ -124,11 +124,15 @@ function saveLine(s){
 }
 
 /* ---------- records ---------- */
-var REC_FIELDS=['best','runs','deaths','time','kills','bosses'];
+var REC_FIELDS=['best','runs','deaths','time','kills','bosses'],MARKS='SABCD';
 function blankRec(){return{best:0,runs:0,deaths:0,time:0,kills:0,bosses:0}}
 function cleanRec(r){
-  var o=blankRec(),k,i;o.v=2;o.cls={};o.fast={};
+  var o=blankRec(),k,i;o.v=2;o.cls={};o.fast={};o.marks={S:0,A:0,B:0,C:0,D:0};o.chain=0;o.gr={};
   if(!r||typeof r!=='object')return o;
+  // round 12: how often each mark was earned, the best chain, the best mark per floor
+  if(r.marks&&typeof r.marks==='object')for(k in o.marks)o.marks[k]=clamp(Math.floor(num(r.marks[k])),0,1e9);
+  o.chain=clamp(Math.floor(num(r.chain)),0,1e9);
+  if(r.gr&&typeof r.gr==='object')for(k in r.gr){var gl=Math.floor(+k);if(gl>=0&&gl<10000&&typeof r.gr[k]==='string'&&MARKS.indexOf(r.gr[k])>=0)o.gr[gl]=r.gr[k]}
   for(i=0;i<REC_FIELDS.length;i++){k=REC_FIELDS[i];o[k]=clamp(Math.floor(num(r[k])),0,1e9)}
   if(r.cls&&typeof r.cls==='object')for(k in r.cls)if(MB.CLASSES&&Object.prototype.hasOwnProperty.call(MB.CLASSES,k)&&r.cls[k]&&typeof r.cls[k]==='object'){
     o.cls[k]=blankRec();for(i=0;i<REC_FIELDS.length;i++)o.cls[k][REC_FIELDS[i]]=clamp(Math.floor(num(r.cls[k][REC_FIELDS[i]])),0,1e9)}
@@ -143,6 +147,7 @@ function saveRec(){
   // keep the list of fastest kills bounded: drop the slowest ordinary levels first
   var keys=Object.keys(rec.fast);
   if(keys.length>80){keys.sort(function(a,b){return rec.fast[b].t-rec.fast[a].t});for(var i=0;i<keys.length&&Object.keys(rec.fast).length>80;i++)if((+keys[i]+1)%10&&+keys[i]!==7)delete rec.fast[keys[i]]}
+  var gk=Object.keys(rec.gr);if(gk.length>400){gk.sort(function(a,b){return a-b});for(var j=0;j<gk.length-400;j++)delete rec.gr[gk[j]]} // the lowest floors go first
   store.set('records',rec);
 }
 function mergeRec(other){
@@ -150,6 +155,8 @@ function mergeRec(other){
   for(i=0;i<REC_FIELDS.length;i++){f=REC_FIELDS[i];rec[f]=Math.max(rec[f],o[f])}
   for(k in o.cls){if(!rec.cls[k])rec.cls[k]=blankRec();for(i=0;i<REC_FIELDS.length;i++){f=REC_FIELDS[i];rec.cls[k][f]=Math.max(rec.cls[k][f],o.cls[k][f])}}
   for(k in o.fast)if(!rec.fast[k]||o.fast[k].t<rec.fast[k].t)rec.fast[k]=o.fast[k];
+  for(k in o.marks)rec.marks[k]=Math.max(rec.marks[k],o.marks[k]);rec.chain=Math.max(rec.chain,o.chain);
+  for(k in o.gr)if(!rec.gr[k]||MARKS.indexOf(o.gr[k])<MARKS.indexOf(rec.gr[k]))rec.gr[k]=o.gr[k];
   saveRec();
 }
 function classRec(id){if(!id||!MB.CLASSES||!MB.CLASSES[id])return null;return rec.cls[id]||(rec.cls[id]=blankRec())}
@@ -205,6 +212,14 @@ guard('records',function(){
     var best=h('b',{text:run.newBest&&rec.best===lv+1?'A new best: floor '+rec.best+'.':'Best: floor '+rec.best+'.'});
     panelNote(function(){return MB.S&&MB.S.mode==='dead'},h('p',{class:'keys mbx-note'},parts.join(' ')+' ',best));
   });
+  listen('grade',function(d){
+    if(inMp()||MARKS.indexOf(d.mark)<0)return;
+    var lv=Math.floor(num(d.level,-1)),old=rec.gr[lv];
+    rec.marks[d.mark]++;rec.chain=Math.max(rec.chain,Math.floor(num(d.combo)));
+    if(lv>=0&&(!old||MARKS.indexOf(d.mark)<MARKS.indexOf(old)))rec.gr[lv]=d.mark;
+    saveRec();
+  });
+  MB.records=function(){return JSON.parse(JSON.stringify(rec))};
   MB.openRecords=openRecords;
 });
 
@@ -231,6 +246,8 @@ function openRecords(){
     else{
       var tile=function(v,l){return h('div',null,h('b',{text:String(v)}),h('small',{text:l}))};
       p.appendChild(h('div',{class:'mbx-tiles'},tile(rec.best||'—','Best floor'),tile(rec.runs,'Climbs'),tile(rec.bosses,'Bosses killed'),tile(rec.deaths,'Deaths'),tile(clock(rec.time),'Time played')));
+      var mk=rec.marks,mn=mk.S+mk.A+mk.B+mk.C+mk.D;
+      if(mn||rec.chain)p.appendChild(h('div',{class:'mbx-tiles'},tile(mk.S,'S marks'),tile(mk.A,'A marks'),tile(mk.B,'B marks'),tile(mk.C+mk.D,'C and D'),tile(rec.chain||'—','Best chain')));
       var cols=h('div',{class:'mbx-rec'});
       // fastest kills: once a class is chosen only those fights count, the crypt ones are too short to compare
       var ks=Object.keys(rec.fast).map(Number),late=ks.filter(function(k){return k>=8}),pick=(late.length?late:ks).sort(function(a,b){return rec.fast[a].t-rec.fast[b].t}).slice(0,6);
@@ -306,6 +323,8 @@ function openSettings(){
       choice('Graphics','gfx',[['low','Low'],['high','High'],['ultra','Ultra']]),
       has('res')?slider('Resolution','res',50,100,5,pct):null,
       has('ui')?slider('Interface','ui',80,150,5,pct):null,
+      has('camDist')?choice('Camera distance','camDist',[['near','Near'],['standard','Standard'],['far','Far']]):null,
+      has('shake')?toggle('Screen shake','shake','On','Off'):null,
       slider('Button size','btn',80,140,5,pct),
       toggle('Left-handed','left','Stick on the right','Stick on the left'),
       toggle('Hints','hints','Shown once each','Off'),

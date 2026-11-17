@@ -178,7 +178,7 @@ const SHLIFE=10,SHK=.32,DOMHOLD=.75,DOMSUM=1.5,DOMPET=1.15,ORDD=1.6,ORDLIFE=1.25
 // damage of the order side is in multiples of your own damage (dmgMul), or a share of the damage your own blows have just done.
 const AX={
  st:{order:[ORDD,ORDLIFE],storm:[1.42,1.1],stone:[1.38,1.4],blade:[1.32,1.15],tide:[1.42,1.3]}, // order side: [damage, health]
- col:{packbeast:'#5fe07a',icewight:'#8fd8ff',cinder:'#ff6a1e',beasts:'#5fe07a',frost:'#8fd8ff',plague:'#b7c61f',flame:'#ff6a1e',storm:'#ffe74a',stone:'#c9a26b',blade:'#8fa0ff',tide:'#19d3c5'},
+ col:{packbeast:'#5fe07a',icewight:'#8fd8ff',cinder:'#ff6a1e',beasts:'#5fe07a',frost:'#8fd8ff',plague:'#9fc414',flame:'#ff6a1e',storm:'#ffe74a',stone:'#c9a26b',blade:'#8fa0ff',tide:'#19d3c5'},
  // beasts: cap0 beasts, one more every capK floors (capMax at most); each lasts `life` s and another answers every t s. A bite is `bite` U, syn more for every other beast alive, every cd s.
  beast:{cap0:3,capK:30,capMax:5,life:24,t:4,bite:.21,syn:.1,cd:.75,spd:265,howl:6,runK:4,huntN:4,huntT:10},
  // frost: a blow of yours chills (hit, once per icd s per monster; a floor's own monster takes bossK of any chill); at full chill it is frozen (frz s; frzB a floor's own), takes `more` times the damage, and when it thaws or dies
@@ -445,7 +445,7 @@ let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],f
 let NEXTID=1;const nid=()=>NEXTID++;
 // Multiplayer (MB.mp; the code is in the multiplayer section near the end). Everything about it is off unless MP.on.
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
-const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#ff5ad2','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
+const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#b46cff','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
   cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],owe:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],lkq:[],hsKey:''};
 let REM=null;
 // VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
@@ -2896,7 +2896,7 @@ function petsScreen(back,note){
   show({wide:true,list:R.length>3,kick:rel?'Release · pick one to let go':rs?heldLine(on):cap1(w.pl)+' · '+R.length+' kept',title:w.mine,
     body:!R.length?'You keep none. Kill a boss, and you may '+(w.pet?(petOwner()==='necro'?'bind':'tame')+' it.':'take one.')
       :rel?'Pick the one to release. It is gone for good.'
-      :rs&&w.pet?'Pick one to send it out or call it back. Each is the monster it was, with its own attacks and its own power, however many stand beside it. Each one that is out holds mana for as long as it is out, the more the stronger it is: held mana cannot be spent on skills and does not refill. One that falls rises again after '+REVT+' seconds for a quarter more than it holds, from what is left, and half as much again each further time on a floor'+(PETS.auto?'.':'; that is switched off now, so the fallen stay down until the next floor.')
+      :rs&&w.pet?'Pick one to send it out or call it back. Each is the monster it was, with its own attacks and its own power, however many stand beside it. Each one that is out holds mana for as long as it is out, the more the stronger it is: held mana cannot be spent on skills and does not refill. One that falls rises again after '+REVT+' seconds for a quarter more than it holds, from what is left, and half as much again each further time on a floor'+(PETS.auto?'.':'; that is switched off now, so the fallen stay down until the next floor.')+' A trinket that makes thralls and pets hit harder raises what a pet holds as well as its power.'
       :rs?'Pick one to send it out or call it back. Each one that is out holds part of your mana for as long as it is out: held mana cannot be spent on skills and does not refill. The more that fight at once, the weaker each one is.'
       :'Pick one to use it. One is in use at a time.',
     keys:note||'',
@@ -3106,7 +3106,8 @@ function padMove(e,down){
     padO.x+=(x-x/l)*R;padO.y+=(y-y/l)*R;x/=l;y/=l;l=1}
   const DZ=.14;let m=l<=DZ?0:Math.pow((l-DZ)/(1-DZ),1.15);if(m>1)m=1;
   joy.x=l>0?x/l*m:0;joy.y=l>0?y/l*m:0;
-  knob.style.transform=`translate(${padO.x+x*R}px,${padO.y+y*R}px)`}
+  let kx=padO.x+x*R,ky=padO.y+y*R;const kl=Math.hypot(kx,ky),km=r.width/2-R*.2;if(kl>km&&kl>0){kx*=km/kl;ky*=km/kl} // the drawn knob stays inside the ring
+  knob.style.transform=`translate(${kx}px,${ky}px)`}
 pad.addEventListener('pointerdown',e=>{try{pad.setPointerCapture(e.pointerId)}catch(_){}padMove(e,true);e.preventDefault()});
 pad.addEventListener('pointermove',e=>{if(pad.hasPointerCapture(e.pointerId))padMove(e,false)});
 const padUp=()=>{joy.x=joy.y=0;padO=null;knob.style.transform=''};pad.addEventListener('pointerup',padUp);pad.addEventListener('pointercancel',padUp);pad.addEventListener('lostpointercapture',padUp);
