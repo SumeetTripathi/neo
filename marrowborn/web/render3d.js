@@ -1346,11 +1346,11 @@ function frameWant(sight){
   if(TR.obj)grow(TR.ox,TR.oy,TR.or+26,74); // the thing being guarded stays in view while the hero is anywhere near it
   // versus: every opponent still standing counts as the boss does (those past the reach below sit at the edge, or get an edge badge);
   // a spectator's view takes in everyone near the one being watched, or every fighter left when it is watching the fight as a whole
+  let vsFar=0;
   if(VS.on)for(let i=0;i<rems.length;i++){const rm=rems[i];if(!rm.vis||rm.dead)continue;
     if(SPEC.on){if(SPEC.rm){if(rm===SPEC.rm)continue;const dx=rm.P.x-ax,dy=rm.P.y-ay;if(dx*dx+dy*dy>380*380)continue}}
     else if(!rm.foe)continue;
-    grow(rm.P.x,rm.P.y,40,70);
-    if(!SPEC.on)grow(2*ax-rm.P.x,2*ay-rm.P.y,40,70)} // (round 12) fair framing: the view takes in as much on the far side of the hero as it needs toward the opponent, so two fighters the same distance apart see each other at the same scale whichever of them stands north
+    grow(rm.P.x,rm.P.y,40,70);if(!SPEC.on){const d=Math.hypot(rm.P.x-ax,rm.P.y-ay);if(d<520&&d>vsFar)vsFar=d}}
   if(VS.on&&VS.ringOn&&!SPEC.on){ // the way back into the ring stays in view
     const dx=VS.rx-ax,dy=VS.ry-ay,d=Math.hypot(dx,dy);if(d>VS.rr-40&&d>1){const k=Math.max(0,(VS.rr-60))/d;grow(VS.rx-dx*k,VS.ry-dy*k,30,0)}}
   // never chase something across the whole arena: past this reach it may sit at the edge of the view
@@ -1359,7 +1359,10 @@ function frameWant(sight){
   // lean a third of the way from the player to the middle of the group
   // (round 12) where the widening starts: the Camera distance setting, the size of the screen and what is in play (CAM.pull); the view also runs a little
   // ahead of the hero (CAM.lx, CAM.lz), less as it widens
-  const fx=ax+((bb.x0+bb.x1)/2-ax)*.6,fz=ay+((bb.z0+bb.z1)/2-ay)*.6,base=Math.max(.34,Math.min(.96,(viewW&&viewW<640?.5:.58)*camK()+CAM.pull));
+  const fx=ax+((bb.x0+bb.x1)/2-ax)*.6,fz=ay+((bb.z0+bb.z1)/2-ay)*.6,base0=Math.max(.34,Math.min(.96,(viewW&&viewW<640?.5:.58)*camK()+CAM.pull)),
+    // versus, fair framing: how wide the view opens depends only on how far the opponent is, not on which side of the hero it stands (the tilted view would
+    // otherwise show the fighter to the south more of the room than the one to the north), nor on the screen or the Camera distance setting
+    base=VS.on&&vsFar>0?Math.max(base0,Math.min(1,.5+vsFar/860)):base0;
   for(let z=base;;z+=.05){
     if(z>=1){want.x=W/2;want.z=H/2-4;want.zoom=1;return}
     const f=(z-base)/(1-base),fol=.62*(1-f*f),la=SPEC.on?0:1-f;
