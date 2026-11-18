@@ -968,8 +968,8 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
    #ovMark    = the floor's mark on the first reward screen (letter, the four parts it was worked out from, the luck it gives).
    .trialHud.dare = the trial band showing a dare (tower.js). --dare = its accent. Everything is a multiple of --u. */
 :root{--dare:#ffd95e;--breath:#6fe3ff;--mk-S:#ffe9a8;--mk-A:#c9a8ff;--mk-B:#8fe3ff;--mk-C:#d3d6ea;--mk-D:#8f93b5}
-#mbChain{position:fixed;z-index:2;right:var(--sr);top:calc(var(--hud-r,30%) + calc(var(--u)*4));pointer-events:none;display:grid;justify-items:end;gap:calc(var(--u)*3);font-family:var(--display);text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*8) #000;transform-origin:100% 0}
-.mb-left #mbChain{right:auto;left:var(--sl);justify-items:start;transform-origin:0 0}
+#mbChain{position:fixed;z-index:2;right:max(var(--sr),var(--hud-rx,0px));top:calc(var(--hud-r,30%) + calc(var(--u)*4));pointer-events:none;display:grid;justify-items:end;gap:calc(var(--u)*3);font-family:var(--display);text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*8) #000;transform-origin:100% 0}
+.mb-left #mbChain{right:auto;left:max(var(--sl),var(--hud-rx,0px));justify-items:start;transform-origin:0 0}
 #mbChain[hidden]{display:none}
 .ch-top{display:grid;justify-items:inherit;transform:skewX(-8deg);transform-origin:100% 100%}
 .ch-top[hidden],.ch-str[hidden],.ch-chip[hidden]{display:none}
@@ -1020,7 +1020,7 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 #mbFin::after{content:"";position:absolute;left:8%;right:8%;bottom:calc(var(--u)*4);height:calc(var(--u)*2);background:var(--ink);opacity:.5}
 @media (pointer:coarse){#mbFin::before{display:none}#mbFin{bottom:calc(var(--sb) + calc(var(--u)*150))}}
 @media (pointer:coarse) and (max-width:600px){#mbFin{bottom:calc(var(--foot) + calc(var(--u)*14))}}
-@media (pointer:coarse) and (max-height:500px){#mbFin{bottom:auto;top:calc(var(--hud-top,var(--hud0)) + calc(var(--u)*10))}}
+@media (pointer:coarse) and (max-height:500px){#mbFin{bottom:calc(var(--sb) + calc(var(--u)*52))}}
 @keyframes mbFinIn{from{opacity:0;transform:translateX(-50%) skewX(-8deg) scale(1.5)}}
 @keyframes mbFinPulse{50%{filter:brightness(1.25);box-shadow:0 0 calc(var(--u)*26) rgba(240,184,72,.75)}}
 /* the held breath */
@@ -1258,11 +1258,14 @@ P.roundRect=function(x,y,w,h,r){if(w<0){x+=w;w=-w}if(h<0){y+=h;h=-h}r=typeof r==
   }
   if(keys&&window.MutationObserver)try{new MutationObserver(function(){try{markTick()}catch(e){}}).observe(keys,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
   /* where the right-hand column may start: under the toggles and the ledger chips */
-  var hudR=-1,hudRAt=0;
-  function rightTop(now){if(now<hudRAt)return;hudRAt=now+500;var top=0,els=[doc.querySelector('.togs'),doc.getElementById('ledger'),doc.getElementById('vsHud')],i,r;
+  var hudR=-1,hudRAt=0,hudRx=-1;
+  function rightTop(now){if(now<hudRAt)return;hudRAt=now+500;var top=0,els=[doc.querySelector('.togs'),doc.getElementById('ledger'),doc.getElementById('vsHud'),doc.getElementById('bossBar'),bk,doc.getElementById('bossName')],i,r;
     var side=wrap.classList.contains('mb-left')||doc.documentElement.classList.contains('mb-left')||doc.body.classList.contains('mb-left');
     for(i=0;i<els.length;i++){var e=els[i];if(!e||e.hidden)continue;r=e.getBoundingClientRect();if(!r.width||!r.height)continue;if(side?r.left<innerWidth*.3:r.right>innerWidth*.7)top=Math.max(top,r.bottom)}
-    top=Math.round(Math.max(top,innerHeight*.12));if(top!==hudR){hudR=top;wrap.style.setProperty('--hud-r',top+'px')}}
+    top=Math.round(Math.max(top,innerHeight*.12));if(top!==hudR){hudR=top;wrap.style.setProperty('--hud-r',top+'px')}
+    // a phone held sideways: the buttons stand in a column where the chain would be, so it moves in beside them
+    var acts=doc.querySelector('.touch .acts'),rx=0;if(acts){r=acts.getBoundingClientRect();if(r.width&&r.height&&r.top<top+innerHeight*.3&&r.height>innerHeight*.5)rx=Math.round(side?r.right+8:innerWidth-r.left+8)}
+    if(rx!==hudRx){hudRx=rx;wrap.style.setProperty('--hud-rx',rx+'px')}}
   var lastT=0,ok=true;
   function tick(ts){
     requestAnimationFrame(tick);if(!ok)return;
