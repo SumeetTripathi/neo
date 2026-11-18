@@ -557,7 +557,8 @@ function fxm(){
     rotBlob:toonM(0x2c2e12),rotBruise:toonM(0x5a3068),rotTip:toonM(0x5a6410,{emissive:0xb7c61f,emissiveIntensity:1.4,rim:false}),rotMote:add(0xb7c61f,.75),
     fire:add(0xff6a1e,.85),fireCore:add(0xffd27a,.9),
     arc:new T.MeshBasicMaterial({color:0xfffbe0,fog:false,toneMapped:false}),arcGlow:add(0xffe74a,.55),
-    drip:add(0x8ff0e6,.75)
+    drip:add(0x8ff0e6,.75),
+    reel:add(0xffd95e,.85),reelChip:toonM(0xffe9a8,{emissive:0xffb020,emissiveIntensity:.9})
   };
   return FXM;
 }
@@ -617,6 +618,11 @@ var DRESS={
   burn:function(u){var g=grp(u.fx),i,f;for(i=0;i<5;i++){f=grp(g);fxMesh(G.cone4,FXM.fire,f,0,0,0,.26,.85,.26);fxMesh(G.cone4,FXM.fireCore,f,0,0,0,.13,.5,.13)}return g},
   // shock: three jagged arcs that jump about the body
   shock:function(u){var g=grp(u.fx),i,h;for(i=0;i<3;i++){h=grp(g);fxMesh(arcGeo(i,.11),FXM.arcGlow,h,0,0,0,1,u.top,1);fxMesh(arcGeo(i,.04),FXM.arc,h,0,0,0,1,u.top,1)}return g},
+  // (round 12) reeling: its footing is broken. Two halves of a ring of light hang askew round it and turn against each other, chips of it still falling
+  reel:function(u){var g=grp(u.fx,0,u.top*.58,0),a=grp(g),b=grp(g),i;
+    if(!G.reelArc)G.reelArc=new T.TorusGeometry(1,.045,5,26,PI*1.35).rotateX(PI/2);
+    fxMesh(G.reelArc,FXM.reel,a,0,0,0,1.42,1.42,1.42).renderOrder=6;fxMesh(G.reelArc,FXM.reel,b,0,0,0,1.2,1.2,1.2).renderOrder=6;
+    for(i=0;i<4;i++)fxMesh(G.oct,FXM.reelChip,g,0,0,0,.13,.2,.13);return g},
   // soak: water running off it into a ring on the floor
   soak:function(u){var g=grp(u.fx),i;fxMesh(G.aura,auraMat(0x19d3c5),g,0,.05,0,1.55,1,1.55).renderOrder=1;for(i=0;i<5;i++)fxMesh(G.sphLo,FXM.drip,g,0,0,0,.07,.17,.07);return g}
 };
@@ -948,7 +954,7 @@ function update(g,m,MB,dt){
   // who it faces: the hero it is fighting when the game names one (multiplayer: m.tgt is the local hero or another member's), else the local hero
   var P=m.tgt&&typeof m.tgt.x==='number'?m.tgt:MB.P,S=MB.S,t=S.t,seed=m.seed||0,st=m.st||'idle',cfg=u.cfg,p=u.p,body=u.body,root=u.root,i,o,k,q;
   dt=dt>0?min(dt,.1):1/60;
-  var rage=!!m.rage,stun=m.stun>0;
+  var rage=!!m.rage,stun=m.stun>0,reel=m.stagT>0; // (round 12) reel: footing broken (m.stagT), it cannot act
   if(rage)u.extra+=dt*.8; // enraged: everything idles faster
   var tt=t+seed+u.extra,fz=m.frozen>0;
   if(fz){if(u.fzT===undefined)u.fzT=tt;tt=u.fzT}else if(u.fzT!==undefined)u.fzT=undefined; // frozen solid: it holds the pose it was caught in
@@ -965,12 +971,13 @@ function update(g,m,MB,dt){
   else if(u.ai==='beamer'&&(st==='wind'||st==='beam')&&typeof m.ba==='number')face=m.ba;
   else if(u.ai==='mite')face=a+sin(t*3+seed)*.6;
   var want=PI/2-face;
-  if(!u.init){u.init=true;u.rot=want}else if(!stun&&!fz)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
+  if(!u.init){u.init=true;u.rot=want}else if(!stun&&!fz&&!reel)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
   root.rotation.y=u.rot;
   var look=wrap(PI/2-a-u.rot);look=look>1.1?1.1:look<-1.1?-1.1:look;
   // pose targets
   var sx=1,sy=1,sz=1,tilt=0,roll=0,shake=0,lift=m.lift||0;
-  if(st==='wind'){sy=.8;sx=sz=1.1;tilt=-.1;shake=1}
+  if(reel){sy=.74;sx=sz=1.12;tilt=.34+.05*sin(tt*4.2);roll=sin(tt*2.1)*.24}        // reeling: slumped forward and swaying, wide open
+  else if(st==='wind'){sy=.8;sx=sz=1.1;tilt=-.1;shake=1}
   else if(fast){sz=1.28;sx=.9;sy=.9;tilt=.2}
   else if(st==='dazed'||stun){sy=.86;sx=sz=1.05;tilt=.16;roll=sin(tt*3)*.12}
   else if(st==='leap'){sy=1.12-.1*sin(lift*PI);sx=sz=.94}
@@ -996,7 +1003,9 @@ function update(g,m,MB,dt){
   // eyes follow the player
   var E=p.eyes;for(i=0;i<E.length;i++)E[i].pu.position.x=E[i].x+look*E[i].er*.38;
   // dazed or stunned: stars
-  var dz=st==='dazed'||stun;
+  if(reel||u.f.reel){o=dress(u,'reel',reel);if(o){k=o.children;k[0].rotation.set(.42+.08*sin(t*3.1),t*1.7,0);k[1].rotation.set(-.5,-t*2.3,.2*sin(t*2.2));
+    for(i=2;i<k.length;i++){q=(t*.55+i*.25)%1;var rl=i*1.57+t*.8;k[i].position.set(cos(rl)*(1.5-.3*q),.5-q*1.25*u.top*.58,sin(rl)*(1.5-.3*q));k[i].rotation.set(t*3+i,t*2,0);k[i].visible=q<.9}}}
+  var dz=(st==='dazed'||stun)&&!reel;
   if(dz||u.f.stars){o=dress(u,'stars',dz);if(o){o.rotation.y=t*5;o.position.y=cfg.top*u.sy+.08*sin(t*7)}}
   // enrage and phase changes: a burst, then a red pulse that stays
   var ph=m.phase||1;

@@ -478,7 +478,7 @@ const AXK={side:{dominion:{archmage:.85,beastmaster:.9,berserker:1.1,duelist:1.1
 const axK=()=>{if(!S.apex||VS||!APEX[S.apex])return 1;const a=S.adv,p=AXK.path[S.apex];return(AXK.side[APEX[S.apex].side][a]||1)*(p&&p[a]||1)};
 const zealAdd=()=>{const L=P&&LNG[S.cls];if(L)P.zeal=(P.zeal||0)+L.ev};
 const dmgMul=()=>zealK()*axK()*(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
-const cdMul=()=>1/((P&&P.pdT>0&&MP.on?PD.hasteK:1)*(P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
+const cdMul=()=>1/((P&&P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>{const k=Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
 const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)):0};
@@ -732,7 +732,7 @@ function ringShot(m,n,spd,off=0){for(let i=0;i<n;i++)shoot(m.x,m.y,off+i*TAU/n,s
 function zone(x,y,r,dur,m){dur/=m?aiK(m):mspd();const z=SIDE?{x,y,r,t:0,dur,mine:true,dmg:SIDE.du[2],pet:SIDE.par||SIDE}:{id:nid(),x,y,r,t:0,dur};clamp(z,10);zones.push(z);return z}
 function puff(e,c,n=10,spd=160){for(let i=0;i<n;i++){const a=rand()*TAU,s=spd*(.3+rand());bits.push({x:e.x,y:e.y,vx:Math.cos(a)*s,vy:Math.sin(a)*s,life:.5,max:.5,c,r:2+rand()*3})}}
 const miteHp=()=>S.level<8?2:S.level<12?4:Math.round(4*Math.pow(CURVE(S.level),.8));
-function spawn(kind,x,y,isBoss,spec,raw){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=miteHp();if(kind==='husk')hp=Math.round(miteHp()*1.5);if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);if(MP.on&&!raw)hp=mpHp(hp,kind);const m={id:nid(),kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,mods:[],ward:0,beam:null};clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);mons.push(m);return m}
+function spawn(kind,x,y,isBoss,spec,raw){const s=spec||SPEC[kind];let hp=s.hp;if(kind==='mite'&&S.level>=8)hp=miteHp();if(kind==='husk')hp=Math.round(miteHp()*1.5);if(isBoss&&window.__mb&&window.__mb.hpK)hp=Math.round(hp*window.__mb.hpK);if(isBoss&&!VS&&tenth(S.level)&&R12())hp=Math.round(hp*FIN.hp);if(MP.on&&!raw)hp=mpHp(hp,kind);const m={id:nid(),kind,s,ai:s.ai||kind,x,y,r:s.r,hp,maxHp:hp,boss:!!isBoss,st:'idle',t:1,n:0,flash:0,ring:0,ang:rand()*TAU,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,mods:[],ward:0,beam:null};clamp(m,m.r);if(obstacles.length)collide(m,m.r,true);mons.push(m);return m}
 function lesser(kind,x,y,hp,raw){const m=spawn(kind,x,y,false,lesserSpec(kind,S.level,hp),raw);m.lesser=true;m.spdK=.8;m.t=1+rand()*.6;puff(m,col(m.s.col),10);return m}
 // a wave pack: one or two lesser monsters and a handful of mites, spread along the far side of the room from you
 const LESSER=['crawler','hound','witch','fist','bomber'];
@@ -966,7 +966,6 @@ function strike(pt){
   const done=()=>{P.chAt=S.t;P.chGap=P.cd+.7;P.chC=cl;P.chT=0;P.chN=N;if(cl)P.atk=.26;
     const k=pshots.length-n0,one={fx:cl?1:0,rip:rip?1:0};for(let i=n0;i<pshots.length;i++){const p=pshots[i];p.one=one;if(cl){p.big=1.4;p.bk=BRK.closer*1.5/k;p.push=C.push;p.r+=C.r||0;if(C.pierce&&p.pierce<99)p.pierce+=C.pierce}if(rip)p.big=1.8} // (one: what the whole cast does once, whichever bolt lands first)
     if(rip&&k)P.rip=0;
-    if(cl&&c==='necro')for(const al of allies)if(al.kind==='thrall')al.cd=0; // the closer of a Necromancer: every thrall strikes at once
     emit('chainstep',{step:P.chS,steps:N,closer:cl,cls:c,style:CH.style,ang:a,x:P.x,y:P.y})};
   if(c==='mage'){P.atk=.14;P.cd=.45*H;const n=1+(pw(1)?2:0)+S.b.spec+(S.adv==='archmage'?2:0);
     for(let i=0;i<n;i++){const o=i-(n-1)/2,mid=Math.abs(o)<.6;pshot(a+o*.17,430,(mid?2:1)*D,mid?5:4,'bolt',pw(3))}SND.bolt();return done()}
@@ -974,7 +973,7 @@ function strike(pt){
   if(c==='necro'){P.atk=.14;P.cd=.48*H;pshot(a,400,NEC.skull*D,5,'skull',S.adv==='reaper');SND.skull();return done()}
   if(c==='healer'){P.atk=.14;P.cd=.38*H;pshot(a,560,2.2*D,6,'orb',S.adv==='inquisitor');SND.orb();return done()}
   const M={tank:[2.2,.4,80,1.35],fighter:[2,.32,pw(1)?90:74,pw(1)?3.2:1.3],assassin:[1.15,.22,68,1.1]}[c]||[1,has('organs')?.3:.4,66,1.15];
-  const reach=M[2]+(cl?C.reach:0),arc=M[3]+(cl?C.arc:0),push=cl?C.push:26;
+  const reach=M[2]+(cl&&!VS?C.reach:0),arc=M[3]+(cl&&!VS?C.arc:0),push=cl?C.push:26; // (in versus a closer is heavier and slower, but reaches no further)
   let dmg=M[0]*D,amb=false,hitM=null;if(c==='assassin'&&P.amb>0){dmg*=3+S.b.spec;P.amb=0;amb=true}
   const twice=c==='assassin'&&pw(1);
   P.atk=.16;P.cd=M[1]*H;SND.swing(c);
@@ -1079,7 +1078,7 @@ function roomStep(dt){
     if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
 }
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?PD.hasteK:1):1);
+  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(!VP.hold&&P.atk>0&&c&&!melee(c)){mx*=VSK.shootSlow;my*=VSK.shootSlow}if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
@@ -1102,9 +1101,9 @@ function playerStep(dt){
   if(S.apex||P.auraR)apexStep(dt,held);
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
-  if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){
-    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;P.dgT=PD.win+.02;SND.blink();if(VS)VP.dodgeT=VSK.dodge}
-    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dgT=PD.win+.02;P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash();if(VS)VP.dodgeT=VSK.dodge}
+  if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){const PDS=P.pdCd>0||!R12()?null:pdScan(); // (looked at before the hero moves)
+    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);SND.blink();if(VS)VP.dodgeT=VSK.dodge}
+    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash();if(VS)VP.dodgeT=VSK.dodge}
     haptic(10)}
   want.dash=false;
   if(want.skill)want.sk[0]=true;want.skill=false;
@@ -2111,19 +2110,29 @@ function comboHit(){
 function comboEnd(){if(!CB.n)return;const last=CB.n;CB.n=0;CB.t=0;emit('combo',{count:0,best:CB.best,ended:true,last})}
 // --- the hairbreadth dodge: a dash begun in the last PD.win seconds before a blow lands. Alone the world holds its breath (slowK of its speed for `slow` seconds); in a shared world the dodger is quicker for `haste` seconds instead.
 // Either way the next basic attack within `rip` seconds is a riposte (ripK times its damage; ripVs in versus) and `mana` of the pool comes back. cd: no second one for that long.
-const PD={win:.18,slow:1.3,slowK:.3,haste:3,hasteK:1.25,rip:4,ripK:2.5,ripVs:1.5,mana:.08,cd:2.5};
+const PD={win:.18,slow:1.3,slowK:.3,haste:3,hasteK:1.25,rip:4,ripK:2.5,ripVs:1.5,mana:.08,cd:2.5,cdVs:6,hasteVs:1.1}; // (versus: a longer wait, a smaller quickening, and the dodge itself gives no further untouchable time)
 function pdTry(d,src){
   if(!P||!(P.dgT>0)||P.pdCd>0||!R12())return false;
   if(!VS&&!(src==='shot'||src==='zone'||src==='beam'||src==='siege'||d>=blow(1)))return false; // (brushing past a monster is not a dodge)
-  P.dgT=0;P.pdCd=PD.cd;P.pdT=PD.haste;P.rip=PD.rip;P.inv=Math.max(P.inv,.45);const mana=P.maxMana*PD.mana;manaGive(mana);
+  P.dgT=0;P.pdCd=VS?PD.cdVs:PD.cd;P.pdT=PD.haste;P.rip=PD.rip;if(!VS)P.inv=Math.max(P.inv,.45);const mana=P.maxMana*PD.mana;manaGive(mana);
   const slow=MP.on?0:PD.slow;if(slow){S.slowT=slow;S.slowK=PD.slowK}
   floats.push({x:P.x,y:P.y-56,txt:'Hairbreadth',life:1.1,c:'#6fe3ff',big:1.4});rings.push({x:P.x,y:P.y,life:.45,max:.45,r:70,fx:true});sfx(1320,.18,'triangle',.16,2200);haptic([15,30,15]);
   emit('perfectDodge',{by:-1,x:P.x,y:P.y,src,slow,window:PD.haste,mana:Math.round(mana)});return true}
+// at the moment a dash begins: is a blow about to land where I stand (within PD.win seconds)? Then the dash is a hairbreadth dodge even when it carries me clear of the blow.
+function pdScan(){
+  const w=PD.win,near=(s,rr)=>{const rx=P.x-s.x,ry=P.y-s.y,vv=s.vx*s.vx+s.vy*s.vy;if(!vv)return false;const t=Math.max(0,Math.min(w,(rx*s.vx+ry*s.vy)/vv));return Math.hypot(rx-s.vx*t,ry-s.vy*t)<rr};
+  if(VS){for(const r of MP.remotes)if(r.foe&&!r.dead)for(const p of r.pshots)if(near(p,p.r+12))return'shot';return null}
+  for(const s of shots)if(!(s.g>w)&&near(s,s.r+10))return'shot';
+  for(const z of zones)if(!z.mine&&z.dur-z.t<=w&&dist(z,P)<z.r)return'zone';
+  for(const m of mons){if(m.hidden||m.stun>0)continue;
+    if((m.st==='charge'||m.st==='lunge')&&segDist(P,m.x,m.y,m.ang,540*w)<m.r+12)return m.ai+':'+m.st;
+    if(m.siege&&m.st==='wind'&&m.t<=w&&dist(m,P)<m.r+TK.siegeHit)return'siege'}
+  return null}
 function riposteHit(m,d){floats.push({x:m.x,y:m.y-m.r-26,txt:'Riposte',life:.9,c:'#6fe3ff',big:1.4});brkHit(m,BRK.riposte,'riposte');emit('riposte',{x:m.x,y:m.y,id:m.id,dmg:d});hitFx('riposte',m,.1,.8)}
-const hitFx=(kind,m,stop,kick,ang)=>emit('hitfx',{kind,x:m.x,y:m.y,id:m.id||0,stop,kick,ang:ang===undefined?(P?angTo(P,m):0):ang});
+const hitFx=(kind,m,stop,kick,ang)=>{if(kick>=.5)S.shake=Math.max(S.shake,.14);emit('hitfx',{kind,x:m.x,y:m.y,id:m.id||0,stop,kick,ang:ang===undefined?(P?angTo(P,m):0):ang})};
 // --- footing: the gauge of the monster of every tenth floor. Closers, skill blows, ripostes and payoffs wear it down (the sturdy classes `sturdy` times as fast); empty, the monster reels for `stag` seconds and takes `more` times the damage;
 // then the gauge is whole again and `tough` times as long. rest, back: left alone for `rest` seconds it comes back at `back` a second. mp: longer by this share per further member.
-const BRK={max:100,closer:3,slam:2.5,heavy:2.5,volley:.6,riposte:15,link:8,sturdy:1.8,stag:3.5,more:1.25,tough:1.2,rest:4,back:5,mp:.7};
+const BRK={max:100,closer:2.5,slam:2,heavy:2,volley:.5,riposte:12,link:6,sturdy:1.8,stag:3.5,more:1.2,tough:1.35,rest:4,back:5,mp:.7};
 const brkK=()=>S.cls==='tank'||S.cls==='healer'?BRK.sturdy:1;
 function brkArm(m){if(!tenth(S.level)||VS)return;m.fin=true;if(R12()){m.brkMax=m.brk=Math.round(BRK.max*(MP.on?1+BRK.mp*Math.max(0,MP.cnt-1):1));m.stagT=0;m.stagMax=BRK.stag;m.brkAt=0}}
 function brkHit(m,v,src){
@@ -2172,7 +2181,8 @@ function linkPay(m,d){
   else for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,m)<(kind==='heavy'?80:95)+o.r)hurtM(o,bonus*(kind==='heavy'?.5:.6),true);
   LNK=lk;TAGOK=tk;return d+bonus}
 // --- the last rite: the monster of a tenth floor below FIN.at of its health can be finished by any hero (MB.finish(), X or T). It plays FIN.dur seconds (it can be skipped after FIN.min) and then the monster dies.
-const FIN={at:.08,dur:2.2,min:.35,names:{fighter:'Sundering Arc',tank:'Gravestone Drop',assassin:'Thirteen Quiet Cuts',mage:'The Unwritten Word',ranger:'Last Flight',healer:'Dawn Without End',necro:'All Hands From Below',none:'Bone Verdict'}};
+// hp: the monster of a tenth floor has this much more health since round 12 (the rite takes the last FIN.at of it, and it reels now and then)
+const FIN={at:.08,dur:2.2,min:.35,hp:1.14,names:{fighter:'Sundering Arc',tank:'Gravestone Drop',assassin:'Thirteen Quiet Cuts',mage:'The Unwritten Word',ranger:'Last Flight',healer:'Dawn Without End',necro:'All Hands From Below',none:'Bone Verdict'}};
 let FN=null,FINK=0;
 const finInfo=by=>{const me=!MP.on||by===MP.myIdx,r=me?null:MP.byIdx[by],c=me?S.cls:r&&r.look.cls,h=me?P:r&&r.P;return{by,cls:c||null,adv:(me?S.adv:r&&r.look.adv)||null,apex:(me?S.apex:r&&r.look.apex)||null,name:FIN.names[c||'none'],hx:h?h.x:W/2,hy:h?h.y:H/2}};
 const finEv=(state,skipped)=>{const f=FN||{};emit('finisher',{state,id:f.id||0,by:f.by===undefined?-1:f.by,cls:f.cls||null,adv:f.adv||null,apex:f.apex||null,name:f.name||'',dur:FIN.dur,x:f.x||0,y:f.y||0,hx:f.hx||0,hy:f.hy||0,skipped:!!skipped})};
@@ -2246,7 +2256,7 @@ function dareStep(dt){
 function dareClose(){const d=DRE;if(!d||d.state!=='run')return;dareEnd(d.kind==='hunt'?'fail':'done',d.kind==='hunt'?'it was not caught':'')}
 // --- marks: each floor from the ninth is marked when it is cleared: time (up to `time` points: all of them at ord[0] / boss[0] seconds, none at ord[1] / boss[1]; a trial with a clock of its own gets them all), damage taken (`taken` points, none at
 // `hurt` of your health lost, `hurtBoss` on a tenth floor), the best chain (`combo` points at cOrd / cBoss blows; a Tank needs fewer), and `dare` points for a dare met. S and A make the drop luckier (two and one more rolls, the best counts), and so does a dare met.
-const GRD={time:40,taken:35,combo:25,dare:12,marks:[['S',88],['A',72],['B',52],['C',32],['D',-1]],ord:[20,50],boss:[100,220],cOrd:25,cBoss:80,hurt:.8,hurtBoss:2};
+const GRD={time:40,taken:35,combo:25,dare:12,marks:[['S',92],['A',76],['B',56],['C',36],['D',-1]],ord:[16,45],boss:[100,220],cOrd:35,cBoss:90,hurt:.8,hurtBoss:2};
 let GR=null,GLINE='';
 function gradeMake(){
   GR=null;GLINE='';const n=S.level;if(n<8||!S.cls||VS||!P)return null;
@@ -2309,10 +2319,10 @@ function step(dt){
     if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp&&!P.down)healP(.04)}}
   fields=fields.filter(f=>f.t<f.dur);
   if(S.mode!=='play')return;
-  if(S.slowT>0){S.slowT-=dt;dt*=S.slowK} // the held breath after a hairbreadth dodge: from here on (the trial, the traps, the monsters, their bolts and blasts) the world runs slow
   if(!CL())finStep();
   if(TR){trialStep(dt);if(S.mode!=='play')return}
   if(DRE)dareStep(dt);
+  if(S.slowT>0){S.slowT-=dt;dt*=S.slowK} // the held breath after a hairbreadth dodge: from here on (the traps, the monsters, their bolts and blasts) the world runs slow; the clocks of a trial and of a dare do not
   if(obstacles.length)roomStep(dt);
   const CLI=CL(); // a client's monsters are the host's: it only works out what they do to its own hero and pets
   if(!CLI&&S.wave&&!boss&&!mons.length&&(S.waveT-=dt)<=0){if(S.wave.n<S.wave.of){S.wave.n++;spawnWave()}else enterBoss()}
@@ -4336,7 +4346,7 @@ function frame(ts){const real=(ts-last)/1000||0,dt=Math.min(.033,real);last=ts;
   // the game keeps real time on a slow device: several short steps per frame (up to three alone, six in a shared world) instead of slow motion
   if(MP.on){const e=Math.max(0,Math.min(.2,real)),n=Math.max(1,Math.ceil(e/.0334));for(let i=0;i<n*fast;i++)tick(e/n);mpFrame(e)}
   else{const e=Math.max(0,Math.min(.1,real)),n=Math.max(1,Math.ceil(e/.0334));for(let i=0;i<n*fast;i++)tick(e/n)}
-  skillUi();manaUi();petUi();finUi();
+  skillUi();manaUi();petUi();finUi();if(!SET.shake)S.shake=0;
   const R=MB.renderer;
   if(R&&R.ok){try{R.draw(Math.max(0,Math.min(MP.on?.2:.1,real)))}catch(e){console.error('3D renderer failed, falling back to 2D',e);R.ok=false;if(R.dispose)try{R.dispose()}catch(_){}}}
   else draw();
@@ -4357,7 +4367,7 @@ if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,NEC,LNG,AXK
     if(r.hold)return; // hold: only set the character (multiplayer tests)
     startLevel(n)},mpGo:(n,retry)=>mpGo(n,retry),down:()=>{if(MP.on&&P&&!P.down&&S.mode==='play'){P.hp=0;mpDown();return true}return false},kill:()=>{if(S.mode==='play'&&TR&&!boss&&!S.wave&&TR.dur&&!TR.failed){S.banner=0;TR.t=TR.dur;if(!CL())trialStep(0);return true}if(!boss&&S.wave&&S.mode==='play'){mons=[];enterBoss()}return boss&&mons.includes(boss)&&(boss.ward=0,hurtM(boss,1e9))},
   // r8: floorKind(n), the tower record, the trial as it stands (and trialFail), a seasoned run, a shade, the lamp
-  floorKind,TW:TWR,TK,get TR(){return TR},trialFail:w=>trialFail(w||'The trial is lost'),seasonedRun,AX,VPATH,apxAlly:(k,life)=>P&&['packbeast','icewight','cinder'].includes(k)?apxAlly(k,life||10):null,stat:(m,k,v,d)=>{m=m||boss||mons[0];if(m)mSt(m,k,v===undefined?1:v,d===undefined?UD():d);return m},fieldA:(...a)=>fieldA(...a),wave:(g,d)=>wave(P.x,P.y,g||0,70,d||0,400),arc:(...a)=>arc(...a),chain:(m,d)=>chain(P.x,P.y,m||boss||mons[0],d||1,3,200),UD,shade:(kind,life)=>{const k=SPEC[kind]?kind:'crawler';return shadeRise({s:lesserSpec(k,S.level,1),ai:SPEC[k].ai||k,kind:k,x:P.x+40,y:P.y},life||SHLIFE,true)},lampHit:()=>TR&&TR.obj&&lampHit(TR.obj),rewardEnd,apexScreen,doorScreen,skill:si=>skill(si),reward,loadout,dropScreen,
+  floorKind,TW:TWR,TK,get TR(){return TR},trialFail:w=>trialFail(w||'The trial is lost'),seasonedRun,AX,VPATH,apxAlly:(k,life)=>P&&['packbeast','icewight','cinder'].includes(k)?apxAlly(k,life||10):null,stat:(m,k,v,d)=>{m=m||boss||mons[0];if(m)mSt(m,k,v===undefined?1:v,d===undefined?UD():d);return m},fieldA:(...a)=>fieldA(...a),wave:(g,d)=>wave(P.x,P.y,g||0,70,d||0,400),arc:(...a)=>arc(...a),chain:(m,d)=>chain(P.x,P.y,m||boss||mons[0],d||1,3,200),UD,shade:(kind,life)=>{const k=SPEC[kind]?kind:'crawler';return shadeRise({s:lesserSpec(k,S.level,1),ai:SPEC[k].ai||k,kind:k,x:P.x+40,y:P.y},life||SHLIFE,true)},lampHit:()=>{const o=OBJ();return o&&lampHit(o)},rewardEnd,apexScreen,doorScreen,skill:si=>skill(si),reward,loadout,dropScreen,
   // pet(kind, o): put a pet of that monster kind (a SPEC id, 'tyrant' for a crowned one) on the roster, make it active and field it. o: {plv, perk, owner, name}; owner forces how it is drawn when the class cannot have pets
   // pet(kind, o): o: {plv, lv (the level it was bound on, 0-based; the level you are on when left out), mods:[...] or perk, owner, name}
   pet:(kind,o)=>{const e=window.__mb.petNew(kind,o);if(!e)return null;o=o||{};

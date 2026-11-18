@@ -562,6 +562,9 @@ function setCls(c){if(last.cls!==c){last.cls=c;hud.className=c}}
 function hudOff(){if(hud&&!hud.hidden){hud.hidden=true;last={}}}
 function hudTick(){
   var s=S(),tr=trialNow(),mode=s.mode,live=!!tr&&typeof tr==='object'&&(mode==='play'||mode==='clear'),now=Date.now();
+  // (round 12) a dare (MB.objective) borrows the band on a floor that is not a trial: never both on one floor
+  if(!live&&!endState){var dr=dareNow();if(dr&&(mode==='play'||mode==='clear')){dareTick(dr,now);return}}
+  if(dareOn){dareOn=false;dareKey='';dareEnd=0;last={}}
   if(endState&&now>stateT){endState='';endKind=''}
   if(!live&&!(endState&&mode!=='title')){hudOff();sawTrial=false;return}
   if(!ensureHud())return;
@@ -597,6 +600,34 @@ function hudTick(){
   if(hud.hidden){hud.hidden=false;measure()}
 }
 function say(x){try{if(H.say)H.say.textContent=x}catch(e){}}
+/* (round 12) dares: MB.objective = null | {kind:'hunt'|'unscathed'|'holdout'|'protect', title, rule, state:'run'|'done'|'fail', t, dur, left, value, obj}.
+   An optional objective on a plain floor: the same band in the dare's own colour (.trialHud.dare), with the time, the ember's health or the harm taken;
+   once it is met or missed the outcome shows for a few seconds and the band goes. */
+var DKIND={hunt:'race',holdout:'survive',protect:'guard',unscathed:'ordeal'},dareOn=false,dareKey='',dareEnd=0,dareSaid='';
+function dareNow(){var d=null;try{d=MB.objective}catch(e){}return d&&typeof d==='object'&&typeof d.kind==='string'?d:null}
+function dareTick(d,now){
+  if(!ensureHud())return;
+  var key=S().level+'|'+d.kind,st=d.state==='done'?'clear':d.state==='fail'?'fail':'',fresh=key!==dareKey;
+  if(fresh){dareKey=key;dareEnd=0;stateT=now+2400;last={};if(!st)say('Dare: '+(d.title||'')+'. '+(d.rule||''))}
+  if(st&&!dareEnd){dareEnd=now+3600;if(dareSaid!==key+st){dareSaid=key+st;say(st==='clear'?'Dare met.':'Dare missed.')}}
+  if(st&&now>dareEnd){hudOff();dareOn=true;return}
+  dareOn=true;
+  var kind=DKIND[d.kind]||'ordeal';
+  if(last.kind!==kind){last.kind=kind;H.ic.textContent='';H.ic.appendChild(icon(kind))}
+  setTxt('k',H.kind,d.title||'Dare');setTxt('st',H.state,st==='clear'?'Met':st==='fail'?'Missed':'Dare');
+  setTxt('rule',H.rule,st==='clear'?'The mark rises and the drop is luckier.':st==='fail'?'Nothing is lost. The floor goes on.':d.rule||'');
+  var dur=num(d.dur),left=Math.max(0,num(d.left)),timed=dur>0&&!st&&(d.kind==='hunt'||d.kind==='holdout'),urgent=false,late=false;
+  if(H.time.el.hidden!==!timed)H.time.el.hidden=!timed;
+  if(timed){var drain=d.kind==='hunt';setTxt('tv',H.time.val,clock(left));setW('tw',H.time.fill,drain?left/dur:1-left/dur);setTxt('tl',H.time.lab,drain?'Time left':'Hold for');late=urgent=drain&&left<Math.max(4,dur*.25)}
+  if(!H.goal.el.hidden)H.goal.el.hidden=true;
+  var o=d.obj,hasO=!st&&!!o&&num(o.maxHp)>0;
+  if(H.obj.el.hidden!==!hasO)H.obj.el.hidden=!hasO;
+  if(hasO){setTxt('ol2',H.obj.lab,o.name?String(o.name).replace(/^the\s+/i,''):'Ember');var f=Math.max(0,num(o.hp))/num(o.maxHp);setTxt('ov',H.obj.val,Math.ceil(f*100)+'%');setW('ow',H.obj.fill,f);if(f<.34)urgent=true;if(last.ol!==(f<.34)){last.ol=f<.34;H.obj.el.classList.toggle('low',f<.34)}}
+  var cap=!st&&d.kind==='unscathed'?'No harm so far':!st&&d.kind==='holdout'?'Stay above half health':'';
+  if(H.cap.hidden!==!cap)H.cap.hidden=!cap;if(cap)setTxt('cap',H.cap,cap);
+  setCls('trialHud dare k-'+kind+(st?' s-'+st+' done':now<stateT?' s-start':'')+(urgent?' urgent':'')+(late?' late':''));
+  if(hud.hidden){hud.hidden=false;measure()}
+}
 if(typeof MB.on==='function'){
   MB.on('trial',function(d){try{
     if(!d)return;var k=d.kind||(trialNow()&&trialNow().kind)||endKind;

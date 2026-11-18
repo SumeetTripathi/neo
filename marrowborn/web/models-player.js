@@ -827,7 +827,7 @@ const player={
     const mb=ud.mb,dl=ud.dl,sw=Math.sin(P.walk||0)*mb,cw=Math.cos(P.walk||0)*mb,br=Math.sin(t*2.4);
     const rig=s.rig;
     // blink while invulnerable
-    rig.visible=!(P.inv>0&&Math.floor(t*18)%2);
+    rig.visible=!(P.inv>0&&Math.floor(t*18)%2)||!!(MB.finisher&&MB.finisher.state==='play'); // (no blinking through a last rite)
     // rattle: a numb body on its last health shakes
     const rat=!MB.has('touch')&&P.hp<=2&&S.mode==='play'?1:0;
     rig.position.set(rat*Math.sin(t*70)*1.3,-Math.abs(sw)*1.2-dl*2.5,rat*Math.sin(t*57)*.6);
@@ -845,19 +845,34 @@ const player={
     else if(wt==='staff'){rx=-.55;re=-.75;tilt=.05;fr=.12}
     else if(wt==='bow'){rx=0;re=-.2;lx=-.4;le=-.7;ltilt=.12;fl=.2;fr=1}
     rx-=sw*.6*fr;lx+=sw*.6*fl;re-=Math.max(0,-sw)*.3*fr+mb*.25*fr;le-=Math.max(0,sw)*.3*fl+mb*.25*fl;
-    let twist=-sw*.18,spin=0;
+    let twist=-sw*.18,spin=0,lean=0,hop=0,lunge=0,orbK=0;
     // attack pose, blended in by ab
+    // (round 12) the string: P.chS is the step of this blow (1..P.chN, 0 = a game without strings: the one old swing), P.chC marks the closer.
+    // Blades cut forehand and backhand in turn; each class has its own third beat and its own closer (a felling cut from the shoulder, a shield bash,
+    // crossed knives thrown open, an overhead hammer). A bow's last shot is a long draw, a staff's a blow from overhead, a necromancer's a raising of both hands.
     if(ab>0){
-      const e=k*k*(3-2*k);
-      if(wt==='staff'){rx+=(-1.35-rx)*ab;re+=(-.2-re)*ab;tilt+=(1.05-tilt)*ab;twist+=.25*ab}
-      else if(wt==='bow'){lx+=(-1.5-lx)*ab;le+=(0-le)*ab;ltilt+=(0-ltilt)*ab;rx+=(-1.15-rx)*ab;re+=(-1.9-re)*ab;twist-=.3*ab}
+      const e=k*k*(3-2*k),st=P.chS|0,cl=st>0&&(P.chC===true||st===(P.chN|0)),odd=st%2===1||st===0,arcE=Math.sin(e*PI);
+      if(wt==='staff'){
+        if(cl&&c==='necro'){rx+=(-2.3+.5*e-rx)*ab;re+=(-.3-re)*ab;lx+=(-2.3+.5*e-lx)*ab;le+=(-.3-le)*ab;tilt+=(.5-tilt)*ab;lean=-.1*ab;hop=1.5*arcE*ab;orbK=.7}
+        else if(cl){rx+=(-2.75+1.7*e-rx)*ab;re+=(-.15-re)*ab;lx+=(-2.3+1.6*e-lx)*ab;le+=(-.4-le)*ab;tilt+=(.2+1.1*e-tilt)*ab;lean=(-.16+.4*e)*ab;hop=2.2*arcE*ab;orbK=.9}
+        else if(odd){rx+=(-1.35-rx)*ab;re+=(-.2-re)*ab;tilt+=(1.05-tilt)*ab;twist+=.25*ab}
+        else{rx+=(-1.05-rx)*ab;re+=(-.45-re)*ab;tilt+=(1.3-tilt)*ab;rz+=-.45*ab;twist+=(.55-1*e)*ab;lx+=(-.7-lx)*ab}
+      }
+      else if(wt==='bow'){lx+=(-1.5-lx)*ab;le+=(0-le)*ab;ltilt+=(0-ltilt)*ab;rx+=(-1.15-rx)*ab;re+=(-1.9-re)*ab;twist-=(cl?.55:st>0&&!odd?.18:.3)*ab;
+        if(cl){lean=-.14*(1-e)*ab;lunge=-2.5*(1-e)*ab}else if(st>0&&!odd)lx+=.18*ab}
       else{
         rx+=(-1.3-rx)*ab;re+=(-.12-re)*ab;tilt+=(1.42-tilt)*ab;rz+=-.3*ab;
-        if(ud.full)spin=e*TAU;else twist+=(-1.2+2.4*e)*ab;
+        if(cl&&c==='tank'){twist+=(.7-1.1*e)*ab;lx+=(-1.55-lx)*ab;le+=(-.1-le)*ab;lz+=-.35*ab;rx+=.5*ab;lunge=6*arcE*ab;lean=.2*ab}
+        else if(cl&&wt==='dual'){twist+=(-.3+.6*e)*ab;rz+=(.95-1.9*e)*ab;lz+=(-.95+1.9*e)*ab+.3*ab;hop=3*arcE*ab;lean=.16*ab}
+        else if(cl&&c==='fighter'){if(ud.full)spin=e*TAU*2;else twist+=(-1.95+3.9*e)*ab;lean=.24*ab;hop=-1.6*arcE*ab;rx+=(-.5+.5*e)*ab}
+        else if(cl||(c==='fighter'&&st===3)){rx+=(-1.5+1.9*e)*ab;re+=-.2*ab;twist+=(-.35+.7*e)*ab;lean=(-.1+.36*e)*ab;if(cl)hop=2*arcE*ab}
+        else if(ud.full)spin=(odd?1:-1)*e*TAU;         // a full-circle cleave turns one way, then the other
+        else twist+=(odd?-1.2+2.4*e:1.2-2.4*e)*ab;
         if(wt==='dual'){lx+=(-1.35-lx)*ab;le+=(-.15-le)*ab;ltilt+=(1.45-ltilt)*ab}
         if(wt==='great'){lx+=(-1.1-lx)*ab;le+=(-.5-le)*ab;lz+=-.5*ab}
       }
     }
+    if(lean||hop||lunge){rig.rotation.x+=lean;rig.position.y+=hop;rig.position.z+=lunge}
     rx+=dl*.9*(mel?1:.3);lx+=dl*.8;rz-=dl*.25;lz+=dl*.25;
     s.torso.rotation.set(mb*.07+(mel?ab*.14:0),twist+spin,0);s.torso.position.y=br*.22;s.torso.scale.y=1+br*.01;
     s.armR.rotation.set(rx,0,rz+rat*Math.sin(t*83)*.14);s.foreR.rotation.x=re;
@@ -881,7 +896,7 @@ const player={
     s.scarf2.rotation.set(.1+mb*.3+dl*.2+Math.sin(t*7.1-.5)*.16*(.4+mb),0,-yv);
     s.band.rotation.set(.25+mb*.9+dl*.5+fl3*.12*(.4+mb),0,-yv*1.5);
     // class extras
-    if(wt==='staff'){const f=1+.55*ab+Math.sin(t*5)*.04;s.orb.scale.set(f,f,f);
+    if(wt==='staff'){const f=1+(.55+orbK)*ab+Math.sin(t*5)*.04;s.orb.scale.set(f,f,f);
       if(c==='necro'){s.orb.position.y=25.4;s.orb.rotation.y=0}else if(c==='healer')s.spin.rotation.z=t;else{s.orb.position.y=27.6+Math.sin(t*2.6)*.5;s.orb.rotation.y=t*1.6;s.spin.rotation.y=t*1.2}}
     if(wt==='bow'){const H=ud.bowH,p=atk?(1-k)*9:0,L=Math.sqrt(H*H+p*p),a=Math.atan2(p,H);s.strA.scale.y=L;s.strB.scale.y=L;s.strA.rotation.x=a;s.strB.rotation.x=-a}
     if(c==='healer'){const hm=ud.haloM;

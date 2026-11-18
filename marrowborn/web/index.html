@@ -959,6 +959,112 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
   font:600 .72rem/1.2 var(--display);letter-spacing:.06em;font-variant-numeric:tabular-nums;color:var(--power2);background:rgba(7,9,18,.62);padding:calc(var(--u)*2) calc(var(--u)*6);box-shadow:inset calc(var(--u)*2) 0 0 var(--power)}
 @media (max-height:600px){#mbPerf{top:max(8%,calc(var(--st,0px) + calc(var(--u)*6)));padding:calc(var(--u)*8) calc(var(--u)*14);gap:calc(var(--u)*6);font-size:.86rem;max-width:min(92vw,calc(var(--u)*620))}#mbPerf .mbp-row button{min-height:max(44px,calc(var(--u)*40))}}
 @media (prefers-reduced-motion:reduce){#mbPerf{animation:none}}
+/*R12-HUD*/
+/* ================= round 12: the fighting HUD =================
+   #mbChain   = the chain (hits landed in a row), the string's steps under it and the short-lived states (held breath, quickened, riposte). Right edge, never takes a touch.
+   #bossBrk   = footing, the thin gauge under the boss bar (placed by the script at the foot of the page, wherever the boss bar is in this layout); .reel while it reels.
+   #mbFin     = the last rite's prompt (the game makes the button and shows it; the look is here). .wrap.fin-ready while it is offered.
+   #mbBreath  = the held breath: the edge of the view cools and closes in (works over the 3D view and the 2D one).
+   #ovMark    = the floor's mark on the first reward screen (letter, the four parts it was worked out from, the luck it gives).
+   .trialHud.dare = the trial band showing a dare (tower.js). --dare = its accent. Everything is a multiple of --u. */
+:root{--dare:#ffd95e;--breath:#6fe3ff;--mk-S:#ffe9a8;--mk-A:#c9a8ff;--mk-B:#8fe3ff;--mk-C:#d3d6ea;--mk-D:#8f93b5}
+#mbChain{position:fixed;z-index:2;right:var(--sr);top:calc(var(--hud-r,30%) + calc(var(--u)*4));pointer-events:none;display:grid;justify-items:end;gap:calc(var(--u)*3);font-family:var(--display);text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*8) #000;transform-origin:100% 0}
+.mb-left #mbChain{right:auto;left:var(--sl);justify-items:start;transform-origin:0 0}
+#mbChain[hidden]{display:none}
+.ch-top{display:grid;justify-items:inherit;transform:skewX(-8deg);transform-origin:100% 100%}
+.ch-top[hidden],.ch-str[hidden],.ch-chip[hidden]{display:none}
+.ch-n{font-weight:700;font-size:3rem;line-height:.86;letter-spacing:.01em;color:var(--bone);font-variant-numeric:tabular-nums;-webkit-text-stroke:calc(var(--u)*1.2) var(--ink);paint-order:stroke fill;display:block}
+.ch-n small{text-transform:uppercase;font-size:.42em;letter-spacing:.2em;color:var(--power2);margin-right:calc(var(--u)*5);-webkit-text-stroke:0;vertical-align:.52em}
+#mbChain.t1 .ch-n{color:var(--power2)}#mbChain.t2 .ch-n{color:var(--gold)}#mbChain.t3 .ch-n{color:#fff;text-shadow:0 0 calc(var(--u)*14) var(--gold),0 0 calc(var(--u)*4) var(--gold)}
+#mbChain.t1 .ch-n small{color:var(--power-hi)}#mbChain.t2 .ch-n small,#mbChain.t3 .ch-n small{color:var(--gold)}
+.ch-bar{display:block;width:calc(var(--u)*92);height:calc(var(--u)*4);margin-top:calc(var(--u)*4);background:rgba(39,46,77,.85);clip-path:polygon(calc(var(--u)*3) 0,100% 0,calc(100% - calc(var(--u)*3)) 100%,0 100%)}
+.ch-bar i{display:block;height:100%;width:100%;margin-left:auto;background:linear-gradient(90deg,var(--power),var(--power2));transform-origin:100% 50%}
+.mb-left .ch-bar i{margin-left:0;transform-origin:0 50%}
+#mbChain.t2 .ch-bar i,#mbChain.t3 .ch-bar i{background:linear-gradient(90deg,#d98a1c,var(--gold))}
+#mbChain.low .ch-bar i{background:var(--foe)}
+.ch-best{font-weight:600;font-size:.62rem;line-height:1.3;letter-spacing:.18em;text-transform:uppercase;color:var(--ash)}
+#mbChain.end .ch-top{opacity:0;transform:skewX(-8deg) translateX(calc(var(--u)*18));transition:opacity .45s ease-in,transform .45s ease-in}
+/* the string: one pip a step, the closer a larger diamond at the end */
+.ch-str{display:flex;align-items:center;gap:calc(var(--u)*4);padding:calc(var(--u)*3) calc(var(--u)*8) calc(var(--u)*3) calc(var(--u)*10);background:rgba(9,11,24,.62);clip-path:polygon(calc(var(--u)*6) 0,100% 0,calc(100% - calc(var(--u)*6)) 100%,0 100%)}
+.ch-str i{display:block;width:calc(var(--u)*13);height:calc(var(--u)*5);background:rgba(74,85,140,.7);transform:skewX(-24deg)}
+.ch-str i.on{background:var(--power2);box-shadow:0 0 calc(var(--u)*6) var(--power)}
+.ch-str i.cl{width:calc(var(--u)*10);height:calc(var(--u)*10);transform:rotate(45deg) scale(.86);background:rgba(74,85,140,.7);margin:0 calc(var(--u)*3) 0 calc(var(--u)*4)}
+.ch-str i.cl.on{background:var(--gold);box-shadow:0 0 calc(var(--u)*9) var(--gold);transform:rotate(45deg) scale(1.12)}
+.ch-str b{font-weight:700;font-size:.6rem;line-height:1;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-left:calc(var(--u)*2);white-space:nowrap;max-width:calc(var(--u)*120);overflow:hidden;text-overflow:ellipsis}
+.ch-str b:empty{display:none}
+/* held breath, quickened, riposte: a small plate with a line that runs out */
+.ch-chip{--k:var(--breath);position:relative;font-weight:700;font-size:.7rem;line-height:1;letter-spacing:.18em;text-transform:uppercase;color:var(--ink);background:var(--k);padding:calc(var(--u)*4) calc(var(--u)*12) calc(var(--u)*6);text-shadow:none;clip-path:polygon(calc(var(--u)*6) 0,100% 0,calc(100% - calc(var(--u)*6)) 100%,0 100%);white-space:nowrap}
+.ch-chip i{position:absolute;left:0;bottom:0;height:calc(var(--u)*2.5);width:100%;background:var(--ink);opacity:.55;transform-origin:0 50%}
+.ch-chip.rip{--k:#fff;box-shadow:inset 0 0 0 calc(var(--u)*1.5) var(--breath);color:#0a3a4c}
+/* footing under the boss bar */
+#bossBrk{position:fixed;z-index:2;pointer-events:none;height:calc(var(--u)*5);background:rgba(39,46,77,.85);clip-path:polygon(calc(var(--u)*3.5) 0,100% 0,calc(100% - calc(var(--u)*3.5)) 100%,0 100%)}
+#bossBrk[hidden]{display:none}
+#bossBrk i{display:block;height:100%;width:100%;background:linear-gradient(90deg,#c98a1e,var(--dare) 70%,#fff6d0);transition:width .12s linear}
+#bossBrk::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 calc(25% - 1px),rgba(7,9,18,.8) calc(25% - 1px) 25%)}
+#bossBrk.hit i{filter:brightness(1.8)}
+#bossBrk.reel{background:rgba(72,10,26,.9)}
+#bossBrk.reel i{background:repeating-linear-gradient(-60deg,#fff 0 calc(var(--u)*4),var(--dare) calc(var(--u)*4) calc(var(--u)*8));transition:none;animation:mbReel .5s linear infinite}
+#bossBrkLab{position:fixed;z-index:2;pointer-events:none;font-family:var(--display);font-weight:700;font-size:.58rem;line-height:1;letter-spacing:.2em;text-transform:uppercase;color:var(--dare);text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*6) #000;white-space:nowrap}
+#bossBrkLab[hidden]{display:none}
+#bossBrkLab.reel{color:#fff;font-size:.74rem;animation:mbReelLab .5s steps(2) infinite}
+@keyframes mbReel{to{background-position:calc(var(--u)*9.24) 0}}
+@keyframes mbReelLab{50%{color:var(--dare)}}
+.wrap.fin-ready #bossFill{background:linear-gradient(90deg,#fff,var(--dare));animation:mbFinBar .5s steps(2) infinite}
+@keyframes mbFinBar{50%{filter:brightness(.7)}}
+/* the last rite */
+#mbFin{position:fixed;z-index:3;left:50%;bottom:calc(var(--foot) + calc(var(--u)*26));transform:translateX(-50%) skewX(-8deg);pointer-events:auto;
+  --c:calc(var(--u)*10);--e:#fff;--f:linear-gradient(100deg,#8a5a08,#f0b848 45%,#ffe9a8 70%,#f0b848);color:var(--ink);font-weight:700;font-size:1.2rem;letter-spacing:.2em;text-shadow:none;
+  padding:calc(var(--u)*11) calc(var(--u)*30);min-height:max(44px,calc(var(--u)*48));white-space:nowrap;animation:mbFinIn .22s ease-out both,mbFinPulse .9s .22s ease-in-out infinite}
+#mbFin[hidden]{display:none}
+#mbFin::before{content:"X";display:inline-block;margin-right:calc(var(--u)*12);padding:0 calc(var(--u)*7);font-size:.82em;letter-spacing:0;line-height:1.5;color:var(--dare);background:var(--ink);vertical-align:.06em}
+#mbFin::after{content:"";position:absolute;left:8%;right:8%;bottom:calc(var(--u)*4);height:calc(var(--u)*2);background:var(--ink);opacity:.5}
+@media (pointer:coarse){#mbFin::before{display:none}#mbFin{bottom:calc(var(--sb) + calc(var(--u)*150))}}
+@media (pointer:coarse) and (max-width:600px){#mbFin{bottom:calc(var(--foot) + calc(var(--u)*14))}}
+@media (pointer:coarse) and (max-height:500px){#mbFin{bottom:auto;top:calc(var(--hud-top,var(--hud0)) + calc(var(--u)*10))}}
+@keyframes mbFinIn{from{opacity:0;transform:translateX(-50%) skewX(-8deg) scale(1.5)}}
+@keyframes mbFinPulse{50%{filter:brightness(1.25);box-shadow:0 0 calc(var(--u)*26) rgba(240,184,72,.75)}}
+/* the held breath */
+#mbBreath{grid-area:1/1;z-index:0;position:relative;width:100%;height:100%;pointer-events:none;opacity:0;
+  background:radial-gradient(ellipse 62% 58% at 50% 52%,rgba(111,227,255,0) 55%,rgba(60,150,200,.16) 78%,rgba(6,22,48,.62) 100%),linear-gradient(rgba(111,227,255,.5),rgba(111,227,255,.5)) 0 0/100% calc(var(--u)*2) no-repeat,linear-gradient(rgba(111,227,255,.5),rgba(111,227,255,.5)) 0 100%/100% calc(var(--u)*2) no-repeat}
+#mbBreath[hidden]{display:none}
+/* the mark on the reward screen */
+#ovMark{--k:var(--mk-C);display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:calc(var(--u)*6) calc(var(--u)*16);align-self:stretch;text-align:left;padding:calc(var(--u)*10) calc(var(--u)*14);background:linear-gradient(100deg,rgba(39,46,77,.55),rgba(9,11,24,.3));box-shadow:inset calc(var(--u)*3) 0 0 var(--k);animation:mbIn .25s ease-out both}
+#ovMark[hidden]{display:none}
+#ovMark.m-S{--k:var(--mk-S)}#ovMark.m-A{--k:var(--mk-A)}#ovMark.m-B{--k:var(--mk-B)}#ovMark.m-C{--k:var(--mk-C)}#ovMark.m-D{--k:var(--mk-D)}
+.mk-seal{grid-row:1/3;position:relative;display:grid;place-items:center;width:calc(var(--u)*78);height:calc(var(--u)*78);animation:mbStamp .5s .15s cubic-bezier(.2,1.6,.4,1) both}
+.mk-seal::before{content:"";position:absolute;inset:0;background:var(--k);clip-path:polygon(50% 0,100% 28%,88% 100%,12% 100%,0 28%)}
+.mk-seal::after{content:"";position:absolute;inset:calc(var(--u)*4);background:var(--ink);clip-path:polygon(50% 0,100% 28%,88% 100%,12% 100%,0 28%)}
+.mk-seal b{position:relative;z-index:1;font-family:var(--display);font-weight:700;font-size:3.1rem;line-height:1;color:var(--k);transform:skewX(-8deg) translateY(calc(var(--u)*3))}
+.mk-seal small{position:absolute;z-index:1;top:calc(var(--u)*-9);left:50%;transform:translateX(-50%);font-family:var(--display);font-weight:700;font-size:.58rem;letter-spacing:.24em;text-transform:uppercase;color:var(--ink);background:var(--k);padding:0 calc(var(--u)*7);white-space:nowrap}
+#ovMark.m-S .mk-seal b{text-shadow:0 0 calc(var(--u)*16) var(--gold)}
+.mk-parts{display:grid;grid-template-columns:auto minmax(calc(var(--u)*40),1fr) auto;align-items:center;gap:calc(var(--u)*3) calc(var(--u)*9);font-size:.8rem;line-height:1.2;color:var(--text);font-variant-numeric:tabular-nums}
+.mk-parts .lab{font-size:.62rem;letter-spacing:.14em}
+.mk-parts u{display:block;height:calc(var(--u)*5);background:var(--stone-2);transform:skewX(-24deg);text-decoration:none;overflow:hidden}
+.mk-parts u i{display:block;height:100%;background:var(--k);width:0;transition:width .5s .3s ease-out}
+.mk-parts em{font-style:normal;white-space:nowrap;text-align:right;color:var(--bone)}
+.mk-parts em small{color:var(--ash);font-size:.86em}
+.mk-luck{grid-column:2;font-family:var(--display);font-weight:600;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--k)}
+.mk-luck:empty{display:none}
+.panel .keys.mk-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+@keyframes mbStamp{from{opacity:0;transform:scale(2.2) rotate(-14deg)}}
+@media (max-width:420px){.mk-seal{width:calc(var(--u)*62);height:calc(var(--u)*62)}.mk-seal b{font-size:2.5rem}#ovMark{gap:calc(var(--u)*4) calc(var(--u)*11);padding:calc(var(--u)*9) calc(var(--u)*9)}}
+/* a dare in the trial band */
+.trialHud.dare{--k:var(--dare);background:linear-gradient(90deg,rgba(52,40,8,.88),rgba(9,11,24,.82) 70%)}
+.trialHud.dare.s-clear{--k:#7fd66b;background:linear-gradient(90deg,rgba(16,52,26,.95),rgba(9,11,24,.93) 70%)}
+.trialHud.dare.s-clear .th-state{background:#7fd66b;color:var(--ink)}
+.trialHud.dare.s-fail{--k:var(--ash);background:linear-gradient(90deg,rgba(40,42,60,.95),rgba(9,11,24,.93) 70%)}
+.trialHud.dare.s-fail .th-state{background:var(--ash);color:var(--ink)}
+/* what a skill sets up (a hollow pip) and pays off (a full one), by tag: aloft, brittle, branded */
+.sk[data-lk]::before,#skillBar li[data-lk]::before{content:"";position:absolute;left:calc(var(--u)*5);bottom:calc(var(--u)*5);width:calc(var(--u)*9);height:calc(var(--u)*9);background:var(--lk,#fff);pointer-events:none}
+#skillBar li[data-lk]{position:relative}#skillBar li[data-lk]::before{left:auto;bottom:auto;right:calc(var(--u)*6);top:calc(var(--u)*5)}
+[data-lk^="s"]::before{-webkit-mask:var(--lkm) center/contain no-repeat;mask:var(--lkm) center/contain no-repeat;opacity:.95}
+[data-lk$="aloft"]{--lk:#9fe8ff;--lkm:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 0l6 7H8.4v5H3.6V7H0z'/%3E%3C/svg%3E")}
+[data-lk$="brittle"]{--lk:#bfe6ff;--lkm:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M6 0l6 6-6 6-6-6zM6 2.6L4.6 6 6.8 6.6 5.4 9.6 8 5.6 5.8 5z' fill-rule='evenodd'/%3E%3C/svg%3E")}
+[data-lk$="branded"]{--lk:#ff9a5c;--lkm:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath d='M0 1h12v2.2H0zM1.6 5l4.4 7 4.4-7z'/%3E%3C/svg%3E")}
+[data-lk^="p"]::before{-webkit-mask:var(--lkm) center/contain no-repeat;mask:var(--lkm) center/contain no-repeat;outline:0;filter:drop-shadow(0 0 calc(var(--u)*3) var(--lk))}
+[data-lk^="s"]::before{opacity:.6}
+@media (prefers-reduced-motion:reduce){#mbFin,.mk-seal,#ovMark,#bossBrk.reel i,#bossBrkLab.reel,.wrap.fin-ready #bossFill{animation:none}#mbChain.end .ch-top{transition:none}}
+/*R12-HUD-END*/
 </style>
 
 <main class="wrap">
@@ -1026,6 +1132,156 @@ P.roundRect=function(x,y,w,h,r){if(w<0){x+=w;w=-w}if(h<0){y+=h;h=-h}r=typeof r==
   try{if(window.MB&&typeof MB.on==='function')MB.on('settings',function(){seen={};later()})}catch(e){}
   later();
 })();
+</script>
+<script>
+/*R12-HUD-JS*/
+/* (round 12) The fighting HUD: the chain and the string, the held breath, footing under the boss bar, the last rite's prompt, the floor's mark on the
+   reward screen and the set-up / payoff pips on the skills. Everything is read from MB each frame (plain data) or heard through MB.on; nothing here
+   changes the game. Missing fields (an older game.js) leave the piece hidden. Works over the 3D view and the 2D one. */
+(function(){
+  var MB=window.MB,doc=document;if(!MB||!doc.querySelector)return;
+  var wrap=doc.querySelector('.wrap'),stage=doc.querySelector('.stage');if(!wrap||!stage)return;
+  function h(tag,cls,txt){var e=doc.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+  function num(v,d){v=+v;return v===v?v:(d||0)}
+  var calm=false;try{calm=matchMedia('(prefers-reduced-motion: reduce)').matches}catch(e){}
+  function pop(el,k,ms){if(calm||!el.animate)return;try{el.animate([{transform:'scale('+k+')'},{transform:'scale(1)'}],{duration:ms||170,easing:'cubic-bezier(.2,.8,.3,1)'})}catch(e){}}
+  /* ---- chain, string, states ---- */
+  var ch=h('div');ch.id='mbChain';ch.hidden=true;ch.setAttribute('aria-hidden','true');
+  var chTop=h('div','ch-top'),chN=h('span','ch-n'),chLab=h('small',null,'Chain'),chNum=doc.createTextNode('0'),chBar=h('span','ch-bar'),chFill=h('i'),chBest=h('span','ch-best');
+  chN.appendChild(chLab);chN.appendChild(chNum);chBar.appendChild(chFill);chTop.appendChild(chN);chTop.appendChild(chBar);chTop.appendChild(chBest);chTop.hidden=true;
+  var chStr=h('div','ch-str'),chName=h('b');chStr.hidden=true;
+  function chip(cls,txt){var c=h('div','ch-chip'+(cls?' '+cls:''),txt),i=h('i');c.appendChild(i);c.hidden=true;return{el:c,bar:i,max:0,w:-1}}
+  var cBreath=chip('','Held breath'),cQuick=chip('','Quickened'),cRip=chip('rip','Riposte');
+  ch.appendChild(chTop);ch.appendChild(chStr);ch.appendChild(cBreath.el);ch.appendChild(cQuick.el);ch.appendChild(cRip.el);wrap.appendChild(ch);
+  var L={n:-1,tier:-1,best:-1,steps:-1,step:-1,cl:null,name:null,endAt:0,lastN:0,strAt:0,vis:null,low:null,bar:-1};
+  var pips=[];
+  function setChip(c,left,full){var on=left>0;if(c.el.hidden===on)c.el.hidden=!on;if(!on){c.max=0;return}
+    if(left>c.max)c.max=Math.max(left,full||0);var w=Math.round(Math.max(0,Math.min(1,1-left/(c.max||1)))*100);if(w!==c.w){c.w=w;c.bar.style.transform='scaleX('+(w/100)+')'}}
+  function closerName(){try{var c=MB.cls&&MB.cls(),T=MB.CHAINS&&MB.CHAINS[c||'none'];return T&&T.closer&&T.closer.name||''}catch(e){return ''}}
+  function chainTick(S,P,play,now){
+    var c=null;try{c=MB.chain}catch(e){}
+    var n=play&&c?num(c.count):0,show=n>=2,ended=!show&&now<L.endAt;
+    if(show){
+      if(n!==L.n){if(n>L.n)pop(chN,n%10===0?1.55:1.22,n%10===0?260:150);L.n=n;chNum.nodeValue=''+n;L.lastN=n;L.endAt=now+650;
+        var tier=n>=50?3:n>=25?2:n>=10?1:0;if(tier!==L.tier){L.tier=tier;ch.classList.toggle('t1',tier===1);ch.classList.toggle('t2',tier===2);ch.classList.toggle('t3',tier===3)}}
+      var f=Math.round(Math.max(0,Math.min(1,num(c.t)/3))*50);if(f!==L.bar){L.bar=f;chFill.style.transform='scaleX('+(f/50)+')'}
+      var low=num(c.t)<.9;if(low!==L.low){L.low=low;ch.classList.toggle('low',low)}
+      var b=num(c.best);if(b!==L.best){L.best=b;chBest.textContent=b>n?'Best '+b:''}
+      if(ch.classList.contains('end'))ch.classList.remove('end');
+    }else if(L.n!==-1&&!ended){L.n=-1;L.bar=-1}
+    if(ended&&!ch.classList.contains('end'))ch.classList.add('end');
+    var topOn=show||ended;if(chTop.hidden===topOn)chTop.hidden=!topOn;
+    // the string: P.chS of P.chN, the closer's name while its blow is out
+    var steps=play&&P?num(P.chN):0,step=play&&P?num(P.chS):0;if(step>0)L.strAt=now+500;
+    var strOn=steps>0&&(step>0||now<L.strAt);
+    if(strOn){
+      if(steps!==L.steps){L.steps=steps;L.step=-1;while(chStr.firstChild)chStr.removeChild(chStr.firstChild);pips=[];for(var i=0;i<steps;i++){var p=h('i',i===steps-1?'cl':'');pips.push(p);chStr.appendChild(p)}chStr.appendChild(chName)}
+      if(step!==L.step){L.step=step;for(var j=0;j<pips.length;j++){var on=j<step;if(pips[j].classList.contains('on')!==on)pips[j].classList.toggle('on',on)}
+        var cl=step>0&&step===steps,nm=cl?closerName():'';if(nm!==L.name){L.name=nm;chName.textContent=nm}if(cl)pop(chStr,1.18,200)}
+    }
+    if(chStr.hidden===strOn)chStr.hidden=!strOn;
+    var slow=play?num(S.slowT):0,pd=play&&P?num(P.pdT):0,rip=play&&P?num(P.rip):0,PD=MB.PD||{};
+    setChip(cBreath,slow,num(PD.slow,1.3));setChip(cQuick,slow>0?0:pd,num(PD.haste,3));setChip(cRip,rip,num(PD.rip,4));
+    var any=topOn||strOn||slow>0||pd>0||rip>0;if(ch.hidden===any)ch.hidden=!any;
+    return slow;
+  }
+  /* ---- the held breath over the view ---- */
+  var br=h('div');br.id='mbBreath';br.hidden=true;br.setAttribute('aria-hidden','true');stage.appendChild(br);
+  var brK=0,brShown=-1;
+  function breathTick(slow,dt){var want=slow>0?Math.min(1,slow/.25):0;brK+=(want-brK)*Math.min(1,dt*(want>brK?14:5));if(brK<.004)brK=0;
+    var v=Math.round(brK*40)/40;if(v!==brShown){brShown=v;br.style.opacity=v;if(br.hidden===(v>0))br.hidden=!(v>0)}}
+  /* ---- footing: a thin gauge under the boss bar, wherever this layout puts the bar ---- */
+  var bk=h('div'),bkFill=h('i'),bkLab=h('div',null,'Footing');bk.id='bossBrk';bk.hidden=true;bk.appendChild(bkFill);bkLab.id='bossBrkLab';bkLab.hidden=true;bk.setAttribute('aria-hidden','true');bkLab.setAttribute('aria-hidden','true');
+  wrap.appendChild(bk);wrap.appendChild(bkLab);
+  var bar=doc.getElementById('bossBar'),B={w:-1,reel:null,at:0,box:'',hitAt:0,reelT:0,reelMax:0,lab:''};
+  function place(now){if(!bar||now<B.at)return;B.at=now+250;var r=bar.getBoundingClientRect();if(!r.width||!r.height){if(!bk.hidden){bk.hidden=true;bkLab.hidden=true}return false}
+    var u=parseFloat(getComputedStyle(doc.documentElement).fontSize)/16||1,key=Math.round(r.left)+'|'+Math.round(r.bottom)+'|'+Math.round(r.width);
+    if(key!==B.box){B.box=key;bk.style.left=r.left+'px';bk.style.top=(r.bottom+2*u)+'px';bk.style.width=r.width+'px';
+      // the word sits left of the gauge when there is room, else under its right end
+      var room=r.left>90*u;bkLab.style.left=room?'':(r.left+4*u)+'px';bkLab.style.right=room?(innerWidth-r.left+6*u)+'px':'';bkLab.style.top=room?(r.bottom+1*u)+'px':(r.bottom+9*u)+'px'}
+    return true}
+  function brkTick(S,play,now,dt){
+    var b=null;try{b=MB.boss}catch(e){}
+    var on=play&&!!b&&num(b.brkMax)>0&&num(b.hp)>0&&!b.hidden;
+    if(!on){if(!bk.hidden){bk.hidden=true;bkLab.hidden=true}B.reelT=0;return}
+    if(place(now)===false)return;
+    var reel=num(b.stagT)>0;
+    if(reel){if(!(B.reelT>0)){B.reelMax=Math.max(.5,num(b.stagMax)||num(MB.BRK&&MB.BRK.stag,3.5));B.reelT=B.reelMax}B.reelT=Math.max(.01,B.reelT-dt)}else B.reelT=0;
+    var w=Math.round((reel?B.reelT/B.reelMax:Math.max(0,Math.min(1,num(b.brk)/num(b.brkMax,1))))*200)/2;
+    if(w!==B.w){if(w<B.w&&!reel){B.hitAt=now+90;bk.classList.add('hit')}B.w=w;bkFill.style.width=w+'%'}
+    if(B.hitAt&&now>B.hitAt){B.hitAt=0;bk.classList.remove('hit')}
+    if(reel!==B.reel){B.reel=reel;bk.classList.toggle('reel',reel);bkLab.classList.toggle('reel',reel);if(reel)pop(bkLab,1.6,260)}
+    var lab=reel?'Reeling':'Footing';if(lab!==B.lab){B.lab=lab;bkLab.textContent=lab}
+    if(bk.hidden){bk.hidden=false;bkLab.hidden=false}
+  }
+  /* ---- the last rite: the game's own button, moved beside the HUD and given the page's look ---- */
+  var fin=null,finReady=null;
+  function finTick(play){
+    if(!fin){fin=doc.getElementById('mbFin');if(fin){fin.removeAttribute('style');fin.setAttribute('aria-label','Last rite: finish the guardian');if(fin.parentNode!==wrap)wrap.appendChild(fin)}}
+    var f=null;try{f=MB.finisher}catch(e){}
+    var rdy=play&&!!f&&f.state==='ready';if(rdy!==finReady){finReady=rdy;wrap.classList.toggle('fin-ready',rdy)}
+  }
+  /* ---- set-up and payoff pips on the skills ---- */
+  var lkKey='',lkAt=0,PAYTAG={slam:'aloft',heavy:'brittle',volley:'branded'};
+  function linkTick(now){
+    if(now<lkAt||typeof MB.skillLink!=='function')return;lkAt=now+700;
+    var key='',vals=[],i,v,k;
+    for(i=0;i<6;i++){v='';try{k=MB.skillLink(i);var sk=MB.skills&&MB.skills[i];if(k&&sk&&sk.unlocked!==false){if(k.pays&&k.pays.length){var L2=MB.LINK&&MB.LINK.pay&&MB.LINK.pay[k.pays[0]];v='p-'+((L2&&L2.tag)||PAYTAG[k.pays[0]]||'')}else if(k.sets&&k.sets.length)v='s-'+k.sets[0]}}catch(e){}
+      if(v.length<3)v='';vals.push(v);key+=v+'|'}
+    var bs=doc.querySelectorAll('.touch .acts button.sk'),ls=doc.querySelectorAll('#skillBar li');key+=bs.length+'|'+ls.length;
+    if(key===lkKey)return;lkKey=key;
+    for(i=0;i<6;i++){var els=[bs[i],ls[i]];for(var j=0;j<2;j++){var e=els[j];if(!e)continue;if(vals[i]){e.setAttribute('data-lk',vals[i]);if(j)e.title=(vals[i][0]==='p'?'Pays off ':'Sets up ')+vals[i].slice(2)}else if(e.hasAttribute('data-lk')){e.removeAttribute('data-lk');if(j)e.removeAttribute('title')}}}
+  }
+  /* ---- the mark, on the first reward screen ---- */
+  var keys=doc.getElementById('ovKeys'),panel=doc.getElementById('ovPanel'),mk=null,mkFor='';
+  function fmtS(s){s=num(s);return s<100?s.toFixed(1)+' s':Math.round(s)+' s'}
+  function part(par,lab,pts,max,txt){var u=h('u'),i=h('i'),em=h('em');u.appendChild(i);em.textContent=txt+' ';em.appendChild(h('small',null,Math.round(pts)+'/'+max));par.appendChild(h('span','lab',lab));par.appendChild(u);par.appendChild(em);
+    var f=Math.max(0,Math.min(1,pts/max));setTimeout(function(){i.style.width=Math.round(f*100)+'%'},30)}
+  function markTick(){
+    if(!keys||!panel)return;
+    var g=null;try{g=MB.grade}catch(e){}
+    var txt=keys.textContent||'',on=!!g&&!keys.hidden&&/^Mark [SABCD]\b/.test(txt)&&typeof g.mark==='string'&&txt.indexOf('Mark '+g.mark)===0;
+    if(!on){if(mk&&!mk.hidden){mk.hidden=true;mkFor=''}if(keys.classList.contains('mk-sr')&&!/^Mark [SABCD]\b/.test(txt))keys.classList.remove('mk-sr');return}
+    var id=g.level+'|'+g.mark+'|'+g.score+'|'+txt.length;if(id===mkFor)return;mkFor=id;
+    if(!mk){mk=h('div');mk.id='ovMark';panel.insertBefore(mk,keys)}
+    while(mk.firstChild)mk.removeChild(mk.firstChild);
+    mk.className='m-'+g.mark;mk.setAttribute('role','img');mk.setAttribute('aria-label','Mark '+g.mark);
+    var seal=h('div','mk-seal');seal.appendChild(h('small',null,'Mark'));seal.appendChild(h('b',null,g.mark));mk.appendChild(seal);
+    var G=MB.GRD||{},P2=g.parts||{},parts=h('div','mk-parts');
+    part(parts,'Time',num(P2.time),num(G.time,40),fmtS(g.time));
+    part(parts,'Harm',num(P2.taken),num(G.taken,35),(Math.round(num(g.taken)*10)/10)+' taken');
+    part(parts,'Chain',num(P2.combo),num(G.combo,25),'best '+num(g.combo));
+    if(g.dare)part(parts,'Dare',num(P2.dare),num(G.dare,12),g.dare==='done'?'met':'missed');
+    mk.appendChild(parts);
+    var luck=num(g.luck);mk.appendChild(h('div','mk-luck',luck>0?'The drop was rolled '+(luck>1?'twice':'once')+' more for this mark':''));
+    mk.hidden=false;keys.classList.add('mk-sr');
+  }
+  if(keys&&window.MutationObserver)try{new MutationObserver(function(){try{markTick()}catch(e){}}).observe(keys,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
+  /* where the right-hand column may start: under the toggles and the ledger chips */
+  var hudR=-1,hudRAt=0;
+  function rightTop(now){if(now<hudRAt)return;hudRAt=now+500;var top=0,els=[doc.querySelector('.togs'),doc.getElementById('ledger'),doc.getElementById('vsHud')],i,r;
+    var side=wrap.classList.contains('mb-left')||doc.documentElement.classList.contains('mb-left')||doc.body.classList.contains('mb-left');
+    for(i=0;i<els.length;i++){var e=els[i];if(!e||e.hidden)continue;r=e.getBoundingClientRect();if(!r.width||!r.height)continue;if(side?r.left<innerWidth*.3:r.right>innerWidth*.7)top=Math.max(top,r.bottom)}
+    top=Math.round(Math.max(top,innerHeight*.12));if(top!==hudR){hudR=top;wrap.style.setProperty('--hud-r',top+'px')}}
+  var lastT=0,ok=true;
+  function tick(ts){
+    requestAnimationFrame(tick);if(!ok)return;
+    try{
+      var now=ts||0,dt=Math.min(.1,Math.max(0,(now-lastT)/1000));lastT=now;
+      var S=MB.S,P=MB.P;if(!S)return;
+      var play=S.mode==='play'&&(!S.paused||!!(MB.renderer&&MB.renderer.testHold)); // testHold: a test froze the game to take a picture
+      if(play)rightTop(now);
+      var slow=chainTick(S,P,S.mode==='play',now);
+      breathTick(play?slow:0,dt);
+      brkTick(S,S.mode==='play',now,dt);
+      finTick(play);
+      if(S.mode==='play')linkTick(now);else if(S.mode==='reward')markTick();
+    }catch(e){ok=false;try{console.warn('round 12 HUD stopped',e)}catch(_){}}
+  }
+  requestAnimationFrame(tick);
+  window.MBHud={chain:ch,footing:bk,mark:function(){markTick();return mk}};
+})();
+/*R12-HUD-JS-END*/
 </script>
 
 
