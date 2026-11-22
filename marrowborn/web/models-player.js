@@ -845,7 +845,7 @@ const player={
     else if(wt==='staff'){rx=-.55;re=-.75;tilt=.05;fr=.12}
     else if(wt==='bow'){rx=0;re=-.2;lx=-.4;le=-.7;ltilt=.12;fl=.2;fr=1}
     rx-=sw*.6*fr;lx+=sw*.6*fl;re-=Math.max(0,-sw)*.3*fr+mb*.25*fr;le-=Math.max(0,sw)*.3*fl+mb*.25*fl;
-    let twist=-sw*.18,spin=0,lean=0,hop=0,lunge=0,orbK=0;
+    let twist=-sw*.18,spin=0,lean=0,hop=0,lunge=0,orbK=0,dualStep=0;
     // attack pose, blended in by ab
     // (round 12) the string: P.chS is the step of this blow (1..P.chN, 0 = a game without strings: the one old swing), P.chC marks the closer.
     // Blades cut forehand and backhand in turn; each class has its own third beat and its own closer (a felling cut from the shoulder, a shield bash,
@@ -866,9 +866,16 @@ const player={
         else if(cl&&wt==='dual'){twist+=(-.3+.6*e)*ab;rz+=(.95-1.9*e)*ab;lz+=(-.95+1.9*e)*ab+.3*ab;hop=3*arcE*ab;lean=.16*ab}
         else if(cl&&c==='fighter'){if(ud.full)spin=e*TAU*2;else twist+=(-1.95+3.9*e)*ab;lean=.24*ab;hop=-1.6*arcE*ab;rx+=(-.5+.5*e)*ab}
         else if(cl||(c==='fighter'&&st===3)){rx+=(-1.5+1.9*e)*ab;re+=-.2*ab;twist+=(-.35+.7*e)*ab;lean=(-.1+.36*e)*ab;if(cl)hop=2*arcE*ab}
+        // (round 13) the knives' four beats before the closer, each a different body: 1 a high forehand with the right knife, the left held back at the hip;
+        // 2 the left knife backhand and low, the right arm thrown behind; 3 both knives driven forward in a deep crouching lunge; 4 a rising turn with the arms flung wide
+        else if(wt==='dual'&&st>=1&&st<=4){dualStep=st;
+          if(st===1){twist+=(-1.05+2.1*e)*ab;rx+=-.35*ab;rz+=(-.75+1.5*e)*ab;lx+=(.55-lx)*ab;le+=(-1.25-le)*ab;lz+=.25*ab;ltilt+=(.3-ltilt)*ab;lean=.1*ab;hop=.9*arcE*ab}
+          else if(st===2){twist+=(1.05-2.1*e)*ab;lx+=(-.95-lx)*ab;le+=(-.1-le)*ab;lz+=(.85-1.6*e)*ab;ltilt+=(1.45-ltilt)*ab;rx+=(1.95)*ab;re+=(-1.0-re)*ab;rz+=-.2*ab;tilt+=(.4-tilt)*ab;lean=.2*ab;hop=-1.7*arcE*ab}
+          else if(st===3){rx+=-.28*ab;re+=(0-re)*ab;lx+=(-1.58-lx)*ab;le+=(0-le)*ab;rz+=.42*ab;lz+=-.12*ab;tilt+=(1.57-tilt)*ab;ltilt+=(1.57-ltilt)*ab;lean=.44*ab;lunge=7.5*arcE*ab;hop=-2.6*arcE*ab}
+          else{spin=e*TAU;rx+=.25*ab;rz+=-1.0*ab;lx+=(-1.05-lx)*ab;le+=(-.1-le)*ab;lz+=1.15*ab;ltilt+=(1.45-ltilt)*ab;lean=-.14*ab;hop=4.6*arcE*ab}}
         else if(ud.full)spin=(odd?1:-1)*e*TAU;         // a full-circle cleave turns one way, then the other
         else twist+=(odd?-1.2+2.4*e:1.2-2.4*e)*ab;
-        if(wt==='dual'){lx+=(-1.35-lx)*ab;le+=(-.15-le)*ab;ltilt+=(1.45-ltilt)*ab}
+        if(wt==='dual'&&!dualStep){lx+=(-1.35-lx)*ab;le+=(-.15-le)*ab;ltilt+=(1.45-ltilt)*ab}
         if(wt==='great'){lx+=(-1.1-lx)*ab;le+=(-.5-le)*ab;lz+=-.5*ab}
       }
     }

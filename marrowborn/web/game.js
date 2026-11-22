@@ -933,7 +933,8 @@ function hurtP(d,src){
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
   if(P.plates>0&&S.apex==='stone'){if(d>blow(0)){plateBreak();d=Math.round(d*AX.stone.leak);if(d<1)return}else d=Math.max(1,Math.round(d*(1-AX.stone.chip*P.plates)))} // a plate breaks a heavy blow: only `leak` of it reaches you; a light one gets through
   if(P.stoneT>0)d=Math.ceil(d/2);
-  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
+  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();if(TR&&TR.kind==='guard'&&TR.obj&&!CL())for(let i=0;i<TK.vigWound;i++)lampHit(TR.obj); // (round 13) a keeper's wound is the lamp's
+  const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(CL())mpQ(['vp']);else vamp();
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
   if(P.hp<=0){if(MP.on)return mpDown();S.mode='dead';SND.dead();ST.deaths++;save(S.level);
@@ -1078,7 +1079,7 @@ function roomStep(dt){
     if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
 }
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1):1);
+  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(VS&&VP.spurT>0?VSK.spur:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(!VP.hold&&P.atk>0&&c&&!melee(c)){mx*=VSK.shootSlow;my*=VSK.shootSlow}if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
@@ -1477,16 +1478,21 @@ const SURVT=32,GUARDT=34,RACET=28,DARKR=245,TMANA=8;
 // TK: the trials' numbers. raceHp: the monster of a race has this share of its usual health (and is enraged). survGap: seconds between packs; survHp: a pack's lesser monsters have this many times a wave's (times survLate from floor 51, where a class has its upgrade);
 // survMax: no new pack while this many monsters stand. lamp: the blows the lamp can take. siegeHp: a besieger's health against a wave's lesser monster; siegeGap: seconds between besiegers at the start
 // (siegeGap2 at the end); siegeSpd: how fast they walk; siegeRest: seconds between a besieger's blows.
-const TK={raceHp:.7,survGap:4,survHp:3,survLate:1.4,survMax:22,lamp:11,siegeHp:.7,siegeGap:2.8,siegeGap2:1.9,siegeSpd:80,siegeRest:1.3,
+const TK={raceHp:.7,survGap:4,survHp:3,survLate:1.4,survMax:22,lamp:10,siegeHp:.7,siegeGap:2.8,siegeGap2:1.9,siegeSpd:80,siegeRest:1.3,
   // round 11: survRamp (+survRampK per floor past 13, 1 at most): by the end of an Onslaught every blow is this much heavier (it grows with the clock); survLateK: past floor 51 a pack's lesser monsters gain this much health per floor (up to 2.6 times).
   // raceDmg, ordDmg (+ordDmgK per floor past 24, +.5 at most): how much heavier the blows of an Hourglass monster and of an Ordeal's are.
   // raceAt, raceK, raceMin: after raceAt s of an Hourglass the glass is cut to raceK x the time the kill would take at the damage done so far, never below raceMin s and never above RACET (alone only; in co-op the clock stays).
   // siegeHit: a besieger's blow also lands on a hero within this reach of it (a heavy blow, telegraphed like any other). miteGap, miteN: mites come for you this often in a Vigil, this many at a time. h2From: from this floor an Ordeal carries a second handicap.
-  survRamp:.15,survRampK:.012,survLateK:.02,raceDmg:1.15,ordDmg:1.25,ordDmgK:.008,raceAt:4,raceK:2,raceMin:10,siegeHit:46,miteGap:7,miteN:3,h2From:60};
+  survRamp:.15,survRampK:.012,survLateK:.02,raceDmg:1.15,ordDmg:1.25,ordDmgK:.008,raceAt:4,raceK:2,raceMin:10,siegeHit:46,miteGap:7,miteN:3,h2From:60,
+  // round 13 (what carelessness costs in a Vigil; the Ordeal was measured with a bot that never dodges and left as it was):
+  // vigWound: in a Vigil every blow that lands on a hero dims the lamp by this much. vigFallGap / vigFallAt / vigFallR / vigFallT: every vigFallGap seconds (vigFallK less per floor past 25, never under vigFallMin; from vigFallAt on) a cinder falls where each hero stands:
+  // a blast of radius vigFallR with vigFallT seconds of warning, aimed vigLead x that time ahead of the hero's pace (where it will be if it does not react), so not reacting is what loses the lamp.
+  // siegeDip: on floors 41-50 (the last before a class has its upgrade, where the Vigil was the one hard trial) a besieger has this share of its health.
+  vigWound:2,vigFallGap:5,vigFallAt:6,vigFallR:102,vigFallT:.8,vigLead:1,vigFallK:.045,vigFallMin:2.5,siegeDip:.6};
 const HCAPS=['dark','halfheal','nomana','swift','alone'];
 const HRULE={nomana:'Your mana does not come back on this floor.',dark:'The dark is back: you see only what is near you.',alone:'Your pets, familiars and trophies stay behind on this floor, and so does everything your path would send to fight for you.',halfheal:'All healing is halved on this floor.',swift:'Everything on this floor moves and strikes a fifth faster.'};
 const HNAME={nomana:'Dry',dark:'Dark',alone:'Alone',halfheal:'Thin blood',swift:'Swift'};
-const TRIALS={survive:{title:'The Onslaught',rule:'Stay alive for '+SURVT+' seconds.'},guard:{title:'The Vigil',rule:'Keep the Vigil Lamp burning for '+GUARDT+' seconds.'},race:{title:'The Hourglass',rule:'It is enraged: kill it within '+RACET+' seconds.'},ordeal:{title:'The Ordeal',rule:''}};
+const TRIALS={survive:{title:'The Onslaught',rule:'Stay alive for '+SURVT+' seconds.'},guard:{title:'The Vigil',rule:'Keep the Vigil Lamp burning for '+GUARDT+' seconds. Every blow that lands on you dims it too.'},race:{title:'The Hourglass',rule:'It is enraged: kill it within '+RACET+' seconds.'},ordeal:{title:'The Ordeal',rule:''}};
 const handicapOf=n=>{const i=trialIdx(n+1);return i>=0&&TKIND[trialK(i)]==='ordeal'?HCAPS[sameBefore(i)%HCAPS.length]:null};
 // the second, lesser handicap of an Ordeal from floor TK.h2From on: one of the three that do not change what you bring (never the same as the first)
 const H2=['swift','halfheal','dark'];
@@ -1532,7 +1538,7 @@ function trialMake(L){
   const k=L.floorKind;if(!isTrial(k))return null;
   const h=k==='ordeal'?L.handicap||'dark':null,h2=handicap2(S.level,h),d=k==='survive'?SURVT:k==='guard'?GUARDT:k==='race'?RACET:0,lamp=TK.lamp+3*(MP.on?Math.max(0,MP.cnt-1):0);
   return{kind:k,title:TRIALS[k].title,rule:k==='ordeal'?HRULE[h]+(h2?' '+HRULE[h2]:''):TRIALS[k].rule,t:0,dur:d,goal:0,progress:0,handicap:h,handicap2:h2,failed:false,cleared:false,sight:h==='dark'||h2==='dark'?DARKR:0,
-    obj:k==='guard'?{x:W/2,y:H/2,r:26,hp:lamp,maxHp:lamp,flash:0,name:'The Vigil Lamp'}:null,pk:0,nextT:k==='guard'?5:0,spT:0,failT:0};
+    obj:k==='guard'?{x:W/2,y:H/2,r:26,hp:lamp,maxHp:lamp,flash:0,name:'The Vigil Lamp'}:null,pk:0,nextT:k==='guard'?5:0,spT:0,failT:0,fallT:TK.vigFallAt};
 }
 // a floor is cleared: its monster died, or a trial without one was held to the end
 function floorClear(){
@@ -1559,7 +1565,7 @@ function trialPack(i){
 // The Vigil: besiegers come in from the corners and the sides, more at a time as it goes on, and now and then a few mites come for you
 const GATES=[[80,90],[880,510],[880,90],[80,510],[70,300],[890,300],[480,70],[480,530]],SIEGERS=['crawler','hound','fist'];
 function siegeSpawn(i){
-  const n=S.level,g=GATES[(i*5+n)%GATES.length],kind=SIEGERS[(n+i)%SIEGERS.length],m=lesser(kind,g[0],g[1],GENHP[kind]*genMul(n)*.085*TK.siegeHp);
+  const n=S.level,g=GATES[(i*5+n)%GATES.length],kind=SIEGERS[(n+i)%SIEGERS.length],m=lesser(kind,g[0],g[1],GENHP[kind]*genMul(n)*.085*TK.siegeHp*(n>=40&&n<50?TK.siegeDip:1));
   m.siege=true;m.spdK=1;m.t=.5;return m;
 }
 // a besieger: it walks to the lamp, winds up (the usual tell) and strikes it; a blow that starts in reach and ends out of it (it was thrown back) misses
@@ -1592,6 +1598,10 @@ function trialStep(dt){
     let n=0;for(const m of mons)if(m.siege)n++;
     if((t.spT-=dt)<=0&&n<2+Math.floor(t.t/12)+(MP.on?mpPack():0)&&t.t<t.dur-2){t.spT=(TK.siegeGap+(TK.siegeGap2-TK.siegeGap)*t.t/t.dur)/(1+.5*(MP.on?Math.max(0,MP.cnt-1):0));siegeSpawn(t.pk++)}
     if(t.t>=t.nextT){t.nextT=t.t+TK.miteGap;for(let j=0;j<TK.miteN+(MP.on?mpPack():0);j++)if(mons.length<12){const g=GATES[(t.pk+j*3)%GATES.length],m=spawn('mite',g[0],g[1]);m.t=1}}
+    // (round 13) a cinder falls where each hero stands; the others' wounds (seen by the host as their health falling) dim the lamp as the host's own do
+    {const k=Math.min(1,dt/.2);t.hvx=(t.hvx||0)*(1-k)+(P.x-(t.hx===undefined?P.x:t.hx))/dt*k;t.hvy=(t.hvy||0)*(1-k)+(P.y-(t.hy===undefined?P.y:t.hy))/dt*k;t.hx=P.x;t.hy=P.y} // the hero's pace, smoothed
+    if(TK.vigFallGap>0&&t.t>=t.fallT&&t.t<t.dur-1.5){t.fallT=t.t+Math.max(TK.vigFallMin,TK.vigFallGap-TK.vigFallK*Math.max(0,S.level-24));const L=TK.vigFallT*TK.vigLead;if(!P.down&&!MP.away&&!(P.dashT>0))zone(P.x+t.hvx*L,P.y+t.hvy*L,TK.vigFallR,TK.vigFallT);if(MP.on)for(const r of MP.remotes)if(!r.away&&!r.dead)zone(r.P.x+(r.P.moving?r.P.vx||0:0)*L,r.P.y+(r.P.moving?r.P.vy||0:0)*L,TK.vigFallR,TK.vigFallT)}
+    if(MP.on&&TK.vigWound>0)for(const r of MP.remotes){const h=r.P.hp;if(!r.away&&r._vh!==undefined&&h<r._vh-.01)for(let i=0;i<TK.vigWound;i++)lampHit(t.obj);r._vh=h}
   }
 }
 
@@ -2128,8 +2138,8 @@ function pdScan(){
     if((m.st==='charge'||m.st==='lunge')&&segDist(P,m.x,m.y,m.ang,540*w)<m.r+12)return m.ai+':'+m.st;
     if(m.siege&&m.st==='wind'&&m.t<=w&&dist(m,P)<m.r+TK.siegeHit)return'siege'}
   return null}
-function riposteHit(m,d){floats.push({x:m.x,y:m.y-m.r-26,txt:'Riposte',life:.9,c:'#6fe3ff',big:1.4});brkHit(m,BRK.riposte,'riposte');emit('riposte',{x:m.x,y:m.y,id:m.id,dmg:d});hitFx('riposte',m,.1,.8)}
-const hitFx=(kind,m,stop,kick,ang)=>{if(kick>=.5)S.shake=Math.max(S.shake,.14);emit('hitfx',{kind,x:m.x,y:m.y,id:m.id||0,stop,kick,ang:ang===undefined?(P?angTo(P,m):0):ang})};
+function riposteHit(m,d){floats.push({x:m.x,y:m.y-m.r-26,txt:'Riposte',life:.9,c:'#6fe3ff',big:1.4});brkHit(m,BRK.riposte,'riposte');{const ang=P?angTo(P,m):0;if(MP.on)MP.rpOut=[Math.round(m.x),Math.round(m.y),Math.round(ang*100)||0];emit('riposte',{by:-1,x:m.x,y:m.y,id:m.id,dmg:d,ang})}hitFx('riposte',m,.1,.8)}
+const hitFx=(kind,m,stop,kick,ang)=>{if(SET.shake===false)kick=0;if(kick>=.5)S.shake=Math.max(S.shake,.14);emit('hitfx',{kind,x:m.x,y:m.y,id:m.id||0,stop,kick, /* (round 13) shake off: the event itself asks for no kick */ang:ang===undefined?(P?angTo(P,m):0):ang})};
 // --- footing: the gauge of the monster of every tenth floor. Closers, skill blows, ripostes and payoffs wear it down (the sturdy classes `sturdy` times as fast); empty, the monster reels for `stag` seconds and takes `more` times the damage;
 // then the gauge is whole again and `tough` times as long. rest, back: left alone for `rest` seconds it comes back at `back` a second. mp: longer by this share per further member.
 const BRK={max:100,closer:2.5,slam:2,heavy:2,volley:.5,riposte:12,link:6,sturdy:1.8,stag:3.5,more:1.2,tough:1.35,rest:4,back:5,mp:.7};
@@ -2227,10 +2237,11 @@ function dareMake(L,n){
   const d={kind:k,title:DARES.titles[k],rule:DARES.rules[k],state:'run',t:0,dur:DARES.dur[k],left:DARES.dur[k],value:0,goal:0,obj:null,pk:0,nextT:1.5,d0:ST.dmgTaken,q:null,pulse:0};
   if(k==='protect'){if([4,7,10,11].includes(L.room))L.room-=2;const hp=DARES.ember+DARES.emberMp*(MP.on?Math.max(0,MP.cnt-1):0);d.obj={x:W/2,y:H/2,r:20,hp,maxHp:hp,flash:0,name:'The Ember'};d.nextT=3}
   L.hint=d.title+'. '+d.rule;return d}
-function dareEv(state){const d=DRE;emit('objective',{kind:d.kind,state,title:d.title,rule:d.rule,dur:d.dur})}
+function dareEv(state){const d=DRE;emit('objective',{kind:d.kind,state,title:d.title,rule:d.rule,dur:d.dur,why:d.why||''})}
 function dareEnd(state,why){
-  const d=DRE;if(!d||d.state!=='run')return;d.state=state;const ok=state==='done';
-  floats.push({x:W/2,y:H/2-110,txt:d.title+(ok?': met':': '+(why||'missed')),life:2,c:ok?'#7fd66b':'#ff8a4c',big:1.4});if(ok)sfx(660,.3,'triangle',.2,1320);else sfx(240,.3,'sawtooth',.16,120);
+  const d=DRE;if(!d||d.state!=='run')return;d.state=state;const ok=state==='done';d.why=ok?'':why||'missed';
+  if(!window.MBDareBand)floats.push({x:W/2,y:H/2-110,txt:d.title+(ok?': met':': '+d.why),life:2,c:ok?'#7fd66b':'#ff8a4c',big:1.4}); // (round 13) with the band of tower.js on the page the band says it, and no title floats over the top of the screen
+ if(ok)sfx(660,.3,'triangle',.2,1320);else sfx(240,.3,'sawtooth',.16,120);
   if(d.kind==='protect'&&!CL())for(const m of mons)if(m.siege)m.siege=false; // the besiegers turn on the heroes
   dareEv(state)}
 // damage the party has taken since the last look (alone: mine; the host also sees the others' health fall)
@@ -2768,7 +2779,7 @@ function startLevel(n){
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Floor '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
   if(MP.on)mpLevelStarted();
   emit('levelstart',{level:n,L});emit('floor',{floor:n+1,kind:L.floorKind});if(TR)emit('trial',{kind:TR.kind,state:'start'});
-  if(DRE){dareEv('start');floats.push({x:W/2,y:H/2-110,txt:DRE.title,life:3.4,c:'#ffd95e',big:1.4})}
+  if(DRE){dareEv('start');if(!window.MBDareBand)floats.push({x:W/2,y:H/2-110,txt:DRE.title,life:3.4,c:'#ffd95e',big:1.4})}
 }
 function reward(){
   haptic([40,60,40,60,140]);chime();const n=S.level,r0=rank(n),L=S.L;allies=[];TSRC=[];MP.menu=false;emit('reward',{level:n});
@@ -3481,11 +3492,12 @@ function mpSendMe(now,force){
     for(const f of fields)if(!f.rem&&!f._sent){f._sent=true;const a=VS?[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100),Math.round(f.dmg*100)/100,f.slow?1:0]:[Math.max(0,FKIND.indexOf(f.kind)),Math.round(f.x),Math.round(f.y),f.r,Math.round(f.dur*100),Math.round(f.every*100)];
       if(f.ax){const q=f.kind==='quake';a[3]=q?f.w:f.r;a[4]=Math.round(Math.min(600,f.dur)*100);a.push(Math.round(q?f.x2:f.vx||0),Math.round(q?f.y2:f.vy||0),f.follow?1:0)}(msg.f||(msg.f=[])).push(a)}
     if(MP.aq.length){msg.ar=MP.aq;MP.aq=[]}
+    if(MP.rpOut){msg.rp=MP.rpOut;MP.rpOut=null;ev=true} // round 13: my riposte landed there (x, y, angle x100), so the other pages can draw it
     if(S.apex&&APXSTEP[S.apex]&&cls()){const hs=[P.blades|0,P.plates|0,Math.round((P.haste||0)*10),P.pack|0],k=hs.join();if(k!==MP.hsKey||force){MP.hsKey=k;msg.hs=hs;ev=true}}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
     if(VS&&VP.ev.length){msg.v=VP.ev;VP.ev=[]}
     if(msg.s||msg.e||msg.z||msg.f||msg.r||msg.v||msg.ar)ev=true;
-  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rq.length=0;MP.aq.length=0;MP.hsKey='';MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
+  }else{if(MP.hadAl){msg.a=[];MP.hadAl=false;ev=true}MP.rpOut=null;MP.rq.length=0;MP.aq.length=0;MP.hsKey='';MP.wasAway=true;for(const q of pshots)q._sent=true;for(const e of echoes)e._sent=true;for(const z of zones)z._sent=true;for(const f of fields)f._sent=true}
   // nothing new to say: three times a second is enough
   const key=p.join();if(!ev&&!force&&key===MP.pKey&&now-MP.tSent<320)return;MP.pKey=key;MP.tSent=now;
   nsend(msg);
@@ -3528,6 +3540,7 @@ function mpOnMe(msg,from){
     for(const o of out)if(o.pet){const b=msg.ab&&msg.ab[o.nid];if(b)beamIn(o,b);else if(o.beam)o.beam=null}}
   if(Array.isArray(msg.hs)){const q=r.P,h=msg.hs;q.blades=Math.max(0,Math.min(6,h[0]|0));q.plates=Math.max(0,Math.min(4,h[1]|0));q.haste=Math.max(0,Math.min(1,(+h[2]||0)/10));q.pack=Math.max(0,Math.min(12,h[3]|0))}
   if(r.away)return;
+  if(Array.isArray(msg.rp)&&S.mode==='play'){const x=Math.max(0,Math.min(W,+msg.rp[0]||0)),y=Math.max(0,Math.min(H,+msg.rp[1]||0));floats.push({x,y:y-44,txt:'Riposte',life:.9,c:'#6fe3ff',big:1.4});emit('riposte',{by:r.idx,x,y,id:0,dmg:0,ang:(+msg.rp[2]||0)/100})}
   if(msg.ar&&S.mode==='play')for(const a of msg.ar)if(Array.isArray(a)&&arcs.length<90)arcs.push({x1:+a[0]||0,y1:+a[1]||0,x2:+a[2]||0,y2:+a[3]||0,life:.26,max:.26,col:AX.col.storm,rem:true,foe:!!r.foe});
   if(VS)vsOnMe(r,msg,now,c);else if(msg.s)for(const a of msg.s)if(r.pshots.length<400)r.pshots.push({x:+a[0]||0,y:+a[1]||0,vx:+a[2]||0,vy:+a[3]||0,r:+a[4]||4,kind:PKIND[a[5]]||'bolt',pierce:a[6]|0});
   if(msg.e)for(const a of msg.e){const base=typeof a[3]==='string'&&own(SPEC,a[3])?SPEC[a[3]]:SPEC.crawler,ow=own(CLASSES,a[8])?a[8]:'mage';
@@ -3798,8 +3811,9 @@ const VFLOORS=[11,31,51,101,151],VNONE=[];
 // round 11, counterplay: dodge: for this long after a dash or a blink starts, bolts, arrows, spears and orbs pass through you (a dash already shrugs off everything for its first quarter second; this is the window to close on someone who shoots).
 // shootSlow: a hero who fights at range moves at this share of its speed while it looses a bolt (the moment of the cast), so shooting on the run costs ground. rally: the hero with less of its health left takes less from the one with more:
 // a blow is multiplied by 1 + rally x (victim's share of health - attacker's share), so a fight that is being lost can still turn.
+// round 13, spur / spurT: a hero who fights hand to hand (fighter, tank, assassin) and is struck by a shot moves at `spur` times its speed for spurT seconds: shooting at it is what lets it close.
 // braceN, braceT, brace, braceK: the braceN-th blow within braceT seconds braces you: for `brace` seconds every blow does braceK of its damage (many small hits in a row are worth less than they look; one heavy blow is not).
-const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,dodge:.45,braceN:3,braceT:1.2,brace:1.5,braceK:.6,shootSlow:.6,rally:.8,
+const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shield:3,thr:.05,wolf:.1,lead:.15,count:3,over:5,pick:45,ringT:30,ring0:570,ringD:.08,dodge:.45,braceN:3,braceT:1.2,brace:1.5,braceK:.6,shootSlow:.6,rally:.8,spur:1.3,spurT:1.5,
   cls:{},dev:false};
 // VCLS: per hero level, k (the level's own factor on the conversion) and the factors of every build [what its blows on heroes are multiplied by, what the blows it takes are multiplied by].
 // A build is the class, with its upgrade past floor 50 and its apex path past 100. Found with the versus bots (r9-sim/tuneb.js: every build near 50% over all opponents, a mirror match near 30 s);
@@ -3824,6 +3838,7 @@ const VRULES=['Every blow is scaled to a hero\'s health, and no single blow take
   'A shield blocks one blow every '+VSK.shield+' seconds at most, and a blocked blow protects from nothing else.',
   'For '+VSK.dodge+' seconds after a dash or a blink, bolts and arrows pass through you.',
   'Loosing a bolt, an arrow, a spear or an orb slows your step for the moment of the cast.',
+  'Spur: a bolt, an arrow, a spear or an orb that lands on a hero who fights hand to hand spurs it on: '+Math.round((VSK.spur-1)*100)+'% faster for '+VSK.spurT+' seconds.',
   'The hero with less health left is hurt less by the one with more, by up to '+Math.round(VSK.rally*100)+'%.',
   'The '+['','','second','third','fourth','fifth'][VSK.braceN]+' blow within '+VSK.braceT+' seconds braces you: for '+VSK.brace+' seconds blows do '+Math.round((1-VSK.braceK)*100)+'% less.',
   'How many fight for you is limited by your mana and by nothing else.',
@@ -4080,6 +4095,7 @@ function vsHurt(raw,by,src,pure){
   if(!pure){if(VP.braceT>0)d*=VSK.braceK;else{if(!(S.t-VP.hcT<=VSK.braceT)){VP.hc=0;VP.hcT=S.t}if(++VP.hc>=VSK.braceN){VP.hc=0;VP.braceT=VSK.brace;floats.push({x:P.x,y:P.y-58,txt:'Braced',life:.8,c:'#d5dce2'})}}}
   d=Math.max(.01,Math.min(d,VSK.cap*P.maxHp));
   const got=Math.max(0,Math.min(d,P.hp));P.hp-=d;ST.dmgTaken+=got;comboEnd();vsDm(by,0,got);if(window.__mb&&window.__mb.dmgBy)window.__mb.dmgBy[src]=(window.__mb.dmgBy[src]||0)+got;if(by>=0){VP.last=by;VP.lastT=S.t}
+  if(src==='shot'&&VSK.spur>1&&melee(cls())){if(!(VP.spurT>0))floats.push({x:P.x,y:P.y-70,txt:'Spurred',life:.8,c:'#ffd95e'});VP.spurT=VSK.spurT} // round 13: a bolt that lands on a hand-to-hand hero spurs it on
   VP.fl+=d;VP.hud=true;S.shake=Math.max(S.shake,.12);if(S.t-VP.hurtT>.25){VP.hurtT=S.t;puff(P,'#b8263d',6);SND.hurt();haptic(40)}
   if(P.hp<=0){
     if(S.adv==='saint'&&!P.saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2)*VSK.heal;P.inv=VSK.inv;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
@@ -4122,7 +4138,7 @@ function vsDown(by,ring){
 }
 // no more than VSK.inv seconds untouchable at a stretch, whatever grants it; after that, VSK.invRest seconds in which nothing does
 function vsInv(dt){
-  if(VP.dodgeT>0)VP.dodgeT-=dt;if(VP.braceT>0)VP.braceT-=dt;
+  if(VP.dodgeT>0)VP.dodgeT-=dt;if(VP.braceT>0)VP.braceT-=dt;if(VP.spurT>0)VP.spurT-=dt;
   if(VP.invBlk>0){VP.invBlk-=dt;P.inv=0;P.guardT=0;return}
   if(P.inv>0||P.guardT>0){VP.invRun+=dt;if(VP.invRun>=VSK.inv){P.inv=0;P.guardT=0;VP.invRun=0;VP.invBlk=VSK.invRest}}else VP.invRun=0;
 }

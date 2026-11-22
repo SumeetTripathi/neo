@@ -604,6 +604,7 @@ function say(x){try{if(H.say)H.say.textContent=x}catch(e){}}
    An optional objective on a plain floor: the same band in the dare's own colour (.trialHud.dare), with the time, the ember's health or the harm taken;
    once it is met or missed the outcome shows for a few seconds and the band goes. */
 var DKIND={hunt:'race',holdout:'survive',protect:'guard',unscathed:'ordeal'},dareOn=false,dareKey='',dareEnd=0,dareSaid='';
+try{window.MBDareBand=true}catch(e){} /* (round 13) the band carries a dare's title and outcome, so the rules put no title float in the arena */
 function dareNow(){var d=null;try{d=MB.objective}catch(e){}return d&&typeof d==='object'&&typeof d.kind==='string'?d:null}
 function dareTick(d,now){
   if(!ensureHud())return;
@@ -615,7 +616,7 @@ function dareTick(d,now){
   var kind=DKIND[d.kind]||'ordeal';
   if(last.kind!==kind){last.kind=kind;H.ic.textContent='';H.ic.appendChild(icon(kind))}
   setTxt('k',H.kind,d.title||'Dare');setTxt('st',H.state,st==='clear'?'Met':st==='fail'?'Missed':'Dare');
-  setTxt('rule',H.rule,st==='clear'?'The mark rises and the drop is luckier.':st==='fail'?'Nothing is lost. The floor goes on.':d.rule||'');
+  setTxt('rule',H.rule,st==='clear'?'The mark rises and the drop is luckier.':st==='fail'?(d.why&&d.why!=='missed'?String(d.why).charAt(0).toUpperCase()+String(d.why).slice(1)+'. ':'')+'Nothing is lost. The floor goes on.':d.rule||'');
   var dur=num(d.dur),left=Math.max(0,num(d.left)),timed=dur>0&&!st&&(d.kind==='hunt'||d.kind==='holdout'),urgent=false,late=false;
   if(H.time.el.hidden!==!timed)H.time.el.hidden=!timed;
   if(timed){var drain=d.kind==='hunt';setTxt('tv',H.time.val,clock(left));setW('tw',H.time.fill,drain?left/dur:1-left/dur);setTxt('tl',H.time.lab,drain?'Time left':'Hold for');late=urgent=drain&&left<Math.max(4,dur*.25)}

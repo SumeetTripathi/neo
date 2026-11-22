@@ -311,13 +311,17 @@ kbd{font-family:var(--display);font-weight:600;font-size:.86em;letter-spacing:.0
 }
 /* a phone held upright: the toggles keep the top right corner, the health sits beside them, then mana, pets and the boss each take a row */
 @media (max-width:600px) and (orientation:portrait){
-  .vitals,.mb-left .vitals{padding:0;gap:calc(var(--u)*3) calc(var(--u)*10)}
+  /* (round 13) a grid of two columns: the health in the first, the second kept free for the toggles (which stay fixed in the corner); the first block's box is dissolved
+     (display:contents) so the health is a cell of its own and no box of the HUD lies under the toggles. Mana, pets and the boss each take a row below. */
+  .vitals,.mb-left .vitals{display:grid;grid-template-columns:minmax(0,1fr) var(--togw);padding:0;gap:calc(var(--u)*3) 0;align-items:center}
   .mb-left .togs{left:auto;right:var(--sr)}
-  .vitals>div:first-child{flex:1 1 100%}
-  .vitals>div:first-child>.lab:first-child{display:none}
-  #hp{min-height:max(44px,calc(var(--u)*44));box-sizing:border-box;width:calc(100% - var(--togw));align-content:center;padding-left:0}
+  .vitals>div:first-child{display:contents}
+  .vitals>div:first-child>.lab:first-child,.vitals .vbrk{display:none}
+  #hp{grid-column:1;grid-row:1;min-height:max(44px,calc(var(--u)*44));box-sizing:border-box;align-content:center;padding-left:0}
   #hp em{max-width:100%}
-  .vitals>div:last-child{flex:1 1 100%;justify-content:flex-start;flex-wrap:nowrap}
+  #mana{grid-column:1/-1;grid-row:2;justify-self:start}
+  #petHud{grid-column:1/-1;grid-row:3;justify-self:start}
+  .vitals>div:last-child{grid-column:1/-1;grid-row:4;justify-content:flex-start;flex-wrap:nowrap}
   #bossName{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   #bossBar{flex:1 1 calc(var(--u)*60);width:auto;min-width:calc(var(--u)*60)}
 }
@@ -930,6 +934,15 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
   #ovCards:has(>.apexCard[class*="apexSide-"])::before,#ovCards:has(>.apexCard[class*="apexSide-"])::after{top:calc(var(--u)*(29 - var(--tp)))}
 }
 @media (max-height:600px){#ovPanel:has(#ovCards>.apexCard[class*="apexSide-"]){--tp:12}}
+/* (round 13) the steps of a seasoned start (tower.js, .mbt-panel.mbt-flow) on a small screen: the same compact bar. The step count and the title stay at the top while the choices scroll under them. */
+@media (max-width:600px),(max-height:600px){
+  .mbt-panel.mbt-flow>.mbt-head{position:sticky;top:calc(var(--u)*-1*var(--stk,8));z-index:3;flex-direction:column;gap:calc(var(--u)*2);align-self:stretch;margin:calc(var(--u)*-1*var(--tp,16)) calc(var(--u)*-4) 0;padding:calc(var(--u)*7) calc(var(--u)*8) calc(var(--u)*6);box-sizing:border-box;flex:none;
+    background:#0b0d1c;box-shadow:inset 0 -1px 0 var(--stone-2),inset 0 calc(var(--u)*-3) 0 -1px var(--power)}
+  .mbt-panel.mbt-flow>.mbt-head h2{font-size:1.12rem;line-height:1.05;letter-spacing:.08em;margin:0;max-width:100%;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .mbt-panel.mbt-flow>.mbt-head h2::after{display:none}
+  .mbt-panel.mbt-flow>.mbt-head .kick{margin:0;font-size:.68rem;letter-spacing:.14em}
+}
+@media (max-height:600px){.mbt-panel.mbt-flow{--tp:10;--stk:10}.mbt-panel.mbt-flow>.mbt-head{flex-direction:row;align-items:baseline;justify-content:center;gap:calc(var(--u)*12)}}
 @media (max-width:480px){#ovPanel:has(#ovCards>.apexCard[class*="apexSide-"]){--tp:18}}
 /* roomy screens: name, title, sentence and skills each share a row across the five cards of a side, so a one-line name is not followed by an empty line */
 @supports (grid-template-rows:subgrid){@media (min-width:900px) and (min-height:560px){
