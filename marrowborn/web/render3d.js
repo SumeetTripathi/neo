@@ -1346,11 +1346,13 @@ function frameWant(sight){
   if(TR.obj)grow(TR.ox,TR.oy,TR.or+26,74); // the thing being guarded stays in view while the hero is anywhere near it
   // versus: every opponent still standing counts as the boss does (those past the reach below sit at the edge, or get an edge badge);
   // a spectator's view takes in everyone near the one being watched, or every fighter left when it is watching the fight as a whole
-  let vsFar=0;
+  let vsFar=0,vsDuel=false;
+  // (round 13) one opponent left standing (a duel, or the end of a free-for-all): it is always in the picture, however far off; the reach below only holds while several stand
+  if(VS.on&&!SPEC.on){let nf=0;for(let i=0;i<rems.length;i++){const rm=rems[i];if(rm.vis&&!rm.dead&&rm.foe)nf++}if(nf===1){vsDuel=true;rx=rz=1e4}}
   if(VS.on)for(let i=0;i<rems.length;i++){const rm=rems[i];if(!rm.vis||rm.dead)continue;
     if(SPEC.on){if(SPEC.rm){if(rm===SPEC.rm)continue;const dx=rm.P.x-ax,dy=rm.P.y-ay;if(dx*dx+dy*dy>380*380)continue}}
     else if(!rm.foe)continue;
-    grow(rm.P.x,rm.P.y,40,70);if(!SPEC.on){const d=Math.hypot(rm.P.x-ax,rm.P.y-ay);if(d<520&&d>vsFar)vsFar=d}}
+    grow(rm.P.x,rm.P.y,40,70);if(!SPEC.on){const d=Math.hypot(rm.P.x-ax,rm.P.y-ay);if((d<520||vsDuel)&&d>vsFar)vsFar=d}}
   if(VS.on&&VS.ringOn&&!SPEC.on){ // the way back into the ring stays in view
     const dx=VS.rx-ax,dy=VS.ry-ay,d=Math.hypot(dx,dy);if(d>VS.rr-40&&d>1){const k=Math.max(0,(VS.rr-60))/d;grow(VS.rx-dx*k,VS.ry-dy*k,30,0)}}
   // never chase something across the whole arena: past this reach it may sit at the edge of the view

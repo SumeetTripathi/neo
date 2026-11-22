@@ -1492,7 +1492,7 @@ const TK={raceHp:.7,survGap:4,survHp:3,survLate:1.4,survMax:22,lamp:10,siegeHp:.
 const HCAPS=['dark','halfheal','nomana','swift','alone'];
 const HRULE={nomana:'Your mana does not come back on this floor.',dark:'The dark is back: you see only what is near you.',alone:'Your pets, familiars and trophies stay behind on this floor, and so does everything your path would send to fight for you.',halfheal:'All healing is halved on this floor.',swift:'Everything on this floor moves and strikes a fifth faster.'};
 const HNAME={nomana:'Dry',dark:'Dark',alone:'Alone',halfheal:'Thin blood',swift:'Swift'};
-const TRIALS={survive:{title:'The Onslaught',rule:'Stay alive for '+SURVT+' seconds.'},guard:{title:'The Vigil',rule:'Keep the Vigil Lamp burning for '+GUARDT+' seconds. Every blow that lands on you dims it too.'},race:{title:'The Hourglass',rule:'It is enraged: kill it within '+RACET+' seconds.'},ordeal:{title:'The Ordeal',rule:''}};
+const TRIALS={survive:{title:'The Onslaught',rule:'Stay alive for '+SURVT+' seconds.'},guard:{title:'The Vigil',rule:'Keep the Lamp lit for '+GUARDT+' seconds. Your wounds dim it too.'},race:{title:'The Hourglass',rule:'It is enraged: kill it within '+RACET+' seconds.'},ordeal:{title:'The Ordeal',rule:''}};
 const handicapOf=n=>{const i=trialIdx(n+1);return i>=0&&TKIND[trialK(i)]==='ordeal'?HCAPS[sameBefore(i)%HCAPS.length]:null};
 // the second, lesser handicap of an Ordeal from floor TK.h2From on: one of the three that do not change what you bring (never the same as the first)
 const H2=['swift','halfheal','dark'];
@@ -1588,7 +1588,7 @@ function trialStep(dt){
   if(t.kind==='ordeal'||CL())return; // (a client's trial is the host's: its clock and its lamp come with the world)
   if(t.kind==='race'){
     if(!t.cut&&!MP.on&&boss&&t.t>=TK.raceAt){t.cut=true;const done=boss.maxHp-boss.hp,d=done>0?Math.max(TK.raceMin,Math.min(t.dur,Math.round(TK.raceK*t.t*boss.maxHp/done))):t.dur; // the glass is cut to the hero's measure
-      if(d<t.dur){t.dur=d;t.rule='It is enraged: kill it within '+d+' seconds.';floats.push({x:W/2,y:H/2-90,txt:'The glass narrows: '+d+' seconds',life:2.2,c:'#d6a544'});sfx(880,.3,'triangle',.14,440)}}
+      if(d<t.dur){t.dur=d;t.rule='It is enraged: kill it within '+d+' seconds.';if(!window.MBDareBand)floats.push({x:W/2,y:H/2-90,txt:'The glass narrows: '+d+' seconds',life:2.2,c:'#d6a544'});sfx(880,.3,'triangle',.14,440)}}
     if(t.t>=t.dur&&boss&&boss.hp>0)trialFail('The hourglass ran out');return}
   if(t.t>=t.dur)return floorClear();
   if(t.kind==='survive'){
@@ -3127,7 +3127,7 @@ function padMove(e,down){
     padO.x+=(x-x/l)*R;padO.y+=(y-y/l)*R;x/=l;y/=l;l=1}
   const DZ=.14;let m=l<=DZ?0:Math.pow((l-DZ)/(1-DZ),1.15);if(m>1)m=1;
   joy.x=l>0?x/l*m:0;joy.y=l>0?y/l*m:0;
-  let kx=padO.x+x*R,ky=padO.y+y*R;const kl=Math.hypot(kx,ky),km=r.width/2-R*.2;if(kl>km&&kl>0){kx*=km/kl;ky*=km/kl} // the drawn knob stays inside the ring
+  let kx=padO.x+x*R,ky=padO.y+y*R;const kl=Math.hypot(kx,ky),km=Math.max(0,r.width/2-(knob.offsetWidth||0)/2);if(kl>km&&kl>0){kx*=km/kl;ky*=km/kl} // the drawn knob stays inside the ring, all of it (round 13: its edge used to stand out by a quarter of its width)
   knob.style.transform=`translate(${kx}px,${ky}px)`}
 pad.addEventListener('pointerdown',e=>{try{pad.setPointerCapture(e.pointerId)}catch(_){}padMove(e,true);e.preventDefault()});
 pad.addEventListener('pointermove',e=>{if(pad.hasPointerCapture(e.pointerId))padMove(e,false)});
@@ -3819,16 +3819,16 @@ const VSK={K:1.5,kf:1,cap:.35,heal:.5,inv:1.5,invRest:1,cc:1,ccImm:2,cre:2.5,shi
 // A build is the class, with its upgrade past floor 50 and its apex path past 100. Found with the versus bots (r9-sim/tuneb.js: every build near 50% over all opponents, a mirror match near 30 s);
 // each column has a geometric mean of 1, so K x k is the conversion for an average build.
 const VCLS={
- 11:{k:0.96,
-  'fighter':[0.66,0.67],'tank':[0.5,0.97],'assassin':[0.59,0.74],'mage':[1.09,0.88],'ranger':[1.68,1.11],'healer':[1.4,1.68],'necro':[2.01,1.27]},
- 31:{k:3.34,
-  'fighter':[0.5,0.57],'tank':[0.62,1.03],'assassin':[0.68,0.82],'mage':[1.46,0.82],'ranger':[1.53,0.77],'healer':[1.47,1.71],'necro':[1.46,1.94]},
- 51:{k:2.5,
-  'fighter/champion':[0.51,0.61],'fighter/duelist':[0.63,0.5],'tank/paladin':[1.08,1.22],'tank/berserker':[0.64,0.81],'assassin/nightblade':[0.53,0.97],'assassin/phantom':[0.6,1.3],'mage/archmage':[1.64,0.78],'mage/pyromancer':[1.73,0.8],'ranger/sharpshooter':[1.25,0.65],'ranger/beastmaster':[2.02,0.51],'healer/saint':[0.87,2.0],'healer/inquisitor':[0.57,1.68],'necro/lich':[2.0,2.0],'necro/reaper':[2.02,1.87]},
- 101:{k:4.29,
-  'fighter/champion/order':[0.55,0.61],'fighter/champion/dominion':[0.97,0.51],'fighter/duelist/order':[0.65,0.58],'fighter/duelist/dominion':[1.1,0.51],'tank/paladin/order':[0.87,0.96],'tank/paladin/dominion':[1.39,0.73],'tank/berserker/order':[0.51,0.68],'tank/berserker/dominion':[0.86,0.52],'assassin/nightblade/order':[0.54,1.56],'assassin/nightblade/dominion':[0.83,1.21],'assassin/phantom/order':[0.69,2.02],'assassin/phantom/dominion':[0.89,1.94],'mage/archmage/order':[0.85,0.98],'mage/archmage/dominion':[0.88,0.59],'mage/pyromancer/order':[0.85,0.97],'mage/pyromancer/dominion':[0.94,0.63],'ranger/sharpshooter/order':[1.09,0.88],'ranger/sharpshooter/dominion':[1.54,0.56],'ranger/beastmaster/order':[1.73,1.24],'ranger/beastmaster/dominion':[2.0,0.59],'healer/saint/order':[1.48,2.02],'healer/saint/dominion':[1.79,1.56],'healer/inquisitor/order':[0.9,2.02],'healer/inquisitor/dominion':[1.39,1.24],'necro/lich/order':[1.5,2.02],'necro/lich/dominion':[1.07,2.02],'necro/reaper/order':[0.96,1.24],'necro/reaper/dominion':[1.02,1.14]},
- 151:{k:5.04,
-  'fighter/champion/order':[0.52,0.8],'fighter/champion/dominion':[0.9,0.51],'fighter/duelist/order':[0.75,0.76],'fighter/duelist/dominion':[1.11,0.51],'tank/paladin/order':[0.77,1.02],'tank/paladin/dominion':[1.32,0.74],'tank/berserker/order':[0.5,0.63],'tank/berserker/dominion':[0.97,0.51],'assassin/nightblade/order':[0.62,1.24],'assassin/nightblade/dominion':[0.82,0.96],'assassin/phantom/order':[0.76,2.0],'assassin/phantom/dominion':[0.92,1.68],'mage/archmage/order':[0.75,1.12],'mage/archmage/dominion':[0.81,0.62],'mage/pyromancer/order':[0.79,1.15],'mage/pyromancer/dominion':[0.84,0.63],'ranger/sharpshooter/order':[1.27,1.07],'ranger/sharpshooter/dominion':[1.72,0.61],'ranger/beastmaster/order':[1.69,1.08],'ranger/beastmaster/dominion':[1.75,0.61],'healer/saint/order':[0.84,2.02],'healer/saint/dominion':[1.37,2.01],'healer/inquisitor/order':[0.62,2.02],'healer/inquisitor/dominion':[1.0,1.77],'necro/lich/order':[2.02,1.25],'necro/lich/dominion':[2.02,1.17],'necro/reaper/order':[1.01,1.29],'necro/reaper/dominion':[1.9,1.11]},
+ 11:{k:0.87,
+  'fighter':[0.63,0.77],'tank':[0.51,0.99],'assassin':[0.54,0.78],'mage':[1.16,0.8],'ranger':[1.78,1.0],'healer':[1.34,1.66],'necro':[2.07,1.25]},
+ 31:{k:3.17,
+  'fighter':[0.5,0.6],'tank':[0.64,1.03],'assassin':[0.64,0.87],'mage':[1.47,0.8],'ranger':[1.54,0.7],'healer':[1.39,1.68],'necro':[1.57,1.98]},
+ 51:{k:2.37,
+  'fighter/champion':[0.5,0.64],'fighter/duelist':[0.58,0.56],'tank/paladin':[1.01,1.25],'tank/berserker':[0.62,0.84],'assassin/nightblade':[0.49,1.05],'assassin/phantom':[0.65,1.38],'mage/archmage':[1.65,0.75],'mage/pyromancer':[1.8,0.76],'ranger/sharpshooter':[1.41,0.61],'ranger/beastmaster':[2.11,0.48],'healer/saint':[0.88,2.01],'healer/inquisitor':[0.56,1.69],'necro/lich':[2.0,1.95],'necro/reaper':[2.0,1.65]},
+ 101:{k:4.08,
+  'fighter/champion/order':[0.59,0.62],'fighter/champion/dominion':[1.01,0.49],'fighter/duelist/order':[0.74,0.61],'fighter/duelist/dominion':[1.19,0.49],'tank/paladin/order':[0.88,1.0],'tank/paladin/dominion':[1.33,0.73],'tank/berserker/order':[0.52,0.68],'tank/berserker/dominion':[0.91,0.5],'assassin/nightblade/order':[0.6,1.53],'assassin/nightblade/dominion':[0.84,1.22],'assassin/phantom/order':[0.71,2.03],'assassin/phantom/dominion':[0.89,2.02],'mage/archmage/order':[0.79,1.01],'mage/archmage/dominion':[0.85,0.58],'mage/pyromancer/order':[0.91,1.03],'mage/pyromancer/dominion':[0.93,0.63],'ranger/sharpshooter/order':[1.07,0.9],'ranger/sharpshooter/dominion':[1.5,0.52],'ranger/beastmaster/order':[1.7,1.24],'ranger/beastmaster/dominion':[1.94,0.75],'healer/saint/order':[1.21,2.02],'healer/saint/dominion':[1.67,1.39],'healer/inquisitor/order':[0.86,1.87],'healer/inquisitor/dominion':[1.16,1.21],'necro/lich/order':[1.62,1.77],'necro/lich/dominion':[1.09,1.99],'necro/reaper/order':[0.91,1.14],'necro/reaper/dominion':[1.14,1.38]},
+ 151:{k:4.78,
+  'fighter/champion/order':[0.54,0.78],'fighter/champion/dominion':[0.85,0.51],'fighter/duelist/order':[0.74,0.8],'fighter/duelist/dominion':[1.12,0.52],'tank/paladin/order':[0.79,1.02],'tank/paladin/dominion':[1.28,0.74],'tank/berserker/order':[0.5,0.65],'tank/berserker/dominion':[0.85,0.48],'assassin/nightblade/order':[0.61,1.28],'assassin/nightblade/dominion':[0.89,1.0],'assassin/phantom/order':[0.71,1.83],'assassin/phantom/dominion':[0.97,1.77],'mage/archmage/order':[0.76,1.08],'mage/archmage/dominion':[0.83,0.64],'mage/pyromancer/order':[0.79,1.06],'mage/pyromancer/dominion':[0.84,0.64],'ranger/sharpshooter/order':[1.23,1.03],'ranger/sharpshooter/dominion':[1.73,0.59],'ranger/beastmaster/order':[1.68,1.17],'ranger/beastmaster/dominion':[1.6,0.67],'healer/saint/order':[0.64,2.5],'healer/saint/dominion':[1.29,2.08],'healer/inquisitor/order':[0.59,2.49],'healer/inquisitor/dominion':[0.99,1.74],'necro/lich/order':[2.42,1.21],'necro/lich/dominion':[2.51,0.76],'necro/reaper/order':[1.15,1.2],'necro/reaper/dominion':[2.13,1.09]},
 };
 const VRULES=['Every blow is scaled to a hero\'s health, and no single blow takes more than '+Math.round(VSK.cap*100)+'% of it.',
   'Healing and lifesteal work at half strength.',

@@ -576,6 +576,8 @@ function hudTick(){
   setTxt('st',H.state,st==='clear'?'Cleared':st==='fail'?'Failed':'Trial');
   if(live){
     setTxt('rule',H.rule,st==='fail'?(tr.rule?tr.rule+' ':'')+'The floor begins again.':tr.rule||kindOf(kind).line);
+    /* (round 13) the Hourglass is cut to the hero's measure a few seconds in: the band says the new time and beats once, so the rules need no float over the top of the screen */
+    if(kind==='race'&&!st&&last.rr!==undefined&&last.rr!==tr.rule&&tr.rule){endState='start';stateT=now+1600;say('The glass narrows. '+tr.rule)}last.rr=tr.rule||'';
     var dur=num(tr.dur),t=num(tr.t),goal=num(tr.goal),pr=num(tr.progress),o=tr.obj,left=Math.max(0,dur-t),urgent=false,late=false;
     if(H.time.el.hidden!==!(dur>0))H.time.el.hidden=!(dur>0);
     if(dur>0){
