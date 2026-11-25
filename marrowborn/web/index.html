@@ -1078,6 +1078,78 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 [data-lk^="s"]::before{opacity:.6}
 @media (prefers-reduced-motion:reduce){#mbFin,.mk-seal,#ovMark,#bossBrk.reel i,#bossBrkLab.reel,.wrap.fin-ready #bossFill{animation:none}#mbChain.end .ch-top{transition:none}}
 /*R12-HUD-END*/
+/*R14-HUD*/
+/* ================= round 14: faces of a tyrant, orders, the lesson, the frame and alterations =================
+   #mbPhase  = the banner of a shift (title, the new attack, the hazard of the floor), over the arena for about three seconds. .wrap.ph-on while a tyrant stands (two marks on its bar).
+   #bossHz   = the hazard that is running, a word under the boss bar's right end (placed by the script from the bar's box).
+   #mbCmd    = the four orders for pets; under the vitals, a row with a pointer and on a phone held upright, a block of 2 x 2 on a phone held sideways. .on = the order in force.
+   #mbTut    = the lesson's band: step n of m, what to do, and Skip. In the stage, top middle.
+   [data-alt] on a skill button = the alteration it carries (a word in the corner). Everything is a multiple of --u. */
+:root{--haz:#ff9a3c;--cmd:#6fe3ff}
+#bossBar{position:relative}
+#bossBar .bossPh{display:none;position:absolute;top:0;bottom:0;width:calc(var(--u)*2.5);margin-left:calc(var(--u)*-1.25);background:var(--ink);box-shadow:0 0 0 calc(var(--u)*.5) rgba(255,255,255,.35);pointer-events:none;z-index:1}
+.wrap.ph-on #bossBar .bossPh{display:block}
+#bossBar .bossPh.gone{opacity:.25}
+#bossHz{position:fixed;z-index:2;pointer-events:none;font-family:var(--display);font-weight:700;font-size:.66rem;line-height:1.2;letter-spacing:.2em;text-transform:uppercase;color:var(--haz);text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*6) #000;white-space:nowrap;transform:translateX(-100%)}
+#bossHz[hidden]{display:none}
+#bossHz::before{content:"";display:inline-block;width:calc(var(--u)*7);height:calc(var(--u)*7);margin-right:calc(var(--u)*6);background:var(--haz);transform:rotate(45deg);vertical-align:.08em}
+#mbPhase{grid-area:1/1;position:relative;z-index:3;align-self:start;justify-self:center;margin-top:calc(var(--u)*46);max-width:min(calc(var(--u)*620),calc(100% - calc(var(--u)*20)));box-sizing:border-box;pointer-events:none;text-align:center;
+  padding:calc(var(--u)*10) calc(var(--u)*34) calc(var(--u)*12);background:linear-gradient(90deg,transparent,rgba(40,4,14,.92) 14%,rgba(40,4,14,.92) 86%,transparent);border-top:calc(var(--u)*2) solid var(--foe);border-bottom:calc(var(--u)*2) solid var(--foe);
+  font-family:var(--display);color:var(--bone);text-shadow:0 1px calc(var(--u)*2) #000}
+#mbPhase[hidden]{display:none}
+#mbPhase b{display:block;font-weight:700;font-size:2.1rem;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:#fff;text-shadow:0 0 calc(var(--u)*14) var(--foe),0 1px calc(var(--u)*2) #000}
+#mbPhase small{display:block;font-weight:700;font-size:.7rem;letter-spacing:.3em;text-transform:uppercase;color:#ffb3c0;margin-bottom:calc(var(--u)*4)}
+#mbPhase p{margin:calc(var(--u)*6) 0 0;font-family:inherit;font-size:.9rem;line-height:1.3;letter-spacing:.02em;color:var(--bone)}
+#mbPhase p i{font-style:normal;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--dare);margin-right:calc(var(--u)*6)}
+#mbPhase p.hz i{color:var(--haz)}
+#mbPhase.in{animation:mbPhaseIn .34s cubic-bezier(.2,.8,.3,1)}
+#mbPhase.out{opacity:0;transition:opacity .5s}
+@keyframes mbPhaseIn{from{opacity:0;transform:scaleX(1.25) scaleY(.6)}to{opacity:1;transform:none}}
+.stage:has(#ov:not([hidden])) #mbPhase,.stage:has(#mbx:not([hidden])) #mbPhase{visibility:hidden}
+/* orders */
+#mbCmd{position:fixed;z-index:2;display:flex;gap:calc(var(--u)*5);pointer-events:none;font-family:var(--display)}
+#mbCmd[hidden]{display:none}
+#mbCmd button{--c:calc(var(--u)*5);pointer-events:auto;display:flex;align-items:center;gap:calc(var(--u)*6);min-width:0;margin:0;padding:calc(var(--u)*4) calc(var(--u)*9) calc(var(--u)*4) calc(var(--u)*6);border:0;font:inherit;font-weight:700;font-size:.68rem;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;color:var(--ash);background:rgba(12,15,32,.8);
+  clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#mbCmd button kbd{font:inherit;font-size:.9em;letter-spacing:0;min-width:1.2em;text-align:center;padding:0 calc(var(--u)*3);color:var(--cmd);background:rgba(111,227,255,.14);border:0}
+#mbCmd button.on{color:var(--ink);background:var(--cmd)}
+#mbCmd button.on kbd{color:var(--cmd);background:var(--ink)}
+#mbCmd button:hover:not(.on){color:var(--bone)}
+#mbCmd .cmd-lab{align-self:center;font-weight:700;font-size:.6rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cmd);margin-right:calc(var(--u)*3);text-shadow:0 1px calc(var(--u)*2) #000}
+@media (pointer:coarse){
+  #mbCmd{gap:calc(var(--u)*6)}#mbCmd .cmd-lab{display:none}#mbCmd button kbd{display:none}
+  #mbCmd button{justify-content:center;min-width:max(46px,calc(var(--u)*58));min-height:max(44px,calc(var(--u)*40));padding:calc(var(--u)*4) calc(var(--u)*8);font-size:.7rem;opacity:.9}
+}
+@media (pointer:coarse) and (max-height:500px){#mbCmd{display:grid;grid-template-columns:auto auto}#mbCmd button{min-width:max(46px,calc(var(--u)*52));min-height:44px}}
+@media (pointer:coarse) and (max-width:420px){#mbCmd button{min-width:max(46px,calc(var(--u)*50));font-size:.64rem;letter-spacing:.1em}}
+.wrap:has(#ov:not([hidden])) #mbCmd,.wrap:has(#mbx:not([hidden])) #mbCmd,.wrap:has(#mbt:not([hidden])) #mbCmd,.wrap:has(#mbn:not([hidden])) #mbCmd{visibility:hidden}
+/* the lesson */
+#mbTut{grid-area:1/1;position:relative;z-index:3;align-self:start;justify-self:center;margin:max(calc(var(--u)*8),var(--hud-mid,var(--hud0))) calc(var(--u)*10) 0;width:min(calc(var(--u)*520),calc(100% - calc(var(--u)*20)));box-sizing:border-box;
+  background:linear-gradient(90deg,rgba(28,20,64,.96),rgba(9,11,24,.94));box-shadow:inset calc(var(--u)*4) 0 0 var(--dare);clip-path:polygon(0 0,100% 0,calc(100% - calc(var(--u)*14)) 100%,0 100%);
+  padding:calc(var(--u)*8) calc(var(--u)*26) calc(var(--u)*10) calc(var(--u)*16);color:var(--bone);text-align:left;pointer-events:none}
+#mbTut[hidden]{display:none}
+#mbTut .tu-top{display:flex;align-items:center;gap:calc(var(--u)*8);font-family:var(--display);font-weight:700;font-size:.7rem;letter-spacing:.2em;text-transform:uppercase;color:var(--dare)}
+#mbTut .tu-pips{display:flex;gap:calc(var(--u)*3);margin-left:auto}
+#mbTut .tu-pips i{width:calc(var(--u)*9);height:calc(var(--u)*4);background:rgba(255,255,255,.18)}
+#mbTut .tu-pips i.on{background:var(--dare)}#mbTut .tu-pips i.cur{background:#fff}
+#mbTut h3{margin:calc(var(--u)*3) 0 calc(var(--u)*2);font-family:var(--display);font-weight:700;font-size:1.25rem;line-height:1.05;letter-spacing:.04em;text-transform:uppercase;color:#fff}
+#mbTut p{margin:0;font-size:.9rem;line-height:1.34}
+#mbTut.ok{box-shadow:inset calc(var(--u)*4) 0 0 #7fd66b}#mbTut.ok h3{color:#7fd66b}
+#mbTut button{pointer-events:auto;margin:calc(var(--u)*6) calc(var(--u)*8) 0 0;padding:calc(var(--u)*3) calc(var(--u)*10);border:1px solid var(--line);background:rgba(12,15,32,.7);color:var(--ash);font-family:var(--display);font-weight:700;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;cursor:pointer;touch-action:manipulation}
+#mbTut button:hover{color:var(--bone)}
+.wrap.tut-on #mbHint,.wrap.tut-on #mbtPeek{display:none}
+.stage:has(#ov:not([hidden])) #mbTut,.stage:has(#mbx:not([hidden])) #mbTut{visibility:hidden}
+@media (pointer:coarse) and (max-height:500px){#mbTut{width:min(calc(var(--u)*430),calc(100% - calc(var(--u)*20)));padding-top:calc(var(--u)*5);padding-bottom:calc(var(--u)*6)}#mbTut h3{font-size:1rem;display:inline;margin-right:calc(var(--u)*6)}#mbTut p{font-size:.8rem;line-height:1.25;display:inline}#mbTut .tu-top{font-size:.6rem}#mbTut button{margin-top:calc(var(--u)*3);padding:calc(var(--u)*2) calc(var(--u)*8)}}
+@media (max-width:420px){#mbTut p{font-size:.84rem}#mbPhase b{font-size:1.5rem}#mbPhase p{font-size:.8rem}#mbPhase{padding-inline:calc(var(--u)*16)}}
+@media (pointer:coarse) and (max-height:500px){#mbPhase{max-width:64vw;margin-top:calc(var(--u)*34);padding-block:calc(var(--u)*5) calc(var(--u)*6)}#mbPhase b{font-size:1.5rem}#mbPhase p{font-size:.78rem;margin-top:calc(var(--u)*3)}}
+/* the alteration a skill carries: a word in the corner of its button */
+.sk[data-alt]::after{content:attr(data-alt);position:absolute;right:calc(var(--u)*4);bottom:calc(var(--u)*3);font-family:var(--display);font-weight:700;font-size:.5rem;line-height:1;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);pointer-events:none;text-shadow:0 1px 2px #000}
+#skillBar li[data-alt] .n::after{content:" · " attr(data-altn);color:var(--gold);font-size:.86em;letter-spacing:.04em}
+/* the frame and the alterations on the game's own panel */
+.framePanel .cards button.frCard small{letter-spacing:.06em;text-transform:none;font-size:.82rem}
+.altPanel .cards button.altCard.shut{opacity:.55}
+@media (prefers-reduced-motion:reduce){#mbPhase.in{animation:none}}
+/*R14-HUD-END*/
 </style>
 
 <main class="wrap">
@@ -1298,6 +1370,94 @@ P.roundRect=function(x,y,w,h,r){if(w<0){x+=w;w=-w}if(h<0){y+=h;h=-h}r=typeof r==
   window.MBHud={chain:ch,footing:bk,mark:function(){markTick();return mk}};
 })();
 /*R12-HUD-JS-END*/
+/*R14-HUD-JS*/
+/* (round 14) The banner of a tyrant's shift and the marks on its bar, the hazard's name, the orders for pets, the lesson's band, and the word of an alteration on a skill button.
+   Read from MB each frame or heard through MB.on; the order buttons and Skip call MB (petCommand, tutorialSkip, tutorialNext). Missing members leave a piece hidden. */
+try{window.MBPhaseBand=true}catch(e){}
+(function(){
+  var MB=window.MB,doc=document;if(!MB||!doc.querySelector||typeof MB.on!=='function')return;
+  var wrap=doc.querySelector('.wrap'),stage=doc.querySelector('.stage');if(!wrap||!stage)return;
+  function h(tag,cls,txt){var e=doc.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+  function U(){return parseFloat(getComputedStyle(doc.documentElement).fontSize)/16||1}
+  var coarse=false;try{coarse=matchMedia('(pointer:coarse)').matches}catch(e){}
+  /* ---- the shift ---- */
+  var ph=h('div');ph.id='mbPhase';ph.hidden=true;ph.setAttribute('role','status');var phS=h('small'),phB=h('b'),phA=h('p'),phH=h('p','hz');ph.appendChild(phS);ph.appendChild(phB);ph.appendChild(phA);ph.appendChild(phH);stage.appendChild(ph);
+  var phOff=0,phFade=0,HUDIDS=['hp','mana','bossName','bossBar','bossBrkLab','petHud','mbPets','petBar'];
+  // a band in the stage keeps clear of the HUD blocks that lie above the arena where the band is (the vitals, footing, the toggles; the orders too when asked)
+  function clearTop(el,withCmd,base){var sr=stage.getBoundingClientRect(),w=Math.min(sr.width,el.offsetWidth||sr.width),l=sr.left+(sr.width-w)/2,r=l+w,top=sr.top+base,u=U(),v=doc.querySelector('.vitals'),list=[],i,b;
+    if(v)for(i=0;i<v.children.length;i++)list.push(v.children[i]);for(i=0;i<HUDIDS.length;i++)list.push(doc.getElementById(HUDIDS[i]));list.push(doc.getElementById('bossBrk'),doc.getElementById('bossHz'),doc.querySelector('.togs'),doc.getElementById('pauseB'));if(withCmd)list.push(doc.getElementById('mbCmd'));
+    for(i=0;i<list.length;i++){var e=list[i];if(!e||e.hidden)continue;b=e.getBoundingClientRect();if(!b.width||!b.height||b.right<l+8*u||b.left>r-8*u||b.top>innerHeight*.42)continue;top=Math.max(top,b.bottom+6*u)}
+    var m=Math.round(top-sr.top);if(el._mt!==m){el._mt=m;el.style.marginTop=m+'px'}}
+  function line(p,name,text){while(p.firstChild)p.removeChild(p.firstChild);if(!name){p.hidden=true;return}p.hidden=false;p.appendChild(h('i',null,name));p.appendChild(doc.createTextNode(text||''))}
+  MB.on('bossPhase',function(I){if(!I)return;var b=null;try{b=MB.boss}catch(e){}
+    phS.textContent=(b&&b.s&&b.s.name?b.s.name+' · ':'')+'face '+I.phase+' of '+(I.of||3);phB.textContent=I.title||'It changes';
+    line(phA,I.attack&&I.attack.name,I.attack&&I.attack.text);line(phH,I.hazard&&I.hazard.name,I.hazard&&I.hazard.text);
+    ph.hidden=false;clearTop(ph,innerWidth<500,stage.getBoundingClientRect().height*.1);ph.classList.remove('out');ph.classList.remove('in');void ph.offsetWidth;ph.classList.add('in');var now=performance.now();phFade=now+3300;phOff=now+3900});
+  var bar=doc.getElementById('bossBar'),marks=[],hz=h('div');hz.id='bossHz';hz.hidden=true;hz.setAttribute('aria-hidden','true');wrap.appendChild(hz);
+  if(bar)for(var mi=0;mi<2;mi++){var mk=h('i','bossPh');mk.style.left=(mi?33.333:66.667)+'%';bar.appendChild(mk);marks.push(mk)}
+  var PHS={on:null,ph:-1,hz:null,at:0,box:''};
+  function phaseTick(play,now){
+    if(phOff){if(now>phOff){phOff=0;ph.hidden=true}else if(now>phFade&&!ph.classList.contains('out'))ph.classList.add('out')}
+    if(now<PHS.at)return;PHS.at=now+200;if(phOff)clearTop(ph,innerWidth<500,stage.getBoundingClientRect().height*.1);var I=null;try{I=play?MB.bossPhase:null}catch(e){}
+    var on=!!I;if(on!==PHS.on){PHS.on=on;wrap.classList.toggle('ph-on',on)}
+    if(!on){if(!hz.hidden)hz.hidden=true;PHS.hz=null;PHS.ph=-1;return}
+    if(I.phase!==PHS.ph){PHS.ph=I.phase;if(marks[0])marks[0].classList.toggle('gone',I.phase>=2);if(marks[1])marks[1].classList.toggle('gone',I.phase>=3)}
+    var name=I.hazard&&!I.shifting?I.hazard.name:'';if(name!==PHS.hz){PHS.hz=name;hz.textContent=name;hz.hidden=!name}
+    if(name&&bar){var r=bar.getBoundingClientRect(),u=U(),key=Math.round(r.right)+'|'+Math.round(r.bottom);if(key!==PHS.box&&r.width){PHS.box=key;hz.style.left=r.right+'px';hz.style.top=(r.bottom+9*u)+'px'}}
+  }
+  /* ---- orders ---- */
+  var cmd=h('div');cmd.id='mbCmd';cmd.hidden=true;cmd.setAttribute('role','group');cmd.setAttribute('aria-label','Orders for your pets');cmd.appendChild(h('span','cmd-lab','Orders'));
+  var ORD=[1,2,3,0],cb=[],C={on:null,idx:-1,at:0,box:''};
+  function mkCmd(i){var b=h('button');b.type='button';var k=h('kbd'),s=h('span');b.appendChild(k);b.appendChild(s);b._k=k;b._s=s;b._i=i;
+    b.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();var ok=false;try{ok=MB.petCommand(i)}catch(_){}if(ok)markCmd(i);C.at=0});b.addEventListener('click',function(e){e.preventDefault()});return b}
+  for(var ci=0;ci<4;ci++){var b0=mkCmd(ORD[ci]);cb.push(b0);cmd.appendChild(b0)}wrap.appendChild(cmd);
+  function markCmd(idx){C.idx=idx;for(var q=0;q<4;q++){var act=cb[q]._i===idx;cb[q].classList.toggle('on',act);cb[q].setAttribute('aria-pressed',act?'true':'false')}}
+  function cmdTick(play,now){
+    if(now<C.at)return;C.at=now+180;var I=null;try{I=MB.petCmd}catch(e){}
+    var on=play&&!!I&&!!I.can&&typeof MB.petCommand==='function';if(on!==C.on){C.on=on;cmd.hidden=!on;C.box=''}
+    if(!on)return;
+    if(!C.lab){C.lab=1;for(var i=0;i<4;i++){var b=cb[i],j=b._i;b._s.textContent=(I.short&&I.short[j])||'';b._k.textContent=(I.keys&&I.keys[j])||'';b.title=((I.names&&I.names[j])||'')+((I.text&&I.text[j])?': '+I.text[j]:'');b.setAttribute('aria-label',(I.names&&I.names[j])||'')}}
+    if(I.index!==C.idx)markCmd(I.index);
+    var v=doc.querySelector('.vitals');if(!v)return;var r=v.getBoundingClientRect(),you=v.firstElementChild?v.firstElementChild.getBoundingClientRect():r,u=U(),bk=doc.getElementById('bossBrk'),bot=r.bottom;
+    if(coarse&&bk&&!bk.hidden){var kr=bk.getBoundingClientRect();if(kr.left<innerWidth*.5)bot=Math.max(bot,kr.bottom+8*u)}
+    if(!coarse)bot=you.bottom;
+    var top=bot+(coarse?12:6)*u,left=Math.max(4,you.left),pad=coarse?doc.getElementById('pad'):null;
+    if(pad){var pr=pad.getBoundingClientRect(),ch=cmd.offsetHeight,cw=cmd.offsetWidth;if(pr.width&&left<pr.right&&left+cw>pr.left&&top+ch>pr.top-4*u)top=Math.max(bot+2*u,pr.top-4*u-ch)} // a large stick (the button-size setting): the orders move up to stay clear of it
+    var key=Math.round(left)+'|'+Math.round(top);if(key!==C.box){C.box=key;cmd.style.left=left+'px';cmd.style.top=top+'px'}
+  }
+  /* ---- the lesson ---- */
+  var tu=h('div');tu.id='mbTut';tu.hidden=true;tu.setAttribute('role','status');tu.setAttribute('aria-live','polite');
+  var tuTop=h('div','tu-top'),tuN=h('span'),tuP=h('span','tu-pips'),tuH=h('h3'),tuT=h('p'),tuNext=h('button',null,'Skip this step'),tuSkip=h('button',null,'Leave the lesson');tuNext.type=tuSkip.type='button';
+  tuTop.appendChild(tuN);tuTop.appendChild(tuP);tu.appendChild(tuTop);tu.appendChild(tuH);tu.appendChild(tuT);tu.appendChild(tuNext);tu.appendChild(tuSkip);stage.appendChild(tu);
+  function press(el,fn){el.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();try{fn()}catch(_){}TS.at=0});el.addEventListener('click',function(e){e.preventDefault()})}
+  press(tuNext,function(){MB.tutorialNext()});press(tuSkip,function(){MB.tutorialSkip()});
+  var TS={on:null,key:'',at:0,of:-1};
+  function tutTick(now){
+    if(now<TS.at)return;TS.at=now+150;var I=null;try{I=MB.tutorial}catch(e){}
+    var S=MB.S,on=!!I&&!!S&&S.mode==='play';if(on!==TS.on){TS.on=on;tu.hidden=!on;wrap.classList.toggle('tut-on',on)}
+    if(!on)return;
+    clearTop(tu,true,6*U());
+    var key=I.index+'|'+I.of+'|'+(I.done?1:0)+'|'+I.text.length;if(key===TS.key)return;TS.key=key;
+    tuN.textContent='The lesson · '+(I.index+1)+' of '+I.of;tuH.textContent=I.done?'Well done':I.title;tuT.textContent=I.text;tu.classList.toggle('ok',!!I.done);
+    if(I.of!==TS.of){TS.of=I.of;while(tuP.firstChild)tuP.removeChild(tuP.firstChild);for(var i=0;i<I.of;i++)tuP.appendChild(h('i'))}
+    for(var j=0;j<tuP.children.length;j++)tuP.children[j].className=j<I.index||j===I.index&&I.done?'on':j===I.index?'cur':'';
+  }
+  /* ---- the alteration on a skill button ---- */
+  var alKey='',alAt=0;
+  function altTick(now){
+    if(now<alAt)return;alAt=now+600;var sk=MB.skills;if(!sk)return;var key='',i;for(i=0;i<6;i++)key+=(sk[i]&&sk[i].altName||'')+'|';
+    var bs=doc.querySelectorAll('.touch .acts button.sk'),ls=doc.querySelectorAll('#skillBar li');key+=bs.length+'|'+ls.length;if(key===alKey)return;alKey=key;
+    for(i=0;i<6;i++){var nm=sk[i]&&sk[i].unlocked!==false&&sk[i].altName||'',els=[bs[i],ls[i]];for(var j=0;j<2;j++){var e=els[j];if(!e)continue;if(nm){e.setAttribute('data-alt',nm);e.setAttribute('data-altn',nm);var n=e.querySelector&&e.querySelector('.n');if(n)n.setAttribute('data-altn',nm)}else if(e.hasAttribute('data-alt')){e.removeAttribute('data-alt');e.removeAttribute('data-altn')}}}
+  }
+  var ok=true;
+  function tick(ts){requestAnimationFrame(tick);if(!ok)return;
+    try{var now=ts||0,S=MB.S;if(!S)return;var play=S.mode==='play'&&!S.paused;
+      phaseTick(S.mode==='play',now);cmdTick(play,now);tutTick(now);if(S.mode==='play')altTick(now);
+    }catch(e){ok=false;try{console.warn('round 14 HUD stopped',e)}catch(_){}}}
+  requestAnimationFrame(tick);
+  window.MBHud14={phase:ph,orders:cmd,lesson:tu,hazard:hz};
+})();
+/*R14-HUD-JS-END*/
 </script>
 
 

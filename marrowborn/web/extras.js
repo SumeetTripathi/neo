@@ -507,6 +507,14 @@ guard('hints',function(){
       touch:'Your skills sit beside Strike. A number on a button counts the seconds until it is ready again.',keys:'Keys 1 to 6 use your skills as you unlock them. The bar under the arena counts the seconds until each is ready again.'},
     {id:'pet',t:1,when:function(){var p=MB.pets;return !!(p&&p.active&&p.active.length&&p.roster&&p.roster.length&&(S().cls==='necro'||S().adv==='beastmaster'))},
       touch:'A pet fights on its own, with every attack it had as a monster, and cannot hurt you. Each one that is out holds part of your mana, the stronger the more. If it falls, it rises again after a moment, paid for with mana. Pause to choose how many go with you.',keys:'A pet fights on its own, with every attack it had as a monster, and cannot hurt you. Each one that is out holds part of your mana, the stronger the more. If it falls, it rises again after a moment, paid for with mana. Pause (Esc) to choose how many go with you.'},
+    {id:'dare',t:1.2,when:function(){var o=MB.objective;return !!(o&&o.state==='run')},
+      touch:'This floor carries a dare, named in the band at the top: a task you may take or leave. Meet it and the floor is marked higher and its drop is luckier. Miss it and nothing is lost.',keys:'This floor carries a dare, named in the band at the top: a task you may take or leave. Meet it and the floor is marked higher and its drop is luckier. Miss it and nothing is lost.'},
+    {id:'trial',t:1.2,when:function(){var t=MB.trial;return !!(t&&!t.failed&&!t.cleared)},
+      touch:'A trial floor. Its rule is in the band at the top, and the rule is the whole floor: break it and the floor begins again. A trial passed is worth a better drop and more mana for good.',keys:'A trial floor. Its rule is in the band at the top, and the rule is the whole floor: break it and the floor begins again. A trial passed is worth a better drop and more mana for good.'},
+    {id:'orders',t:3,when:function(){var c=MB.petCmd;return !!(c&&c.can&&c.count>0&&c.cmd==='free'&&!MB.tutorial)},until:function(){var c=MB.petCmd;return !!(c&&c.cmd!=='free')},
+      touch:'Those who fight for you take orders: the four buttons below your health. Attack my target, hold here, fall back to me, or free.',keys:'Those who fight for you take orders. G: attack my target. H: hold here. B: fall back to me. N: free again.'},
+    {id:'faces',t:2,when:function(){var b=MB.bossPhase;return !!(b&&b.phase===1&&!MB.tutorial)},
+      touch:'A tyrant has three faces. The marks on its bar are where it shifts: each shift brings a new attack and a hazard of the floor, after a beat in which nothing can hurt it.',keys:'A tyrant has three faces. The marks on its bar are where it shifts: each shift brings a new attack and a hazard of the floor, after a beat in which nothing can hurt it.'},
     {id:'mana',t:2,when:function(){var m=MB.mana;return !!S().cls&&S().level>=8&&!!m&&m.max>0&&m.cur<(m.max-m.reserved)*.7},
       touch:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.',keys:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.'}
   ];
@@ -536,7 +544,14 @@ guard('hints',function(){
     setTimeout(function(){if(!isDrop())return;mark('gear');
       panelNote(isDrop,h('p',{class:'keys mbx-note'},h('b',{text:'Hint: '}),'Every boss drops one item. Upgrade is the steady choice. Replace is worth it when the drop is rarer than what you wear. Destroy only when neither helps.'))},0);
   });
-  hintsApi={reset:function(){seen=[];store.set('hints',seen);moved=0;struck=0}};
+  // marks: explained the first time one is shown, as a line in that panel
+  listen('grade',function(g){
+    if(!enabled()||seen.indexOf('mark')>=0||!g||!g.mark)return;
+    var isMark=function(){var k=$('ovKeys'),o=$('ov');return !!(o&&!o.hidden&&k&&/^Mark /.test(k.textContent))};
+    var tries=0,iv=setInterval(function(){if(++tries>40){clearInterval(iv);return}if(!isMark())return;clearInterval(iv);mark('mark');
+      panelNote(isMark,h('p',{class:'keys mbx-note'},h('b',{text:'Hint: '}),'Every floor from the ninth is marked, S to D: how fast it fell, how little it cost you, and your longest chain of blows. A dare met counts on top. An A makes the drop luckier, an S luckier still.'))},150);
+  });
+  hintsApi={reset:function(){seen=[];store.set('hints',seen);moved=0;struck=0;try{localStorage.removeItem('marrowborn.tut')}catch(e){}}};
 });
 
 /* ---------- reward accent (style only) ---------- */

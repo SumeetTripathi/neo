@@ -3116,7 +3116,7 @@ function draw(dt){
     const ar=R.testArcs||MB.arcs;if(ar&&ar.length)drawArcs(ar,t,low,sight);if(IMK.length)imxEnd()}
   if(sight&&MB.has('touch')){const zs=MB.zones;
     for(let i=0;i<zs.length;i++){const z=zs[i],q=Math.min(1,z.t/z.dur),o=pools.zone.get(),u=o.userData;o.position.set(z.x,0,z.y);
-      const zm=z.mine&&z.foe!==true;u.disc.material.color.setHex(zm?0x5a48ff:0xd0143c);u.rim.material.color.setHex(zm?PAL.power2:0xffc04a);
+      const zm=z.mine&&z.foe!==true;u.disc.material.color.setHex(zm?0x5a48ff:z.hz?0xe06a12:0xd0143c);u.rim.material.color.setHex(zm?PAL.power2:z.hz?0xffe9a0:0xffc04a);
       u.disc.scale.setScalar(z.r);u.rim.scale.setScalar(z.r);u.grow.scale.setScalar(Math.max(.01,z.r*q));u.disc.material.opacity=.16+.4*q+(q>.8?.12*Math.sin(t*40):0)}}
   {const ms=MB.mons;for(let i=0;i<ms.length;i++){const m=ms[i],b=m.beam;if(!b||m.hidden||!b.rays)continue;
     for(let j=0;j<b.rays.length;j++){const ry=b.rays[j],o=pools.beam.get(),u=o.userData,len=Math.max(1,ry.len),w=b.w||12;
