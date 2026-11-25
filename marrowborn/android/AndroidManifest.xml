@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.marrowborn.game" android:versionCode="25" android:versionName="4.1">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="com.marrowborn.game" android:versionCode="26" android:versionName="4.2">
   <uses-permission android:name="android.permission.VIBRATE"/>
   <!-- multiplayer on the local network: sockets to and from other devices, and reading the Wi-Fi address to show it to the host -->
   <uses-permission android:name="android.permission.INTERNET"/>
