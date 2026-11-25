@@ -164,6 +164,41 @@ const SKILLS={
   ['pact','Dark Pact',25,'Unmake your thralls. Each one heals a tenth of your health, up to half.',[['pact']],'thrall']],
 };
 const SKLV=[9,9,10,11,15,20,25,30,36,42]; // the level at which each skill is learned
+/* ---------- round 14: alterations. Every class skill has three; one may be active per skill (S.md[skill] = 1..3, 0: as taught); they open ALTLV floors after the skill is learned ---------- */
+// Each is a trade, not an upgrade. k: what it changes while the skill is cast (AK): d damage, h healing, r reach, dur how long buffs, fields, summons and debuffs last, more: more bolts in a fan or a ring
+// (together they weigh the same), many: half again as many raised, tag: a debuff on everything the skill hits (which leaves the setup tag that goes with it). cd, cost: the skill's recharge and mana.
+// A skill never gets the tag its own blow pays off.
+const ALTLV=[3,8,14];
+const ALT={
+ w:{id:'wide',name:'Sweeping',text:'Reaches 30% wider and hits 10% lighter.',k:{r:1.3,d:.9}},
+ s:{id:'scatter',name:'Scattering',text:'Throws more of them in a wider spread. Together they weigh the same.',k:{more:1}},
+ h:{id:'heavy',name:'Weighted',text:'Does 30% more. Recharges 25% slower.',cd:1.25,k:{d:1.3,h:1.3}},
+ q:{id:'quick',name:'Hurried',text:'Recharges 25% faster and hits 15% lighter.',cd:.75,k:{d:.85}},
+ r:{id:'ready',name:'Hurried',text:'Recharges 20% faster. Costs 25% more mana.',cd:.8,cost:1.25,k:{}},
+ f:{id:'frugal',name:'Frugal',text:'Costs 40% less mana. Recharges 10% slower.',cd:1.1,cost:.6,k:{}},
+ l:{id:'long',name:'Lingering',text:'Lasts 40% longer. Costs 20% more mana.',cost:1.2,k:{dur:1.4}},
+ m:{id:'many',name:'Crowded',text:'Raises half again as many. Costs 25% more mana.',cost:1.25,k:{many:1}},
+ u:{id:'up',name:'Upending',sets:'aloft',text:'Staggers what it hits for a moment and leaves it aloft, open to a ground blow. Costs 20% more mana.',cost:1.2,k:{tag:{stun:.35}}},
+ c:{id:'chill',name:'Chilling',sets:'brittle',text:'Slows what it hits and leaves it brittle, open to a single heavy blow. Costs 20% more mana.',cost:1.2,k:{tag:{slow:2.5}}},
+ e:{id:'sear',name:'Searing',sets:'branded',text:'Sets what it hits alight and leaves it branded, open to a volley. Costs 20% more mana.',cost:1.2,k:{tag:{dot:.2,weak:1}}},
+};
+const SKALT={
+ fighter:['whc','hqe','lrf','hle','hrf','lhf','whc','lrf','hqu','wlr'],
+ tank:['whc','hqf','lrf','hqe','hrf','hqc','lrf','whe','wlh','whc'],
+ assassin:['hqe','shc','lrf','hqu','lrf','hqf','lrf','wlh','hle','shc'],
+ mage:['shc','hqu','wlh','whe','lrf','hqf','lrf','shc','wlr','hqu'],
+ ranger:['shc','hqc','hle','wlh','hqu','lhf','mlf','lrf','whl','lrf'],
+ healer:['hqe','whr','wlr','wlh','lrf','wrf','lrf','shc','whe','hrf'],
+ necro:['mrf','hqe','hle','hqf','whq','lmf','shc','lrf','wlh','hrf'],
+};
+const AK0={d:1,h:1,r:1,dur:1,more:0,many:0,tag:null};for(const k in ALT)ALT[k].k=Object.assign({},AK0,ALT[k].k);
+let AK=AK0;
+const noAlts=()=>[0,0,0,0,0,0,0,0,0,0];
+const altIn=v=>Array.isArray(v)&&v.length===10&&v.every(x=>Number.isInteger(x)&&x>=0&&x<=3)?v.slice():noAlts();
+const altAt=(si,j)=>SKLV[si]+ALTLV[j];                                   // the floor on which alteration j (0-2) of skill si opens
+const altOpen=(si,j,lv=S.level)=>lv+1>=altAt(si,j);
+const altOf=si=>{if(VS||!(si>=0&&si<10)||!S.md||!S.cls||S.level<8)return null;const j=S.md[si];return j>0&&altOpen(si,j-1)?ALT[SKALT[S.cls][si][j-1]]:null};
+const ALTROW=new Map();
 /* ---------- the apex tier: above the class and its upgrade, chosen once after floor 100 (S.apex: one of the ten ids of APEX) ---------- */
 // Ten paths on two sides. Side 'dominion' (you command others): pets and familiars hold DOMHOLD of the mana they held, thralls and wolves hit DOMSUM times as hard, pets, familiars and trophies DOMPET times.
 // Side 'order' (you are the weapon): mana back ORDMANA times as fast, skills at ORDCOST of their cost, every pet or familiar kept but not sent out lends ORDRESK damage (up to ORDRESN of them),
@@ -287,7 +322,9 @@ const APEXSK={
 // the side of the hero's path, and what the order side gives this path: [damage, health]
 const apxSide=()=>S.apex&&APEX[S.apex]?APEX[S.apex].side:null,DOMS=()=>apxSide()==='dominion',ORDS=()=>apxSide()==='order',apxSt=()=>AX.st[S.apex]||AX.st.order;
 const apexOk=id=>typeof id==='string'&&Object.prototype.hasOwnProperty.call(APEX,id);
-const skD=(c,si)=>si<10?SKILLS[c][si]:S.apex?APEXSK[S.apex][si-10]:null;
+const skBase=(c,si)=>si<10?SKILLS[c][si]:S.apex?APEXSK[S.apex][si-10]:null;
+// the skill as carried: with an alteration its recharge and its cost differ (what it does while it is cast is AK, set by skill())
+const skD=(c,si)=>{const d=skBase(c,si),A=d&&c===S.cls?altOf(si):null;if(!A||!A.cd&&!A.cost)return d;const key=c+si+A.id;let r=ALTROW.get(key);if(!r){r=d.slice();r[2]=Math.round(d[2]*(A.cd||1)*100)/100;r[6]=Math.max(1,Math.round(d[6]*(A.cost||1)));ALTROW.set(key,r)}return r};
 /* ---------- mana: what skills are paid with, from the day you have a class ---------- */
 // MANA0: the pool of each class. MCOST: what each skill costs, in the order of SKILLS (it is copied onto the skill row as its seventh entry).
 // Costs follow strength and the size of the class's pool: the quick skills are cheap, the ultimate takes about half a pool.
@@ -314,6 +351,7 @@ const MRISE=.007;
 const PCOST={pet:16,familiar:18},PCROWN={pet:28,familiar:30},REVT=4,REVHP=.5,REVUP=1.5;
 // a skill's text says what it costs at the level you stand on (mana: the listed cost, before the rise)
 const skText=(d,k,i)=>d[3]+' Cooldown: '+d[2]+' seconds. Mana: '+(S.cls===k&&S.level>=8?skCost(i):d[6])+'.';
+const skCostOf=base=>S.level>=8?Math.max(1,Math.round(base*skRise()*(ORDS()?ORDCOST:1))):base;
 for(const k in SKILLS){const c=CLASSES[k];SKILLS[k].forEach((d,i)=>{d[6]=MCOST[k][i]});c.mana=MANA0[k];c.skills=SKILLS[k].map((d,i)=>({id:d[0],name:d[1],cd:d[2],mana:d[6],get text(){return skText(d,k,i)},level:SKLV[i]}));
   c.pows[1]=[SKILLS[k][3][1],''];Object.defineProperty(c.pows[1],1,{get:()=>'A new skill. '+skText(SKILLS[k][3],k,3),enumerable:true})}
 const SK=[0,1,2,3,4,5].map(i=>({id:'',name:'',key:''+(i+1),cd:0,max:0,ready:false,unlocked:false,index:-1,cost:0,affordable:false}));
@@ -439,7 +477,7 @@ function dropItem(n,o){
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,well:0,spec:0});
 // apex: the apex path (one of the ten ids of APEX). tr: trials passed (each is worth TMANA maximum mana). door: {id, n} the door chosen at a crossroads for floor n.
-const S={sp:null,mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,apex:null,tr:0,door:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
+const S={sp:null,md:noAlts(),mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,apex:null,tr:0,door:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[],echoes=[];
 // Every monster, enemy bolt, enemy blast and morsel carries an id, and every ally a nid, so that each can be named across the network in multiplayer.
 let NEXTID=1;const nid=()=>NEXTID++;
@@ -1014,10 +1052,10 @@ function aim(pt,range,spd){
   if(best&&spd&&best.vx!==undefined&&best.st!=='charge'&&best.st!=='lunge'){const k=Math.min(.6,dist(best,P)/spd);return Math.atan2(best.y+best.vy*k-P.y,best.x+best.vx*k-P.x)} // auto-aim leads a moving target
   return best?angTo(P,best):P.face;
 }
-function pshot(a,spd,dmg,r,kind,pierce){pshots.push({x:P.x+Math.cos(a)*16,y:P.y-4+Math.sin(a)*16,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r,dmg,kind,pierce:pierce===true?99:pierce||0,hit:new Set(),sx:P.x,sy:P.y,lk:LNK,sk:TAGOK>0})}
+function pshot(a,spd,dmg,r,kind,pierce){pshots.push({x:P.x+Math.cos(a)*16,y:P.y-4+Math.sin(a)*16,vx:Math.cos(a)*spd,vy:Math.sin(a)*spd,r,dmg,kind,pierce:pierce===true?99:pierce||0,hit:new Set(),sx:P.x,sy:P.y,lk:LNK,sk:TAGOK>0,alt:AK.tag||undefined,altD:AK.tag?dmgMul():0})}
 function shock(r,d){
   rings.push({x:P.x,y:P.y,life:.4,max:.4,r,fx:true});if(MP.on)MP.rq.push(VS?[Math.round(P.x),Math.round(P.y),Math.round(r),40,Math.round(d*dmgMul()*100)/100]:[Math.round(P.x),Math.round(P.y),Math.round(r),40]);
-  GEO++;MINE++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<r+m.r)hurtM(m,d*dmgMul());MINE--;GEO--;
+  GEO++;MINE++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<r+m.r){hurtM(m,d*dmgMul());if(AK.tag&&mons.includes(m))debuff(m,AK.tag,dmgMul())}MINE--;GEO--;
   clearShots(P,r+10);S.shake=.3;noise(.25,.4);sfx(70,.3,'square',.35,35);haptic(50);
 }
 function ally(kind,life){const a=rand()*TAU;return{nid:nid(),kind,x:P.x+Math.cos(a)*30,y:P.y+Math.sin(a)*30,r:kind==='wolf'?12:9,life:life||(kind==='wolf'||S.adv==='lich'?1e9:14),cd:0,walk:rand()*6}}
@@ -1052,9 +1090,10 @@ function strike(pt){
   if(hitM&&c)troStrike(hitM,amb);
 }
 function field(kind,x,y,r,dur,every,dmg,slow){const f={kind,x,y,r,t:0,dur,every,tick:0,dmg,slow,sk:TAGOK>0};clamp(f,10);fields.push(f)}
-function rush(a,dmg,stun){if(VS&&dmg)vsRush(a,dmg,stun);P.dashT=dmg?.24:.2;P.dx=Math.cos(a);P.dy=Math.sin(a);P.face=a;P.rushD=dmg;P.rushStun=stun;P.rushLk=LNK;P.rushSk=TAGOK>0;P.rushHit=dmg?new Set():null;P.inv=Math.max(P.inv,.4)}
+function rush(a,dmg,stun){if(VS&&dmg)vsRush(a,dmg,stun);P.dashT=dmg?.24:.2;P.dx=Math.cos(a);P.dy=Math.sin(a);P.face=a;P.rushD=dmg;P.rushStun=stun;P.rushLk=LNK;P.rushSk=TAGOK>0;P.rushAlt=AK.tag;P.rushAltD=AK.tag?dmgMul():0;P.rushHit=dmg?new Set():null;P.inv=Math.max(P.inv,.4)}
 const debuff=(m,o,D)=>{if(m.vs)return vsDebuff(m,o,D);if(TAGOK){if(o.slow)tagSet(m,2);if(o.stun)tagSet(m,1);if(o.dot||o.mark)tagSet(m,4)}const c=CL();if(c)mpQ(['db',m.id,o.slow||0,o.stun||0,o.dot?Math.round(o.dot*D*1000)/1000:0,o.mark||0]);
-  if(o.slow&&!c)m.slow=Math.max(m.slow||0,o.slow);if(o.stun&&!c)m.stun=m.boss?o.stun:o.stun*2;if(o.dot){if(!c){m.dotT=6;m.dotD=o.dot*D;m.dotK=.5;m.dotRem=null}puff(m,'#7fd66b',10,120)}if(o.mark){if(!c)m.markT=o.mark;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+40,fx:true});puff(m,'#b8263d',14,120)}};
+  if(o.slow&&!c)m.slow=Math.max(m.slow||0,o.slow);if(o.stun&&!c)m.stun=m.boss?o.stun:o.stun*2;if(o.dot){if(!c&&!(o.weak&&m.dotT>0&&m.dotD>o.dot*D)){m.dotT=6;m.dotD=o.dot*D;m.dotK=.5;m.dotRem=null}puff(m,'#7fd66b',10,120)}if(o.mark){if(!c)m.markT=o.mark;rings.push({x:m.x,y:m.y,life:.5,max:.5,r:m.r+40,fx:true});puff(m,'#b8263d',14,120)}};
+const altDb=b=>{if(AK===AK0)return b;const o=Object.assign({},b);if(AK.dur!==1)for(const k of['slow','stun','mark'])if(o[k])o[k]*=AK.dur;if(AK.tag)for(const k in AK.tag)if(!o[k])o[k]=AK.tag[k];return o};
 const pierceOf=g=>g==='pw3'?pw(3):g==='barb'?(S.adv==='sharpshooter'?99:S.b.spec):g;
 // one effect of a skill. x = {t: nearest monster or null, ta: angle to it, at: its position or a spot ahead, D: damage multiplier}
 // (while it is worked out: MINE, so its blows count for the chain; LNK, the payoff it can be; TAGOK, so what it slows, stuns or marks is tagged)
@@ -1062,30 +1101,30 @@ function cast(op,x){const k=LNK;LNK=lkOf(op);MINE++;TAGOK++;try{cast0(op,x)}fina
 function cast0(op,x){
   const[o,a,b,c,d,e,f,g,h]=op,{t,ta,at,D}=x,ring=(p,r)=>{rings.push({x:p.x,y:p.y,life:.5,max:.5,r,fx:true});if(MP.on)MP.rq.push([Math.round(p.x),Math.round(p.y),Math.round(r),50])};
   switch(o){
-  case'shock':shock(a,b);break;                                   // radius, damage
+  case'shock':shock(a*AK.r,b*AK.d);break;                                   // radius, damage
   case'rush':rush(ta,a*D,b);break;                                // damage, stun: dash through the target
   case'back':rush(ta+Math.PI,0,0);break;                          // untouchable roll away from the target
-  case'buff':P[a]=Math.max(P[a]||0,b);puff(P,'#d6a544',14,180);break; // timer name, seconds
-  case'heal':healP(a);puff(P,'#7fd66b',18,200);break;
+  case'buff':P[a]=Math.max(P[a]||0,b*AK.dur);if(a==='stormT')P.stormD=AK.d;if(a==='fireT')P.fireD=AK.d;puff(P,'#d6a544',14,180);break; // timer name, seconds
+  case'heal':healP(Math.min(1,a*AK.h));puff(P,'#7fd66b',18,200);break;
   case'shield':if(S.adv!=='berserker'){P.shield=true;P.shT=0}break;
-  case'fan':for(let k=0;k<a;k++){pshot(ta+(k-(a-1)/2)*b,c,d*D,e,f,pierceOf(g));if(h){const p=pshots[pshots.length-1];if(h.boom)p.boom=h.boom*D;if(h.slow)p.slow=h.slow;if(h.stun)p.stun=h.stun}}break; // count, spread, speed, damage, radius, kind, pierce, extras
-  case'ringp':for(let k=0;k<a;k++)pshot(k*TAU/a,b,c*D,d,e,pierceOf(f));break; // count, speed, damage, radius, kind, pierce
-  case'blast':meteor(a==='at'?at:P,b,c,d*D,e);break;              // where, radius, delay, damage, extras
-  case'line':for(let k=1;k<=a;k++)meteor({x:P.x+Math.cos(ta)*k*b,y:P.y+Math.sin(ta)*k*b},c,.3+k*.15,d*D);break; // count, spacing, radius, damage
-  case'field':field(a,b==='at'?at.x:P.x,b==='at'?at.y:P.y,c,d,e,f*D,g);break; // kind, where, radius, seconds, tick, damage per tick, slows
-  case'hit':debuff(t,b,D);if(a){puff(t,'#dfe6ec',12,200);hurtM(t,a*D)}break; // damage, debuffs: the target
-  case'near':for(const m of[...mons])if(!m.hidden&&dist(m,P)<a+m.r)debuff(m,b,D);break; // radius, debuffs: every monster around you
-  case'summon':for(let k=0;k<b;k++){const al=ally(a,c);al.extra=2;allies.push(al);puff(al,'#7fd66b',6)}break; // kind, count, seconds
-  case'clear':clearShots(P,a);break;
+  case'fan':{const n=a>1&&AK.more?a+2:a,dk=n>a?a/n*1.05:1;for(let k=0;k<n;k++){pshot(ta+(k-(n-1)/2)*b,c,d*D*dk,e,f,pierceOf(g));if(h){const p=pshots[pshots.length-1];if(h.boom)p.boom=h.boom*D;if(h.slow)p.slow=h.slow*AK.dur;if(h.stun)p.stun=h.stun*AK.dur}}break} // count, spread, speed, damage, radius, kind, pierce, extras
+  case'ringp':{const n=AK.more?a+4:a,dk=n>a?a/n*1.05:1;for(let k=0;k<n;k++)pshot(k*TAU/n,b,c*D*dk,d,e,pierceOf(f));break} // count, speed, damage, radius, kind, pierce
+  case'blast':meteor(a==='at'?at:P,b*AK.r,c,d*D,e&&e.stun&&AK.dur!==1?{stun:e.stun*AK.dur}:e);break;              // where, radius, delay, damage, extras
+  case'line':for(let k=1;k<=a;k++)meteor({x:P.x+Math.cos(ta)*k*b,y:P.y+Math.sin(ta)*k*b},c*AK.r,.3+k*.15,d*D);break; // count, spacing, radius, damage
+  case'field':field(a,b==='at'?at.x:P.x,b==='at'?at.y:P.y,c*AK.r,d*AK.dur,e,f*D,g);break; // kind, where, radius, seconds, tick, damage per tick, slows
+  case'hit':debuff(t,altDb(b),D);if(a){puff(t,'#dfe6ec',12,200);hurtM(t,a*D)}break; // damage, debuffs: the target
+  case'near':for(const m of[...mons])if(!m.hidden&&dist(m,P)<a*AK.r+m.r)debuff(m,altDb(b),D);break; // radius, debuffs: every monster around you
+  case'summon':for(let k=0,n=b+(AK.many?Math.ceil(b/2):0);k<n;k++){const al=ally(a,c*AK.dur);al.extra=2;allies.push(al);puff(al,'#7fd66b',6)}break; // kind, count, seconds
+  case'clear':clearShots(P,a*AK.r);break;
   case'tele':puff(P,'#22242b',12);P.x=t.x+Math.cos(ta)*(t.r+24);P.y=t.y+Math.sin(ta)*(t.r+24);clamp(P,14);collide(P,14,true);P.face=ta+Math.PI;P.swing=P.face;P.inv=Math.max(P.inv,.6);puff(P,'#22242b',12);break;
-  case'pull':case'knock':for(const m of mons)if(!m.hidden&&m.st!=='leap'&&dist(m,P)<a+m.r){const g2=angTo(P,m),dd=dist(m,P),nd=o==='pull'?Math.max(m.r+50,dd-(m.boss?90:400)):dd+(m.boss?80:160);mMove(m,P.x+Math.cos(g2)*nd,P.y+Math.sin(g2)*nd)}break;
-  case'seq':if(a==='quake'){P.quakeN=2;P.quakeT=.4}else if(a==='cuts'){P.cutN=8;P.cutT=0;P.cutM=t;P.inv=Math.max(P.inv,1.9)}else{P.starN=7;P.starT=0}break;
-  case'ring':ring(P,a);break;
+  case'pull':case'knock':for(const m of mons)if(!m.hidden&&m.st!=='leap'&&dist(m,P)<a*AK.r+m.r){const g2=angTo(P,m),dd=dist(m,P),nd=o==='pull'?Math.max(m.r+50,dd-(m.boss?90:400)):dd+(m.boss?80:160);mMove(m,P.x+Math.cos(g2)*nd,P.y+Math.sin(g2)*nd)}break;
+  case'seq':P.seqD=AK.d;if(a==='quake'){P.quakeN=2;P.quakeT=.4}else if(a==='cuts'){P.cutN=8;P.cutT=0;P.cutM=t;P.inv=Math.max(P.inv,1.9)}else{P.starN=7;P.starT=0}break;
+  case'ring':ring(P,a*AK.r);break;
   case'ringT':ring(t,t.r+a);puff(t,'#7fd66b',20,180);break;
   case'beam':for(let k=1;k<=6;k++)bits.push({x:t.x+(P.x-t.x)*k/6,y:t.y+(P.y-t.y)*k/6,vx:0,vy:0,life:.4,max:.4,c:'#7fd66b',r:3});break;
-  case'chain':{const n3=mons.filter(m=>!m.hidden).sort((p,q)=>dist(p,P)-dist(q,P)).slice(0,3);for(const m of n3)if(mons.includes(m)){for(let k=1;k<=6;k++)bits.push({x:P.x+(m.x-P.x)*k/6+rand()*14-7,y:P.y+(m.y-P.y)*k/6+rand()*14-7,vx:0,vy:0,life:.3,max:.3,c:'#8fd3ff',r:3});hurtM(m,3*D)}break}
+  case'chain':{const n3=mons.filter(m=>!m.hidden).sort((p,q)=>dist(p,P)-dist(q,P)).slice(0,3);for(const m of n3)if(mons.includes(m)){for(let k=1;k<=6;k++)bits.push({x:P.x+(m.x-P.x)*k/6+rand()*14-7,y:P.y+(m.y-P.y)*k/6+rand()*14-7,vx:0,vy:0,life:.3,max:.3,c:'#8fd3ff',r:3});hurtM(m,3*D);if(AK.tag&&mons.includes(m))debuff(m,AK.tag,D)}break}
   case'army':for(const al of allies)if(al.extra===1)puff(al,'#e7dfcd',6);allies=allies.filter(al=>al.extra!==1); // a new army replaces the old one, so the cap holds
-    for(let k=0;k<4;k++){const al=ally('thrall',9);al.extra=1;allies.push(al);puff(al,'#7fd66b',6)}break;
+    for(let k=0;k<(AK.many?6:4);k++){const al=ally('thrall',9);al.extra=1;allies.push(al);puff(al,'#7fd66b',6)}break;
   case'burst':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);S.shake=.25;noise(.25,.35,900,150);
     for(const al of th){ring(al,70);if(VS)MP.rq[MP.rq.length-1][4]=Math.round(2*D*100)/100;puff(al,'#7fd66b',10,220);GEO++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,al)<70+m.r)hurtM(m,2*D,true);GEO--}break}
   case'rollcall':rollCall();break;
@@ -1093,7 +1132,7 @@ function cast0(op,x){
   case'verdict':P.bmT=1;P.bmA=ta-.6;P.bmHit=new Set();noise(.9,.25,3000,6000);break;
   case'sever':sever(t,D);break;
   default:{const f=APXOP[o];if(f)f(x,op)}break;
-  case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);healP(Math.min(.5,.1*th.length));break}
+  case'pact':{const th=allies.filter(al=>al.kind==='thrall');allies=allies.filter(al=>al.kind!=='thrall');P.sumT=Math.max(P.sumT,2);for(const al of th)puff(al,'#7fd66b',8,160);healP(Math.min(.5*AK.h,.1*AK.h*th.length));break}
   }
 }
 function skill(si){
@@ -1102,28 +1141,28 @@ function skill(si){
   let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
   // nothing to use it on: keep the skill ready instead of wasting the cooldown
   if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')||typeof need==='function'&&!need(t)){SND.fizzle();return false}
-  const x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()};
+  const A=altOf(si),x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()*(A?A.k.d:1)};
   if(R12()){if(P.cd>0)P.cd*=.5;if(P.chS){P.chAt=S.t;P.chGap=Math.max(P.chGap,P.cd+.9)}} // a skill cuts the recovery of a blow short and keeps the place in the string
   P.mana-=cost;P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
-  for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam'||op[0]==='collect'||op[0]==='sever')&&!mons.includes(t))continue;cast(op,x)}
+  AK=A?A.k:AK0;try{for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam'||op[0]==='collect'||op[0]==='sever')&&!mons.includes(t))continue;cast(op,x)}}finally{AK=AK0}
   if(sk[0]==='shadowstep'&&TSRC.length&&TSRC[0].form==='venom'){P.trQ=1;P.trT=t}
   P.mxS[si]=sk[2]*skMul(si);P.cdS[si]=P.mxS[si];syncSkills();return true;
 }
-function meteor(at,r,dur,dmg,ex){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,stun:ex&&ex.stun,lk:LNK,sk:TAGOK>0};clamp(z,10);zones.push(z)}
+function meteor(at,r,dur,dmg,ex){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,stun:ex&&ex.stun,lk:LNK,sk:TAGOK>0,alt:AK.tag||undefined,altD:AK.tag?dmgMul():0};clamp(z,10);zones.push(z)}
 // skills that play out over time
 function channels(dt){
   MINE++;LNK='slam';
-  if(P.stormT>0){P.stormT-=dt;if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2);P.atk=.16;P.swing+=2}}
-  if(P.quakeN>0&&(P.quakeT-=dt)<=0){P.quakeT=.4;shock(P.quakeN===2?190:250,4);P.quakeN--}
-  if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);collide(P,14,true);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');LNK='heavy';hurtM(m,3*dmgMul());LNK='slam'}}
-  if(P.starN>0&&(P.starT-=dt)<=0){P.starT=.35;P.starN--;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160};meteor({x:at.x+rand()*60-30,y:at.y+rand()*60-30},80,.6,6*dmgMul())}
+  if(P.stormT>0){P.stormT-=dt;if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2*(P.stormD||1));P.atk=.16;P.swing+=2}}
+  if(P.quakeN>0&&(P.quakeT-=dt)<=0){P.quakeT=.4;shock(P.quakeN===2?190:250,4*(P.seqD||1));P.quakeN--}
+  if(P.cutN>0&&(P.cutT-=dt)<=0){const m=P.cutM;if(!mons.includes(m)||m.hidden)P.cutN=0;else{P.cutT=.2;P.cutN--;const a=rand()*TAU;puff(P,'#22242b',6);P.x=m.x+Math.cos(a)*(m.r+24);P.y=m.y+Math.sin(a)*(m.r+24);clamp(P,14);collide(P,14,true);P.face=P.swing=a+Math.PI;P.atk=.16;P.inv=Math.max(P.inv,.5);SND.swing('assassin');LNK='heavy';hurtM(m,3*dmgMul()*(P.seqD||1));LNK='slam'}}
+  if(P.starN>0&&(P.starT-=dt)<=0){P.starT=.35;P.starN--;let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const at=t||{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160};meteor({x:at.x+rand()*60-30,y:at.y+rand()*60-30},80,.6,6*dmgMul()*(P.seqD||1))}
   LNK=null;MINE--;
-  if(P.fireT>0){P.fireT-=dt;if((P.fireK-=dt)<=0){P.fireK=.1;const a=aim(null,1200);P.swing=a;P.atk=.1;pshot(a+rand()*.1-.05,720,dmgMul(),3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow()}}
+  if(P.fireT>0){P.fireT-=dt;if((P.fireK-=dt)<=0){P.fireK=.1;const a=aim(null,1200);P.swing=a;P.atk=.1;pshot(a+rand()*.1-.05,720,dmgMul()*(P.fireD||1),3,'arrow',S.adv==='sharpshooter'?99:S.b.spec);SND.arrow()}}
   if(P.renewT>0){P.renewT-=dt;if((P.renewK+=dt)>=1){P.renewK=0;if(P.hp<P.maxHp){healP(.04);puff(P,'#7fd66b',4,80)}}}
 }
 // slot i (0-5) carries skill S.load[i] once that skill is learned
 const slotSkill=i=>{const si=S.load[i];return cls()&&(si<10?si<known():!!S.apex)?si:-1};
-function syncSkills(){const c=cls();for(let i=0;i<NSK;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&skD(c,si);s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;s.cost=d?skCost(si):0;s.affordable=!!d&&!!P&&P.mana>=s.cost;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0];manaSync()}
+function syncSkills(){const c=cls();for(let i=0;i<NSK;i++){const s=SK[i],si=c?slotSkill(i):-1,d=si>=0&&skD(c,si);s.index=si;s.id=d?d[0]:'';s.name=d?d[1]:'';{const A=d?altOf(si):null;s.alt=A?A.id:'';s.altName=A?A.name:''}s.unlocked=!!d;s.cd=P&&d?Math.max(0,P.cdS[si]):0;s.max=d?P&&P.mxS[si]||d[2]*skMul(si):0;s.ready=!!d&&s.cd<=0;s.cost=d?skCost(si):0;s.affordable=!!d&&!!P&&P.mana>=s.cost;if(P)P.skCds[i]=s.cd}if(P)P.skCd=P.skCds[0];manaSync()}
 // the room against the player: pillars push back, a pit swallows you unless you are dashing across it, raised spikes and burning braziers hurt
 function roomP(){
   collide(P,14,false);
@@ -1149,7 +1188,7 @@ function playerStep(dt){
   {const ix=P.ix||0,iy=P.iy||0,k=1-Math.exp(-dt/(Math.hypot(mx,my)>Math.hypot(ix,iy)?.05:.035));P.ix=ix+(mx-ix)*k;P.iy=iy+(my-iy)*k;if(Math.abs(P.ix)<.012)P.ix=0;if(Math.abs(P.iy)<.012)P.iy=0;mx=P.ix;my=P.iy}
   P.moving=Math.hypot(mx,my)>.06;const ox=P.x,oy=P.y;
   if(P.dashT>0){P.dashT-=dt;const v=P.rushHit?780:640;P.x+=P.dx*v*dt;P.y+=P.dy*v*dt;
-    if(P.rushHit){GEO++;MINE++;LNK=P.rushLk||null;if(P.rushSk)TAGOK++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushD)hurtM(m,P.rushD);if(P.rushStun&&mons.includes(m))mStun(m,m.boss?P.rushStun*.7:P.rushStun*2)}if(P.rushSk)TAGOK--;LNK=null;MINE--;GEO--;if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
+    if(P.rushHit){GEO++;MINE++;LNK=P.rushLk||null;if(P.rushSk)TAGOK++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&!P.rushHit.has(m)&&dist(m,P)<m.r+30){P.rushHit.add(m);if(P.rushD)hurtM(m,P.rushD);if(P.rushStun&&mons.includes(m))mStun(m,m.boss?P.rushStun*.7:P.rushStun*2);if(P.rushAlt&&mons.includes(m))debuff(m,P.rushAlt,P.rushAltD)}if(P.rushSk)TAGOK--;LNK=null;MINE--;GEO--;if(P.dashT<=0){P.rushD=0;P.rushHit=null}}
     if(rand()<.6)bits.push({x:P.x,y:P.y,vx:0,vy:0,life:.25,max:.25,c:has('skin')?'#c68863':'#e7dfcd',r:6})}
   else if(P.moving){P.x+=mx*spd*dt;P.y+=my*spd*dt;P.face=Math.atan2(my,mx);P.walk+=dt*11}
   clamp(P,14);if(obstacles.length)roomP();
@@ -2057,7 +2096,27 @@ const apexInfo=()=>S.apex&&APEX[S.apex]?{path:S.apex,side:APEX[S.apex].side,name
 let APXLIST=null;const apexPaths=()=>APXLIST||(APXLIST=APEXIDS.map(id=>{const A=APEX[id];return{id,side:A.side,name:A.name,title:A.title,sub:A.sub,blurb:A.blurb,lore:A.lore,text:A.text,skills:APEXSK[id].map(d=>({id:d[0],name:d[1],text:d[3],cd:d[2],mana:d[6]}))}}));
 // what a hero knows: the base skills learned so far, and the three apex skills once a path is chosen
 const learned=()=>{const o=[];for(let i=0,k=known();i<k;i++)o.push(i);if(S.apex&&cls())o.push(10,11,12);return o};
-const skInfo=si=>{const c=S.cls,d=skD(c,si);return si<10?CLASSES[c].skills[si]:{id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d,c,si),level:101}};
+const skInfo=si=>{const c=S.cls,d=skD(c,si),A=altOf(si);return si<10&&!A?CLASSES[c].skills[si]:{id:d[0],name:d[1],cd:d[2],mana:d[6],text:skText(d,c,si)+(A?' '+A.name+': '+A.text:''),level:si<10?SKLV[si]:101,alt:A?A.id:''}};
+// alterations may be changed between floors: on a reward screen, and at the start of a floor until the first blow of mine has landed
+const altFree=()=>S.mode!=='play'&&S.mode!=='clear'||ST.dmgDealt===(S.dd0||0)&&!P.cdS.some(v=>v>0);
+// MB.alterations(si) -> the three of a class skill: [{id, name, text, sets, floor, open, active}] ; MB.setAlteration(si, j) (j 0: as taught, 1-3) -> true when it was set
+function altList(si){const c=S.cls;if(!c||!(si>=0&&si<10))return[];return[0,1,2].map(j=>{const A=ALT[SKALT[c][si][j]];return{id:A.id,name:A.name,text:A.text,sets:A.sets||null,floor:altAt(si,j),open:altOpen(si,j),active:S.md[si]===j+1&&altOpen(si,j)}})}
+function altSet(si,j){if(!S.cls||VS||!(si>=0&&si<10)||!(j>=0&&j<=3)||j&&!altOpen(si,j-1)||!altFree()||si>=known())return false;S.md[si]=j;if(P)syncSkills();emit('alteration',{skill:si,id:SKILLS[S.cls][si][0],alt:j?ALT[SKALT[S.cls][si][j-1]].id:''});if(S.mode==='play'||S.mode==='clear')save(S.level);return true}
+function altScreen(si,back){
+  const c=S.cls,d=skBase(c,si),L=altList(si),free=altFree(),cur=S.md[si],again=()=>altScreen(si,back);
+  show({wide:true,cls:'altPanel',kick:'Alterations · '+d[1],title:cur&&L[cur-1].open?L[cur-1].name+' '+d[1]:d[1],body:d[3]+' One alteration can be active on a skill. Each is a trade, and none is owed.'+(free?'':' They can be changed between floors: after a floor is cleared, or at the start of the next before your first blow lands.'),
+    cards:[{title:'As taught',sub:!cur||!L[cur-1].open?'Active':'',col:!cur||!L[cur-1].open?'#7fd66b':'',cls:'altCard',data:{alt:''},body:'No alteration. Cooldown: '+d[2]+' seconds. Mana: '+skCostOf(d[6])+'.',fn:()=>{altSet(si,0);again()}},
+      ...L.map((a,j)=>({title:a.name,sub:a.active?'Active':a.open?'Open':'Opens on floor '+a.floor,col:a.active?'#7fd66b':a.open?'':'#958ea3',cls:'altCard'+(a.open?'':' shut'),data:{alt:a.id},body:a.text,fn:()=>{altSet(si,j+1);again()}}))],
+    btns:[['Back',back]]});
+}
+// the floors behind have opened alterations: a note at the start of the floor, and the first time a screen that says what they are
+function altNews(n){const c=S.cls,out=[];if(!c)return out;for(let si=0;si<Math.min(10,known());si++)for(let j=0;j<3;j++)if(altAt(si,j)===n+1)out.push(ALT[SKALT[c][si][j]].name+' '+SKILLS[c][si][1]);return out}
+function altIntro(n,next){
+  if(!S.cls||S.altSeen||VS||n+2<SKLV[0]+ALTLV[0])return next();S.altSeen=true;
+  show({soft:true,cls:'altPanel',kick:'Floor '+(n+1)+' · alterations',title:'Skills can be altered',body:'From here your skills open alterations as you climb: three for each skill, one active at a time. An alteration is a trade: wider but lighter, harder but slower, or a setup for another skill to pay off. Open one from the pause screen under Skills. They can be changed between floors.',
+    btns:[['Go on',next],['Show me',()=>loadout(next)]]});
+}
+
 
 /* ---------- screens of the tower: the crossroads, the apex choice ---------- */
 function doorScreen(next){
@@ -2368,7 +2427,7 @@ function step(dt){
     if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
-      p.hit.add(m);if(p.sk)TAGOK++;if(p.slow)mSlow(m,p.slow);if(p.stun)mStun(m,m.boss?p.stun*.7:p.stun*2);if(p.sk)TAGOK--;byPet=p.pet||null;if(!p.pet){MINE++;LNK=p.lk||null;BIG=p.big||0}hurtM(m,d,!!p.pet);if(!p.pet){MINE--;LNK=null;BIG=0;if(p.bk)brkHit(m,p.bk,'closer');if(p.one){if(p.one.rip){p.one.rip=p.one.fx=0;riposteHit(m,d)}else if(p.one.fx){p.one.fx=0;hitFx('closer',m,.05,.4,Math.atan2(p.vy,p.vx))}}if(p.push&&!m.boss&&mons.includes(m)){const v=Math.hypot(p.vx,p.vy)||1;mPush(m,p.vx/v*p.push,p.vy/v*p.push)}}byPet=null;if(S.apex&&!p.pet)apexHit(m,d);
+      p.hit.add(m);if(p.alt){TAGOK++;debuff(m,p.alt,p.altD);TAGOK--}if(p.sk)TAGOK++;if(p.slow)mSlow(m,p.slow);if(p.stun)mStun(m,m.boss?p.stun*.7:p.stun*2);if(p.sk)TAGOK--;byPet=p.pet||null;if(!p.pet){MINE++;LNK=p.lk||null;BIG=p.big||0}hurtM(m,d,!!p.pet);if(!p.pet){MINE--;LNK=null;BIG=0;if(p.bk)brkHit(m,p.bk,'closer');if(p.one){if(p.one.rip){p.one.rip=p.one.fx=0;riposteHit(m,d)}else if(p.one.fx){p.one.fx=0;hitFx('closer',m,.05,.4,Math.atan2(p.vy,p.vx))}}if(p.push&&!m.boss&&mons.includes(m)){const v=Math.hypot(p.vx,p.vy)||1;mPush(m,p.vx/v*p.push,p.vy/v*p.push)}}byPet=null;if(S.apex&&!p.pet)apexHit(m,d);
       if(p.kind==='arrow'&&!p.pet&&TSRC.length&&TSRC[0].form==='arrowhead'&&++P.trN>=6){P.trN=0;P.trQ=1;P.trT=m}
       if(p.boom){rings.push({x:p.x,y:p.y,life:.35,max:.35,r:85,fx:true});puff(p,'#ff8a4c',14,220);S.shake=Math.max(S.shake,.2);noise(.2,.3,700,150);for(const o of[...mons])if(!o.hidden&&mons.includes(o)&&dist(o,p)<85+o.r)hurtM(o,p.boom,true)}if(p.kind==='skull')leech();
       if(p.kind==='bolt'&&S.adv==='pyromancer'){rings.push({x:p.x,y:p.y,life:.3,max:.3,r:70,fx:true});puff(p,'#ff8a4c',8,160);for(const o of[...mons])if(o!==m&&!o.hidden&&mons.includes(o)&&dist(o,p)<70+o.r)hurtM(o,d/2)}
@@ -2429,7 +2488,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}if(z.alt&&mons.includes(m)){TAGOK++;debuff(m,z.alt,z.altD);TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(1),'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24&&!P.down){f.dead=true;healP(.25,3);SND.pickup();haptic(15);if(MP.on)mpMorsel(f)}
   morsels=morsels.filter(f=>!f.dead);
@@ -2826,7 +2885,7 @@ function startLevel(n){
   // the door chosen at the crossroads below (or forced for a test) changes this floor, if it is a plain fight; a door for a floor that is behind is forgotten
   {const dv=!MP.on&&window.__mb&&window.__mb.over&&window.__mb.over.door;if(dv&&DOOR[dv]&&n>=12)S.door={id:dv,n};if(S.door&&S.door.n<n)S.door=null;
     L.door=S.door&&S.door.n===n&&L.floorKind==='fight'&&DOOR[S.door.id]?S.door.id:null;if(L.door==='horde')L.waves=2;if(L.door)L.hint=DOOR[L.door].title+'. '+DOOR[L.door].risk}
-  TR=trialMake(L);DRE=dareMake(L,n);FN=null;CB.n=0;CB.best=0;CB.t=0;S.slowT=0;S.dmg0=ST.dmgTaken;MINE=0;LNK=null;TAGOK=0;BIG=0;DOORS=null;FALLEN.length=0;PG.clear();
+  TR=trialMake(L);DRE=dareMake(L,n);FN=null;CB.n=0;CB.best=0;CB.t=0;S.slowT=0;S.dmg0=ST.dmgTaken;S.dd0=ST.dmgDealt;AK=AK0;MINE=0;LNK=null;TAGOK=0;BIG=0;DOORS=null;FALLEN.length=0;PG.clear();
   freshBody();if(L.door==='wound')P.hp=Math.max(1,Math.ceil(P.maxHp/2));if(MP.on)mpSpawnAt();
   mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];arcs=[];TSRC=[];S.elite=4;
   S.paused=false;SND.levelStart();obstacles=buildRoom(n,L.room);boss=null;S.wave=null;
@@ -2838,6 +2897,7 @@ function startLevel(n){
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
   PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
   if(S.note){floats.push({x:P.x,y:P.y-70,txt:S.note,life:4.5,c:'#6fe3ff'});S.note=''}
+  if(S.cls&&!VS){const nw=altNews(n);if(nw.length){floats.push({x:P.x,y:P.y-92,txt:'New alteration: '+nw.join(', '),life:5,c:'#d6a544'});emit('alterationOpen',{names:nw,floor:n+1})}}
   if(!S.wave)$('bossName').textContent=L.name;
   ST.levelTime=0;if(!SET.testUnlock||MP.on)ST.bestLevel=Math.max(ST.bestLevel,n);
   $('ov').hidden=true;save(n);hud();$('lvl').textContent='Floor '+(n+1)+' · '+L.title+(S.rank?' · Rank '+S.rank:'');
@@ -2868,9 +2928,9 @@ function newSkill(n,next){
 }
 function loadout(done,fresh){
   const c=CLASSES[S.cls],ids=learned(),sks=ids.map(skInfo),again=()=>{syncSkills();loadout(done,fresh)};
-  show({wide:true,kick:'Skills · '+c.name,title:'Choose your six',body:(matchMedia('(pointer:coarse)').matches?'You carry six skills, one on each skill button.':'You carry six skills, on keys 1 to 6.')+' Pick a skill you are not carrying to swap it in.'+(MRISE?' Skills cost '+MRISE*100+'% more mana with every floor past the ninth; your pool grows faster than that.':''),
-    cards:sks.map((sk,q)=>{const i=ids[q],slot=S.load.indexOf(i);return{title:sk.name,sub:slot>=0?'Carried · '+(slot+1):i===fresh||fresh===10&&i>9?'New · not carried':'Not carried',col:slot>=0?'':'#958ea3',body:sk.text,
-      fn:slot>=0?again:()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>{const cur=skD(S.cls,v)?skInfo(v):{name:'Empty',text:'Nothing is carried here.'};return{title:cur.name,sub:'Slot '+(j+1),body:cur.text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}}}),btns:[['Back',again]]})}}),
+  show({wide:true,kick:'Skills · '+c.name,title:ids.length>NSK?'Choose your six':'Your skills',body:(matchMedia('(pointer:coarse)').matches?'You carry six skills, one on each skill button.':'You carry six skills, on keys 1 to 6.')+(ids.length>NSK?' Pick a skill you are not carrying to swap it in.':'')+' Pick a skill you carry to see its alterations.'+(MRISE?' Skills cost '+MRISE*100+'% more mana with every floor past the ninth; your pool grows faster than that.':''),
+    cards:sks.map((sk,q)=>{const i=ids[q],slot=S.load.indexOf(i);const A=altOf(i),nOpen=i<10?[0,1,2].filter(j=>altOpen(i,j)).length:0;return{title:(A?A.name+' ':'')+sk.name,sub:(slot>=0?'Carried · '+(slot+1):i===fresh||fresh===10&&i>9?'New · not carried':'Not carried')+(nOpen&&slot>=0?' · '+nOpen+(nOpen>1?' alterations':' alteration'):''),col:slot>=0?'':'#958ea3',body:sk.text,data:{sk:i},
+      fn:slot>=0?(i<10?()=>altScreen(i,again):again):()=>show({wide:true,kick:'Carry '+sk.name,title:'In place of which?',cards:S.load.map((v,j)=>{const cur=skD(S.cls,v)?skInfo(v):{name:'Empty',text:'Nothing is carried here.'};return{title:cur.name,sub:'Slot '+(j+1),body:cur.text,fn:()=>{S.load[j]=i;if(S.mode!=='reward')save(S.level);again()}}}),btns:[['Back',again],...(i<10?[['Alterations',()=>altScreen(i,again)]]:[])]})}}),
     btns:[['Done',done]]});
 }
 // what a level's boss looks like on the roster: its name without its modifiers, the level it was taken on, and every modifier it carried
@@ -3025,18 +3085,18 @@ function boonPick(n,of,i,next){
 }
 // the end of every reward flow past the crypt: the apex choice once floor 100 is behind you, the doors of a crossroads (the host's choice in co-op), then the next floor
 function rewardEnd(n,framed){
-  if(!framed)return frameAsk(()=>rewardEnd(n,true));
+  if(!framed)return altIntro(n,()=>frameAsk(()=>rewardEnd(n,true)));
   if(n>=99&&S.cls&&!S.apex)return apexScreen(()=>rewardEnd(n,true));
   if(S.L&&S.L.floorKind==='cross'&&!CL()&&!(S.door&&S.door.n===S.level))return doorScreen(()=>begin(S.level));
   begin(S.level);
 }
 function chooseClass(){
-  S.mode='reward';S.level=8;S.sp=frNew();S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;TR=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the root';hud();
+  S.mode='reward';S.level=8;S.sp=frNew();S.md=noAlts();S.altSeen=false;S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;TR=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the root';hud();
   show({wide:true,kick:'You are whole. You climb out of the root of the Spire as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown and its cost in mana, and you carry six at a time. Mana comes back on its own, faster while you stand still. Your pool grows with every floor, and skills cost a little more as you climb. After floor 50 the class can be upgraded, and after floor 100 it reaches its apex.',
     cards:[...(MP.on?mpPickCards():[]),...Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' '+c.mana+' mana. First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))]});
 }
 function pauseShow(){
-  const btns=[['Resume',()=>pause(false)]];if(learned().length>NSK)btns.push(['Skills',()=>loadout(pauseShow)]);
+  const btns=[['Resume',()=>pause(false)]];if(learned().length>NSK||S.cls&&act2()&&altOpen(0,0))btns.push(['Skills',()=>loadout(pauseShow)]);
   if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(pauseShow)]);
   if(form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(pauseShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',pauseShow)]);
@@ -3081,10 +3141,10 @@ const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
   const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS){eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};if(S.eq[sl].m)eq[sl].m=1} // m: a trinket that carries mana
-  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),...(S.apex?{apex:S.apex}:{}),...(S.tr?{tr:S.tr}:{}),...(S.door?{door:[S.door.id,S.door.n]}:{}),...(S.cls&&S.sp&&(!S.sp.auto||S.sp.asked)?{sp:frOut()}:{}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),...(S.apex?{apex:S.apex}:{}),...(S.tr?{tr:S.tr}:{}),...(S.door?{door:[S.door.id,S.door.n]}:{}),...(S.cls&&S.sp&&(!S.sp.auto||S.sp.asked)?{sp:frOut()}:{}),...(S.cls&&S.md.some(v=>v)?{md:S.md.slice()}:{}),...(S.cls&&S.altSeen?{as:1}:{}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
 function save(n){if(MP.on)return mpSave(n); // a co-op run is kept apart and never touches the single-player save
-  SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,apex:SAVE.apex,tr:SAVE.tr,door:SAVE.door,sp:SAVE.sp,st:SAVE.stats}))}
+  SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,apex:SAVE.apex,tr:SAVE.tr,door:SAVE.door,sp:SAVE.sp,md:SAVE.md,as:SAVE.as,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 // read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
 function applyRun(r,now=0){
@@ -3093,7 +3153,7 @@ function applyRun(r,now=0){
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
     S.apex=S.cls&&apexOk(r.apex)?r.apex:null;S.tr=S.cls?Math.min(99999,Math.max(0,Math.floor(+r.tr)||0)):0; // older saves have no apex path and no trials behind them
     S.door=S.cls&&Array.isArray(r.door)&&own(DOOR,r.door[0])&&Number.isInteger(r.door[1])&&r.door[1]>=12?{id:r.door[0],n:r.door[1]}:null;
-    S.sp=frIn(r.sp);S.level=now;frFix(); // older saves have no frame: theirs is kept even
+    S.md=S.cls?altIn(r.md):noAlts();S.altSeen=!!r.as;S.sp=frIn(r.sp);S.level=now;frFix(); // older saves have no frame: theirs is kept even
     S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
@@ -3102,7 +3162,7 @@ function applyRun(r,now=0){
       PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[]);petFix(now)}
     PETS.auto=!(r.rev===0||r.rev===false); // raising the fallen is on unless the save says otherwise
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
-  }catch(e){S.sp=frNew();S.cls=S.adv=S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
+  }catch(e){S.sp=frNew();S.md=noAlts();S.altSeen=false;S.cls=S.adv=S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
   eqSync();
 }
 // MB.api.loadSave is strict where applyRun is forgiving: anything that is not exactly a save is refused and nothing changes
@@ -3122,10 +3182,12 @@ function checkSave(o){
   let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETSANE||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
     pet=actIn(o.pet,pets.length,pets.length);if(!pet)return null}
   if(o.rev!==undefined&&o.rev!==0&&o.rev!==1)return null;
+  if(o.md!==undefined&&!(c&&Array.isArray(o.md)&&o.md.length===10&&o.md.every(x=>int(x,0,3))))return null;
+  if(o.as!==undefined&&o.as!==1)return null;
   if(o.sp!==undefined&&!(c&&Array.isArray(o.sp)&&o.sp.length===7&&o.sp.every(x=>int(x,0,30000))&&o.sp[2]+o.sp[3]+o.sp[4]+o.sp[5]+o.sp[6]<=FR.per*Math.max(0,o.level-8)))return null;
   const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
   if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
-  return{cls:c,adv:o.adv||null,apex,tr:o.tr||0,door:o.door||null,sp:o.sp,b,eq,scrap:o.scrap,load,pets,pet,rev:o.rev===0?0:1,st,level:o.level};
+  return{cls:c,adv:o.adv||null,apex,tr:o.tr||0,door:o.door||null,sp:o.sp,md:o.md,as:o.as,b,eq,scrap:o.scrap,load,pets,pet,rev:o.rev===0?0:1,st,level:o.level};
 }
 function loadSave(o){
   if(MP.on)return false;
@@ -3134,7 +3196,7 @@ function loadSave(o){
   applyRun(r,r.level);save(r.level);title(r.level);return true;
 }
 function storedLevel(){try{return Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0))}catch(e){return SAVE.level}}
-function newRun(){S.sp=frNew();S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
+function newRun(){S.sp=frNew();S.md=noAlts();S.altSeen=false;S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
 // a hook set by extras.js; `back` puts the screen it was opened from back up
 function hook(name,back){try{MB[name](back)}catch(e){console.error('Ashes to Apex: '+name+' failed',e);back()}}
 let titleSaved=0;
@@ -3724,7 +3786,7 @@ function mpMenuClose(){
 function mpMenuShow(){
   if(VS)return vsMenuShow();
   const inLv=S.mode==='play'||S.mode==='clear',host=MP.role==='host',btns=[[inLv?'Back to the fight':'Back',mpMenuClose]];
-  if(S.cls&&act2()&&learned().length>NSK)btns.push(['Skills',()=>loadout(mpMenuShow)]);
+  if(S.cls&&act2()&&(learned().length>NSK||altOpen(0,0)))btns.push(['Skills',()=>loadout(mpMenuShow)]);
   if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(mpMenuShow)]);
   if(S.cls&&form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(mpMenuShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',mpMenuShow)]);
@@ -4420,10 +4482,11 @@ function vsDraw2d(pass){
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
 window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door(){return S.door&&DOOR[S.door.id]?{...doorInfo(S.door.id),floor:S.door.n+1}:null},get apex(){return apexInfo()},get apexPaths(){return apexPaths()},get arcs(){return arcs},get sightR(){return S.mode==='title'?0:sightR()},APEX,mp:MP,settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
   // round 14 (see the contract, section Round 14)
+  ALT,alterations:si=>altList(si|0),setAlteration:(si,j)=>altSet(si|0,j|0),get alterationsFree(){return!!P&&altFree()},openSkills:back=>{if(S.cls&&act2()&&!VS)loadout(typeof back==='function'?back:API.hide)},
   FRAME:FR,get frame(){return frInfo()},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
   // round 12 (see the contract in the round-12 notes)
   CHAINS:CHN,PD,BRK,FIN,LINK,DARES,GRD,get chain(){return{count:CB.n,best:CB.best,t:Math.max(0,CB.t),cls:cls(),style:CHN[cls()||'none'].style,steps:CHN[cls()||'none'].steps.length}},breakOf:m=>m&&m.brkMax?Math.max(0,m.brk/m.brkMax):-1,
-  get finisher(){return FN},finish:()=>finish(),get objective(){return DRE},get grade(){return GR},skillLink:i=>{const c=cls(),si=c?slotSkill(i|0):-1,d=si>=0&&skD(c,si);return d?linkInfo(d[4]):{sets:[],pays:[]}},
+  get finisher(){return FN},finish:()=>finish(),get objective(){return DRE},get grade(){return GR},skillLink:i=>{const c=cls(),si=c?slotSkill(i|0):-1,d=si>=0&&skD(c,si);if(!d)return{sets:[],pays:[]};const o=linkInfo(d[4]),A=altOf(si);if(A&&A.sets&&!o.sets.includes(A.sets))o.sets.push(A.sets);return o},
   get P(){return P},get mons(){return VS?VNONE:mons},get shots(){return shots},get pshots(){return pshots},get allies(){return allies},get zones(){return zones},
   get echoes(){return echoes},get bits(){return bits},get rings(){return rings},get floats(){return floats},get morsels(){return morsels},get boss(){return VS?null:boss}};
 let last=0;
@@ -4448,7 +4511,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)
