@@ -416,6 +416,46 @@ function modsOf(n,kind,tyrant){
   // copies of something that shoots or breeds would bury you, so those are shielded instead; the caller already has a ward of its own, so it is swift instead
   return out.map(x=>x==='splitting'&&['witch','mother','beamer','summoner'].includes(kind)?'shielded':x).map(x=>x==='shielded'&&kind==='summoner'?'swift':x).filter((x,j,l)=>l.indexOf(x)===j);
 }
+/* ---------- round 15: elites. From floor 15 a plain fight floor without a dare has a few lesser monsters that carry a modifier of their own: one in each pack, or one beside the floor's monster ---------- */
+// An elite (m.el = 1..5, the index into ELITE.kinds + 1) is a lesser monster with `hp` times the health, a little larger, marked. shielded: a shell every 9 s; enraged: its clock runs faster from the start;
+// splitting: two small ones step out of it when it falls; volatile: it leaves a blast where it falls (a telegraphed blow like any other); mending: it closes the wounds of the floor's monster until it is killed.
+// So that the floor stays short: an elite's fall shakes the floor's monster (`shake` of its health gone; if it has not entered yet, it enters `debt` short). Killing it also gives `mana` times a kill's mana and a morsel.
+const ELITE={from:14,kinds:['shielded','enraged','splitting','volatile','mending'],names:['Shielded','Enraged','Splitting','Volatile','Mending'],col:'#ffb347',
+  text:['A shell closes round it again and again. Strike between.','Its clock runs fast from the first moment.','Two small ones step out of it when it falls.','It bursts where it falls. Step away.','It closes the wounds of the floor\'s monster. Kill it first.'],
+  hp:1.4,r:1.15,spd:.9,shake:.08,debt:.045,pay:.03,mana:3,mendT:3,mendK:.012,mendMax:.08,volR:96,volT:1,splitHp:.3,escHp:.085};
+const elOver=()=>{const o=CL()?MP.over:window.__mb&&window.__mb.over;return o&&o.elite!==undefined?o.elite:o&&o.kind?0:undefined};
+// how many elites floor n (0-based) brings, given its definition and whether a dare runs on it
+function elitesOf(n,L,dare){const o=elOver();if(o===0||o===false)return 0;if(VS||TU||L.floorKind!=='fight'||tenth(n)||n<12)return 0;if(o===undefined&&(n<ELITE.from||dare))return 0;return L.waves?L.waves:1}
+function eliteMake(m,j){
+  const n=S.level,o=elOver(),f=typeof o==='string'?ELITE.kinds.indexOf(o):-1,k=f>=0?f:(n*3+j*2+(S.wave?S.wave.n:0))%ELITE.kinds.length;
+  m.el=k+1;m.maxHp=m.hp=Math.round(m.hp*ELITE.hp);m.r=Math.round(m.r*ELITE.r);m.s={...m.s,name:ELITE.names[k]+' '+m.s.name.replace('Lesser ',''),r:m.r};m.spdK=ELITE.spd;m.mendT=ELITE.mendT;m.mendSum=0;
+  if(k===0){m.mods=['shielded'];m.shT=2.2}if(k===1)m.rage=true;
+  rings.push({x:m.x,y:m.y,life:.7,max:.7,r:m.r+60,fx:true});return m;
+}
+// the elites that come beside the floor's monster on a floor without packs
+function eliteEscort(nE){
+  const n=S.level,b=boss,kinds=[];
+  for(let j=0;j<nE;j++){const kind=LESSER[(n+1+j*2)%LESSER.length],m=lesser(kind,b.x+(j?150:-150)*(nE>1?1:(n%2?1:-1)),b.y+30,GENHP[kind]*genMul(n)*ELITE.escHp);eliteMake(m,j);m.t=1.6+j*.4;kinds.push(ELITE.kinds[m.el-1])}
+  eliteNews(kinds);
+}
+function eliteNews(kinds){if(!kinds.length)return;const names=kinds.map(k=>ELITE.names[ELITE.kinds.indexOf(k)]);S.L.elites=(S.L.elites||[]).concat(kinds);
+  if(!window.MBEliteBand)floats.push({x:W/2,y:H/2-90,txt:(kinds.length>1?'Elites: ':'Elite: ')+names.join(', '),life:2.4,c:ELITE.col});emit('elite',{state:'enter',kinds,names})}
+// a floor's monster that brings an elite beside it has `pay` less health: what the elite adds to the fight, it gives up (an elite of a pack takes the place of a lesser monster, so nothing is owed)
+// (and the floor's monster of a floor that carries the hazard of its land has ARENA.pay less: the land wears on the fight)
+function floorPay(b,L){const k=(L.elN&&!L.waves?ELITE.pay:0)+(L.area?ARENA.pay:0);if(k>0)b.maxHp=b.hp=Math.max(1,Math.round(b.maxHp*(1-Math.min(.4,k))))}
+function eliteStep(m,dt){
+  if(m.el===5&&!(m.stun>0)&&(m.mendT-=dt)<=0){m.mendT=ELITE.mendT;const t=boss&&boss.hp>0&&boss.hp<boss.maxHp&&!boss.hidden?boss:null;
+    if(t&&m.mendSum<ELITE.mendMax){const h=Math.min(t.maxHp-t.hp,t.maxHp*ELITE.mendK);t.hp+=h;m.mendSum+=ELITE.mendK;for(let k=1;k<=7;k++)bits.push({x:m.x+(t.x-m.x)*k/7,y:m.y+(t.y-m.y)*k/7,vx:0,vy:-20,life:.5,max:.5,c:'#7fd66b',r:3});
+      floats.push({x:t.x,y:t.y-t.r-10,txt:'+'+fmt(Math.round(h*10)/10),life:1,c:'#7fd66b'});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+30,fx:true});sfx(660,.2,'sine',.1,990)}}
+}
+function eliteFell(m){
+  const k=m.el-1;floats.push({x:m.x,y:m.y-m.r-22,txt:'Elite down',life:1.2,c:ELITE.col,big:1.4});emit('elite',{state:'down',id:m.id,kind:ELITE.kinds[k],x:m.x,y:m.y});if(MP.on&&!CL())MP.elq.push([Math.round(m.x),Math.round(m.y),k]);
+  if(P)manaGive(P.maxMana*MKILL*(ELITE.mana-1));if(has('taste')){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}
+  if(k===2)for(let i=0;i<2;i++){const g=rand()*TAU,c=lesser(m.kind,m.x+Math.cos(g)*(m.r+14),m.y+Math.sin(g)*(m.r+14),m.maxHp*ELITE.splitHp/ELITE.hp,true);c.s.col=m.s.col;c.t=.8+i*.3}
+  if(k===3){const z=zone(m.x,m.y,ELITE.volR,ELITE.volT);z.el=1;floats.push({x:m.x,y:m.y-m.r-40,txt:'Volatile',life:1,c:'#ff5b6e'});sfx(220,.5,'sawtooth',.2,880)}
+  if(boss&&boss.hp>0&&mons.includes(boss)){const d=Math.min(boss.hp-1,boss.maxHp*ELITE.shake);if(d>0){boss.hp-=d;boss.flash=.2;floats.push({x:boss.x,y:boss.y-boss.r-24,txt:'Shaken',life:1.1,c:ELITE.col});puff(boss,ELITE.col,12,200)}}
+  else if(!boss&&S.wave)S.elDebt=(S.elDebt||0)+ELITE.debt;
+}
 // Waves from level 14: some levels open with one or two packs of lesser monsters before the boss enters. Tyrant levels never do.
 const wavesOf=n=>n<13?0:[1,0,2,0,0][(n-13)%5];
 // Rooms: which obstacles stand where. Anchor sets are mirror-symmetric and keep clear of both spawn points; solid things are never combined closer than a boss is wide.
@@ -440,15 +480,85 @@ function levelDef(n,fk){
 }
 // a small, weaker copy of a pool monster: wave packs and what a splitting boss sheds
 function lesserSpec(kind,n,hp){const base=SPEC[kind];return{...base,ai:base.ai||kind,name:'Lesser '+base.name.replace('The ',''),r:Math.round(base.r*.72),hp:Math.max(6,Math.round(hp))}}
-function buildRoom(n,room){
+/* ---------- round 15: the arena. Things of the room can be used, and each land has a hazard of its own on some of its floors ---------- */
+// Pillars break: a heavy blow of a hero (a closer, a riposte, a skill) or a monster's charge cracks one (`pillarHp` cracks; the ram of a lesser monster counts two). It falls: what a hero brought down hurts and stuns every monster within
+// `fallR` (they are left aloft); a monster that rams one down is crushed by it (`ramK` of its health: the floor's monster / a lesser one). The stump is no longer in the way.
+// Braziers tip: any blow of a hero that reaches the bowl spills it along the blow. The fire burns monsters for `spillT` seconds and brands them, and the brazier is dark for the rest of the floor.
+// The lands (themeOf): ash: embers fall where a hero is going; fen: mires slow everything that wades through them (a dash crosses); peaks: rotten plates give way under weight and stay open;
+// court: the rake, a line of blasts drawn across the room through a hero, with a gap. Only on plain fight floors from floor 14 without a dare, every second one (areaOf). Not in versus, not in the lesson.
+const ARENA={from:12,pillarHp:3,fallR:90,fallD:7,fallStun:1.4,ramK:[.02,.3],spillR:88,spillT:4.5,spillTick:.5,spillD:.5,crackWarn:.9,crackR:50,crackK:[.05,.3],crackStun:1.5,mireR:66,mireK:.74,mireM:.7,pay:.03,
+  themes:['ash','fen','peaks','court'],names:{ash:'Falling Ash',fen:'The Mire',peaks:'Rotten Floor',court:'The Rake'},
+  text:{ash:'Embers fall where you are going. Keep moving.',fen:'The mire slows whatever wades through it. A dash crosses.',peaks:'The cracked floor gives way under weight, and stays open.',court:'A line of blasts is drawn across the room. Find the gap.'},
+  ash:{gap:5.5,r:68,warn:1.15},court:{gap:8.5,r:50,warn:1.25,step:.07}};
+const themeOf=bi=>bi<=0?null:bi<5?ARENA.themes[bi-1]:['court','peaks','ash','fen','ash','peaks','ash','court'][(bi-5)%8];
+const arOver=()=>{const o=CL()?MP.over:window.__mb&&window.__mb.over;return o?o.area:undefined};
+// the hazard of the land on floor n (0-based), or null
+function areaOf(n,L,dare){const o=arOver();if(o==='none'||o===0)return null;if(VS||TU||n<12||tenth(n)||L.floorKind!=='fight')return null;if(ARENA.themes.includes(o))return o;if(n<ARENA.from||dare||n%2===0||((CL()?MP.over:window.__mb&&window.__mb.over)||{}).kind)return null;return themeOf(L.band)}
+const objOn=()=>!VS&&!TU&&S.level>=8&&!!S.cls;
+function buildRoom(n,room,area){
   const out=[],quick=Math.max(.75,1-Math.max(0,n-12)*.006); // traps cycle a little faster deep down
   for(const[kind,set]of ROOMS[room]||[])set.forEach(([x,y],i)=>{
     const o={kind,x,y,r:kind==='pillar'?26:kind==='pit'?(set===QC?54:46):kind==='spikes'?36:62,on:false,t:0,warn:false,per:0,core:0};
     if(kind==='spikes'){o.per=3.4*quick;o.t=(i%2)*o.per*.35} // every trap starts inside its quiet stretch, so nothing fires without its warning
     if(kind==='brazier'){o.per=4.6*quick;o.core=13;o.t=i/set.length*o.per*.45}
     out.push(o)});
+  if(area==='fen'||area==='peaks'){ // mires or rotten plates: the first anchor set that keeps clear of what already stands
+    const rr=area==='fen'?ARENA.mireR:ARENA.crackR,sets=area==='fen'?[QD,[[480,180],[480,420]],QB,QA]:[[[480,180],[480,420]],QD,QB,QE,QA];
+    const set=sets.find(s=>s.every(([x,y])=>out.every(o=>Math.hypot(o.x-x,o.y-y)>o.r+rr+34)));
+    if(set)set.forEach(([x,y])=>out.push({kind:area==='fen'?'mire':'crack',x,y,r:rr,on:false,t:0,warn:false,per:0,core:0}))}
   return out;
 }
+// ---- things of the room that are struck. ev: 1 a pillar cracks, 2 it falls, 3 a brazier tips, 4 a plate starts to give, 5 it goes. by: the member index of the hero who did it (alone 0), -1: a monster or the floor.
+const objMine=by=>by>=0&&(!MP.on||by===MP.myIdx);
+function objDo(i,ev,ang,by){
+  const o=obstacles[i];if(!o)return;const mine=objMine(by),kind=ev<3?'pillar':ev===3?'brazier':'crack',state=['','crack','fall','tip','warn','fall'][ev];
+  if(ev===1){if(o.kind!=='pillar'||o.dead)return;o.cr=(o.cr||0)+1;puff(o,'#b9b2c6',10,160);sfx(140,.18,'square',.2,90);noise(.15,.2,400,1200)}
+  else if(ev===2){if(o.kind!=='pillar'||o.dead)return;o.dead=true;o.cr=ARENA.pillarHp;const fx=o.x+Math.cos(ang)*34,fy=o.y+Math.sin(ang)*34;puff({x:fx,y:fy},'#b9b2c6',30,260);rings.push({x:fx,y:fy,life:.5,max:.5,r:ARENA.fallR,fx:true});S.shake=Math.max(S.shake,.35);sfx(60,.4,'square',.4,30);noise(.4,.35,200,900);
+    floats.push({x:o.x,y:o.y-50,txt:'It falls',life:1,c:'#d6a544',big:1.4});
+    if(mine){GEO++;MINE++;TAGOK++;const k=AK;AK=AK0;try{for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&Math.hypot(m.x-fx,m.y-fy)<ARENA.fallR+m.r){hurtM(m,ARENA.fallD*dmgMul());if(mons.includes(m))mStun(m,m.boss?ARENA.fallStun*.6:ARENA.fallStun)}}finally{AK=k;TAGOK--;MINE--;GEO--}}}
+  else if(ev===3){if(o.kind!=='brazier'||o.spent)return;o.spent=true;o.per=0;o.on=false;o.warn=false;o.tip=ang;const fx=o.x+Math.cos(ang)*58,fy=o.y+Math.sin(ang)*58;puff({x:fx,y:fy},'#ff8a4c',26,240);sfx(200,.5,'sawtooth',.2,70);noise(.5,.25,500,1800);
+    floats.push({x:o.x,y:o.y-46,txt:'Spilled',life:1,c:'#ff8a4c'});
+    if(mine){const f={kind:'fire',x:fx,y:fy,r:ARENA.spillR,t:0,dur:ARENA.spillT,every:ARENA.spillTick,tick:0,dmg:ARENA.spillD*dmgMul(),slow:false,sk:false,brand:true};clamp(f,10);fields.push(f)}
+    else rings.push({x:fx,y:fy,life:.6,max:.6,r:ARENA.spillR,fx:true})}
+  else if(ev===4){if(o.kind!=='crack'||o.warn)return;o.warn=true;o.wt=ARENA.crackWarn;sfx(300,.3,'sawtooth',.12,120);noise(.3,.12,800,2400)}
+  else if(ev===5){if(o.kind!=='crack')return;o.kind='pit';o.warn=false;o.r=ARENA.crackR-2;o.fell=true;puff(o,'#6d6478',26,220);S.shake=Math.max(S.shake,.3);sfx(90,.4,'square',.3,30);noise(.4,.3,150,700);
+    if(!CL())for(const m of[...mons])if(!m.hidden&&m.st!=='leap'&&mons.includes(m)&&dist(m,o)<o.r){const g=angTo(o,m);m.x=o.x+Math.cos(g)*(o.r+m.r);m.y=o.y+Math.sin(g)*(o.r+m.r);clamp(m,m.r);m.stun=Math.max(m.stun||0,m.boss?ARENA.crackStun*.6:ARENA.crackStun);if(m.st==='charge'||m.st==='lunge'||m.st==='wind'){m.st='dazed';m.t=.6}
+      floats.push({x:m.x,y:m.y-m.r-20,txt:'The floor takes it',life:1.1,c:'#d6a544'});if(m.ward<=0)hurtM(m,m.maxHp*ARENA.crackK[m.boss?0:1],true)}}
+  else return;
+  emit('arena',{kind,state,index:i,x:o.x,y:o.y,ang,by:mine?-1:by});
+}
+// host or alone: the thing is struck. n: how many cracks a pillar takes from it
+function objHit(i,ang,by,n){
+  const o=obstacles[i];if(!o||!objOn()||CL())return 0;let ev=0;
+  if(o.kind==='pillar'&&!o.dead)ev=(o.cr||0)+(n||1)>=ARENA.pillarHp?2:1;else if(o.kind==='brazier'&&!o.spent)ev=3;if(!ev)return 0;
+  if(ev===1&&n>1)o.cr=(o.cr||0)+n-1;
+  objDo(i,ev,ang,by);if(MP.on)MP.oeq.push([i,ev,Math.round(ang*100)||0,by]);return ev;
+}
+// a blow of my hero reaches it (a client asks the host; the answer comes back as the event)
+function objMy(i,ang,heavy){
+  const o=obstacles[i];if(o.kind==='pillar'?o.dead||!heavy:o.kind!=='brazier'||o.spent)return;if(S.t-(o._q||-9)<.3)return;o._q=S.t;
+  if(CL())mpQ(['ob',i,Math.round(ang*100)||0]);else objHit(i,ang,MP.on?MP.myIdx:0,1)}
+// everything of the room within r of (x, y): struck from there (shockwaves, blasts)
+function objBlow(x,y,r,heavy){if(!obstacles.length||!objOn())return;for(let i=0;i<obstacles.length;i++){const o=obstacles[i],R=o.kind==='pillar'?o.r:o.kind==='brazier'?o.core:0;if(R&&Math.hypot(o.x-x,o.y-y)<r+R)objMy(i,Math.atan2(o.y-y,o.x-x),heavy)}}
+// a swing of reach and arc along a
+function objArc(a,reach,arc,heavy){if(!obstacles.length||!objOn())return;for(let i=0;i<obstacles.length;i++){const o=obstacles[i],R=o.kind==='pillar'?o.r:o.kind==='brazier'?o.core:0;if(!R)continue;const d=dist(o,P);if(d<reach+R){const g=angTo(P,o),da=Math.atan2(Math.sin(g-a),Math.cos(g-a));if(Math.abs(da)<arc||d<R+18)objMy(i,a,heavy)}}}
+// a monster's charge has run into something solid
+function objRam(m){
+  if(SIDE||CL()||!objOn())return;for(let i=0;i<obstacles.length;i++){const o=obstacles[i];if(o.kind!=='pillar'||o.dead||dist(o,m)>o.r+m.r+12)continue;
+    if(objHit(i,m.ang+Math.PI,-1,m.boss?1:2)===2&&mons.includes(m)){floats.push({x:m.x,y:m.y-m.r-20,txt:'Crushed',life:1.1,c:'#d6a544',big:1.4});m.stun=Math.max(m.stun||0,m.boss?ARENA.fallStun*.65:ARENA.fallStun);if(m.ward<=0)hurtM(m,m.maxHp*ARENA.ramK[m.boss?0:1],true)}return}
+}
+// the hazard of the land that falls by the clock (ash, court): host or alone
+function areaStep(dt){
+  const h=S.L.haz;if(!h||S.banner>0||FN&&FN.state==='play'||!(boss||S.wave))return;if((h.t-=dt)>0)return;
+  const K=ARENA[h.kind],hs=MP.on?mpHeroes():[P],hz=z=>{z.hz=1;return z};h.t=K.gap;h.n++;if(!hs.length)return;
+  if(h.kind==='ash')for(const q of hs)hz(zone(q.x+(q.vx||0)*.6,q.y+(q.vy||0)*.6,K.r,K.warn));
+  else{const q=hs[h.n%hs.length],across=h.n%2===1,n=across?9:5,gap=1+Math.floor(rand()*(n-2));
+    for(let i=0;i<n;i++){if(i===gap)continue;const f=i/(n-1);hz(across?zone(WALL+60+f*(W-2*WALL-120),Math.max(WALL+60,Math.min(H-WALL-60,q.y)),K.r,K.warn+Math.abs(i-gap)*K.step):zone(Math.max(WALL+60,Math.min(W-WALL-60,q.x)),WALL+60+f*(H-2*WALL-120),K.r,K.warn+Math.abs(i-gap)*K.step))}}
+  sfx(h.kind==='ash'?620:240,.4,'sawtooth',.1,h.kind==='ash'?180:60);
+}
+// what MB.arena hands out: {theme, name, text, hazard (a clocked one runs), objects:{pillar, brazier, crack, mire}, broken, spilled, fallen}
+function arenaInfo(){const L=S.L;if(!L||S.mode==='title')return null;const c={pillar:0,brazier:0,crack:0,mire:0};let br=0,sp=0,fl=0;for(const o of obstacles){if(o.kind==='pillar'){if(o.dead)br++;else c.pillar++}else if(o.kind==='brazier'){if(o.spent)sp++;else c.brazier++}else if(o.kind==='crack')c.crack++;else if(o.kind==='mire')c.mire++;if(o.fell)fl++}
+  return{theme:L.area||null,name:L.area?ARENA.names[L.area]:'',text:L.area?ARENA.text[L.area]:'',hazard:!!L.haz,objects:c,broken:br,spilled:sp,fallen:fl,usable:objOn()}}
 
 /* ---------- equipment: three slots, four rarities, dropped by every boss from level 9 on ---------- */
 const SLOTS=['weapon','armor','trinket'];
@@ -520,7 +630,7 @@ let NEXTID=1;const nid=()=>NEXTID++;
 // Multiplayer (MB.mp; the code is in the multiplayer section near the end). Everything about it is off unless MP.on.
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
 const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#b46cff','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
-  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],owe:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],lkq:[],hsKey:''};
+  cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],owe:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],lkq:[],elq:[],oeq:[],hsKey:''};
 let REM=null,TELL=0;
 // VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
 let VS=null,VP=null,GEO=0;
@@ -528,11 +638,11 @@ const CL=()=>MP.on&&MP.role==='client'&&!VS;
 // whom a monster fights: you; in multiplayer the nearest hero standing (the host decides)
 const foe=m=>MP.on?mpFoe(m):P;
 /* ---------- settings, events and run counters, shared with extras.js through MB ---------- */
-const SET={music:.6,sfx:.8,haptic:1,btn:1,left:false,gfx:'high',hints:true,testUnlock:false,res:1,ui:1,camDist:'standard',shake:true}; // camDist: how far the camera stands (the view's; near, standard, far); shake: the screen shakes on heavy blows // res: render scale (0.5 to 1); ui: interface scale (0.8 to 1.5); // testUnlock: every checkpoint up to floor 201 counts as reached (for trying late content)
+const SET={music:.6,sfx:.8,haptic:1,btn:1,left:false,gfx:'high',hints:true,testUnlock:false,res:1,ui:1,camDist:'standard',shake:true,lock:(()=>{try{return matchMedia('(pointer:coarse)').matches}catch(e){return false}})()}; // lock (round 15): the soft target lock; on by default where the first pointer is a finger // camDist: how far the camera stands (the view's; near, standard, far); shake: the screen shakes on heavy blows // res: render scale (0.5 to 1); ui: interface scale (0.8 to 1.5); // testUnlock: every checkpoint up to floor 201 counts as reached (for trying late content)
 // the valid form of a setting, or undefined when the key or the value makes no sense
 function setClean(k,v){
   if(k==='music'||k==='sfx'||k==='haptic'||k==='btn'){if(typeof v==='string'&&v.trim()!=='')v=+v;if(typeof v!=='number'||!isFinite(v))return;return k==='btn'?Math.max(.8,Math.min(1.4,v)):Math.max(0,Math.min(1,v))}
-  if(k==='left'||k==='hints'||k==='testUnlock'||k==='shake')return typeof v==='boolean'?v:undefined;
+  if(k==='left'||k==='hints'||k==='testUnlock'||k==='shake'||k==='lock')return typeof v==='boolean'?v:undefined;
   if(k==='camDist')return v==='near'||v==='standard'||v==='far'?v:undefined;
   if(k==='res'||k==='ui'){if(typeof v==='string'&&v.trim()!=='')v=+v;if(typeof v!=='number'||!isFinite(v))return;return k==='res'?Math.max(.5,Math.min(1,v)):Math.max(.8,Math.min(1.5,v))}
   if(k==='gfx')return v==='high'||v==='low'||v==='ultra'?v:undefined;
@@ -817,7 +927,7 @@ const dist=(a,b)=>Math.hypot(a.x-b.x,a.y-b.y);
 const angTo=(a,b)=>Math.atan2(b.y-a.y,b.x-a.x);
 function clamp(e,r){const x=Math.max(WALL+r,Math.min(W-WALL-r,e.x)),y=Math.max(WALL+r,Math.min(H-WALL-r,e.y));const hit=x!==e.x||y!==e.y;e.x=x;e.y=y;return hit}
 /* ---------- rooms: pillars and brazier bowls are solid, pits are holes that walkers go around ---------- */
-const solidR=o=>o.kind==='pillar'?o.r:o.kind==='brazier'?o.core:0;
+const solidR=o=>o.kind==='pillar'?(o.dead?0:o.r):o.kind==='brazier'?o.core:0;
 // push a body out of everything solid (and out of pits when pits is set); true when it was touching something
 function collide(e,r,pits){
   let hit=false;
@@ -874,7 +984,7 @@ function lesser(kind,x,y,hp,raw){const m=spawn(kind,x,y,false,lesserSpec(kind,S.
 const LESSER=['crawler','hound','witch','fist','bomber'];
 function spawnWave(){
   const n=S.level,w=S.wave,loud=S.L.door==='horde'?2:1,big=(w.n>1?2:1)*loud,py=MP.on?mpPartyY():P.y,far=py>H/2?150:H-150,base=GENHP,total=(3+(n>=30?1:0)-(w.n>1?1:0))*loud+(MP.on?mpPack():0); // small packs: one lesser monster and three mites, then two and two (the Loud Door: twice that)
-  for(let j=0;j<big;j++){const kind=LESSER[(n+w.n*2+j*3)%LESSER.length];lesser(kind,W/2+(big>2?(j-1.5)*150:big>1?(j?170:-170):0),far,base[kind]*genMul(n)*.085)}
+  for(let j=0;j<big;j++){const kind=LESSER[(n+w.n*2+j*3)%LESSER.length],m=lesser(kind,W/2+(big>2?(j-1.5)*150:big>1?(j?170:-170):0),far,base[kind]*genMul(n)*.085);if(!j&&S.L.elN){eliteMake(m,0);eliteNews([ELITE.kinds[m.el-1]])}}
   for(let j=0;j<total;j++){const m=spawn('mite',W/2+(j-(total-1)/2)*70,far+(py>H/2?60:-60));m.t=1}
   w.hp0=mons.reduce((a,m)=>a+m.maxHp,0);S.waveT=.6;
   $('bossName').textContent='Wave '+w.n+' of '+w.of;
@@ -882,7 +992,7 @@ function spawnWave(){
 }
 // the boss of a wave level walks in once the packs are dead, on the far side of the room from you
 function enterBoss(){
-  const L=S.L;S.wave=null;boss=spawn(L.kind,W/2,(MP.on?mpPartyY():P.y)>H/2?140:H-140,true,L.spec);arm(boss,L);boss.t=1.4;boss.ward=1;
+  const L=S.L;S.wave=null;boss=spawn(L.kind,W/2,(MP.on?mpPartyY():P.y)>H/2?140:H-140,true,L.spec);arm(boss,L);boss.t=1.4;boss.ward=1;floorPay(boss,L);if(S.elDebt>0){boss.hp=Math.max(1,Math.round(boss.maxHp*(1-Math.min(.3,S.elDebt))));S.elDebt=0;floats.push({x:boss.x,y:boss.y-boss.r-44,txt:'It enters shaken',life:1.6,c:ELITE.col})}
   rings.push({x:boss.x,y:boss.y,life:.7,max:.7,r:boss.r+120,fx:true});puff(boss,col(boss.s.col),26,240);S.shake=Math.max(S.shake,.3);SND.roar();haptic([30,30,80]);
   floats.push({x:boss.x,y:boss.y-boss.r-20,txt:L.spec.name,life:1.8,c:'#ff5b6e'});$('bossName').textContent=L.spec.name;
 }
@@ -905,7 +1015,7 @@ function chargeStates(m,dt,a,next,E){
   if(m.st==='wind'){if(m.t>.22)m.ang=a; // the line of the charge locks just before it goes, so a sidestep at the last moment works
     if((m.t-=dt)<=0){m.st='charge';m.t=1;sfx(180,.3,'sawtooth',.25,70);noise(.3,.16,300,900)}}
   else if(m.st==='charge'){const hit=move(m,m.ang,540,dt,true);if(hit||(m.t-=dt)<=0){
-    if(hit){quake(.25);sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU)}
+    if(hit){quake(.25);sfx(70,.2,'square',.35,40);if(E)ringShot(m,8,150,rand()*TAU);objRam(m)}
     if(E&&!m.again&&LV()>=8){m.again=1;m.st='wind';m.t=.62} // enraged: a second charge straight away
     else{m.again=0;m.st='dazed';m.t=hit?(E?1:1.5):.6}}}
   else if((m.t-=dt)<=0){m.st='idle';m.t=next}
@@ -980,7 +1090,7 @@ const AI={
     else{m.ba+=m.bs*(E?.8:.68)*dt;if((m.t-=dt)<=0){m.st='idle';m.t=E?1.3:1.9;m.beam=null;return}}
     if(m.st==='idle')return;
     const n=E?2:1,on=m.st==='beam';if(!m.beam||m.beam.rays.length!==n)m.beam={on,w:12,rays:Array.from({length:n},()=>({a:0,len:0}))};
-    m.beam.on=on;m.beam.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(on){if(SIDE)beamHits(m,r);else if(segDist(P,m.x,m.y,r.a,r.len)<m.beam.w+9)hurtP(blow(0),'beam')}});
+    {const B=m.beam;B.on=on;B.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(on&&m.beam===B){if(SIDE)beamHits(m,r);else if(segDist(P,m.x,m.y,r.a,r.len)<B.w+9)hurtP(blow(0),'beam')}})}
   },
   burrower(m,dt,a){
     const E=m.rage;
@@ -1009,7 +1119,7 @@ const AI={
       if(!on){if(m.t>.4)m.ba=a;if((m.t-=dt)<=0){m.st='beam';m.t=ph>=3?K.dur3:K.dur;m.bs=Math.sin(a-m.ba)>=0?1:-1;quake(.15);sfx(110,.5,'sawtooth',.25,70);noise(.4,.2,2400,600)}}
       else{m.ba+=m.bs*(ph>=3?K.turn3:K.turn)*dt;if((m.t-=dt)<=0){m.st='idle';m.t=1.1*g;m.beam=null;return}}
       if(!m.beam||m.beam.rays.length!==n)m.beam={on:false,w:12,rays:Array.from({length:n},()=>({a:0,len:0}))};
-      m.beam.on=m.st==='beam';m.beam.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(m.beam.on){if(SIDE)beamHits(m,r);else if(segDist(P,m.x,m.y,r.a,r.len)<m.beam.w+9)hurtP(blow(0),'beam')}});return}
+      {const B=m.beam;B.on=m.st==='beam';B.rays.forEach((r,i)=>{r.a=m.ba+i*TAU/n;r.len=rayLen(m.x,m.y,r.a);if(B.on&&m.beam===B){if(SIDE)beamHits(m,r);else if(segDist(P,m.x,m.y,r.a,r.len)<B.w+9)hurtP(blow(0),'beam')}})}return} // (round 15: B, not m.beam: a hero whose block answers with a shockwave can push the tyrant into its next face from inside this loop, and the shift takes the beam away)
     if(m.st==='leap'){const K=PH.atk.sky;m.t-=dt;const p=Math.min(1,1-m.t/m.dur);m.x=m.sx+(m.tx-m.sx)*p;m.y=m.sy+(m.ty-m.sy)*p;m.lift=Math.sin(p*Math.PI);clamp(m,m.r);
       if(m.t<=0){m.lift=0;m.st='idle';m.t=1*g;quake(.3);const b=rand()*TAU;for(let i=0;i<K.ring;i++)zone(m.x+Math.cos(b+i*TAU/K.ring)*K.ringR,m.y+Math.sin(b+i*TAU/K.ring)*K.ringR,K.ringZ,K.after,m);ringShot(m,10,150,b)}return}
     if(m.st==='idle'){move(m,a,[62,84,100][ph-1],dt);if((m.t-=dt)<=0){const sq=faces?PH.seq[ph-1]:null,k=sq?sq[m.n++%sq.length]:m.n++%(ph>1||crown?5:4);
@@ -1084,7 +1194,7 @@ function phaseBegin(m){
 function petFed(got){PETS.dmg+=got;const a=byPet;if(a.pet&&a.mods.includes('vampiric')&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<4)&&(a.vSum||0)<a.maxHp*.16){const h=Math.min(a.maxHp-a.hp,a.maxHp*.02);a.hp+=h;a.vAt=S.t;a.vSum=(a.vSum||0)+h;puff(a,'#b8263d',8,120)}}
 function hurtM(m,d,quiet){
   if(m.vs){if(MINE>0)comboHit();return vsHit(m,d,quiet)}
-  if(MINE>0&&!byPet&&!REM&&!m.decoy){const q=S.myT||(S.myT={m:null,t:0});q.m=m;q.t=S.t}
+  if(MINE>0&&!byPet&&!REM&&!m.decoy){const q=S.myT||(S.myT={m:null,t:0});q.m=m;q.t=S.t;if(!VS&&SET.lock&&!LK.hard){if(LK.m===m)LK.t=S.t;else if(!lockOk(LK.m)||S.t-LK.t>LOCK.keep)lockPut(m,false)}}
   if(MINE>0&&!byPet&&!REM&&d>0&&d<1e8){const tl=frTell();if(tl>0?rand()<tl:rand()<-tl){d*=tl>0?FR.tellK:FR.glanceK;if(tl>0){BIG=Math.max(BIG||0,1.4);TELL=1}else TELL=-1}}
   if(CL())return mpHurtM(m,d,quiet);
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
@@ -1110,7 +1220,7 @@ function hurtM(m,d,quiet){
   if(m.hp<=0){
     mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P)manaGive(P.maxMana*MKILL);if(m.quarry&&DRE)dareEnd('done');
     if(m.boss){if(TU)return tutEnd(true);floorClear()}
-    else{if(has('taste')&&rand()<.35*frK(4,FR.e.find)){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m)}
+    else{if(has('taste')&&rand()<.35*frK(4,FR.e.find)){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m);if(m.el)eliteFell(m)}
   }
 }
 // a vampiric boss feeds when it wounds a hero
@@ -1128,7 +1238,7 @@ function hurtP(d,src){
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
   if(P.plates>0&&S.apex==='stone'){if(d>blow(0)){plateBreak();d=Math.round(d*AX.stone.leak);if(d<1)return}else d=Math.max(1,Math.round(d*(1-AX.stone.chip*P.plates)))} // a plate breaks a heavy blow: only `leak` of it reaches you; a light one gets through
   if(P.stoneT>0)d=Math.ceil(d/2);
-  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();if(TR&&TR.kind==='guard'&&TR.obj&&!CL())for(let i=0;i<TK.vigWound;i++)lampHit(TR.obj); // (round 13) a keeper's wound is the lamp's
+  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();if(P.revT>0)P.revT=0; // (a wound breaks off the raising of an ally)if(TR&&TR.kind==='guard'&&TR.obj&&!CL())for(let i=0;i<TK.vigWound;i++)lampHit(TR.obj); // (round 13) a keeper's wound is the lamp's
   const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(CL())mpQ(['vp']);else vamp();
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
@@ -1137,12 +1247,35 @@ function hurtP(d,src){
     emit('death',{level:S.level})}
 }
 
+/* ---------- round 15: the lock. Blows and skills that are not aimed by a pointer keep to one monster instead of always taking the nearest ---------- */
+// soft (the setting `lock`, on by default on touch): the monster my blows last landed on stays the target for `memo` seconds, while it is in reach. hard: chosen with the cycle button (Tab or Y, the Target button)
+// or, on touch, by tapping a monster: it stays the target until it falls, hides for good or the floor ends; cycling past the last one frees the aim again. Those who fight for me under "Attack my target" go for a hard lock.
+// A melee blow only keeps to the lock while it is within `melee` times its reach; otherwise the nearest is struck as always. Not in versus (the aim there is the same for everyone, as before).
+const LOCK={memo:3.5,melee:1.5,tap:36,keep:.4};
+let LK={m:null,hard:false,t:-9};
+const lockSet=()=>!VS&&!!SET.lock;
+const lockOk=m=>!!m&&mons.includes(m)&&m.hp>0&&!m.decoy;
+function lockInfo(){const m=lockNow();return{on:lockSet(),id:m?m.id:0,hard:!!m&&LK.hard,name:m?m.s.name:'',x:m?m.x:0,y:m?m.y:0,r:m?m.r:0,boss:!!m&&m.boss,count:mons.filter(x=>!x.hidden&&!x.decoy&&x.hp>0).length}}
+function lockNow(){
+  if(VS||!P||!LK.m)return null;const m=LK.m;if(!lockOk(m)){LK.m=null;LK.hard=false;emit('lock',lockInfo());return null}
+  if(!LK.hard&&!(lockSet()&&S.t-LK.t<LOCK.memo))return null;return m.hidden?null:m}
+function lockPut(m,hard){const same=LK.m===m&&LK.hard===hard;LK.m=m;LK.hard=hard;LK.t=S.t;if(!same)emit('lock',lockInfo())}
+function lockDrop(){if(!LK.m)return;LK.m=null;LK.hard=false;emit('lock',lockInfo())}
+// the next monster by distance; after the farthest: none
+function lockCycle(){
+  if(VS||!P||P.down||S.mode!=='play')return false;const SR=sightR(),l=mons.filter(m=>!m.hidden&&!m.decoy&&m.hp>0&&(!SR||dist(m,P)-m.r<SR)).sort((a,b)=>dist(a,P)-a.r-dist(b,P)+b.r);
+  if(!l.length){lockDrop();return false}const i=LK.hard?l.indexOf(LK.m):-1;
+  if(LK.hard&&i===l.length-1){lockDrop();floats.push({x:P.x,y:P.y-56,txt:'Aim free',life:.8,c:'#958ea3'});sfx(520,.08,'triangle',.12,390);return true}
+  lockPut(l[i+1],true);sfx(660,.08,'triangle',.14,990);haptic(12);return true}
+// a finger comes down on a monster: it is the target
+function lockTap(pt){if(!lockSet()||!pt)return;let best=null,bd=1e9;for(const m of mons){if(m.hidden||m.decoy||m.hp<=0)continue;const d=Math.hypot(m.x-pt.x,m.y-pt.y)-m.r;if(d<LOCK.tap&&d<bd){bd=d;best=m}}if(best){lockPut(best,true);haptic(12)}}
 /* ---------- player ---------- */
 const keys={},want={atk:false,dash:false,skill:false,sk:[false,false,false,false,false,false],pt:null},joy={x:0,y:0};
 function aim(pt,range,spd){
   if(pt)return Math.atan2(pt.y-P.y,pt.x-P.x);
   // nearest first, but never something warded while anything else is in reach, and with a ranged weapon the boss wins unless something small is close enough to bite
-  let best=null,bd=1e9;const far=range>500,SR=sightR();for(const m of mons){if(m.hidden)continue;const d=dist(m,P)-m.r;if(d<range&&(!SR||d<SR)){const sc=d+(m.ward>.3?2000:0)-(far&&m.boss?200:0);if(sc<bd){bd=sc;best=m}}}
+  let best=null,bd=1e9;const far=range>500,SR=sightR(),LM=lockNow();if(LM){const d=dist(LM,P)-LM.r;if(d<range*(far?1:LOCK.melee)&&(!SR||d<SR)){best=LM;bd=-1e9}}
+  if(!best)for(const m of mons){if(m.hidden)continue;const d=dist(m,P)-m.r;if(d<range&&(!SR||d<SR)){const sc=d+(m.ward>.3?2000:0)-(far&&m.boss?200:0);if(sc<bd){bd=sc;best=m}}}
   if(best&&spd&&best.vx!==undefined&&best.st!=='charge'&&best.st!=='lunge'){const k=Math.min(.6,dist(best,P)/spd);return Math.atan2(best.y+best.vy*k-P.y,best.x+best.vx*k-P.x)} // auto-aim leads a moving target
   return best?angTo(P,best):P.face;
 }
@@ -1150,6 +1283,7 @@ function pshot(a,spd,dmg,r,kind,pierce){pshots.push({x:P.x+Math.cos(a)*16,y:P.y-
 function shock(r,d){
   rings.push({x:P.x,y:P.y,life:.4,max:.4,r,fx:true});if(MP.on)MP.rq.push(VS?[Math.round(P.x),Math.round(P.y),Math.round(r),40,Math.round(d*dmgMul()*100)/100]:[Math.round(P.x),Math.round(P.y),Math.round(r),40]);
   GEO++;MINE++;for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,P)<r+m.r){hurtM(m,d*dmgMul());if(AK.tag&&mons.includes(m))debuff(m,AK.tag,dmgMul())}MINE--;GEO--;
+  objBlow(P.x,P.y,r,true);
   clearShots(P,r+10);S.shake=.3;noise(.25,.4);sfx(70,.3,'square',.35,35);haptic(50);
 }
 function ally(kind,life){const a=rand()*TAU;return{nid:nid(),kind,x:P.x+Math.cos(a)*30,y:P.y+Math.sin(a)*30,r:kind==='wolf'?12:9,life:life||(kind==='wolf'||S.adv==='lich'?1e9:14),cd:0,walk:rand()*6}}
@@ -1181,6 +1315,7 @@ function strike(pt){
       if(Math.abs(da)<arc||d<m.r+18){const decoy=m.decoy;if(!m.boss&&!decoy)mPush(m,Math.cos(a)*push,Math.sin(a)*push);hurtM(m,dmg);if(twice&&mons.includes(m))hurtM(m,dmg*.6);if(S.apex&&!decoy)apexHit(m,twice?dmg*1.6:dmg);if(cl&&!decoy)brkHit(m,BRK.closer,'closer');if(!decoy&&(!hitM||m.boss))hitM=m;if(decoy)break}}
   }BIG=0;MINE--;GEO--;
   if(hitM){if(rip){P.rip=0;riposteHit(hitM,dmg)}else if(cl)hitFx('closer',hitM,.06,.5,a);else if(amb)hitFx('ambush',hitM,.05,.4,a);tutCl()}
+  objArc(a,reach,arc,cl||rip);
   done();
   if(hitM&&c)troStrike(hitM,amb);
 }
@@ -1234,6 +1369,7 @@ function skill(si){
   const c=cls(),sk=skD(c,si),need=sk[5],cost=skCost(si);
   if(P.mana<cost){noMana(si);return false} // not enough mana: nothing happens and the cooldown does not start
   let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}
+  {const LM=lockNow();if(LM&&LM!==t){const d=dist(LM,P);if(need!=='near'||d<LM.r+110){t=LM;bd=d}}} // (round 15) the lock: a skill goes for the target, when it can reach it
   // nothing to use it on: keep the skill ready instead of wasting the cooldown
   if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')||typeof need==='function'&&!need(t)){SND.fizzle();return false}
   const A=altOf(si),x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()*(A?A.k.d:1)};
@@ -1290,13 +1426,19 @@ function roomP(){
 }
 // traps keep their own time: off, a warning, then on
 function roomStep(dt){
+  for(let i=0;i<obstacles.length;i++){const o=obstacles[i];if(o.kind!=='crack')continue;
+    if(o.warn){if((o.wt-=dt)<=0){if(!CL()){objDo(i,5,0,-1);if(MP.on)MP.oeq.push([i,5,0,-1])}else o.wt=0}continue}
+    if(CL()||S.banner>1.5)continue;let on=false;for(const q of MP.on?mpHeroes():[P])if(dist(q,o)<o.r-8&&!(q===P&&P.dashT>0))on=true;
+    if(!on)for(const m of mons)if(!m.hidden&&m.st!=='leap'&&m.r>=20&&dist(m,o)<o.r-4){on=true;break}
+    if(on){objDo(i,4,0,-1);if(MP.on)MP.oeq.push([i,4,0,-1])}}
   for(const o of obstacles){if(!o.per)continue;o.t=(o.t+dt)%o.per;
     const sp=o.kind==='spikes',onAt=o.per*(sp?.7:.65),warnAt=onAt-(sp?.7:.8),was=o.on;o.on=o.t>=onAt;o.warn=!o.on&&o.t>=warnAt;
     if(o.on&&!was){const near=dist(o,P)<260;if(sp){if(near)sfx(1500,.07,'square',.1,700)}else{if(near){sfx(160,.4,'sawtooth',.14,80);noise(.4,.14,500,1500)}puff(o,'#ff8a4c',12,220)}}
     if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
 }
+const mireAt=e=>{for(const o of obstacles)if(o.kind==='mire'&&Math.hypot(o.x-e.x,o.y-e.y)<o.r)return true;return false};
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?frK(1,FR.e.mv)*(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(VS&&VP.spurT>0?VSK.spur:1):1);
+  const c=cls(),spd=(S.L&&S.L.area==='fen'&&!(P.dashT>0)&&mireAt(P)?ARENA.mireK:1)*({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?frK(1,FR.e.mv)*(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(VS&&VP.spurT>0?VSK.spur:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(!VP.hold&&P.atk>0&&c&&!melee(c)){mx*=VSK.shootSlow;my*=VSK.shootSlow}if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
@@ -1505,7 +1647,8 @@ const cmdNow=()=>VS?'free':PETS.cmd||'free';
 const cmdCan=()=>!VS&&!!S.cls&&act2()&&(S.cls==='necro'||S.adv==='beastmaster'||allies.some(a=>a.pet||a.shade));
 // the monster I am fighting (worked out once a step)
 function heroTarget(){if(PETS._htAt===S.t)return PETS._ht;PETS._htAt=S.t;const q=S.myT;let t=null;
-  if(q&&S.t-q.t<PCMD.memo&&mons.includes(q.m)&&!q.m.hidden&&q.m.hp>0)t=q.m;
+  if(LK.hard&&lockOk(LK.m)&&!LK.m.hidden&&!VS)t=LK.m;
+  else if(q&&S.t-q.t<PCMD.memo&&mons.includes(q.m)&&!q.m.hidden&&q.m.hp>0)t=q.m;
   else{let bd=1e9;for(const m of mons){if(m.hidden||m.decoy)continue;const d=dist(m,P)-m.r+(m.ward>.3?2000:0);if(d<bd){bd=d;t=m}}}
   return PETS._ht=t}
 // where the ones that have nothing to fight gather: the hold point, or their owner
@@ -2430,7 +2573,8 @@ function brkStep(m,dt){
 // --- setups and payoffs: a class skill that throws, stuns or drags leaves a monster aloft, one that slows leaves it brittle, one that marks, poisons or burns leaves it branded (LINK.life seconds).
 // The matching payoff uses the tag up: a ground blow on an aloft monster (Downfall: it is stunned), a single heavy skill blow on a brittle one (Shatter: shards hit what stands near), a fan, ring, chain or burst on a branded one (Flare: a blast around it).
 // k: the payoff blow does this much more; min: at least this many times my damage; none within `wait` seconds of the tag being set, so a skill does not pay off what it has just set up.
-const LINK={life:6,wait:.25,min:2,mana:.03,tags:['aloft','brittle','branded'],kinds:['slam','heavy','volley'],
+const LINK={life:6,wait:.25,min:2,mana:.03,duoK:1.3,duoMana:.04, // duoK, duoMana (round 15, co-op): a payoff on a setup of another hero is `duoK` times as heavy, and both get `duoMana` of their mana back
+  tags:['aloft','brittle','branded'],kinds:['slam','heavy','volley'],
   pay:{slam:{tag:'aloft',bit:1,name:'Downfall',k:.6,col:'#ffd95e'},heavy:{tag:'brittle',bit:2,name:'Shatter',k:.6,col:'#8fd3ff'},volley:{tag:'branded',bit:4,name:'Flare',k:.5,col:'#ff8a4c'}}};
 const LKOP={shock:'slam',blast:'slam',line:'slam',rush:'heavy',chain:'volley',burst:'volley',ringp:'volley'};
 const lkOf=op=>{const o=op[0];return o==='fan'?(op[1]===1?'heavy':'volley'):o==='hit'?(op[1]>0?'heavy':null):o==='seq'?(op[1]==='cuts'?'heavy':'slam'):LKOP[o]||null};
@@ -2442,17 +2586,21 @@ function linkInfo(ops){const sets=new Set(),pays=new Set(),dbg=o=>{if(!o)return;
 function tagSet(m,bit){
   if(!TAGOK||!m||m.vs||m.decoy||VS||m.hp<=0||!R12())return;
   if(CL()){if(!(m.tags&bit)&&!(S.t-(m._tgQ||0)<.3)){m._tgQ=S.t;mpQ(['tg',m.id,bit,setN(3)>=2?1:0])}return}
-  tagPut(m,bit,setN(3)>=2?SETK.kind2:0)}
-function tagPut(m,bit,more){const i=bit>>1,t=m.tgT||(m.tgT=[0,0,0]),a=m.tgAt||(m.tgAt=[0,0,0]);if(!(t[i]>0))a[i]=S.t;t[i]=Math.max(t[i],LINK.life+(more||0));m.tags=(m.tags||0)|bit} // more: Kindled Marks (round 15)
+  tagPut(m,bit,setN(3)>=2?SETK.kind2:0,MP.on?MP.myIdx:-1)}
+function tagPut(m,bit,more,by){const i=bit>>1,t=m.tgT||(m.tgT=[0,0,0]),a=m.tgAt||(m.tgAt=[0,0,0]),w=m.tgBy||(m.tgBy=[-1,-1,-1]);if(!(t[i]>0)){a[i]=S.t;w[i]=by===undefined?-1:by} // by: the member who set it up (co-op, round 15)
+  t[i]=Math.max(t[i],LINK.life+(more||0));m.tags=(m.tags||0)|bit} // more: Kindled Marks (round 15)
+// another hero has paid off a setup of mine: my share of a linked payoff
+function linkMine(m,L,by){if(!P||P.down)return;manaGive(P.maxMana*LINK.duoMana);const r=MP.byIdx[by];floats.push({x:P.x,y:P.y-58,txt:'Linked'+(r?' with '+r.name:''),life:1.3,c:L.col});emit('linked',{id:m.id,kind:LINK.kinds[L.bit>>1],name:L.name,with:by})}
 function tagStep(m,dt){const t=m.tgT;let b=0;if(t)for(let i=0;i<3;i++)if(t[i]>0){t[i]-=dt;if(t[i]>0)b|=1<<i}m.tags=b}
 // the blow d of kind LNK lands on m: when m carries the matching tag it is used up, and the blow comes back heavier
 function linkPay(m,d){
   const L=LINK.pay[LNK];if(!L||!(m.tags&L.bit)||m.vs||m.decoy||m.ward>0||!R12())return d;const kind=LNK,i=L.bit>>1;
+  const sb=m.tgBy?m.tgBy[i]:-1,duo=MP.on&&!VS&&sb>=0&&sb!==MP.myIdx; // a setup of another hero: a linked payoff
   if(CL()){if(S.t-(m._lkAt||0)<1)return d;m._lkAt=S.t;m.tags&=~L.bit;mpQ(['lk',m.id,LINK.kinds.indexOf(kind)])}
-  else{if(m.tgAt&&S.t-m.tgAt[i]<LINK.wait)return d;m.tgT[i]=0;m.tags&=~L.bit;if(MP.on)MP.lkq.push([m.id,LINK.kinds.indexOf(kind),MP.myIdx])}
-  const bonus=Math.max(d*L.k,LINK.min*dmgMul())*(setN(3)>=2?SETK.kindK:1);if(setN(3)>=4)cdCut(SETK.kind4);
-  floats.push({x:m.x,y:m.y-m.r-28,txt:L.name,life:1,c:L.col,big:1.4});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});puff(m,L.col,14,220);sfx(kind==='heavy'?1500:kind==='slam'?90:520,.22,kind==='slam'?'square':'triangle',.2,kind==='heavy'?500:kind==='slam'?40:1400);haptic(40);
-  manaGive(P.maxMana*LINK.mana);emit('link',{id:m.id,x:m.x,y:m.y,kind,tag:L.tag,name:L.name,bonus,by:-1});if(TU)tutEv('link');hitFx('link',m,.07,.5);
+  else{if(m.tgAt&&S.t-m.tgAt[i]<LINK.wait)return d;m.tgT[i]=0;m.tags&=~L.bit;if(MP.on)MP.lkq.push([m.id,LINK.kinds.indexOf(kind),MP.myIdx,duo?sb+1:0])}
+  const bonus=Math.max(d*L.k,LINK.min*dmgMul())*(setN(3)>=2?SETK.kindK:1)*(duo?LINK.duoK:1);if(setN(3)>=4)cdCut(SETK.kind4);if(duo)manaGive(P.maxMana*LINK.duoMana);
+  floats.push({x:m.x,y:m.y-m.r-28,txt:(duo?'Linked ':'')+L.name,life:duo?1.3:1,c:L.col,big:duo?1.8:1.4});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});puff(m,L.col,14,220);sfx(kind==='heavy'?1500:kind==='slam'?90:520,.22,kind==='slam'?'square':'triangle',.2,kind==='heavy'?500:kind==='slam'?40:1400);haptic(40);
+  manaGive(P.maxMana*LINK.mana);emit('link',{id:m.id,x:m.x,y:m.y,kind,tag:L.tag,name:L.name,bonus,by:-1,duo,setBy:duo?sb:-1});if(TU)tutEv('link');hitFx('link',m,.07,.5);
   const lk=LNK,tk=TAGOK;LNK=null;TAGOK=0; // what follows is the payoff's own doing: it neither pays off nor sets up anything further
   brkHit(m,BRK.link,'link');
   if(kind==='slam')mStun(m,m.boss?.6:1.5);
@@ -2463,16 +2611,29 @@ function linkPay(m,d){
 const FIN={at:.08,dur:2.2,min:.35,hp:1.14,names:{fighter:'Sundering Arc',tank:'Gravestone Drop',assassin:'Thirteen Quiet Cuts',mage:'The Unwritten Word',ranger:'Last Flight',healer:'Dawn Without End',necro:'All Hands From Below',none:'Bone Verdict'}};
 let FN=null,FINK=0;
 const finInfo=by=>{const me=!MP.on||by===MP.myIdx,r=me?null:MP.byIdx[by],c=me?S.cls:r&&r.look.cls,h=me?P:r&&r.P;return{by,cls:c||null,adv:(me?S.adv:r&&r.look.adv)||null,apex:(me?S.apex:r&&r.look.apex)||null,name:FIN.names[c||'none'],hx:h?h.x:W/2,hy:h?h.y:H/2}};
-const finEv=(state,skipped)=>{const f=FN||{};emit('finisher',{state,id:f.id||0,by:f.by===undefined?-1:f.by,cls:f.cls||null,adv:f.adv||null,apex:f.apex||null,name:f.name||'',dur:FIN.dur,x:f.x||0,y:f.y||0,hx:f.hx||0,hy:f.hy||0,skipped:!!skipped})};
+const finEv=(state,skipped)=>{const f=FN||{};if(state==='end')finShare();emit('finisher',{state,id:f.id||0,by:f.by===undefined?-1:f.by,cls:f.cls||null,adv:f.adv||null,apex:f.apex||null,name:f.name||'',dur:FIN.dur,x:f.x||0,y:f.y||0,hx:f.hx||0,hy:f.hy||0,skipped:!!skipped,join:f.join?f.join.slice():[],count:1+(f.join?f.join.length:0)})};
 function finStep(){ // alone and on the host, every step: is the prompt up?
   if(FN&&FN.state==='play')return;
   const b=boss,ok=!!b&&!!b.fin&&b.hp>0&&b.hp<=b.maxHp*FIN.at&&!b.hidden&&b.st!=='leap'&&mons.includes(b)&&R12();
-  if(ok&&!FN){FN={state:'ready',id:b.id,by:-1,cls:null,adv:null,apex:null,name:'',t:0,dur:FIN.dur,x:b.x,y:b.y,hx:P.x,hy:P.y};finEv('ready');finCue(b)}
+  if(ok&&!FN){FN={state:'ready',join:[],id:b.id,by:-1,cls:null,adv:null,apex:null,name:'',t:0,dur:FIN.dur,x:b.x,y:b.y,hx:P.x,hy:P.y};finEv('ready');finCue(b)}
   else if(!ok&&FN){finEv('gone');FN=null}
   else if(FN){FN.x=b.x;FN.y=b.y}}
 function finCue(b){floats.push({x:b.x,y:b.y-b.r-44,txt:'Last rite: '+(matchMedia('(pointer:coarse)').matches?'tap the button':'press X'),life:2.4,c:'#ffd95e',big:1.4});sfx(660,.3,'triangle',.18,990)}
+// (round 15) a rite that others join. While a rite plays, any other hero standing may join it (the rite's button, X or T, or simply a blow): the rite is no longer, and nothing more is needed to end it,
+// but everyone who took part is given back all mana and a quarter of their health, and their drop on this floor is rolled once more (S.rite). FN.join: the member indices of those who joined.
+function finJoin(idx){
+  if(!FN||FN.state!=='play'||!MP.on||VS||idx===FN.by||FN.join.includes(idx))return false;FN.join.push(idx);finJoined(idx);return true}
+function finJoined(idx){
+  const me=idx===MP.myIdx,r=me?null:MP.byIdx[idx],h=me?P:r&&r.P,n=FN.join.length+1;if(!h)return;
+  floats.push({x:h.x,y:h.y-56,txt:n>2?'A rite of '+n:'A shared rite',life:1.4,c:'#ffd95e',big:1.4});rings.push({x:h.x,y:h.y,life:.5,max:.5,r:70,fx:true});for(let k=1;k<=8;k++)bits.push({x:h.x+(FN.x-h.x)*k/8,y:h.y+(FN.y-h.y)*k/8,vx:0,vy:-30,life:.6,max:.6,c:'#ffd95e',r:3});sfx(880,.25,'triangle',.18,1320);
+  if(me){P.atk=.3;P.swing=angTo(P,FN);haptic([20,20,80])}
+  emit('finisher',{state:'join',id:FN.id,by:idx,cls:(me?S.cls:r&&r.look.cls)||null,adv:null,apex:null,name:FN.name,dur:FIN.dur,x:FN.x,y:FN.y,hx:h.x,hy:h.y,skipped:false,first:FN.by,join:FN.join.slice(),count:n})}
+// the rite is over: what it gives those who shared it
+function finShare(){
+  if(!FN||FN.state!=='play'||!MP.on||VS||!FN.join||!FN.join.length||!P)return;const me=MP.myIdx,n=FN.join.length+1;if(FN.by!==me&&!FN.join.includes(me))return;
+  S.rite={n,lv:S.level};if(!P.down){P.mana=manaRoom();healP(.25)}floats.push({x:P.x,y:P.y-70,txt:'Shared rite: a luckier drop',life:2.2,c:'#ffd95e'})}
 function finStart(by){
-  const b=boss;if(!FN||FN.state!=='ready'||!b)return;Object.assign(FN,finInfo(by),{state:'play',t:0,x:b.x,y:b.y});
+  const b=boss;if(!FN||FN.state!=='ready'||!b)return;Object.assign(FN,finInfo(by),{state:'play',t:0,x:b.x,y:b.y,join:[]});
   b.stun=Math.max(b.stun||0,FIN.dur+.6);b.beam=null;if(b.st==='charge'||b.st==='lunge'){b.st='dazed';b.t=.6}
   finBegun()}
 // (every member: the rite has begun)
@@ -2483,6 +2644,7 @@ function finBegun(){
 function finPlay(dt){
   FN.t+=dt;if(rand()<dt*40)bits.push({x:FN.x+rand()*80-40,y:FN.y+rand()*80-40,vx:0,vy:-90,life:.5,max:.5,c:rand()<.5?'#ffd95e':'#fff',r:3});
   if(!MP.on&&FN.t>=FIN.min&&(want.atk||want.dash||want.skill||want.sk.some(x=>x)))return finEnd(true);
+  if(MP.on&&!VS&&P&&!P.down&&FN.by!==MP.myIdx&&!FN.join.includes(MP.myIdx)&&!FN._asked&&FN.t>.15&&(want.atk||want.skill||want.sk.some(x=>x)))finish(); // a blow of another hero while the rite plays: it joins
   if(!CL()&&FN.t>=FN.dur)finEnd(false)}
 function finEnd(skipped){
   const b=boss;finEv('end',skipped);FN=null;want.atk=want.dash=want.skill=false;
@@ -2491,6 +2653,7 @@ function finish(){
   if(!FN||S.mode!=='play'||S.paused||!P||P.down||VS)return false;const me=MP.on?MP.myIdx:0;
   if(FN.state==='ready'){if(CL())mpQ(['fin',FN.id]);else finStart(me);return true}
   if(FN.state==='play'&&(!MP.on||FN.by===me)&&FN.t>=FIN.min){if(CL())mpQ(['fin',FN.id]);else finEnd(true);return true}
+  if(FN.state==='play'&&MP.on&&FN.by!==me&&!FN.join.includes(me)){if(CL()){if(!FN._asked){FN._asked=true;mpQ(['fin',FN.id])}}else finJoin(me);return true}
   return false}
 // --- dares: an optional objective on about one plain fight floor in three from floor 13 (never a trial, a crossroads, a tenth floor or a floor changed by a door). Met, it raises the mark and the drop is luckier; missed, nothing is lost.
 const DARES={kinds:['hunt','unscathed','holdout','protect'],titles:{hunt:'The Quarry',unscathed:'Clean Hands',holdout:'The Rush',protect:'The Ember'},dur:{hunt:16,unscathed:0,holdout:14,protect:0},
@@ -2569,8 +2732,9 @@ function step(dt){
   if(FN&&FN.state==='play'&&S.mode==='play'){finPlay(dt);if(!MP.on)return} // the last rite: alone the world is held while it plays
   if(VS)vsStep(dt);
   if(!P.down)playerStep(dt);
+  if(MP.on&&!VS)mpReviveStep(dt);
   GEO++;for(const p of pshots){p.x+=p.vx*dt;p.y+=p.vy*dt;if(p.x<WALL||p.x>W-WALL||p.y<WALL||p.y>H-WALL){p.dead=true;continue}
-    if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);continue}
+    if(obstacles.length&&blocked(p)){p.dead=true;puff(p,'#b9b2c6',3,70);if(!p.pet&&objOn())for(let i=0;i<obstacles.length;i++){const o=obstacles[i],R=solidR(o);if(R&&Math.hypot(p.x-o.x,p.y-o.y)<R+2){objMy(i,Math.atan2(p.vy,p.vx),p.big>=1.4||!!p.lk||!!p.sk);break}}continue}
     for(const m of[...mons]){if(m.hidden||p.hit.has(m)||!mons.includes(m)||dist(m,p)>m.r+p.r+3)continue;
       let d=p.dmg;if(p.kind==='arrow'&&pw(3)&&Math.hypot(p.x-p.sx,p.y-p.sy)>200){d*=2;puff(p,'#d6a544',4,90)}
       p.hit.add(m);if(p.alt){TAGOK++;debuff(m,p.alt,p.altD);TAGOK--}if(p.sk)TAGOK++;if(p.slow)mSlow(m,p.slow);if(p.stun)mStun(m,m.boss?p.stun*.7:p.stun*2);if(p.sk)TAGOK--;byPet=p.pet||null;if(!p.pet){MINE++;LNK=p.lk||null;BIG=p.big||0}hurtM(m,d,!!p.pet);if(!p.pet){MINE--;LNK=null;BIG=0;if(p.bk)brkHit(m,p.bk,'closer');if(p.one){if(p.one.rip){p.one.rip=p.one.fx=0;riposteHit(m,d)}else if(p.one.fx){p.one.fx=0;hitFx('closer',m,.05,.4,Math.atan2(p.vy,p.vx));if(TU)tutEv('closer')}}if(p.push&&!m.boss&&mons.includes(m)){const v=Math.hypot(p.vx,p.vy)||1;mPush(m,p.vx/v*p.push,p.vy/v*p.push)}}byPet=null;if(S.apex&&!p.pet)apexHit(m,d);
@@ -2593,7 +2757,7 @@ function step(dt){
   if(PETS.fallen.length)reviveStep(dt);
   for(const f of fields){if(f.ax){fieldX(f,dt);continue}f.t+=dt;if((f.tick-=dt)<=0){f.tick=f.every;f.n=!f.n;rings.push({x:f.x,y:f.y,life:.45,max:.45,r:f.r,fx:true});
     const fc=f.kind==='frost'?'#8fd3ff':f.kind==='halo'?'#ffe08a':f.kind==='domain'?'#a98bff':'#e7dfcd';for(let i=0;i<5;i++){const a=rand()*TAU,d=rand()*f.r;bits.push({x:f.x+Math.cos(a)*d,y:f.y+Math.sin(a)*d,vx:0,vy:f.kind==='rain'?60:-30,life:.5,max:.5,c:fc,r:2.5})}
-    GEO++;if(!f.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.sk)TAGOK++;if(f.kind==='domain'){mMark(m,.7);if(!m.boss)mSlow(m,.8)}else if(f.slow)mSlow(m,.8);if(f.sk)TAGOK--;hurtM(m,f.dmg,true)}GEO--;
+    GEO++;if(!f.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,f)<f.r+m.r){if(f.sk)TAGOK++;if(f.kind==='domain'){mMark(m,.7);if(!m.boss)mSlow(m,.8)}else if(f.slow)mSlow(m,.8);if(f.sk)TAGOK--;if(f.brand){TAGOK++;tagSet(m,4);TAGOK--}hurtM(m,f.dmg,true)}GEO--;
     if(f.foe){if(VS)vsField(f);continue}
     if(f.kind==='halo'&&f.n&&dist(P,f)<f.r&&P.hp<P.maxHp&&!P.down)healP(.04)}}
   fields=fields.filter(f=>f.t<f.dur);
@@ -2608,6 +2772,7 @@ function step(dt){
   if(!CLI&&S.wave&&!boss&&!mons.length&&(S.waveT-=dt)<=0){if(S.wave.n<S.wave.of){S.wave.n++;spawnWave()}else enterBoss()}
   if(!CLI&&act2()&&boss&&boss.hp>0&&boss.ai!=='hollow'&&boss.ai!=='summoner'&&(S.elite-=dt)<=0){S.elite=5;if(mons.length<5+(MP.on?mpPack():0)){const b=rand()*TAU;spawn('mite',boss.x+Math.cos(b)*50,boss.y+Math.sin(b)*50)}}
   if(!CLI&&!VS&&boss&&boss.hz&&boss.hp>0)hazStep(boss,dt);
+  if(!CLI&&!VS&&S.L.haz)areaStep(dt);
   if(VS)vsFoes(dt);else if(CLI)mpMons(dt);else for(const m of[...mons]){
     if(S.mode!=='play')break;if(!mons.includes(m))continue; // the boss or the player died earlier in this loop
     m.moving=false;if(m.flash>0)m.flash-=dt;if(m.ward>0)m.ward-=dt;const ox=m.x,oy=m.y;
@@ -2616,13 +2781,13 @@ function step(dt){
     if(m.dotT>0){m.dotT-=dt;if((m.dotK-=dt)<=0){m.dotK=.5;REM=m.dotRem||null;hurtM(m,m.dotD,true);REM=null;if(!mons.includes(m))continue}}
     if(m.venT>0){m.venT-=dt;if((m.venK-=dt)<=0){m.venK=.5;puff(m,TCOL.assassin,4,80);byPet=m.venRem?null:m.venBy||true;REM=m.venRem||null;hurtM(m,m.venD,true);byPet=null;REM=null;if(!mons.includes(m))continue}}
     if((m.chill>0||m.frozen>0||m.rot>0||m.burn>0||m.shock>0||m.soak>0||m.thawT>0||m.shockI>0)&&stStep(m,dt))continue;
-    let k=aiK(m);if(m.slow>0){m.slow-=dt;k*=.5}if(m.chill>0)k*=1-AX.frost.slowK*m.chill;if(m.soak>0)k*=1-AX.tide.soakSlow;if(m.rot>0)k*=1-AX.plague.slowK*m.rot;
+    let k=aiK(m);if(S.L.area==='fen'&&!m.hidden&&m.st!=='leap'&&mireAt(m))k*=ARENA.mireM;if(m.slow>0){m.slow-=dt;k*=.5}if(m.chill>0)k*=1-AX.frost.slowK*m.chill;if(m.soak>0)k*=1-AX.tide.soakSlow;if(m.rot>0)k*=1-AX.plague.slowK*m.rot;
     if(m.stun>0){m.stun-=dt;m.beam=null}else if(m.siege&&OBJ()){siege(m,dt*k);T=P}else{T=foe(m);if(T)AI[m.ai](m,dt*k,angTo(m,T),dist(m,T));else T=P} // T: the hero this monster fights (alone that is you; with no hero standing it waits)
     if(S.mode!=='play')break;if(!mons.includes(m))continue;
     if(obstacles.length&&!m.hidden&&m.st!=='leap'){collide(m,m.r,true);
       // a walker that is trying to move and getting nowhere tries the other way round
       if(m.moving&&Math.hypot(m.x-ox,m.y-oy)<12*dt){if((m.stk=(m.stk||0)+dt)>.45){m.stk=0;m.avS=-(m.avS||1);m.avT=1.2;m.side*=-1}}else m.stk=0}
-    modStep(m,dt);
+    modStep(m,dt);if(m.el)eliteStep(m,dt);
     m.vx=(m.x-ox)/dt;m.vy=(m.y-oy)/dt;
     if(m.rage&&rand()<dt*12)bits.push({x:m.x+rand()*m.r*2-m.r,y:m.y-rand()*m.r,vx:rand()*30-15,vy:-50-rand()*40,life:.6,max:.6,c:'#ff5b6e',r:2.5}); // enraged bosses smoulder, whatever draws them
     if((m.ring-=dt)<=0&&(m.moving||m.st==='wind')){rings.push({x:m.x,y:m.y,life:.8,max:.8,r:m.r+24,under:m.hidden});m.ring=m.st==='wind'?.12:.42}
@@ -2636,7 +2801,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}if(z.alt&&mons.includes(m)){TAGOK++;debuff(m,z.alt,z.altD);TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(z.hz?-1:1),z.hz?'hazard':'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(z.hz?-1:1))}}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}if(z.alt&&mons.includes(m)){TAGOK++;debuff(m,z.alt,z.altD);TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z);if(!z.pet&&!z.rem&&!z.foe)objBlow(z.x,z.y,z.r,true)}else{if(dist(z,P)<z.r)hurtP(blow(z.hz?-1:1),z.hz?'hazard':'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(z.hz?-1:1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24&&!P.down){f.dead=true;healP(.25,3);SND.pickup();haptic(15);if(MP.on)mpMorsel(f)}
   morsels=morsels.filter(f=>!f.dead);
@@ -2668,6 +2833,10 @@ function drawMon(m,face,s=m.s,eye){
     if(m.mods.includes('vampiric')){circ(0,0,r+5+Math.sin(S.t*4)*1.5);ctx.strokeStyle='rgba(184,38,61,.8)';ctx.lineWidth=3;ctx.stroke()}
     if(m.mods.includes('splitting')){ctx.strokeStyle='rgba(11,10,15,.85)';ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(-r*.15,-r);ctx.lineTo(r*.12,-r*.3);ctx.lineTo(-r*.1,r*.3);ctx.lineTo(r*.15,r);ctx.stroke()}
     if(m.mods.includes('swift')&&m.moving){ctx.strokeStyle='rgba(231,223,205,.5)';ctx.lineWidth=2;const b=Math.atan2(m.vy||0,m.vx||0)+Math.PI;for(const k of[-.5,0,.5])line(Math.cos(b+k)*r*1.15,Math.sin(b+k)*r*1.15,Math.cos(b+k)*r*1.15+Math.cos(b)*14,Math.sin(b+k)*r*1.15+Math.sin(b)*14)}}
+  if(m.el){ // (round 15) an elite: an amber broken ring, a chevron over it, and the sign of its kind
+    ctx.strokeStyle=ELITE.col;ctx.lineWidth=2.5;ctx.setLineDash([7,5]);ctx.lineDashOffset=-S.t*14;circ(0,0,r+5);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=ELITE.col;ctx.beginPath();ctx.moveTo(-7,-r-16);ctx.lineTo(0,-r-9);ctx.lineTo(7,-r-16);ctx.lineTo(7,-r-21);ctx.lineTo(0,-r-14);ctx.lineTo(-7,-r-21);ctx.fill();
+    if(m.el===4){ctx.fillStyle=`rgba(255,91,110,${.25+.2*Math.sin(S.t*9)})`;circ(0,0,r*.5);ctx.fill()}if(m.el===5){ctx.strokeStyle='#7fd66b';ctx.lineWidth=2.5;line(-5,-r-30,5,-r-30);line(0,-r-35,0,-r-25)}if(m.el===3){ctx.strokeStyle='rgba(11,10,15,.85)';ctx.lineWidth=2;line(0,-r,0,r)}}
   if(m.ward>0){circ(0,0,r+8);ctx.fillStyle='rgba(143,211,255,.12)';ctx.fill();ctx.strokeStyle=`rgba(143,211,255,${.55+.3*Math.sin(S.t*8)})`;ctx.lineWidth=2.5;ctx.stroke()}
   if(m.st==='dazed'){ctx.fillStyle=col('#d6a544');for(let i=0;i<3;i++){const b=S.t*5+i*TAU/3;circ(Math.cos(b)*r*.7,-r-8+Math.sin(b)*4,3);ctx.fill()}}
   ctx.restore();
@@ -2680,14 +2849,21 @@ function drawRoom(){
       circ(x,y,r);ctx.fillStyle=o.on?'rgba(184,38,61,.3)':o.warn?'rgba(214,165,68,.16)':'rgba(8,7,12,.5)';ctx.fill();ctx.strokeStyle=o.on?'#ff5b6e':o.warn?'#d6a544':'rgba(231,223,205,.28)';ctx.lineWidth=o.on||o.warn?2.5:1.5;ctx.stroke();
       for(let i=0;i<9;i++){const b=i*TAU/8,px=i<8?x+Math.cos(b)*r*.62:x,py=i<8?y+Math.sin(b)*r*.62:y;
         if(k>0){ctx.fillStyle=o.on?'#e7dfcd':'#b9b2c6';ctx.beginPath();ctx.moveTo(px-4.5,py+3);ctx.lineTo(px,py+3-20*k);ctx.lineTo(px+4.5,py+3);ctx.fill()}else{circ(px,py,2.6);ctx.fillStyle='rgba(0,0,0,.75)';ctx.fill()}}}
+    else if(o.kind==='brazier'&&o.spent){circ(x,y,o.core+3);ctx.fillStyle=col('#3a3340');ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=2.5;ctx.stroke();ctx.fillStyle='#1a1418';ctx.beginPath();ctx.ellipse(x+Math.cos(o.tip||0)*o.core*1.6,y+Math.sin(o.tip||0)*o.core*1.6,o.core*1.5,o.core*.9,o.tip||0,0,TAU);ctx.fill()}
     else if(o.kind==='brazier'){
       if(o.on){const g=ctx.createRadialGradient(x,y,4,x,y,r);g.addColorStop(0,'rgba(255,217,94,.6)');g.addColorStop(.6,'rgba(255,138,76,.42)');g.addColorStop(1,'rgba(184,38,61,.12)');circ(x,y,r);ctx.fillStyle=g;ctx.fill()}
       else if(o.warn){circ(x,y,r);ctx.fillStyle=`rgba(214,165,68,${.1+.08*Math.sin(S.t*24)})`;ctx.fill()}
       ctx.setLineDash([7,7]);circ(x,y,r);ctx.strokeStyle=o.on?'#ff8a4c':o.warn?'#d6a544':'rgba(255,138,76,.3)';ctx.lineWidth=o.on||o.warn?2.5:1.5;ctx.stroke();ctx.setLineDash([]);
       circ(x,y,o.core+3);ctx.fillStyle=col('#3a3340');ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=2.5;ctx.stroke();circ(x,y,o.core-3);ctx.fillStyle=o.on?'#ffd95e':o.warn?'#ff8a4c':'#7a2a22';ctx.fill()}
+    else if(o.kind==='mire'){const g=ctx.createRadialGradient(x,y,r*.2,x,y,r);g.addColorStop(0,'rgba(22,48,44,.9)');g.addColorStop(.8,'rgba(28,60,52,.7)');g.addColorStop(1,'rgba(40,84,70,.15)');circ(x,y,r);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='rgba(120,190,160,.35)';ctx.lineWidth=1.5;for(let i=0;i<3;i++){const q=((S.t*.25+i/3)%1);circ(x+Math.sin(i*2.1)*r*.3,y+Math.cos(i*1.7)*r*.3,r*.15+q*r*.3);ctx.globalAlpha=1-q;ctx.stroke()}ctx.globalAlpha=1}
+    else if(o.kind==='crack'){circ(x,y,r);ctx.fillStyle=o.warn?`rgba(214,165,68,${.2+.12*Math.sin(S.t*30)})`:'rgba(8,7,12,.38)';ctx.fill();ctx.strokeStyle=o.warn?'#d6a544':'rgba(231,223,205,.32)';ctx.lineWidth=o.warn?2.5:1.5;ctx.setLineDash([3,6]);ctx.stroke();ctx.setLineDash([]);
+      ctx.strokeStyle='rgba(0,0,0,.8)';ctx.lineWidth=2;for(let i=0;i<5;i++){const b=i*TAU/5+.4;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+Math.cos(b)*r*.45,y+Math.sin(b)*r*.45);ctx.lineTo(x+Math.cos(b+.35)*r*.85,y+Math.sin(b+.35)*r*.85);ctx.stroke()}}
+    else if(o.dead){ctx.fillStyle=col('#3a3340');for(let i=0;i<6;i++){const b=i*1.07+o.x,d=r*(.25+.5*((i*37)%10)/10);circ(x+Math.cos(b)*d,y+Math.sin(b)*d,r*(.16+.1*(i%3)));ctx.fill()}circ(x,y,r*.5);ctx.fillStyle=col('#6d6478');ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=2;ctx.stroke()}
     else{ctx.fillStyle='rgba(0,0,0,.4)';ctx.beginPath();ctx.ellipse(x+7,y+9,r,r*.9,0,0,TAU);ctx.fill();
+      if(o.cr){ctx.save()}
       const g=ctx.createRadialGradient(x-r*.35,y-r*.4,r*.1,x,y,r);g.addColorStop(0,col('#a8a2b3'));g.addColorStop(.7,col('#6d6478'));g.addColorStop(1,col('#3a3340'));circ(x,y,r);ctx.fillStyle=g;ctx.fill();ctx.strokeStyle='#0b0a0f';ctx.lineWidth=3;ctx.stroke();
-      circ(x,y,r*.62);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke()}}
+      circ(x,y,r*.62);ctx.strokeStyle='rgba(0,0,0,.3)';ctx.lineWidth=2;ctx.stroke();
+      if(o.cr){ctx.restore();ctx.strokeStyle='rgba(0,0,0,.85)';ctx.lineWidth=2.2;for(let i=0;i<o.cr*2;i++){const b=i*2.4+o.y;ctx.beginPath();ctx.moveTo(x+Math.cos(b)*r*.9,y+Math.sin(b)*r*.9);ctx.lineTo(x+Math.cos(b+.5)*r*.4,y+Math.sin(b+.5)*r*.4);ctx.lineTo(x+Math.cos(b+.2)*r*.1,y+Math.sin(b+.2)*r*.1);ctx.stroke()}}}}
 }
 function drawBeams(){
   for(const m of allies){const b=m.beam;if(!b||!m.pet||m.hidden)continue;ctx.lineCap='round';
@@ -2921,11 +3097,12 @@ function draw(){
   if(sight&&!act2()){ctx.globalCompositeOperation='lighter';for(const[x,y]of[[WALL,WALL],[W-WALL,WALL],[WALL,H-WALL],[W-WALL,H-WALL]]){const R=210+Math.sin(S.t*9+x)*10,g=ctx.createRadialGradient(x,y,4,x,y,R);g.addColorStop(0,'rgba(255,170,70,.42)');g.addColorStop(1,'rgba(255,120,40,0)');ctx.fillStyle=g;ctx.fillRect(x-R,y-R,R*2,R*2)}ctx.globalCompositeOperation='source-over'}
   if(sight){ctx.fillStyle='rgba(255,236,190,.3)';for(let i=0;i<26;i++){const x=(i*137.5+S.t*(6+i%5))%W,y=(i*89.3+Math.sin(S.t*.4+i)*30+S.t*(3+i%3)+60)%H;circ(x,y,1+(i%3)*.5);ctx.fill()}}
   if(obstacles.length)drawRoom();
-  for(const f of fields){if(f.ax){drawFieldX(f);continue}circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':f.kind==='domain'?'rgba(58,47,85,.45)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':f.kind==='domain'?'rgba(169,139,255,.7)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
+  for(const f of fields){if(f.ax){drawFieldX(f);continue}circ(f.x,f.y,f.r);ctx.fillStyle=f.kind==='fire'?'rgba(255,138,76,.22)':f.kind==='frost'?'rgba(143,211,255,.16)':f.kind==='halo'?'rgba(255,224,138,.15)':f.kind==='domain'?'rgba(58,47,85,.45)':'rgba(231,223,205,.1)';ctx.fill();ctx.strokeStyle=f.kind==='frost'?'rgba(143,211,255,.6)':f.kind==='halo'?'rgba(255,224,138,.6)':f.kind==='domain'?'rgba(169,139,255,.7)':'rgba(231,223,205,.45)';ctx.lineWidth=1.5;ctx.stroke()}
   if(TR&&TR.obj)drawLamp2d(TR.obj);
   if(!VS)drawR12();
   for(const f of morsels){circ(f.x,f.y+Math.sin(S.t*4)*2,8);ctx.fillStyle='#d1213f';ctx.fill();circ(f.x-2,f.y-3+Math.sin(S.t*4)*2,2.5);ctx.fillStyle='#ffb3bf';ctx.fill()}
-  if(!VS){for(const m of mons)drawMon(m);for(const m of mons)if(m.chill>0||m.frozen>0||m.rot>0||m.burn>0||m.shock>0||m.soak>0)drawSt(m);
+  if(!VS){for(const m of mons)drawMon(m);{const LM=lockNow();if(LM){const r=LM.r+12+(LK.hard?0:3),k=LK.hard?1:.45;ctx.save();ctx.translate(LM.x,LM.y-LM.lift*46);ctx.rotate(LK.hard?S.t*.8:0);ctx.strokeStyle=`rgba(111,227,255,${k})`;ctx.lineWidth=LK.hard?3:2;for(let i=0;i<4;i++){ctx.beginPath();ctx.arc(0,0,r,i*TAU/4+.25,i*TAU/4+TAU/4-.25);ctx.stroke()}ctx.restore()}}
+    if(MP.on){const RI=reviveInfo();if(RI){const ring=(x,y,k,can)=>{ctx.save();ctx.setLineDash([6,6]);ctx.strokeStyle=can?'rgba(127,214,107,.55)':'rgba(149,142,163,.4)';ctx.lineWidth=2;circ(x,y,REV.r);ctx.stroke();ctx.setLineDash([]);if(k>0){ctx.strokeStyle='#7fd66b';ctx.lineWidth=5;ctx.beginPath();ctx.arc(x,y,REV.r,-Math.PI/2,-Math.PI/2+TAU*k);ctx.stroke()}ctx.restore()};for(const a of RI.allies)ring(a.x,a.y,a.k,a.can);if(RI.me.down)ring(P.x,P.y,RI.me.k,RI.me.left>0)}}for(const m of mons)if(m.chill>0||m.frozen>0||m.rot>0||m.burn>0||m.shock>0||m.soak>0)drawSt(m);
   drawBeams()}else vsDraw2d(0);
   for(const s of shots){if(sight){circ(s.x,s.y,s.r+5);ctx.fillStyle='rgba(255,138,76,.28)';ctx.fill()}circ(s.x,s.y,s.r);ctx.fillStyle=col('#ff8a4c');ctx.fill();circ(s.x,s.y,s.r*.45);ctx.fillStyle='#fff';ctx.fill()}
   for(const a of allies)a.pet?drawPet(a):a.shade?drawShade(a):a.trophy?drawTrophy(a):a.apexAlly?drawApxAlly(a):drawAlly(a);
@@ -3033,14 +3210,16 @@ function startLevel(n){
   // the door chosen at the crossroads below (or forced for a test) changes this floor, if it is a plain fight; a door for a floor that is behind is forgotten
   {const dv=!MP.on&&window.__mb&&window.__mb.over&&window.__mb.over.door;if(dv&&DOOR[dv]&&n>=12)S.door={id:dv,n};if(S.door&&S.door.n<n)S.door=null;
     L.door=S.door&&S.door.n===n&&L.floorKind==='fight'&&DOOR[S.door.id]?S.door.id:null;if(L.door==='horde')L.waves=2;if(L.door)L.hint=DOOR[L.door].title+'. '+DOOR[L.door].risk}
-  TR=trialMake(L);DRE=dareMake(L,n);FN=null;CB.n=0;CB.best=0;CB.t=0;S.slowT=0;S.dmg0=ST.dmgTaken;S.dd0=ST.dmgDealt;AK=AK0;S.myT=null;PETS._htAt=-1;if(PETS.cmd==='hold'||VS)PETS.cmd='free';PETS.home=null;MINE=0;LNK=null;TAGOK=0;BIG=0;DOORS=null;FALLEN.length=0;PG.clear();
+  TR=trialMake(L);DRE=dareMake(L,n);FN=null;CB.n=0;CB.best=0;CB.t=0;S.slowT=0;S.dmg0=ST.dmgTaken;S.dd0=ST.dmgDealt;AK=AK0;S.myT=null;LK={m:null,hard:false,t:-9};PETS._htAt=-1;if(PETS.cmd==='hold'||VS)PETS.cmd='free';PETS.home=null;MINE=0;LNK=null;TAGOK=0;BIG=0;DOORS=null;FALLEN.length=0;PG.clear();
   freshBody();if(L.door==='wound')P.hp=Math.max(1,Math.ceil(P.maxHp/2));if(MP.on)mpSpawnAt();
   mons=[];shots=[];pshots=[];allies=[];zones=[];fields=[];bits=[];rings=[];floats=[];morsels=[];echoes=[];arcs=[];TSRC=[];S.elite=4;
-  S.paused=false;SND.levelStart();obstacles=buildRoom(n,L.room);boss=null;S.wave=null;
+  L.area=areaOf(n,L,!!DRE);L.haz=L.area==='ash'||L.area==='court'?{kind:L.area,t:4.5,n:0}:null;if(L.area&&!L.door&&L.hint==='Stronger than the last. So are you.')L.hint=ARENA.text[L.area];
+  S.paused=false;SND.levelStart();obstacles=buildRoom(n,L.room,L.area);boss=null;S.wave=null;if(L.area)emit('arena',{kind:'area',state:'start',theme:L.area,name:ARENA.names[L.area],text:ARENA.text[L.area]});
+  S.elDebt=0;L.elites=[];L.elN=CL()?0:elitesOf(n,L,!!DRE);
   if(CL()){} // a client's monsters come from the host
   else if(L.floorKind==='survive'||L.floorKind==='guard'){} // no monster of its own: the trial brings its own (trialStep)
   else if(L.waves){S.wave={n:1,of:L.waves};spawnWave();for(const m of mons)m.t+=.4}
-  else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2}
+  else{boss=spawn(L.kind,W/2,140,true,L.spec);arm(boss,L);boss.t=1.2;floorPay(boss,L);if(L.elN)eliteEscort(L.elN)}
   if(L.kind==='mimic'&&!CL())reshuffle();
   if(S.adv==='beastmaster')allies.push(ally('wolf'));
   PETS.down=false;PETS.fielded=[];PETS.dmg=0;S.note='';fieldPets();
@@ -3207,7 +3386,7 @@ function dropScreen(n,rk,next,second){
   // the dice of a drop are seeded with the floor and the hero as it stands (class, upgrade, boons, equipment, scrap): leaving on the reward screen and clearing the floor again brings the same drop, not a new roll
   let sd=2166136261;for(const ch of[n,S.cls,S.adv,S.scrap,second?1:0,...SLOTS.map(sl=>S.eq[sl].r+':'+S.eq[sl].lvl),...Object.values(S.b)].join('|'))sd=Math.imul(sd^ch.charCodeAt(0),16777619)>>>0;sd=sd||1;
   const rnd=()=>{sd^=sd<<13;sd>>>=0;sd^=sd>>>17;sd^=sd<<5;sd>>>=0;return sd/4294967296};for(let i=0;i<4;i++)rnd();
-  const L=S.L,luck=isTrial(L.floorKind),d=(window.__mb&&window.__mb.drop&&window.__mb.drop(n))||dropItem(n,{luck,more:(GR&&GR.level===n?GR.luck:0)+(frF(4)>1?Math.floor((frF(4)-1)*FR.more+rnd()):0),min:L.door==='wrath'?1:0,rnd,marks:!VS}),cur=S.eq[d.slot],after=cur?{...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]}:null,go=f=>()=>{f();eqSync();hud();emit('gear',gearInfo());next()};
+  const L=S.L,luck=isTrial(L.floorKind),d=(window.__mb&&window.__mb.drop&&window.__mb.drop(n))||dropItem(n,{luck,more:(GR&&GR.level===n?GR.luck:0)+(S.rite&&S.rite.lv===n&&!second?1:0)+(frF(4)>1?Math.floor((frF(4)-1)*FR.more+rnd()):0),min:L.door==='wrath'?1:0,rnd,marks:!VS}),cur=S.eq[d.slot],after=cur?{...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]}:null,go=f=>()=>{f();eqSync();hud();emit('gear',gearInfo());next()};
   const marks=(d.set?' It bears the mark of '+SETS[d.set].name+' ('+(SETN[d.set]||0)+' of 4 worn).':'')+(d.tr?' Trait, '+trName(d)+': '+trText(d):''),takes=cur&&(d.set||d.tr)&&(d.set!==cur.set||String(d.tr)!==String(cur.tr));
   if(!cur)return show({wide:true,cls:'gearDrop'+(luck?' trialPanel':''),col:RAR[d.r][1],kick:(second?second:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up':L.spec.name+' dropped')+' '+an(d.rarity)+' relic',title:d.name,body:itemLine(d)+'.'+marks+' A relic is a fourth thing to carry, and you carry none.',keys:rk,cards:[
     {title:'Wear it',sub:d.name,col:RAR[d.r][1],data:{gear:'wear'},body:'You get: '+itemLine(d)+(itemMarks(d)?'. Marks: '+itemMarks(d).slice(3)+'.':'.'),fn:go(()=>{S.eq[d.slot]=d})},
@@ -3477,6 +3656,7 @@ addEventListener('keydown',e=>{
   if(e.key==='Enter'&&!$('ov').hidden&&!(e.target&&e.target.tagName==='BUTTON')){if($('ovBtns').dataset.nodef!=='1')$('ovBtns').querySelector('button')?.click();return}
   if(VS&&P&&P.down&&!e.repeat&&(k==='atk'||e.key==='Tab')&&S.mode==='play'){e.preventDefault();return vsSpectate()}
   if((e.key==='x'||e.key==='X'||e.key==='t'||e.key==='T')&&!e.repeat&&S.mode==='play'&&!S.paused&&FN){e.preventDefault();finish();return} // the last rite
+  if((e.key==='Tab'||e.key==='y'||e.key==='Y')&&S.mode==='play'&&!S.paused&&!VS&&$('ov').hidden&&!e.ctrlKey&&!e.metaKey&&!e.altKey){e.preventDefault();if(!e.repeat)lockCycle();return} // the lock: the next target
   if(!k&&!e.repeat&&S.mode==='play'&&!S.paused&&$('ov').hidden&&!e.ctrlKey&&!e.metaKey&&!e.altKey&&e.key.length===1){const u=e.key.toUpperCase(),ci=PCMD.keys.indexOf(u);if((ci>=0||u==='Z')&&cmdCan()){e.preventDefault();petCommand(ci>=0?ci:(PCMD.ids.indexOf(cmdNow())+1)%4);return}}
   if(!k||e.target.tagName==='BUTTON'&&k==='atk'&&!$('ov').hidden)return;
   if(S.mode==='play'||S.mode==='clear')e.preventDefault();
@@ -3485,7 +3665,7 @@ addEventListener('keydown',e=>{
 });
 addEventListener('keyup',e=>{const k=KEY[e.key.length===1?e.key.toLowerCase():e.key];if(k)keys[k]=false});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false});
-cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;if(VS&&P&&P.down)return vsSpectate();const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:((e.clientX-r.left)/(r.width||1)*V2.bw-V2.ox)/V2.k,y:((e.clientY-r.top)/(r.height||1)*V2.bh-V2.oy)/V2.k};e.preventDefault()});
+cv.addEventListener('pointerdown',e=>{if(S.mode!=='play'||S.paused)return;if(VS&&P&&P.down)return vsSpectate();const r=cv.getBoundingClientRect(),R=MB.renderer;want.atk=true;want.pt=R&&R.ok&&R.screenToGame?R.screenToGame(e.clientX,e.clientY):{x:((e.clientX-r.left)/(r.width||1)*V2.bw-V2.ox)/V2.k,y:((e.clientY-r.top)/(r.height||1)*V2.bh-V2.oy)/V2.k};if(e.pointerType==='touch'&&!VS)lockTap(want.pt);e.preventDefault()});
 const pad=$('pad'),knob=$('knob');
 let padO=null; // where the thumb came down, relative to the stick's centre
 function padMove(e,down){
@@ -3510,7 +3690,7 @@ pressFx($('bAtk'));pressFx($('bDash'));
 // the last rite's prompt: a plain button until the page has one of its own (it may restyle or move #mbFin; the game shows and hides it and listens to it)
 const finB=document.createElement('button');finB.type='button';finB.id='mbFin';finB.hidden=true;finB.textContent='Last rite';finB.style.cssText='position:fixed;left:50%;bottom:24%;transform:translateX(-50%);z-index:30;padding:.6em 1.2em;font:inherit;font-size:1.1rem;color:#0d0c11;background:#ffd95e;border:2px solid #0d0c11;border-radius:10px';
 document.body.appendChild(finB);finB.addEventListener('pointerdown',e=>{finish();e.preventDefault()});
-function finUi(){const on=!!FN&&FN.state==='ready'&&S.mode==='play'&&!S.paused&&!!P&&!P.down;if(finB.hidden===on)finB.hidden=!on}
+function finUi(){const join=!!FN&&FN.state==='play'&&MP.on&&!VS&&FN.by!==MP.myIdx&&!FN.join.includes(MP.myIdx)&&!FN._asked,on=!!FN&&(FN.state==='ready'||join)&&S.mode==='play'&&!S.paused&&!!P&&!P.down;if(finB.hidden===on)finB.hidden=!on;const tx=join?'Join the rite':'Last rite';if(on&&finB.textContent!==tx)finB.textContent=tx}
 // Six skill buttons (touch) and a skill bar under the vitals (keyboard). Both show the skill's name and the seconds left; MB.skills carries the same data.
 // The touch cluster is a 3 x 3 grid laid out in index.html: skills in two columns, first skills at the bottom, Dash above a tall Strike on the outside.
 const skB=[$('bSkill')],skL=[],skBar=document.createElement('ul');
@@ -3703,7 +3883,8 @@ function mpOnHit(msg,from){
     if(k==='sx'){const i=shots.findIndex(s=>s.id===op[1]);if(i>=0){MP.sd.push(op[1]);shots.splice(i,1)}continue}
     if(k==='mo'){morsels=morsels.filter(f=>f.id!==op[1]);continue}
     if(k==='vp'){vamp();continue}
-    if(k==='fin'){const r=MP.rById.get(''+from);if(r&&FN&&FN.id===op[1]){if(FN.state==='ready')finStart(r.idx);else if(FN.by===r.idx&&FN.t>=FIN.min)finEnd(true)}if(S.mode!=='play')break;continue}
+    if(k==='ob'){const r=MP.rById.get(''+from);if(r)objHit(op[1]|0,(+op[2]||0)/100,r.idx,1);continue}
+    if(k==='fin'){const r=MP.rById.get(''+from);if(r&&FN&&FN.id===op[1]){if(FN.state==='ready')finStart(r.idx);else if(FN.by===r.idx){if(FN.t>=FIN.min)finEnd(true)}else finJoin(r.idx)}if(S.mode!=='play')break;continue}
     let m=null;for(const x of mons)if(x.id===op[1]){m=x;break}if(!m)continue;
     REM=from||true;
     try{
@@ -3717,8 +3898,8 @@ function mpOnHit(msg,from){
       else if(k==='vn'){const v=+op[2];if(v>0){m.venT=3;m.venD=Math.max(m.venD||0,v);m.venK=.5;m.venBy=null;m.venRem=REM;puff(m,TCOL.assassin,10,120)}}
       else if(k==='mv'){if(!m.hidden&&m.st!=='leap')mMove(m,+op[2]||m.x,+op[3]||m.y)}
       else if(k==='bk'){const v=+op[2];if(v>0)brkTake(m,Math.min(40,v))}
-      else if(k==='tg'){const b=op[2]|0;if((b===1||b===2||b===4)&&!m.decoy&&R12())tagPut(m,b,op[3]?SETK.kind2:0)}
-      else if(k==='lk'){const i=op[2]|0,kd=LINK.kinds[i],L=LINK.pay[kd],r=MP.rById.get(''+from);if(L&&m.tgT&&m.tgT[i]>0){m.tgT[i]=0;m.tags&=~L.bit;MP.lkq.push([m.id,i,r?r.idx:-1]);emit('link',{id:m.id,x:m.x,y:m.y,kind:kd,tag:L.tag,name:L.name,bonus:0,by:r?r.idx:-1})}}
+      else if(k==='tg'){const b=op[2]|0;if((b===1||b===2||b===4)&&!m.decoy&&R12()){const rr=MP.rById.get(''+from);tagPut(m,b,op[3]?SETK.kind2:0,rr?rr.idx:-1)}}
+      else if(k==='lk'){const i=op[2]|0,kd=LINK.kinds[i],L=LINK.pay[kd],r=MP.rById.get(''+from);if(L&&m.tgT&&m.tgT[i]>0){const sb=m.tgBy?m.tgBy[i]:-1,duo=!!r&&sb>=0&&sb!==r.idx;m.tgT[i]=0;m.tags&=~L.bit;MP.lkq.push([m.id,i,r?r.idx:-1,duo?sb+1:0]);if(duo&&sb===MP.myIdx)linkMine(m,L,r.idx);emit('link',{id:m.id,x:m.x,y:m.y,kind:kd,tag:L.tag,name:L.name,bonus:0,by:r?r.idx:-1,duo,setBy:duo?sb:-1})}}
     }finally{REM=null}
     if(S.mode!=='play')break; // that was the boss
   }
@@ -3727,7 +3908,7 @@ function mpOnHit(msg,from){
 function mpMonDyn(m){
   const f=(m.hidden?1:0)|(m.flash>0?2:0)|(m.ward>0?4:0)|(m.rage?8:0)|(m.stun>0?16:0)|(m.slow>0?32:0)|(m.markT>0?64:0)|(m.dotT>0||m.venT>0?128:0)|(m.moving?256:0)|(m.ward>.3?512:0)|(m.side<0?1024:0)|(m.frozen>0?2048:0)|(m.burn>0?4096:0)|(m.shock>0?8192:0)|(m.soak>0?16384:0)|(m.chill>0?Math.max(1,Math.round(m.chill*3))<<15:0)|(m.rot>0?Math.min(5,m.rot)<<17:0);
   const st=m.st,a=[m.id,Math.round(m.x),Math.round(m.y),hpR(m.hp),STI[st]||0,f,m.tgt?(m.tgt===P?MP.myIdx:m.tgt._mi):-1,m.ai==='mite'?0:Math.round(m.t*10)||0,
-    st==='wind'||st==='charge'||st==='lunge'||st==='dazed'?Math.round(m.ang*100)||0:0,Math.round(m.lift*100)||0,(m.phase||1)-1,(m.tags||0)&7|(m.stagT>0?8:0),m.brkMax?Math.round(m.brk/m.brkMax*100)+1:0];
+    st==='wind'||st==='charge'||st==='lunge'||st==='dazed'?Math.round(m.ang*100)||0:0,Math.round(m.lift*100)||0,(m.phase||1)-1,(m.tags||0)&7|(m.stagT>0?8:0),m.brkMax?Math.round(m.brk/m.brkMax*100)+1:0,m.tags&&m.tgBy?(m.tgBy[0]+1&15)|(m.tgBy[1]+1&15)<<4|(m.tgBy[2]+1&15)<<8:0];
   while(a.length>7&&!a[a.length-1])a.pop();return a}
 const beamOut=b=>{const a=[b.on?1:0,b.w];for(const r of b.rays)a.push(Math.round(r.a*100),Math.round(r.len));return a};
 function beamIn(o,d){const n=(d.length-2)>>1;let b=o.beam;if(!b||b.rays.length!==n)b=o.beam={on:false,w:12,rays:Array.from({length:n},()=>({a:0,len:0}))};b.on=!!d[0];b.w=+d[1]||12;for(let i=0;i<n;i++){b.rays[i].a=d[2+i*2]/100;b.rays[i].len=+d[3+i*2]||0}if(n)o.ba=b.rays[0].a}
@@ -3735,7 +3916,7 @@ function mpSendWorld(now){
   if(S.mode!=='play')return;
   const full=MP.full,wm=full?0:MP.wm,w={t:'w',c:Math.round(now),n:S.level},M=[];let mn=null,b=null,sn=null,zn=null;if(full)w.f=1;
   for(const m of mons){
-    if(m.id>wm){const a=[m.id,m.kind,(m.boss?1:0)|(m.lesser?2:0)|(m.decoy?4:0)|(m.siege?8:0)|(m.quarry?16:0),hpR(m.maxHp)];if(m.lesser&&SPEC[m.kind]&&m.s.col!==SPEC[m.kind].col)a.push(m.s.col);(mn||(mn=[])).push(a)}
+    if(m.id>wm){const a=[m.id,m.kind,(m.boss?1:0)|(m.lesser?2:0)|(m.decoy?4:0)|(m.siege?8:0)|(m.quarry?16:0)|(m.el?m.el<<5:0),hpR(m.maxHp)];if(m.lesser&&SPEC[m.kind]&&m.s.col!==SPEC[m.kind].col)a.push(m.s.col);(mn||(mn=[])).push(a)}
     M.push(mpMonDyn(m));if(m.beam)(b||(b={}))[m.id]=beamOut(m.beam)}
   w.m=M;if(mn)w.mn=mn;if(b)w.b=b;
   for(const s of shots)if(s.id>wm&&!s.dead)(sn||(sn=[])).push([s.id,Math.round(s.x),Math.round(s.y),Math.round(s.vx),Math.round(s.vy),s.r]);if(sn)w.sn=sn;
@@ -3747,8 +3928,8 @@ function mpSendWorld(now){
   const wk=S.wave?S.wave.n+'/'+S.wave.of:'';if(full||wk!==MP.wvKey){MP.wvKey=wk;w.wv=S.wave?[S.wave.n,S.wave.of,Math.round(S.wave.hp0||0)]:0}
   if(TR)w.tr=[Math.round(TR.t*10),TR.obj?TR.obj.hp:0,TR.failed?1:0]; // the trial: its clock (x10), the lamp's health, lost
   if(DRE)w.ob=[DARES.kinds.indexOf(DRE.kind),DRE.state==='run'?0:DRE.state==='done'?1:2,Math.round(DRE.t*10),DRE.obj?DRE.obj.hp:0,Math.round(DRE.value*10)/10]; // the dare
-  if(MP.lkq.length){w.lk=MP.lkq;MP.lkq=[]}
-  if(FN)w.fn=[FN.state==='play'?2:1,FN.id,FN.by,Math.round(FN.t*100)]; // the last rite: ready or playing
+  if(MP.lkq.length){w.lk=MP.lkq;MP.lkq=[]}if(MP.elq.length){w.el=MP.elq;MP.elq=[]}if(MP.oeq.length){w.oe=MP.oeq;MP.oeq=[]}if(full&&obstacles.length&&objOn())w.os=obstacles.map(o=>o.kind==='pillar'?(o.dead?9:o.cr||0):o.kind==='brazier'?(o.spent?9:0):o.fell?9:o.warn?1:0).join('');
+  if(FN){w.fn=[FN.state==='play'?2:1,FN.id,FN.by,Math.round(FN.t*100)];if(FN.join&&FN.join.length)w.fn.push(FN.join.reduce((a,i)=>a|1<<i,0))} // the last rite: ready or playing (and who has joined it)
   MP.wm=NEXTID-1;MP.full=false;nsend(w);
 }
 // a client hears of the dare, of payoffs and of the last rite
@@ -3756,20 +3937,23 @@ function mpR12In(w){
   const q=w.ob,d=DRE;
   if(q&&d){d.t=(+q[2]||0)/10;if(d.dur)d.left=Math.max(0,d.dur-d.t);d.value=+q[4]||0;if(d.obj){const hp=Math.max(0,+q[3]||0);if(hp<d.obj.hp){d.obj.flash=.3;puff(d.obj,'#ffd95e',10,170);sfx(320,.2,'square',.2,120);floats.push({x:d.obj.x,y:d.obj.y-d.obj.r-16,txt:'-1',life:.8,c:'#ff5b6e'})}d.obj.hp=hp}
     if(q[1]&&d.state==='run')dareEnd(q[1]===1?'done':'fail')}
-  if(w.lk)for(const a of w.lk){if(a[2]===MP.myIdx)continue;const m=MP.mons.get(a[0]),kd=LINK.kinds[a[1]|0],L=LINK.pay[kd];if(m&&L){floats.push({x:m.x,y:m.y-m.r-28,txt:L.name,life:1,c:L.col,big:1.4});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});emit('link',{id:m.id,x:m.x,y:m.y,kind:kd,tag:L.tag,name:L.name,bonus:0,by:a[2]|0})}}
+  if(w.el)for(const a of w.el){const k=a[2]|0;if(!ELITE.kinds[k])continue;floats.push({x:+a[0]||0,y:(+a[1]||0)-40,txt:'Elite down',life:1.2,c:ELITE.col,big:1.4});emit('elite',{state:'down',id:0,kind:ELITE.kinds[k],x:+a[0]||0,y:+a[1]||0})}
+  if(w.lk)for(const a of w.lk){if(a[2]===MP.myIdx)continue;const m=MP.mons.get(a[0]),kd=LINK.kinds[a[1]|0],L=LINK.pay[kd],duo=(a[3]|0)>0;if(m&&L){floats.push({x:m.x,y:m.y-m.r-28,txt:(duo?'Linked ':'')+L.name,life:duo?1.3:1,c:L.col,big:duo?1.8:1.4});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});if(duo&&(a[3]|0)-1===MP.myIdx)linkMine(m,L,a[2]|0);emit('link',{id:m.id,x:m.x,y:m.y,kind:kd,tag:L.tag,name:L.name,bonus:0,by:a[2]|0,duo,setBy:duo?(a[3]|0)-1:-1})}}
   const f=w.fn;
   if(f){const b=MP.mons.get(f[1]);
-    if(!FN){FN={state:'ready',id:f[1],by:-1,cls:null,adv:null,apex:null,name:'',t:0,dur:FIN.dur,x:b?b.x:W/2,y:b?b.y:H/2,hx:P.x,hy:P.y};finEv('ready');if(f[0]===1&&b)finCue(b)}
+    if(!FN){FN={state:'ready',join:[],id:f[1],by:-1,cls:null,adv:null,apex:null,name:'',t:0,dur:FIN.dur,x:b?b.x:W/2,y:b?b.y:H/2,hx:P.x,hy:P.y};finEv('ready');if(f[0]===1&&b)finCue(b)}
     if(b){FN.x=b.x;FN.y=b.y}
-    if(f[0]===2&&FN.state!=='play'){Object.assign(FN,finInfo(f[2]|0),{state:'play',t:(+f[3]||0)/100});finBegun()}}
+    if(f[0]===2&&FN.state!=='play'){Object.assign(FN,finInfo(f[2]|0),{state:'play',t:(+f[3]||0)/100,join:[]});finBegun()}
+    if(f[0]===2&&f[4]){const mk=f[4]|0;for(let i=0;i<8;i++)if(mk&1<<i&&!FN.join.includes(i)&&i!==FN.by){FN.join.push(i);finJoined(i)}}}
   else if(FN){finEv(FN.state==='play'?'end':'gone');FN=null}
 }
 /* --- a client's copy of the world --- */
 function mpMkMon(a){
   const id=a[0],kind=typeof a[1]==='string'&&own(SPEC,a[1])?a[1]:'mite',fl=a[2]|0,maxHp=+a[3]||1,L=S.L;let s;
   if(fl&1)s=L.spec;else if(fl&2){s=lesserSpec(kind,S.level,maxHp);if(typeof a[4]==='string'&&/^#[0-9a-f]{6}$/i.test(a[4]))s.col=a[4]}else s=SPEC[kind];
-  return{id,kind,s,ai:AI[s.ai||kind]?s.ai||kind:'mite',x:W/2,y:140,r:s.r,hp:maxHp,maxHp,boss:!!(fl&1),lesser:!!(fl&2),decoy:!!(fl&4),siege:!!(fl&8),quarry:!!(fl&16),st:'idle',t:1,n:0,flash:0,ring:0,ang:0,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,
-    mods:fl&1?(L.mods||[]).slice():[],ward:0,beam:null,vx:0,vy:0,moving:false,rage:false,phase:1,rep:true,_new:true}}
+  const m={id,kind,s,ai:AI[s.ai||kind]?s.ai||kind:'mite',x:W/2,y:140,r:s.r,hp:maxHp,maxHp,boss:!!(fl&1),lesser:!!(fl&2),decoy:!!(fl&4),siege:!!(fl&8),quarry:!!(fl&16),st:'idle',t:1,n:0,flash:0,ring:0,ang:0,side:1,hits:0,seed:rand()*9,hidden:false,lift:0,
+    mods:fl&1?(L.mods||[]).slice():[],ward:0,beam:null,vx:0,vy:0,moving:false,rage:false,phase:1,rep:true,_new:true};
+  const el=(fl>>5)&7;if(el>=1&&el<=ELITE.kinds.length&&(fl&2)){m.el=el;m.r=Math.round(m.r*ELITE.r);m.s={...m.s,name:ELITE.names[el-1]+' '+m.s.name.replace('Lesser ',''),r:m.r};if(S.L){(S.L.elites||(S.L.elites=[])).push(ELITE.kinds[el-1]);if(!window.MBEliteBand)floats.push({x:W/2,y:H/2-90,txt:'Elite: '+ELITE.names[el-1],life:2.4,c:ELITE.col});emit('elite',{state:'enter',kinds:[ELITE.kinds[el-1]],names:[ELITE.names[el-1]]})}}return m}
 function mpNeedSync(now){if(now<MP.tSync)return;MP.tSync=now+1000;MP.synced=false;nsend({t:'sync'},MP.hostId)}
 function mpOnWorld(w,from){
   if(MP.role!=='client'||from!==undefined&&from!==null&&''+from!==MP.hostId)return;
@@ -3795,7 +3979,7 @@ function mpOnWorld(w,from){
     if(f>2047||m._st){m._st=f>2047;m.frozen=f&2048?.3:0;m.burn=f&4096?.3:0;m.shock=f&8192?.3:0;m.soak=f&16384?.3:0;m.chill=(f>>15&3)/3;m.rot=f>>17&7;m.rotT=m.rot?1:0}
     if(a[7]!==undefined&&m.ai!=='mite')m.t=a[7]/10;if(a[8])m.ang=a[8]/100;
     const ph=(a[10]||0)+1;if(ph>(m.phase||1)){m.phase=ph;if(!fresh)phaseFx(m)}m.phase=ph;
-    {const tg=a[11]|0,sg=!!(tg&8);m.tags=tg&7;if(sg!==m.stagT>0){if(sg)m.stagMax=BRK.stag;emit('stagger',{id:m.id,state:sg?'start':'end',dur:sg?BRK.stag:0,x:m.x,y:m.y});if(sg&&!fresh){rings.push({x:m.x,y:m.y,life:.6,max:.6,r:m.r+90,fx:true});floats.push({x:m.x,y:m.y-m.r-30,txt:'Reeling',life:1.4,c:'#ffd95e',big:1.4})}}m.stagT=sg?.3:0;if(a[12]){m.brkMax=100;m.brk=a[12]-1}else m.brkMax=0}
+    {const tg=a[11]|0,sg=!!(tg&8);m.tags=tg&7;if(sg!==m.stagT>0){if(sg)m.stagMax=BRK.stag;emit('stagger',{id:m.id,state:sg?'start':'end',dur:sg?BRK.stag:0,x:m.x,y:m.y});if(sg&&!fresh){rings.push({x:m.x,y:m.y,life:.6,max:.6,r:m.r+90,fx:true});floats.push({x:m.x,y:m.y-m.r-30,txt:'Reeling',life:1.4,c:'#ffd95e',big:1.4})}}m.stagT=sg?.3:0;if(a[12]){m.brkMax=100;m.brk=a[12]-1}else m.brkMax=0;{const c=a[13]|0;m.tgBy=c?[(c&15)-1,(c>>4&15)-1,(c>>8&15)-1]:null}}
     const bd=w.b&&w.b[m.id];if(bd)beamIn(m,bd);else if(m.beam)m.beam=null;
     list.push(m);if(m.boss)bs=m}
   if(byId.size>list.length)for(const[id,m]of byId)if(m._seen!==seen){byId.delete(id);if(!m._gone)puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P&&!P.down)manaGive(P.maxMana*MKILL);if(!m.boss&&!w.f&&m.hp<m.maxHp*.5)fallen(m)}
@@ -3810,6 +3994,8 @@ function mpOnWorld(w,from){
   if(w.zn)for(const a of w.zn){const z={id:a[0],x:a[1],y:a[2],r:+a[3]||60,dur:(+a[4]||100)/100,t:(+a[5]||0)/100};if(a[6]!==undefined&&a[6]!==null){z.sx=a[6];z.sy=a[7]}if(a[8])z.hz=1;zones.push(z)}
   if(w.mo)morsels=w.mo.filter(a=>!MP.ate.has(a[0])).map(a=>({id:a[0],x:a[1],y:a[2]}));
   if(w.o)for(let i=0;i<w.o.length&&i<obstacles.length;i++)obstacles[i].t=w.o[i]/100;
+  if(typeof w.os==='string')for(let i=0;i<w.os.length&&i<obstacles.length;i++){const o=obstacles[i],c=+w.os[i]||0;if(o.kind==='pillar'){if(c===9)o.dead=true;o.cr=c===9?ARENA.pillarHp:c}else if(o.kind==='brazier'){if(c===9&&!o.spent){o.spent=true;o.per=0;o.on=false;o.warn=false;o.tip=0}}else if(o.kind==='crack'){if(c===9){o.kind='pit';o.r=ARENA.crackR-2;o.fell=true;o.warn=false}else if(c===1&&!o.warn){o.warn=true;o.wt=ARENA.crackWarn}}}
+  if(w.oe)for(const a of w.oe)objDo(a[0]|0,a[1]|0,(+a[2]||0)/100,a[3]|0);
   if(w.wv!==undefined){
     if(w.wv){const n=w.wv[0],of=w.wv[1];if(!S.wave||S.wave.n!==n){floats.push({x:W/2,y:H/2-90,txt:of>1?'Pack '+n+' of '+of:'The pack',life:1.6,c:'#d6a544'});sfx(150,.4,'sawtooth',.2,90)}S.wave={n,of,hp0:w.wv[2]||1};$('bossName').textContent='Wave '+n+' of '+of}
     else{const had=S.wave;S.wave=null;$('bossName').textContent=L.spec.name;
@@ -3862,6 +4048,8 @@ function mpSendMe(now,force){
       if(f.ax){const q=f.kind==='quake';a[3]=q?f.w:f.r;a[4]=Math.round(Math.min(600,f.dur)*100);a.push(Math.round(q?f.x2:f.vx||0),Math.round(q?f.y2:f.vy||0),f.follow?1:0)}(msg.f||(msg.f=[])).push(a)}
     if(MP.aq.length){msg.ar=MP.aq;MP.aq=[]}
     if(MP.pcOut){msg.pc=MP.pcOut;MP.pcOut=null;ev=true} // round 14: my order to my pets (index in PCMD.ids, the hold point)
+    if(MP.rvOut){msg.rv=MP.rvOut;MP.rvOut=null;ev=true} // round 15: I am raising that member (index, percent; 100: raised)
+    if(P.down&&!VS)msg.rn=P.rvN|0; // how often I have been raised on this floor
     if(MP.rpOut){msg.rp=MP.rpOut;MP.rpOut=null;ev=true} // round 13: my riposte landed there (x, y, angle x100), so the other pages can draw it
     if(S.apex&&APXSTEP[S.apex]&&cls()){const hs=[P.blades|0,P.plates|0,Math.round((P.haste||0)*10),P.pack|0],k=hs.join();if(k!==MP.hsKey||force){MP.hsKey=k;msg.hs=hs;ev=true}}
     if(MP.rq.length){msg.r=MP.rq;MP.rq=[]}
@@ -3903,6 +4091,10 @@ function mpOnMe(msg,from){
     sPush(q,c,+p[0]||0,+p[1]||0,0);sVel(q);if(!q._s||q._s.length<=4){q.x=+p[0]||0;q.y=+p[1]||0;q.vx=q.vy=0}
     q.face=(p[2]||0)/100;q.moving=!!(f&1);q.inv=f&2?.2:0;q.shield=!!(f&16);r.dead=q.down=!!(f&32);r.look.skill0Ready=!!(f&128);q.skCd=f&128?0:1;q.hp=+p[4]||0;q.maxHp=+p[5]||1;q.swing=(p[6]||0)/100;if(p[7]>0)q.atk=p[7]/100;if(p[8]>0)q.dashT=p[8]/100;
     {const v=p[9]|0,pd=!!(v&32);if((v&15)!==q.chS)q.chT=0;q.chS=v&15;q.chC=!!(v&16);q.chN=CHN[r.look.cls||'none'].steps.length;if(pd&&!(q.pdT>0)&&!aw)emit('perfectDodge',{by:r.idx,x:q.x,y:q.y,src:'',slow:0,window:PD.haste,mana:0});q.pdT=pd?.4:0;q.rip=v&64?.4:0}}
+  if(msg.rn!==undefined)r.rvN=msg.rn|0;else if(!r.dead)r.rvN=r.rvN|0;
+  if(Array.isArray(msg.rv)&&!VS){const who=msg.rv[0]|0,k=+msg.rv[1]||0,now2=performance.now();
+    if(who===MP.myIdx){if(k>=100)mpRaised(r.idx);else if(P&&P.down){MP.revBy=k>0?{by:r.idx,k:k/100,at:now2}:null;if(k>0&&(P.rvN|0)<REV.max)MP.note=r.name+' is raising you.'}}
+    else{const t=MP.byIdx[who];if(t){t.rev=k>0&&k<100?{by:r.idx,k:k/100,at:now2}:null;if(k>=100){floats.push({x:t.P.x,y:t.P.y-52,txt:'Raised',life:1.4,c:'#7fd66b',big:1.4});rings.push({x:t.P.x,y:t.P.y,life:.6,max:.6,r:90,fx:true});emit('revive',{state:'done',by:r.idx,who,k:1,x:t.P.x,y:t.P.y})}}}}
   if(msg.bm!==undefined){const q=r.P;if(Array.isArray(msg.bm)){q.beam=q.beam||{a:0,len:0,w:14,on:true};q.beam.a=(+msg.bm[0]||0)/100;q.beam.len=Math.max(0,Math.min(1200,+msg.bm[1]||0));q._bm=performance.now()}else q.beam=null}
   if(msg.an)for(const a of msg.an)mpMkAlly(r,a);
   if(msg.a){const out=r.allies,seen=++r._seen;out.length=0;for(const d of msg.a){const o=r._al.get(d[0]);if(!o)continue;o._seen=seen;mpAllyIn(o,d,c);out.push(o)}
@@ -3946,10 +4138,37 @@ function mpGo(n,retry){ // host: the level starts for all
 function mpSpawnAt(){const n=Math.max(1,MP.slots),i=MP.myIdx%n;P.x=W/2+(i-(n-1)/2)*Math.min(56,420/n);P.safeX=P.x;P.down=false;MP.down=false}
 function mpLevelStarted(){
   if(cmdNow()!=='free')MP.pcOut=[PCMD.ids.indexOf(cmdNow()),Math.round(P.x),Math.round(P.y)];else MP.pcOut=[0,0,0];
-  MP.mons.clear();MP.q=[];MP.qd.clear();MP.sd=[];MP.ate.clear();MP.moKey='?';MP.wvKey='?';MP.hadAl=true;MP.menu=false;MP.note='';MP.pKey='';MP.rq.length=0;MP.aq.length=0;MP.hsKey='';MP.lkq=[];for(const r of MP.remotes)r._dh=undefined;
+  MP.mons.clear();MP.q=[];MP.qd.clear();MP.sd=[];MP.ate.clear();MP.moKey='?';MP.wvKey='?';MP.hadAl=true;MP.menu=false;MP.note='';MP.pKey='';MP.rq.length=0;MP.aq.length=0;MP.hsKey='';MP.lkq=[];MP.elq=[];MP.oeq=[];for(const r of MP.remotes)r._dh=undefined;
   if(MP.role==='host'){MP.full=true;MP.wm=0}else{MP.synced=false;boss=null;MP.tSync=0}
   for(const r of MP.remotes){r.pshots.length=0;r.echoes.length=0}
   mpSendMe(performance.now(),true);
+}
+/* ---------- round 15: co-op. A hero who is down can be raised; a payoff on a setup of another hero is a linked one; a last rite can be joined ---------- */
+// Raising: a hero standing within REV.r of an ally who is down for REV.t seconds, without being wounded meanwhile, raises it at REV.hp of its health (untouchable for REV.inv seconds). A hero can be raised
+// REV.max times on a floor; after that it waits for the floor to be cleared, as before. The one who raises counts the seconds and tells the others through its `me` message (rv: [member index, percent]; 100 = raised).
+const REV={r:66,t:2.6,hp:.4,inv:1.6,max:2};
+function mpReviveStep(dt){
+  if(!MP.on||VS||!P)return;if(P.down||S.mode!=='play'||MP.away||FN&&FN.state==='play'){if(P.revT>0){P.revT=0;MP.rvOut=[P.revI|0,0]}return}
+  let t=null,bd=1e9;for(const r of MP.remotes){if(!r.dead||r.away||(r.rvN|0)>=REV.max)continue;const d=dist(r.P,P);if(d<REV.r&&d<bd){bd=d;t=r}}
+  if(!t){if(P.revT>0){P.revT=0;MP.rvOut=[P.revI|0,0];emit('revive',{state:'stop',by:-1,who:P.revI|0,k:0})}return}
+  if(P.revI!==t.idx||!(P.revT>0)){P.revI=t.idx;P.revT=0;emit('revive',{state:'start',by:-1,who:t.idx,k:0,x:t.P.x,y:t.P.y})}
+  P.revT+=dt;t.rev={by:MP.myIdx,k:Math.min(1,P.revT/REV.t),at:performance.now()};
+  if(P.revT>=REV.t){P.revT=0;MP.rvOut=[t.idx,100];t.rvN=(t.rvN|0)+1;t.rev=null;floats.push({x:t.P.x,y:t.P.y-52,txt:'Raised',life:1.4,c:'#7fd66b',big:1.4});rings.push({x:t.P.x,y:t.P.y,life:.6,max:.6,r:90,fx:true});sfx(520,.4,'triangle',.2,1040);haptic([20,30,60]);emit('revive',{state:'done',by:-1,who:t.idx,k:1,x:t.P.x,y:t.P.y})}
+  else if(!MP.rvOut||MP.rvOut[1]!==100)MP.rvOut=[t.idx,Math.max(1,Math.min(99,Math.round(P.revT/REV.t*100)))];
+}
+// an ally has raised me
+function mpRaised(by){
+  if(!P||!P.down||S.mode!=='play'||VS||(P.rvN|0)>=REV.max)return false;const r=MP.byIdx[by];
+  P.down=false;MP.down=false;P.rvN=(P.rvN|0)+1;P.hp=Math.max(1,Math.ceil(P.maxHp*REV.hp));P.inv=REV.inv;P.mana=Math.min(P.mana,manaRoom());MP.note='';MP.revBy=null;
+  floats.push({x:P.x,y:P.y-52,txt:r?'Raised by '+r.name:'You are raised',life:1.8,c:'#7fd66b',big:1.4});rings.push({x:P.x,y:P.y,life:.6,max:.6,r:90,fx:true});SND.skill('healer');haptic([20,30,60]);
+  if(S.adv==='beastmaster')allies.push(ally('wolf'));fieldPets(true);hud();emit('revive',{state:'done',by,who:-1,k:1,x:P.x,y:P.y,left:REV.max-P.rvN});mpSendMe(performance.now(),true);return true;
+}
+// what MB.revive hands out in co-op: {r, t, max, me:{down, by, k, left}, allies:[{idx, name, x, y, k, by, can}], mine:{idx, k}|null}
+function reviveInfo(){
+  if(!MP.on||VS||!P)return null;const now=performance.now(),rb=MP.revBy&&now-MP.revBy.at<600?MP.revBy:null;
+  return{r:REV.r,t:REV.t,max:REV.max,me:{down:!!P.down,by:rb?rb.by:-1,k:rb?rb.k:0,left:Math.max(0,REV.max-(P.rvN|0))},
+    allies:MP.remotes.filter(r=>r.dead&&!r.away).map(r=>{const v=r.rev&&now-r.rev.at<600?r.rev:null;return{idx:r.idx,name:r.name,x:r.P.x,y:r.P.y,k:v?v.k:0,by:v?v.by:-1,can:(r.rvN|0)<REV.max}}),
+    mine:P.revT>0?{idx:P.revI|0,k:Math.min(1,P.revT/REV.t)}:null};
 }
 function mpRise(){if(P&&P.down){P.down=false;MP.down=false;P.hp=P.maxHp;P.inv=0;MP.note='';floats.push({x:P.x,y:P.y-52,txt:'You rise',life:1.6,c:'#7fd66b'});hud()}}
 function mpCleared(){ // host: the boss is dead (called from hurtM)
@@ -3997,7 +4216,7 @@ function mpDown(){
   P.hp=0;P.down=true;MP.down=true;P.inv=0;P.moving=false;P.dashT=0;P.atk=0;P.vx=P.vy=0;P.stormT=P.fireT=P.renewT=0;P.cutN=P.starN=P.quakeN=0;P.rushHit=null;P.rushD=0;
   ST.deaths++;SND.dead();for(const a of allies)puff(a,'#e7dfcd',6);allies=[];TSRC=[];fields=fields.filter(f=>f.rem);
   for(const k in keys)keys[k]=false;want.atk=want.dash=want.skill=false;want.pt=null;
-  floats.push({x:P.x,y:P.y-52,txt:'You are down',life:2.5,c:'#ff5b6e'});MP.note='You are down. You rise when the floor is cleared.';hud();
+  floats.push({x:P.x,y:P.y-52,txt:'You are down',life:2.5,c:'#ff5b6e'});MP.note=(P.rvN|0)<REV.max&&!VS?'You are down. An ally who stands by you for a moment can raise you.':'You are down. You rise when the floor is cleared.';P.revT=0;hud();emit('revive',{state:'down',by:-1,who:-1,k:0,x:P.x,y:P.y,left:Math.max(0,REV.max-(P.rvN|0))});
   mpSendMe(performance.now(),true);
 }
 function mpFail(now){ // host: when no one is left standing the level starts again for all
@@ -4730,7 +4949,7 @@ window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door
   PCMD,get petCmd(){return cmdInfo()},petCommand:c=>petCommand(c),
   PHASES:PH,get bossPhase(){return phInfo()},
   ALT,alterations:si=>altList(si|0),setAlteration:(si,j)=>altSet(si|0,j|0),get alterationsFree(){return!!P&&altFree()},openSkills:back=>{if(S.cls&&act2()&&!VS)loadout(typeof back==='function'?back:API.hide)},
-  FRAME:FR,get frame(){return frInfo()},get gear(){return gearInfo()},SETS,TRAITS,openGear:back=>{if(S.cls&&act2()&&!VS)gearScreen(typeof back==='function'?back:API.hide)},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
+  FRAME:FR,get frame(){return frInfo()},get gear(){return gearInfo()},SETS,TRAITS,ELITE,ARENA,get arena(){return arenaInfo()},REV,get revive(){return reviveInfo()},LOCK,get lock(){return lockInfo()},lockCycle:()=>lockCycle(),lockClear:()=>{lockDrop();return true},lockOn:id=>{const m=mons.find(x=>x.id===id);if(m&&!VS&&lockOk(m)&&!m.hidden){lockPut(m,true);return true}return false},get elites(){return mons.filter(m=>m.el&&m.hp>0).map(m=>({id:m.id,kind:ELITE.kinds[m.el-1],name:m.s.name,x:m.x,y:m.y,r:m.r,hp:m.hp,maxHp:m.maxHp,ward:m.ward>0}))},openGear:back=>{if(S.cls&&act2()&&!VS)gearScreen(typeof back==='function'?back:API.hide)},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
   // round 12 (see the contract in the round-12 notes)
   CHAINS:CHN,PD,BRK,FIN,LINK,DARES,GRD,get chain(){return{count:CB.n,best:CB.best,t:Math.max(0,CB.t),cls:cls(),style:CHN[cls()||'none'].style,steps:CHN[cls()||'none'].steps.length}},breakOf:m=>m&&m.brkMax?Math.max(0,m.brk/m.brkMax):-1,
   get finisher(){return FN},finish:()=>finish(),get objective(){return DRE},get grade(){return GR},skillLink:i=>{const c=cls(),si=c?slotSkill(i|0):-1,d=si>=0&&skD(c,si);if(!d)return{sets:[],pays:[]};const o=linkInfo(d[4]),A=altOf(si);if(A&&A.sets&&!o.sets.includes(A.sets))o.sets.push(A.sets);return o},
@@ -4758,7 +4977,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={SETS,SETK,TRAITS,TRK,gearScreen,dropItem,mkItem:item,gear:o=>{if(!S.cls)return null;if(!S.eq)S.eq=basicSet(S.cls);for(const sl of ESLOTS){const g=o&&o[sl];if(g===null){if(sl==='relic')delete S.eq.relic;continue}if(!g)continue;const cur=S.eq[sl]||item(S.cls,sl,1);S.eq[sl]=item(S.cls,sl,g.r!==undefined?g.r:cur.r,cur.lvl,cur.up,cur.m,g.set!==undefined?g.set:cur.set,g.tr!==undefined?g.tr:cur.tr)}eqSync();frApply();hud();return gearInfo()},TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={REV,mpRaised,finJoin,LOCK,get LK(){return LK},lockTap,ARENA,areaOf,themeOf,objHit,objDo,ELITE,elitesOf,SETS,SETK,TRAITS,TRK,gearScreen,dropItem,mkItem:item,gear:o=>{if(!S.cls)return null;if(!S.eq)S.eq=basicSet(S.cls);for(const sl of ESLOTS){const g=o&&o[sl];if(g===null){if(sl==='relic')delete S.eq.relic;continue}if(!g)continue;const cur=S.eq[sl]||item(S.cls,sl,1);S.eq[sl]=item(S.cls,sl,g.r!==undefined?g.r:cur.r,cur.lvl,cur.up,cur.m,g.set!==undefined?g.set:cur.set,g.tr!==undefined?g.tr:cur.tr)}eqSync();frApply();hud();return gearInfo()},TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)

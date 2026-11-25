@@ -429,16 +429,20 @@ BUILD.hollow=function(b,m,p){
   }
 };
 ANIM.hollow=function(p,m,t,tt,st,look){
-  var mad=m.hp>0&&m.maxHp>0&&m.hp<m.maxHp/2,wind=st==='wind',ch=st==='charge',dz=st==='dazed',i,A;
-  p.spin.rotation.y=-t*(ch?5:wind?3.4:mad?1.5:.6);
-  p.ring.rotation.z=sin(tt*1.1)*.25;p.ring.rotation.x=.35+cos(tt*.9)*.2;p.ring2.rotation.x=-.5+sin(tt*1.3)*.3;p.ring2.rotation.z=cos(tt*1.2)*.4;
-  var g=.76*(1+(mad?.09:.04)*sin(tt*(mad?9:4)));p.ring.scale.set(g,.7,g);
+  var mad=m.hp>0&&m.maxHp>0&&m.hp<m.maxHp/2,wind=st==='wind',ch=st==='charge',dz=st==='dazed',sh=st==='shift',aim=st==='aim',bm=st==='beam',i,A;
+  // (round 15) the shift: the blades race the other way, the rings swell and stand upright, the arms are flung wide and up, the head is thrown back.
+  // Aiming Reaping Light: the blades stall, the ring turns to face down the line, both arms are thrust forward with the claws together, the head is lowered; firing: the same, shaking, the ring beating.
+  p.spin.rotation.y=sh?t*7:aim?p.spin.rotation.y*.9:-t*(bm?8:ch?5:wind?3.4:mad?1.5:.6);
+  if(sh){p.ring.rotation.z=tt*2.2;p.ring.rotation.x=1.2;p.ring2.rotation.x=tt*3;p.ring2.rotation.z=1.1}
+  else if(aim||bm){p.ring.rotation.z=0;p.ring.rotation.x=1.5;p.ring2.rotation.x=1.5;p.ring2.rotation.z=bm?t*9:tt*2}
+  else{p.ring.rotation.z=sin(tt*1.1)*.25;p.ring.rotation.x=.35+cos(tt*.9)*.2;p.ring2.rotation.x=-.5+sin(tt*1.3)*.3;p.ring2.rotation.z=cos(tt*1.2)*.4}
+  var g=.76*(sh?1.32+.12*sin(tt*9):bm?1.12+.1*sin(t*38):aim?.92:1+(mad?.09:.04)*sin(tt*(mad?9:4)));p.ring.scale.set(g,.7,g);
   for(i=0;i<2;i++){
     A=p.arms[i];
-    A.o.rotation.x=ch?.9:wind?-1.5+.1*sin(t*40):dz?.2:-.25+sin(tt*1.6+i*2)*.15;
-    A.o.rotation.z=A.x*(wind?.5:ch?.5:dz?-.1:.15+.1*sin(tt*1.3+i));
+    A.o.rotation.x=sh?-2.25+.07*sin(t*31+i):aim?1.32:bm?1.38+.06*sin(t*47+i):ch?.9:wind?-1.5+.1*sin(t*40):dz?.2:-.25+sin(tt*1.6+i*2)*.15;
+    A.o.rotation.z=A.x*(sh?.95:aim||bm?-.42:wind?.5:ch?.5:dz?-.1:.15+.1*sin(tt*1.3+i));
   }
-  p.head.rotation.y=ch||wind?0:look*.6;p.head.rotation.x=wind?-.3:ch?.35:dz?.6:0;p.head.rotation.z=dz?.25*sin(tt*3):0;
+  p.head.rotation.y=ch||wind||sh||aim||bm?0:look*.6;p.head.rotation.x=sh?-.62:aim?.34:bm?.2:wind?-.3:ch?.35:dz?.6:0;p.head.rotation.z=dz?.25*sin(tt*3):sh?.08*sin(t*29):0;
 };
 
 // Cinder Toad: squat, wide-mouthed, a smouldering crater in its back. Swells before it lobs, hops away when crowded.
@@ -969,6 +973,7 @@ function update(g,m,MB,dt){
   var fast=st==='charge'||st==='lunge',face=fast&&typeof m.ang==='number'?m.ang:a;
   if(u.ai==='hound'&&st==='idle'&&typeof m.side==='number')face=a+.9*m.side;
   else if(u.ai==='beamer'&&(st==='wind'||st==='beam')&&typeof m.ba==='number')face=m.ba;
+  else if(u.ai==='hollow'&&(st==='aim'||st==='beam')&&typeof m.ba==='number')face=m.ba; // (round 15) a tyrant aiming Reaping Light turns along its first ray
   else if(u.ai==='mite')face=a+sin(t*3+seed)*.6;
   var want=PI/2-face;
   if(!u.init){u.init=true;u.rot=want}else if(!stun&&!fz&&!reel)u.rot+=wrap(want-u.rot)*min(1,dt*(fast?30:11));
@@ -981,6 +986,9 @@ function update(g,m,MB,dt){
   else if(fast){sz=1.28;sx=.9;sy=.9;tilt=.2}
   else if(st==='dazed'||stun){sy=.86;sx=sz=1.05;tilt=.16;roll=sin(tt*3)*.12}
   else if(st==='leap'){sy=1.12-.1*sin(lift*PI);sx=sz=.94}
+  else if(st==='shift'){sy=1.16+.03*sin(tt*7);sx=sz=.93;tilt=-.24;shake=.55}       // (round 15) the beat of a shift: drawn up to its full height, head thrown back, shuddering
+  else if(st==='aim'){sy=.94;sx=sz=1.04;tilt=.2}                                    // aiming Reaping Light: braced, leaning into the line
+  else if(st==='beam'&&u.ai==='hollow'){sy=.97;tilt=-.07;shake=.4}                  // and firing it: pushed back by its own light
   if(rage&&!shake)shake=.22;
   if(u.prev==='leap'&&st!=='leap')u.slam=.3;u.prev=st;
   if(u.slam>0){u.slam=max(0,u.slam-dt);q=u.slam/.3;sy*=1-.32*q;sx*=1+.2*q;sz*=1+.2*q}
@@ -989,7 +997,7 @@ function update(g,m,MB,dt){
   var br=1+cfg.br*(rage?1.8:1)*sin(tt*cfg.spd*.8);
   body.scale.set(u.sx*br,u.sy*(2-br),u.sz*br);
   body.rotation.set(u.tilt,0,roll);
-  body.position.y=cfg.y0+(st==='idle'||st==='up'?cfg.bob*(.5+.5*sin(tt*cfg.spd)):0);
+  body.position.y=cfg.y0+(st==='idle'||st==='up'?cfg.bob*(.5+.5*sin(tt*cfg.spd)):st==='shift'?.3+.07*sin(tt*5):0);
   if(u.shake>.02)root.position.set(sin(t*91+seed)*.07*r*u.shake,0,cos(t*77+seed)*.05*r*u.shake);else root.position.set(0,0,0);
   if(!fz)ANIM[u.ai](p,m,t,tt,st,look,u,dt);
   if(u.pv==='shade')shadeUpdate(g,m,u,t,dt,r);else if(u.pv)petUpdate(g,m,u,t,dt,r);

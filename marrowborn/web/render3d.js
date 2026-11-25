@@ -978,8 +978,20 @@ const SHARED=new Set(Object.values(G));
 const obsRoot=new THREE.Group();scene.add(obsRoot);
 const obsMap=new Map(),NONE=[];
 const hash2=(x,y)=>{const s=Math.sin(x*12.9898+y*78.233)*43758.5453;return s-Math.floor(s)};
+function crackTexture(){ // a plate of the floor about to go: a darker round with cracks running out from its middle
+  const c=mkCanvas(128,128),g=c.getContext('2d'),rnd=rng(77);
+  g.fillStyle='rgba(10,9,14,.5)';g.beginPath();g.arc(64,64,62,0,TAU);g.fill();g.strokeStyle='rgba(231,223,205,.4)';g.lineWidth=2;g.setLineDash([5,7]);g.beginPath();g.arc(64,64,60,0,TAU);g.stroke();g.setLineDash([]);
+  g.strokeStyle='#020203';g.lineCap='round';for(let i=0;i<7;i++){let a=i*TAU/7+rnd()*.5,x=64,y=64;g.lineWidth=3.4;g.beginPath();g.moveTo(x,y);for(let k=0;k<4;k++){a+=rnd()*.8-.4;const d=11+rnd()*8;x+=Math.cos(a)*d;y+=Math.sin(a)*d;g.lineTo(x,y);g.lineWidth=Math.max(1,3.4-k*.7)}g.stroke()}
+  return canvasTex(c,false);
+}
+function mireTexture(){
+  const c=mkCanvas(128,128),g=c.getContext('2d'),rnd=rng(53),gr=g.createRadialGradient(64,64,8,64,64,63);gr.addColorStop(0,'rgba(14,36,33,.95)');gr.addColorStop(.75,'rgba(24,58,50,.85)');gr.addColorStop(1,'rgba(40,90,74,0)');
+  g.fillStyle=gr;g.beginPath();g.arc(64,64,63,0,TAU);g.fill();g.strokeStyle='rgba(130,205,170,.35)';g.lineWidth=1.5;for(let i=0;i<9;i++){const x=24+rnd()*80,y=24+rnd()*80;g.beginPath();g.ellipse(x,y,4+rnd()*9,2+rnd()*4,0,0,TAU);g.stroke()}
+  return canvasTex(c,false);
+}
+const obKey=o=>o.kind+(o.dead?'d':'')+(o.spent?'s':'');
 function makeObstacle(o){
-  const g=new THREE.Group(),r=o.r||20,k=o.kind,u={kind:k,up:o.on?1:0,r};
+  const g=new THREE.Group(),r=o.r||20,k=o.kind,u={kind:k,up:o.on?1:0,r,key:obKey(o)};
   if(k==='pit'){
     if(!OB.pitMat)OB.pitMat=new THREE.MeshBasicMaterial({map:pitTexture(),transparent:true,alphaTest:.5});
     const d=noLine(new THREE.Mesh(G.disc,OB.pitMat));d.scale.setScalar(r);d.position.y=.32;
@@ -1000,6 +1012,15 @@ function makeObstacle(o){
     if(!OB.wallMat){OB.wallMat=new THREE.MeshBasicMaterial({map:fireTexture(),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,toneMapped:false,fog:false});OB.wallGeo=new THREE.CylinderGeometry(1,1.06,1,28,1,true).translate(0,.5,0)}
     const wall=new THREE.Mesh(OB.wallGeo,OB.wallMat),wall2=new THREE.Mesh(OB.wallGeo,OB.wallMat);wall.renderOrder=wall2.renderOrder=5;
     g.add(b,coal,fl,heat,ring,wall,wall2);u.fl=fl;u.f1=f1;u.f2=f2;u.heat=heat;u.ring=ring;u.coal=coal;u.topY=s*1.9;u.wall=wall;u.wall2=wall2;
+  }else if(k==='mire'||k==='crack'){ // (round 15) a mire of the fen; a rotten plate of the peaks
+    if(!OB.mireMat){OB.mireMat=new THREE.MeshBasicMaterial({map:mireTexture(),transparent:true,depthWrite:false,toneMapped:false});OB.crackMat=new THREE.MeshBasicMaterial({map:crackTexture(),transparent:true,depthWrite:false,toneMapped:false})}
+    const d=noLine(new THREE.Mesh(G.disc,k==='mire'?OB.mireMat:OB.crackMat));d.scale.setScalar(r);d.position.y=.34;d.renderOrder=1;g.add(d);u.d=d;
+    if(k==='mire'){if(!OB.mireRim)OB.mireRim=new THREE.MeshBasicMaterial({color:0x8fe0bc,transparent:true,opacity:.42,depthWrite:false,toneMapped:false});const ring=new THREE.Mesh(G.rim,OB.mireRim);ring.scale.setScalar(r*.97);ring.position.y=.5;ring.renderOrder=2;g.add(ring)}
+    if(k==='crack'){const ring=new THREE.Mesh(G.rim,OB.hot);ring.scale.setScalar(r*1.02);ring.position.y=.6;ring.renderOrder=2;ring.visible=false;g.add(ring);u.ring=ring}
+  }else if(o.dead){ // a pillar that has been brought down: a low stump and its rubble
+    const hh=hash2(o.x,o.y),p=new THREE.Mesh(OB.stump,OB.stone);p.scale.set(r*.95,20+hh*8,r*.95);p.rotation.y=hh*6;p.castShadow=true;p.receiveShadow=true;g.add(p);
+    for(let i=0;i<4;i++){const q=new THREE.Mesh(OB.rock||(OB.rock=new THREE.DodecahedronGeometry(1,0)),OB.stone),a=hh*6+i*1.7,dd=r*(1.1+.5*hash2(o.x+i,o.y));q.position.set(Math.cos(a)*dd,4,Math.sin(a)*dd);q.scale.setScalar(5+4*hash2(o.y,o.x+i));q.rotation.set(i,a,i*2);q.castShadow=true;g.add(q)}
+    u.kind='rubble';
   }else{
     const hh=hash2(o.x,o.y),broken=hh>.78,h=broken?40+hh*20:66+hh*90%22;
     const p=new THREE.Mesh(broken?OB.stump:OB.pillar,OB.stone);p.scale.set(r,h,r);p.rotation.y=hh*6;p.castShadow=true;p.receiveShadow=true;g.add(p);u.p=p;u.h=h;u.kind='pillar';
@@ -1012,7 +1033,7 @@ function syncObstacles(dt,sight){
   const list=R.testObstacles||MB.obstacles||NONE,P=MB.P,t=MB.S.t,low=Q.low;xlN=0;
   for(let i=0;i<list.length;i++){
     const o=list[i];if(!o)continue;let rec=obsMap.get(o);
-    if(!rec||rec.u.r!==(o.r||20)){if(rec)obsRoot.remove(rec.g);rec=makeObstacle(o);obsMap.set(o,rec)}
+    if(!rec||rec.u.r!==(o.r||20)||rec.u.key!==obKey(o)){if(rec)obsRoot.remove(rec.g);rec=makeObstacle(o);obsMap.set(o,rec)}
     rec.stamp=stamp;const u=rec.u,g=rec.g;g.position.set(o.x,0,o.y);
     let near=true;if(!sight&&P){const dx=o.x-P.x,dy=o.y-P.y,lim=fogR+u.r+8;near=dx*dx+dy*dy<lim*lim}
     g.visible=near;
@@ -1021,11 +1042,14 @@ function syncObstacles(dt,sight){
       // a pillar standing between the camera and the player turns to glass
       let hide=false;if(P){const dx=Math.abs(P.x-o.x),dz=o.y-P.y;hide=dx<u.r+12&&dz>2&&dz<u.h*.8+12}
       u.p.material=hide?OB.ghost:OB.stone;u.p.castShadow=!hide||!low;{const lm=u.p.userData.mbLineMesh;if(lm)lm.visible=!hide}
+      {const c=o.cr|0,w=c?c*.045:0;u.p.rotation.z=w*Math.cos(o.x);u.p.rotation.x=w*Math.sin(o.x)} // cracked: it leans
       if(low){const b=pools.blob.get();b.position.set(o.x+u.r*.3,.5,o.y-u.r*.25);b.scale.set(u.r*6,1,u.r*5.2)}
     }else if(u.kind==='spikes'){
       const e=.1+.9*u.up+(o.warn&&!o.on?.06*Math.sin(t*46+o.x):0);u.sp.scale.set(u.r,28*e,u.r);u.sp.position.y=-1.5;
       u.ring.visible=!!(o.on||o.warn);u.ring.material=o.on?OB.warn:OB.hot;
-    }else if(u.kind==='brazier'){
+    }else if(u.kind==='crack'){u.ring.visible=!!o.warn&&near;if(o.warn)u.d.position.y=.34+.5*Math.sin(t*60)}
+    else if(u.kind==='brazier'&&o.spent){const a=o.tip||0;u.fl.visible=u.heat.visible=u.wall.visible=u.wall2.visible=u.ring.visible=u.coal.visible=false;g.rotation.z=-Math.cos(a)*1.25;g.rotation.x=Math.sin(a)*1.25}
+    else if(u.kind==='brazier'){
       const w=o.warn&&!o.on?.35+.12*Math.sin(t*30):0,lvl=Math.max(u.up,w),on=lvl>.04&&near;u.fl.visible=on;u.heat.visible=u.up>.04&&near;
       u.ring.material=o.on?OB.warn:o.warn?OB.hot:OB.idle;u.coal.material=o.on||o.warn?OB.coalHot:OB.coal;
       const burn=u.up>.03&&near;u.wall.visible=u.wall2.visible=burn;
@@ -2899,7 +2923,7 @@ function tagPlate(x,y,i,s,hot,a){
 function tagOverlay(sight){
   const mons=MB.mons,S=MB.S,t=S.t,top=hudBottom(),W=OV.w,H=OV.h;if(S.mode!=='play')return;
   let pay=-1,ob=null;try{ob=MB.objective}catch(e){}
-  for(let i=0;i<mons.length;i++){const m=mons[i],tg=m.tags|0;if((!tg&&!m.quarry)||m.hidden||!(m.hp>0))continue;
+  for(let i=0;i<mons.length;i++){const m=mons[i],tg=m.tags|0;if((!tg&&!m.quarry&&!m.el)||m.hidden||!(m.hp>0))continue;
     toScreen(m.x,m.r*2.3+(m.st==='wind'&&MB.has('touch')?46:14)+(m.lift||0)*LIFT,m.y);if(!sp.ok||sp.x<-20||sp.x>W+20||sp.y<-20||sp.y>H+20)continue;
     const y=Math.max(top+16,sp.y-6);let x=sp.x;
     if(tg){if(pay<0)pay=payNow();const n=(tg&1)+(tg>>1&1)+(tg>>2&1),s=11;x-=(n-1)*s*.95;
@@ -2909,8 +2933,26 @@ function tagOverlay(sight){
       ctx.beginPath();ctx.moveTo(-17,-18);ctx.lineTo(-17,-24);ctx.lineTo(17,-24);ctx.lineTo(17,-18);ctx.lineWidth=2;ctx.strokeStyle=gold;ctx.stroke();
       if(ob&&ob.kind==='hunt'&&(num(ob.dur)-num(ob.left)<4||num(ob.left)<4)){ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.font='700 12px '+FONT;spaced(3);inked('QUARRY',1.5,-29,gold,3.5);spaced(0)}
       ctx.restore()}
+    if(m.el){ // (round 15) an elite: two chevrons, its kind in a word, what is left of it
+      const ye=Math.max(top+48,y-(tg?22:4)),amb=tint('#ffb347'),E=MB.ELITE,k=E&&E.names[m.el-1]||'',bw=44,hp=clamp01(m.hp/m.maxHp);
+      ctx.save();ctx.translate(sp.x,ye);ctx.lineJoin='round';ctx.lineCap='round';
+      for(let q=0;q<2;q++){const dy=-q*7;ctx.beginPath();ctx.moveTo(-10,dy-8);ctx.lineTo(0,dy);ctx.lineTo(10,dy-8);ctx.lineWidth=5.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.lineWidth=2.6;ctx.strokeStyle=amb;ctx.stroke()}
+      ctx.fillStyle='rgba(8,8,12,.85)';ctx.fillRect(-bw/2-1.5,-25.5,bw+3,6);ctx.fillStyle=m.ward>0?'#8fd3ff':amb;ctx.fillRect(-bw/2,-24,bw*hp,3);
+      ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.font='700 11px '+FONT;spaced(2.5);inked(k.toUpperCase(),1.2,-30,amb,3.5);spaced(0);ctx.restore()}
   }
   for(let i=0;i<LNKP.length;i++){const p=LNKP[i];if(!(p.t>0))continue;const q=1-p.t/.5;toScreen(p.x,p.h,p.y);if(sp.ok)tagPlate(sp.x,sp.y-6-q*34,p.tag,11*(1+q*1.6),true,(1-q)*(1-q))}
+  // (round 15) the lock: a broken ring on the floor round the target (turning when it was chosen, faint when the aim merely keeps to it)
+  let LI=null;try{LI=MB.lock}catch(e){}
+  if(LI&&LI.id){toScreen(LI.x+LI.r+10,0,LI.y);const x1=sp.x,ok1=sp.ok;toScreen(LI.x,0,LI.y);if(sp.ok&&ok1){const rp=Math.max(16,Math.abs(x1-sp.x)),cy=tint('#6fe3ff'),rot=LI.hard?t*.9:0;
+      ctx.save();ctx.globalAlpha=LI.hard?1:.5;ctx.lineCap='round';for(let q=0;q<4;q++){ctx.beginPath();ctx.ellipse(sp.x,sp.y,rp,rp*.46,0,rot+q*Math.PI/2+.28,rot+(q+1)*Math.PI/2-.28);ctx.lineWidth=LI.hard?6:4.5;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.lineWidth=LI.hard?3:2;ctx.strokeStyle=cy;ctx.stroke()}ctx.restore()}}
+  // raising a downed ally: the ring to stand in, and how far the raising is
+  let RI=null;try{RI=MB.revive}catch(e){}
+  if(RI){const ring=(x,y,k,can,word)=>{toScreen(x+RI.r,0,y);const x1=sp.x,ok1=sp.ok;toScreen(x,0,y);if(!sp.ok||!ok1)return;const rp=Math.max(18,Math.abs(x1-sp.x)),gr=tint('#7fd66b');
+      ctx.save();ctx.setLineDash([7,7]);ctx.beginPath();ctx.ellipse(sp.x,sp.y,rp,rp*.46,0,0,Math.PI*2);ctx.lineWidth=2;ctx.strokeStyle=can?gr:tint(CSS.dim);ctx.globalAlpha=can?.7:.45;ctx.stroke();ctx.setLineDash([]);ctx.globalAlpha=1;
+      if(k>0){ctx.beginPath();ctx.ellipse(sp.x,sp.y,rp,rp*.46,0,-Math.PI/2,-Math.PI/2+Math.PI*2*k);ctx.lineWidth=7;ctx.strokeStyle=CSS.ink;ctx.stroke();ctx.lineWidth=4;ctx.strokeStyle=gr;ctx.stroke()}
+      if(word){ctx.textAlign='center';ctx.textBaseline='alphabetic';ctx.font='700 12px '+FONT;spaced(3);inked(word,sp.x+1.5,sp.y-rp*.46-10,can?gr:tint(CSS.dim),3.5);spaced(0)}ctx.restore()};
+    for(let i=0;i<RI.allies.length;i++){const a=RI.allies[i];ring(a.x,a.y,a.k,a.can,a.k>0?'RISING':a.can?'DOWN':'')}
+    if(RI.me.down&&MB.P)ring(MB.P.x,MB.P.y,RI.me.k,RI.me.left>0,RI.me.k>0?'RISING':'')}
 }
 // the ember's health, over it
 function emberOverlay(sight){
@@ -2952,7 +2994,7 @@ function threatOverlay(sight){
   const W=OV.w,H=OV.h,top=hudBottom(),mons=MB.mons,t=S.t;let n=0;
   for(let i=0;i<mons.length;i++){const m=mons[i];if(!m||m.hidden||m.decoy||!(m.hp>0))continue;
     if(!offScreen(m.x,m.r||14,m.y,top))continue;
-    const px=sp.x,py=sp.y,d=Math.hypot(m.x-P.x,m.y-P.y),hot=m.st==='wind'||m.st==='charge'||m.st==='lunge'||m.st==='beam'||!!m.beam,pr=m.quarry?4:m.boss?3:hot?2:1;
+    const px=sp.x,py=sp.y,d=Math.hypot(m.x-P.x,m.y-P.y),hot=m.st==='wind'||m.st==='charge'||m.st==='lunge'||m.st==='beam'||!!m.beam,pr=m.quarry?4:m.boss||m.el?3:hot?2:1;
     if(pr===1&&d>560)continue;
     let slot=-1;if(n<THR.length)slot=n++;else{let w=0;for(let j=1;j<n;j++){const a=THR[j],b=THR[w];if(a.pr<b.pr||(a.pr===b.pr&&a.d>b.d))w=j}if(pr>THR[w].pr||(pr===THR[w].pr&&d<THR[w].d))slot=w}
     if(slot<0)continue;const q=THR[slot];q.m=m;q.px=px;q.py=py;q.pr=pr;q.d=d}

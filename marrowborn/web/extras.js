@@ -325,6 +325,7 @@ function openSettings(){
       has('ui')?slider('Interface','ui',80,150,5,pct):null,
       has('camDist')?choice('Camera distance','camDist',[['near','Near'],['standard','Standard'],['far','Far']]):null,
       has('shake')?toggle('Screen shake','shake','On','Off'):null,
+      has('lock')?toggle('Target lock','lock','Blows keep to one target','Always the nearest'):null,
       slider('Button size','btn',80,140,5,pct),
       toggle('Left-handed','left','Stick on the right','Stick on the left'),
       toggle('Hints','hints','Shown once each','Off'),
@@ -515,6 +516,14 @@ guard('hints',function(){
       touch:'Those who fight for you take orders: the four buttons below your health. Attack my target, hold here, fall back to me, or free.',keys:'Those who fight for you take orders. G: attack my target. H: hold here. B: fall back to me. N: free again.'},
     {id:'faces',t:2,when:function(){var b=MB.bossPhase;return !!(b&&b.phase===1&&!MB.tutorial)},
       touch:'A tyrant has three faces. The marks on its bar are where it shifts: each shift brings a new attack and a hazard of the floor, after a beat in which nothing can hurt it.',keys:'A tyrant has three faces. The marks on its bar are where it shifts: each shift brings a new attack and a hazard of the floor, after a beat in which nothing can hurt it.'},
+    {id:'elite',t:1.5,when:function(){var e=MB.elites;return !!(e&&e.length&&!MB.tutorial)},
+      touch:"An elite walks with this floor: a lesser monster with a modifier of its own, named over its head. Its fall shakes the floor's monster, fills your mana and leaves a morsel.",keys:"An elite walks with this floor: a lesser monster with a modifier of its own, named over its head. Its fall shakes the floor's monster, fills your mana and leaves a morsel."},
+    {id:'arena',t:2.5,when:function(){var a=MB.arena;return !!(a&&a.usable&&(a.theme||a.objects.pillar||a.objects.brazier)&&S().level>=9&&!MB.tutorial)},
+      touch:'The room can be used. A heavy blow (a closer, a riposte, a skill) cracks a pillar until it falls on whatever stands by it, and any blow tips a brazier and spills its fire. Some floors also carry the hazard of their land, named as the floor begins.',keys:'The room can be used. A heavy blow (a closer, a riposte, a skill) cracks a pillar until it falls on whatever stands by it, and any blow tips a brazier and spills its fire. Some floors also carry the hazard of their land, named as the floor begins.'},
+    {id:'lock',t:3,when:function(){var l=MB.lock;return !!(l&&l.count>1&&S().level>=9&&!MB.tutorial&&!(MB.mp&&MB.mp.vs))},until:function(){var l=MB.lock;return !!(l&&l.hard)},
+      touch:'Your blows keep to the monster they last landed on. Tap a monster, or the Target button, to choose another; past the last one the aim is free again. The lock can be switched off in the settings.',keys:'Tab (or Y) chooses a target: your blows and skills keep to it until it falls. Press it past the last monster and the aim is free again.'},
+    {id:'revive',t:.5,when:function(){var r=MB.revive;return !!(r&&!r.me.down&&r.allies.some(function(a){return a.can}))},until:function(){var r=MB.revive;return !r||!r.allies.length},
+      touch:'An ally is down. Stand beside them for a few seconds without being wounded and they rise again. A hero can be raised twice on a floor.',keys:'An ally is down. Stand beside them for a few seconds without being wounded and they rise again. A hero can be raised twice on a floor.'},
     {id:'mana',t:2,when:function(){var m=MB.mana;return !!S().cls&&S().level>=8&&!!m&&m.max>0&&m.cur<(m.max-m.reserved)*.7},
       touch:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.',keys:'Skills spend mana, the blue bar under your health. It seeps back on its own, and twice as fast while you stand still and draw it in from the room.'}
   ];

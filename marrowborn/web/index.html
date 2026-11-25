@@ -1163,6 +1163,30 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 .gearPanel .cards button.setCard.on2{opacity:1}
 .gearPanel .cards button.setCard.on4 b::after{content:" \2726\2726";letter-spacing:.1em}
 .gearPanel .cards button{cursor:default}
+/* the land's hazard and the elites of the floor: words under the boss bar's right end (where a tyrant's hazard stands on its own floors) */
+#mbArea{position:fixed;z-index:2;pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;gap:calc(var(--u)*2);font-family:var(--display);font-weight:700;font-size:.66rem;line-height:1.2;letter-spacing:.2em;text-transform:uppercase;text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*6) #000;white-space:nowrap;transform:translateX(-100%)}
+#mbArea[hidden]{display:none}
+#mbArea span::before{content:"";display:inline-block;width:calc(var(--u)*7);height:calc(var(--u)*7);margin-right:calc(var(--u)*6);background:currentColor;transform:rotate(45deg);vertical-align:.08em}
+#mbArea .ar-land{color:var(--haz)}#mbArea .ar-el{color:var(--elite)}
+.wrap:has(#mbHint.on) #mbArea{opacity:0}
+.wrap:has(#ov:not([hidden])) #mbArea,.wrap:has(#mbx:not([hidden])) #mbArea,.wrap:has(#mbt:not([hidden])) #mbArea,.wrap:has(#mbn:not([hidden])) #mbArea{visibility:hidden}
+/* the lock: the Target button (touch) */
+#mbLock{--c:calc(var(--u)*6);position:fixed;z-index:2;margin:0;border:0;min-width:max(48px,calc(var(--u)*64));min-height:max(44px,calc(var(--u)*40));padding:calc(var(--u)*4) calc(var(--u)*10);font-family:var(--display);font-weight:700;font-size:.68rem;letter-spacing:.14em;text-transform:uppercase;color:#6fe3ff;background:rgba(12,15,32,.8);opacity:.9;
+  clip-path:polygon(var(--c) 0,100% 0,100% calc(100% - var(--c)),calc(100% - var(--c)) 100%,0 100%,0 var(--c));cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#mbLock[hidden]{display:none}
+#mbLock.on{color:var(--ink);background:#6fe3ff}
+#mbLock::before{content:"";display:inline-block;width:.7em;height:.7em;margin-right:.5em;border:2px solid currentColor;border-radius:50%;vertical-align:-.08em;box-sizing:border-box}
+.wrap:has(#ov:not([hidden])) #mbLock,.wrap:has(#mbx:not([hidden])) #mbLock,.wrap:has(#mbt:not([hidden])) #mbLock,.wrap:has(#mbn:not([hidden])) #mbLock{visibility:hidden}
+/* raising a downed ally (co-op) */
+#mbRev{position:fixed;z-index:3;left:50%;transform:translateX(-50%);pointer-events:none;min-width:calc(var(--u)*200);max-width:min(calc(var(--u)*420),calc(100vw - calc(var(--u)*24)));box-sizing:border-box;padding:calc(var(--u)*6) calc(var(--u)*16) calc(var(--u)*8);text-align:center;font-family:var(--display);color:var(--bone);background:linear-gradient(90deg,rgba(12,40,24,.94),rgba(9,11,24,.92));box-shadow:inset calc(var(--u)*4) 0 0 #7fd66b;clip-path:polygon(0 0,100% 0,calc(100% - calc(var(--u)*10)) 100%,0 100%)}
+#mbRev[hidden]{display:none}
+#mbRev b{display:block;font-weight:700;font-size:.8rem;line-height:1.25;letter-spacing:.12em;text-transform:uppercase}
+#mbRev i{display:block;height:calc(var(--u)*5);margin-top:calc(var(--u)*5);background:rgba(255,255,255,.14)}
+#mbRev i[hidden]{display:none}
+#mbRev i em{display:block;height:100%;width:0;background:#7fd66b}
+#mbRev.me{box-shadow:inset calc(var(--u)*4) 0 0 var(--foe);background:linear-gradient(90deg,rgba(48,12,22,.94),rgba(9,11,24,.92))}
+.wrap:has(#ov:not([hidden])) #mbRev,.wrap:has(#mbx:not([hidden])) #mbRev,.wrap:has(#mbt:not([hidden])) #mbRev,.wrap:has(#mbn:not([hidden])) #mbRev{visibility:hidden}
+@media (max-width:420px){#mbRev b{font-size:.7rem;letter-spacing:.08em}#mbArea{font-size:.58rem;letter-spacing:.14em}}
 /*R15-HUD-END*/
 </style>
 
@@ -1472,6 +1496,59 @@ try{window.MBPhaseBand=true}catch(e){}
   window.MBHud14={phase:ph,orders:cmd,lesson:tu,hazard:hz};
 })();
 /*R14-HUD-JS-END*/
+/*R15-HUD-JS*/
+/* (round 15) The land's hazard and the floor's elites under the boss bar, the Target button of the lock (touch), and the band of a raising in co-op.
+   Read from MB a few times a second; the Target button calls MB.lockCycle. Missing members leave a piece hidden. window.MBHud15 for tests. */
+(function(){
+  var MB=window.MB,doc=document;if(!MB||!doc.querySelector||typeof MB.on!=='function')return;
+  var wrap=doc.querySelector('.wrap'),stage=doc.querySelector('.stage');if(!wrap||!stage)return;
+  function h(tag,cls,txt){var e=doc.createElement(tag);if(cls)e.className=cls;if(txt!=null)e.textContent=txt;return e}
+  function U(){return parseFloat(getComputedStyle(doc.documentElement).fontSize)/16||1}
+  var coarse=false;try{coarse=matchMedia('(pointer:coarse)').matches}catch(e){}
+  /* ---- the land and the elites ---- */
+  var ar=h('div');ar.id='mbArea';ar.hidden=true;ar.setAttribute('aria-hidden','true');wrap.appendChild(ar);var AR={key:'',at:0,box:''};
+  function areaTick(play,now){
+    if(now<AR.at)return;AR.at=now+300;var A=null,E=null,I=null;try{if(play){A=MB.arena;E=MB.elites;I=MB.bossPhase}}catch(e){}
+    var land=A&&A.theme&&!I?A.name:'',el='';if(E&&E.length&&!I){var names=[],N=MB.ELITE&&MB.ELITE.names,K=MB.ELITE&&MB.ELITE.kinds;for(var i=0;i<E.length&&i<3;i++){var j=K?K.indexOf(E[i].kind):-1;names.push(j>=0&&N?N[j]:E[i].kind)}el='Elite · '+names.join(', ')}
+    var key=land+'|'+el;if(key!==AR.key){AR.key=key;while(ar.firstChild)ar.removeChild(ar.firstChild);if(land)ar.appendChild(h('span','ar-land',land));if(el)ar.appendChild(h('span','ar-el',el));ar.hidden=!(land||el);AR.box=''}
+    if(ar.hidden)return;var bar=doc.getElementById('bossBar');if(!bar)return;var r=bar.getBoundingClientRect(),u=U(),bk=doc.getElementById('bossBrk'),bot=r.bottom;if(bk&&!bk.hidden){var kr=bk.getBoundingClientRect();if(kr.height)bot=Math.max(bot,kr.bottom)}
+    var k=Math.round(r.right)+'|'+Math.round(bot);if(k!==AR.box&&r.width){AR.box=k;ar.style.left=r.right+'px';ar.style.top=(bot+9*u)+'px'}
+  }
+  /* ---- the lock ---- */
+  var lk=h('button',null,'Target');lk.id='mbLock';lk.type='button';lk.hidden=true;lk.setAttribute('aria-label','Next target');wrap.appendChild(lk);var LK={on:null,hard:null,at:0,box:''};
+  lk.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();try{MB.lockCycle()}catch(_){}LK.at=0});lk.addEventListener('click',function(e){e.preventDefault()});
+  function lockTick(play,now){
+    if(now<LK.at)return;LK.at=now+200;var I=null,set=false;try{I=MB.lock;set=!!(MB.settings&&MB.settings.lock)}catch(e){}
+    var on=play&&coarse&&!!I&&typeof MB.lockCycle==='function'&&(set||I.hard)&&!(MB.mp&&MB.mp.vs)&&(I.count>0||I.hard);if(on!==LK.on){LK.on=on;lk.hidden=!on;LK.box=''}
+    if(!on)return;if(I.hard!==LK.hard){LK.hard=I.hard;lk.classList.toggle('on',!!I.hard);lk.setAttribute('aria-pressed',I.hard?'true':'false')}
+    var acts=doc.querySelector('.touch .acts');if(!acts)return;var r=acts.getBoundingClientRect();if(!r.width)return;var u=U(),w=lk.offsetWidth,hh=lk.offsetHeight,left,top,rightSide=r.left+r.width/2>innerWidth/2,tg=doc.querySelector('.togs'),tb=tg?tg.getBoundingClientRect().bottom:0;
+    if(r.top-hh-8*u>Math.max(innerHeight*.3,tb+8*u)){top=r.top-hh-8*u;left=rightSide?r.right-w:r.left}         // above the buttons
+    else{top=r.bottom-hh;left=rightSide?r.left-w-10*u:r.right+10*u}                                           // beside them (a phone held sideways)
+    var pk=doc.querySelector('.mbt-peek');if(pk&&!pk.hidden){var pr=pk.getBoundingClientRect();if(pr.width&&pr.height&&left<pr.right&&left+w>pr.left&&top<pr.bottom&&top+hh>pr.top)top=pr.top-hh-6*u} // the floor strip of the tower lies there: the button goes above it
+    var fin=doc.getElementById('mbFin');if(fin&&!fin.hidden){var fr=fin.getBoundingClientRect();if(left<fr.right&&left+w>fr.left&&top<fr.bottom&&top+hh>fr.top)top=fr.top-hh-6*u}
+    var key=Math.round(left)+'|'+Math.round(top);if(key!==LK.box){LK.box=key;lk.style.left=left+'px';lk.style.top=top+'px'}
+  }
+  /* ---- raising ---- */
+  var rv=h('div');rv.id='mbRev';rv.hidden=true;rv.setAttribute('role','status');var rvB=h('b'),rvI=h('i'),rvE=h('em');rvI.appendChild(rvE);rv.appendChild(rvB);rv.appendChild(rvI);wrap.appendChild(rv);var RV={key:'',at:0,top:-1};
+  function nameOf(idx){try{var rs=MB.mp.remotes;for(var i=0;i<rs.length;i++)if(rs[i].idx===idx)return rs[i].name||'An ally'}catch(e){}return'An ally'}
+  function revTick(play,now){
+    if(now<RV.at)return;RV.at=now+120;var I=null;try{I=play?MB.revive:null}catch(e){}
+    var txt='',k=-1,me=false;
+    if(I){if(I.me.down){me=true;if(I.me.by>=0&&I.me.k>0){txt=nameOf(I.me.by)+' is raising you';k=I.me.k}else txt=I.me.left>0?'You are down · an ally who stands by you can raise you':'You are down · you rise when the floor is cleared'}
+      else if(I.mine){txt='Raising '+nameOf(I.mine.idx);k=I.mine.k}
+      else{for(var i=0;i<I.allies.length;i++){var a=I.allies[i];if(a.can&&!(a.k>0)){txt=a.name+' is down · stand by them to raise them';break}}}}
+    var key=txt;if(key!==RV.key){RV.key=key;rvB.textContent=txt;rv.hidden=!txt;rv.classList.toggle('me',me)}
+    if(!txt)return;rvI.hidden=k<0;if(k>=0)rvE.style.width=Math.round(Math.max(0,Math.min(1,k))*100)+'%';
+    var sr=stage.getBoundingClientRect(),top=Math.round(sr.top+sr.height*(coarse&&innerHeight<500?.2:.26));if(top!==RV.top){RV.top=top;rv.style.top=top+'px'}
+  }
+  var ok=true;
+  function tick(ts){requestAnimationFrame(tick);if(!ok)return;
+    try{var now=ts||0,S=MB.S;if(!S)return;var play=S.mode==='play'&&!S.paused;areaTick(S.mode==='play',now);lockTick(play,now);revTick(S.mode==='play',now);
+    }catch(e){ok=false;try{console.warn('round 15 HUD stopped',e)}catch(_){}}}
+  requestAnimationFrame(tick);
+  window.MBHud15={area:ar,lock:lk,revive:rv};
+})();
+/*R15-HUD-JS-END*/
 </script>
 
 
