@@ -439,7 +439,7 @@ function dropItem(n,o){
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,well:0,spec:0});
 // apex: the apex path (one of the ten ids of APEX). tr: trials passed (each is worth TMANA maximum mana). door: {id, n} the door chosen at a crossroads for floor n.
-const S={mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,apex:null,tr:0,door:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
+const S={sp:null,mode:'title',level:0,t:0,shake:0,stop:0,banner:0,clearT:0,cls:null,adv:null,apex:null,tr:0,door:null,b:noBoons(),elite:4,L:null,paused:false,rank:'',eq:null,scrap:0,load:load0(),wave:null};
 let P,mons=[],shots=[],pshots=[],allies=[],zones=[],fields=[],bits=[],rings=[],floats=[],morsels=[],boss=null,obstacles=[],echoes=[];
 // Every monster, enemy bolt, enemy blast and morsel carries an id, and every ally a nid, so that each can be named across the network in multiplayer.
 let NEXTID=1;const nid=()=>NEXTID++;
@@ -447,7 +447,7 @@ let NEXTID=1;const nid=()=>NEXTID++;
 // REM: set while the host applies what a remote member did to a monster. CL(): this game is a client, so the monsters are the host's to change.
 const MP={on:false,role:'host',mode:'coop',vs:null,versus:true,remotes:[],count:1,myId:'',hostId:'',members:[],myIdx:0,down:false,away:false,colors:['#4fd8ff','#ff9f1a','#7dff5a','#b46cff','#ffe14a','#6a8cff','#3df5c0','#d8c8ff'],teamColors:['#2f9dff','#ffb21e'],
   cnt:1,slots:1,phase:'pick',g:0,lv:8,meReady:false,menu:false,under:null,note:'',toast:'',meter:null,hud:null,timer:0,rById:new Map(),byIdx:[],owe:[],ready:new Set(),mons:new Map(),qd:new Map(),ate:new Set(),hclk:{off:1e18},heroes:[],q:[],sd:[],rq:[],aq:[],lkq:[],hsKey:''};
-let REM=null;
+let REM=null,TELL=0;
 // VS: the versus match (MB.mp.vs) while one runs, else null. VP: its private state. GEO: set while an attack is worked out that its victim decides for itself in versus (see the versus section).
 let VS=null,VP=null,GEO=0;
 const CL=()=>MP.on&&MP.role==='client'&&!VS;
@@ -472,16 +472,78 @@ const stReset=()=>{for(const k in ST)ST[k]=0};
 const act2=()=>S.level>=8,cls=()=>act2()?S.cls:null,pw=n=>!!S.cls&&S.level-8>=n;
 const ADV={berserker:{d:1.5,c:1.6},sharpshooter:{d:1.75},reaper:{d:2},archmage:{k:.5},champion:{d:1.5,hp:6},duelist:{c:1.5,s:1.15},nightblade:{d:1.6},phantom:{k:.4,s:1.1},inquisitor:{d:1.6}};
 const adv=k=>(ADV[S.adv]||{})[k];
+/* ---------- round 14: the frame (stat points). Three points come with every floor cleared since the class was taken; five stats to put them in ---------- */
+// The tower keeps pace with an even frame: par = base + budget/5 in every stat is the hero of before round 14, exactly. What a stat gives is ((stat/par+1)/2)^e, so it is the
+// same share at every height: everything in one stat (five times par) gives 3^e, nothing in it (late in the climb) about 0.55^e. auto: the points are spread evenly (every stat at par).
+// e: dmg (Sinew: all damage of the hero's own), as / mv / dash (Nerve: attack speed, pace, dash recharge), hp (Marrow), mana / cd (Breath: the pool, skill recharge), find (Omen: morsels).
+// Omen above par: telling blows (tell x (f^2-1), at most tellMax; tellK times the damage) and more rolls for a drop; below par: glancing blows (glance x (1-f^2); glanceK). Not in versus.
+const FR={ids:['sinew','nerve','marrow','breath','omen'],names:['Sinew','Nerve','Marrow','Breath','Omen'],per:3,base:6,e:{dmg:.45,as:.4,mv:.12,dash:.2,hp:.5,mana:.35,cd:.3,find:.8},tell:.12,tellMax:.5,tellK:1.5,glance:.25,glanceK:.7,more:1.5,
+  text:['Everything you do hits harder: blows, bolts and skills alike.','You attack faster, move a little faster, and your dash is ready sooner.','More health.','A deeper mana pool, and skills that recharge sooner.','Telling blows that hit half again as hard, better drops and more morsels. Below the even line some of your blows only glance.']};
+const frNew=()=>({auto:true,asked:false,p:[0,0,0,0,0]});
+const frBudget=(lv=S.level)=>S.cls?FR.per*Math.max(0,lv-8):0;
+const frSpent=()=>S.sp.p[0]+S.sp.p[1]+S.sp.p[2]+S.sp.p[3]+S.sp.p[4];
+const frLeft=()=>S.sp.auto?0:Math.max(0,frBudget()-frSpent());
+const frPar=()=>FR.base+frBudget()/5;
+const frF=i=>!S.sp||S.sp.auto||VS||!S.cls||S.level<8?1:((FR.base+S.sp.p[i])/frPar()+1)/2;
+const frK=(i,e)=>{const f=frF(i);return f===1?1:Math.pow(f,e)};
+// the chance that a blow of mine is a telling one (> 0) or a glancing one (< 0)
+const frTell=()=>{const f=frF(4);return f>1?Math.min(FR.tellMax,FR.tell*(f*f-1)):f<1?-FR.glance*(1-f*f):0};
+// more points placed than the floor gives (a save from higher up, a hand-edited one): the largest stats give them back
+function frFix(){const s=S.sp;if(!s||!Array.isArray(s.p)||s.p.length!==5){S.sp=frNew();return}for(let i=0;i<5;i++)s.p[i]=Math.max(0,Math.min(30000,Math.floor(+s.p[i])||0));let over=frSpent()-frBudget();
+  while(over>0){let j=0;for(let i=1;i<5;i++)if(s.p[i]>s.p[j])j=i;const k=Math.min(s.p[j],Math.max(1,Math.ceil(over/5)));if(k<=0)break;s.p[j]-=k;over-=k}}
+// spread n points by weights w (five numbers); the rest of a division goes to the heaviest first
+function frSpread(n,w){const s=S.sp,t=w.reduce((a,v)=>a+v,0)||1,ord=[0,1,2,3,4].sort((a,b)=>w[b]-w[a]);let used=0;const add=w.map(v=>{const k=Math.floor(n*v/t);used+=k;return k});for(let q=0;used<n;q++){add[ord[q%5]]++;used++}for(let i=0;i<5;i++)s.p[i]+=add[i]}
+const frIn=v=>{const s=frNew();if(Array.isArray(v)&&v.length===7&&v.every(x=>Number.isInteger(x)&&x>=0&&x<=30000)){s.auto=!!v[0];s.asked=!!v[1];s.p=v.slice(2)}return s};
+const frOut=()=>[S.sp.auto?1:0,S.sp.asked?1:0,...S.sp.p];
+// what MB.frame hands out: {auto, asked, budget, left, par, stats:[{id, name, text, value, points, f, lines:[...]}]}
+const frPct=k=>(k>=1?'+':'')+Math.round((k-1)*100)+'%';
+function frLines(i){const E=FR.e,f=frF(i);if(i===0)return['Damage '+frPct(Math.pow(f,E.dmg))];if(i===1)return['Attack speed '+frPct(Math.pow(f,E.as)),'Pace '+frPct(Math.pow(f,E.mv)),'Dash recharge '+frPct(Math.pow(f,E.dash))];
+  if(i===2)return['Health '+frPct(Math.pow(f,E.hp))];if(i===3)return['Mana '+frPct(Math.pow(f,E.mana)),'Skill recharge '+frPct(Math.pow(f,E.cd))];
+  const t=frTell();return[t>0?'Telling blows '+Math.round(t*100)+'%':t<0?'Glancing blows '+Math.round(-t*100)+'%':'No telling or glancing blows','Morsels '+frPct(Math.pow(f,E.find))+(f>1?', luckier drops':'')]}
+function frInfo(){if(!S.cls||!S.sp)return null;const par=frPar();return{auto:S.sp.auto,asked:S.sp.asked,budget:frBudget(),left:frLeft(),par,per:FR.per,stats:FR.ids.map((id,i)=>({id,name:FR.names[i],text:FR.text[i],points:S.sp.auto?frBudget()/5:S.sp.p[i],value:S.sp.auto?Math.round(par):FR.base+S.sp.p[i],f:frF(i),lines:frLines(i)}))}}
+// a stat has changed: the body follows at once (health keeps its share, mana its amount)
+function frApply(){if(P&&S.cls&&act2()){const k=P.maxHp?P.hp/P.maxHp:1,m=bodyHp();if(m!==P.maxHp){P.maxHp=m;P.hp=Math.max(P.hp>0?1:0,Math.min(m,Math.round(m*k)))}P.maxMana=manaMax();if(P.mana>manaRoom())P.mana=manaRoom()}emit('frame',frInfo());hud()}
+function frSet(o){ // MB.frameSet({auto}|{add:[i,n]}|{reset:true}|{spread:true}|{asked:true}) -> the new MB.frame, or null when it cannot be done (no class, versus)
+  if(!S.cls||!S.sp||VS||!o)return null;const s=S.sp;
+  if(o.asked)s.asked=true;
+  if(o.auto===true){s.auto=true;s.asked=true}
+  if(o.auto===false&&s.auto){s.auto=false;s.asked=true;s.p=[0,0,0,0,0];const b=frBudget(),e=Math.floor(b/5);for(let i=0;i<5;i++)s.p[i]=e} // taking over starts from the even frame; what does not divide is left to place
+  if(o.reset&&!s.auto)s.p=[0,0,0,0,0];
+  if(o.spread&&!s.auto)frSpread(frLeft(),[1,1,1,1,1]);
+  if(Array.isArray(o.add)&&!s.auto){const i=o.add[0]|0,n=Math.min(frLeft(),Math.max(0,o.add[1]|0));if(i>=0&&i<5)s.p[i]+=n}
+  if(Array.isArray(o.weights)&&o.weights.length===5){s.auto=false;s.asked=true;s.p=[0,0,0,0,0];frSpread(frBudget(),o.weights.map(v=>Math.max(0,+v||0)))}
+  frFix();frApply();if(S.mode==='play'||S.mode==='clear')save(S.level);return frInfo()}
+let frStepN=1;
+function frameScreen(done){
+  const s=S.sp,I=frInfo(),left=I.left,again=()=>frameScreen(done),step=Math.min(frStepN,Math.max(1,left));
+  show({wide:true,cls:'framePanel',kick:'Your frame · floor '+(S.level+1)+' · '+(s.auto?'spread evenly for you':left?left+(left>1?' points':' point')+' to place':'every point placed'),title:s.auto?'An even frame':'Shape your frame',
+    body:FR.per+' points come with every floor. The Spire keeps pace with an even frame, which stands at '+Math.round(I.par)+' in every stat on this floor: a stat above that line gives more than the Spire expects, a stat below it gives less.'+(s.auto?' Yours is kept even for you.':''),
+    keys:s.auto?'':'Pick a stat to put '+(step>1?step+' points':'a point')+' into it.'+(left?'':' Nothing is left to place. Start over takes every point back, so you can move them.'),
+    cards:I.stats.map((st,i)=>({title:st.name+' · '+st.value,sub:st.lines.join(' · '),col:st.f>1.0001?'#7fd66b':st.f<.9999?'#ff8a4c':'',cls:'frCard',data:{fr:st.id},body:st.text,fn:()=>{if(!s.auto&&left>0)frSet({add:[i,step]});again()}})),
+    btns:[['Done',()=>{s.asked=true;if(S.mode==='play'||S.mode==='clear')save(S.level);done()}],
+      ...(s.auto?[['Place the points myself',()=>{frSet({auto:false});again()}]]:[
+        ...(left>1?[[frStepN===1?'Place 5 at a time':frStepN===5?'Place 25 at a time':'Place 1 at a time',()=>{frStepN=frStepN===1?5:frStepN===5?25:1;again()}]]:[]),
+        ...(left?[['Spread the rest evenly',()=>{frSet({spread:true});again()}]]:[]),
+        ['Start over',()=>{frSet({reset:true});again()}],['Keep it even for me',()=>{frSet({auto:true});again()}]])]});
+}
+// the reward flow asks once what kind of player this is, and afterwards shows the frame whenever points wait
+function frameAsk(next){
+  const s=S.sp;if(!S.cls||!s||VS||frBudget()<=0)return next();
+  if(!s.asked)return show({soft:true,cls:'framePanel',kick:'Your frame · '+frBudget()+' points',title:'A body to shape',body:'From here every floor gives you '+FR.per+' points for your frame: Sinew (damage), Nerve (speed), Marrow (health), Breath (mana and skills) and Omen (luck). An even frame is what the Spire expects of you; leaning into a stat puts you ahead in it and behind in the others. You can change your mind at any time from the pause screen.',
+    btns:[['Keep it even for me',()=>{frSet({auto:true});next()}],['Place the points myself',()=>{frSet({auto:false});frameScreen(next)}]]});
+  if(!s.auto&&frLeft()>0)return frameScreen(next);
+  next();
+}
 const zealK=()=>{const L=P&&!VS&&LNG[S.cls];return L&&act2()?(L.base||1)*(LNG[S.adv]||1)*(1+Math.min(L.cap,L.k*(P.zeal||0))):1};
 // AXK: per-build factors of the apex tier (round 11; measured, see r11-balance/NOTES.md): what a build's own damage and its path's damage (UD) are multiplied by, per side and, for the few that still stood out, per path. Not in versus.
 const AXK={side:{dominion:{archmage:.85,beastmaster:.9,berserker:1.1,duelist:1.1,lich:.8,paladin:1.1,phantom:1.1,reaper:.8,saint:1.1},order:{archmage:.85,duelist:1.15,inquisitor:.9,phantom:1.15,reaper:.8}},path:{tide:{lich:.8}}};
 const axK=()=>{if(!S.apex||VS||!APEX[S.apex])return 1;const a=S.adv,p=AXK.path[S.apex];return(AXK.side[APEX[S.apex].side][a]||1)*(p&&p[a]||1)};
 const zealAdd=()=>{const L=P&&LNG[S.cls];if(L)P.zeal=(P.zeal||0)+L.ev};
-const dmgMul=()=>zealK()*axK()*(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
-const cdMul=()=>1/((P&&P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
-const skMul=i=>{const k=Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
+const dmgMul=()=>frK(0,FR.e.dmg)*zealK()*axK()*(ORDS()?apxSt()[0]*(1+(P&&P.resB||0)):1)*(P&&P.rageT>0?1.4:1)*(1+eqv('dmg')/100+(S.level>=8?S.scrap*.01:0))*(1+.2*S.b.might)*(adv('d')||1)*(S.cls==='fighter'&&pw(3)?1.25:1)*(S.cls==='healer'&&pw(3)?1.6:1)*(S.cls==='tank'&&pw(3)?1.25:1);
+const cdMul=()=>1/(frK(1,FR.e.as)*(P&&P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
+const skMul=i=>{const k=frK(3,-FR.e.cd)*Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
-const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)):0};
+const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)*frK(3,FR.e.mana)):0};
 const skRise=()=>1+MRISE*Math.max(0,S.level-8);
 const skCost=si=>{const c=cls(),d=c&&skD(c,si);return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1)*(ORDS()?ORDCOST:1))):0};
 const num=v=>Math.round(v).toLocaleString('en-US');
@@ -892,6 +954,7 @@ function phaseShift(m){
 function petFed(got){PETS.dmg+=got;const a=byPet;if(a.pet&&a.mods.includes('vampiric')&&a.hp>0&&a.hp<a.maxHp&&!(S.t-a.vAt<4)&&(a.vSum||0)<a.maxHp*.16){const h=Math.min(a.maxHp-a.hp,a.maxHp*.02);a.hp+=h;a.vAt=S.t;a.vSum=(a.vSum||0)+h;puff(a,'#b8263d',8,120)}}
 function hurtM(m,d,quiet){
   if(m.vs){if(MINE>0)comboHit();return vsHit(m,d,quiet)}
+  if(MINE>0&&!byPet&&!REM&&d>0&&d<1e8){const tl=frTell();if(tl>0?rand()<tl:rand()<-tl){d*=tl>0?FR.tellK:FR.glanceK;if(tl>0){BIG=Math.max(BIG||0,1.4);TELL=1}else TELL=-1}}
   if(CL())return mpHurtM(m,d,quiet);
   if(m.decoy){puff(m,col('#3fa596'),16);ringShot(m,6,150,rand()*TAU);sfx(700,.2,'sine',.25,200);reshuffle();return}
   if(m.ward>0){SND.ward();return}
@@ -904,7 +967,7 @@ function hurtM(m,d,quiet){
   // (the three-phase bosses shed morsels as their health falls: the Hollow at every fifth, the King and the tyrants at every eighth, because their fight is long and their blows are heavy)
   const before=m.hp;m.hp-=d;if(!REM)ST.dmgDealt+=Math.max(0,Math.min(d,before));
   if(byPet)petFed(Math.max(0,Math.min(d,before))); // 2% of its health, at most once in four seconds, 16% in a level: the monsters' own rule
-  m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(Math.round(d*10)/10),life:.7,c:REM?'#958ea3':'#e7dfcd',big:BIG||undefined});
+  m.flash=.12;puff(m,col(m.s.col),5,120);SND.hit(quiet);if(!quiet)haptic(12);floats.push({x:m.x+rand()*18-9,y:m.y-m.r-6,txt:fmt(Math.round(d*10)/10),life:.7,c:REM?'#958ea3':TELL>0?'#ffd95e':TELL<0?'#8f8aa0':'#e7dfcd',big:BIG||undefined,tell:TELL||undefined});TELL=0;
   const ch=m.maxHp/(m.s.crown?8:5);if(m.ai==='hollow'&&Math.floor(m.hp/ch)<Math.floor(before/ch)&&m.hp>0)morsels.push({id:nid(),x:m.x,y:m.y});
   if(m.boss&&m.hp>0){if(m.ai==='hollow'){const ph=m.hp<=m.maxHp/3?3:m.hp<=m.maxHp*2/3?2:1;if(ph>(m.phase||1)){m.phase=ph;phaseShift(m)}}else if(!m.rage&&m.hp<=m.maxHp*.4)enrage(m)}
   if(m.kind==='mimic'&&m.boss&&m.hp>0&&++m.hits%3===0)reshuffle();
@@ -916,7 +979,7 @@ function hurtM(m,d,quiet){
   if(m.hp<=0){
     mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P)manaGive(P.maxMana*MKILL);if(m.quarry&&DRE)dareEnd('done');
     if(m.boss)floorClear();
-    else{if(has('taste')&&rand()<.35){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m)}
+    else{if(has('taste')&&rand()<.35*frK(4,FR.e.find)){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m)}
   }
 }
 // a vampiric boss feeds when it wounds a hero
@@ -1079,7 +1142,7 @@ function roomStep(dt){
     if(o.on&&o.kind==='brazier'&&rand()<dt*30){const a=rand()*TAU,d=rand()*o.r;bits.push({x:o.x+Math.cos(a)*d,y:o.y+Math.sin(a)*d,vx:0,vy:-50-rand()*40,life:.5,max:.5,c:rand()<.5?'#ff8a4c':'#ffd95e',r:2.5})}}
 }
 function playerStep(dt){
-  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(VS&&VP.spurT>0?VSK.spur:1):1);
+  const c=cls(),spd=({ranger:245,tank:195,assassin:255,fighter:225}[c]||215)*(c?frK(1,FR.e.mv)*(1+.06*S.b.fleet)*(adv('s')||1)*(1+eqv('mv')/100)*(P.fleetT>0?1.4:1)*(P.haste>0?1+AX.storm.mv*P.haste:1)*(P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(VS&&VP.spurT>0?VSK.spur:1):1);
   let mx=(keys.right?1:0)-(keys.left?1:0)+joy.x,my=(keys.down?1:0)-(keys.up?1:0)+joy.y;
   if(VS){if(!VP.hold&&P.atk>0&&c&&!melee(c)){mx*=VSK.shootSlow;my*=VSK.shootSlow}if(VP.hold){mx=my=0;want.dash=false}else if(P.vSlow>0){const l0=Math.hypot(mx,my),k=l0>1?.5/l0:.5;mx*=k;my*=k}}
   const l=Math.hypot(mx,my);if(l>1){mx/=l;my/=l}
@@ -1103,8 +1166,8 @@ function playerStep(dt){
   if((want.atk||keys.atk)&&P.cd<=0&&!held)strike(want.pt);
   want.atk=false;want.pt=null;
   if(want.dash&&has('organs')&&P.dashCd<=0&&P.dashT<=0){const PDS=P.pdCd>0||!R12()?null:pdScan(); // (looked at before the hero moves)
-    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1;P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);SND.blink();if(VS)VP.dodgeT=VSK.dodge}
-    else{P.dashT=.16;P.dashCd=c==='assassin'?(pw(3)?.25:.45):.85;P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash();if(VS)VP.dodgeT=VSK.dodge}
+    if(c==='mage'){puff(P,'#8fd3ff',10);P.x+=Math.cos(P.face)*150;P.y+=Math.sin(P.face)*150;clamp(P,14);collide(P,14,true);puff(P,'#8fd3ff',10);P.inv=Math.max(P.inv,.35);P.dashCd=1.1*frK(1,-FR.e.dash);P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);SND.blink();if(VS)VP.dodgeT=VSK.dodge}
+    else{P.dashT=.16;P.dashCd=(c==='assassin'?(pw(3)?.25:.45):.85)*frK(1,-FR.e.dash);P.amb=1.5;P.inv=Math.max(P.inv,.26);P.dgT=PD.win+.02;if(PDS)pdTry(1e9,PDS);P.dx=Math.cos(P.face);P.dy=Math.sin(P.face);SND.dash();if(VS)VP.dodgeT=VSK.dodge}
     haptic(10)}
   want.dash=false;
   if(want.skill)want.sk[0]=true;want.skill=false;
@@ -2733,8 +2796,9 @@ function hud(){
   $('bDash').disabled=!has('organs');$('bDash').textContent=cls()==='mage'?'Blink':'Dash';
   syncSkills();
 }
+const bodyHp=()=>{const c=cls();return Math.max(1,Math.round((4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0))*(c&&ORDS()?apxSt()[1]:1)*(c?frK(2,FR.e.hp):1)))};
 function freshBody(){
-  const c=cls(),maxHp=Math.round((4+(has('organs')?3:0)+(has('skin')?3:0)+(c?CLASSES[c].hp+3*S.b.vigor:0)+(c==='tank'&&pw(3)?4:0)+(c&&adv('hp')||0)+(c?eqv('hp'):0))*(c&&ORDS()?apxSt()[1]:1));
+  const c=cls(),maxHp=bodyHp();
   const maxMana=manaMax();
   P={x:W/2,y:H-120,face:-Math.PI/2,hp:maxHp,maxHp,mana:maxMana,maxMana,resv:0,still:0,drawK:0,inv:0,atk:0,cd:0,dashCd:0,dashT:0,dx:0,dy:0,walk:0,regen:0,swing:0,moving:false,skCd:0,skCds:[0,0,0,0,0,0],cdS:Array(13).fill(0),mxS:Array(13).fill(0),ascT:0,auraK:.5,auraR:c&&S.apex==='order'?ORDR:0,beam:null,bmT:0,bmA:0,bmHit:null,resB:0,rageT:0,guardT:0,legT:0,fleetT:0,stoneT:0,stormT:0,stormK:0,fireT:0,fireK:0,renewT:0,renewK:0,quakeN:0,cutN:0,starN:0,rushD:0,shield:c==='tank'&&S.adv!=='berserker',shT:0,sumT:3,lc:0,amb:0,trN:0,trCd:0,trQ:0,trT:null,trW:2.5,saved:false,vx:0,vy:0,safeX:W/2,safeY:H-120,chS:0,chN:CHN[c||'none'].steps.length,chC:false,chT:0,chAt:-9,chGap:0,pdT:0,rip:0,dgT:0,pdCd:0};
   apxBody();
@@ -2935,7 +2999,7 @@ function dropScreen(n,rk,next,second){
   // the dice of a drop are seeded with the floor and the hero as it stands (class, upgrade, boons, equipment, scrap): leaving on the reward screen and clearing the floor again brings the same drop, not a new roll
   let sd=2166136261;for(const ch of[n,S.cls,S.adv,S.scrap,second?1:0,...SLOTS.map(sl=>S.eq[sl].r+':'+S.eq[sl].lvl),...Object.values(S.b)].join('|'))sd=Math.imul(sd^ch.charCodeAt(0),16777619)>>>0;sd=sd||1;
   const rnd=()=>{sd^=sd<<13;sd>>>=0;sd^=sd>>>17;sd^=sd<<5;sd>>>=0;return sd/4294967296};for(let i=0;i<4;i++)rnd();
-  const L=S.L,luck=isTrial(L.floorKind),d=dropItem(n,{luck,more:GR&&GR.level===n?GR.luck:0,min:L.door==='wrath'?1:0,rnd}),cur=S.eq[d.slot],after={...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]},go=f=>()=>{f();eqSync();hud();next()};
+  const L=S.L,luck=isTrial(L.floorKind),d=dropItem(n,{luck,more:(GR&&GR.level===n?GR.luck:0)+(frF(4)>1?Math.floor((frF(4)-1)*FR.more+rnd()):0),min:L.door==='wrath'?1:0,rnd}),cur=S.eq[d.slot],after={...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]},go=f=>()=>{f();eqSync();hud();next()};
   show({wide:true,cls:luck?'trialPanel':'',col:RAR[d.r][1],kick:second?second+': '+an(d.rarity)+' '+d.slot:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up '+an(d.rarity)+' '+d.slot:L.spec.name+' dropped '+an(d.rarity)+' '+d.slot,title:d.name,body:itemLine(d)+'. You carry '+itemName(cur)+' ('+cur.rarity+'): '+itemLine(cur)+'.',keys:rk,cards:[
     {title:'Upgrade',sub:itemName(cur)+' to +'+after.lvl,col:RAR[cur.r][1],body:'Melt the drop into what you carry. A '+d.rarity+' drop adds '+Math.round(RAR[d.r][3]*100)+'% of its base stats. It becomes: '+itemLine(after)+'.',fn:go(()=>{S.eq[d.slot]=after})},
     {title:'Replace',sub:d.name,col:RAR[d.r][1],body:'Wear the drop instead. '+itemName(cur)+' is gone for good. You get: '+itemLine(d)+'.',fn:go(()=>{S.eq[d.slot]=d})},
@@ -2946,7 +3010,7 @@ function reward2(n){
     return show({soft:true,kick:'You tore it free',title:p.name,body:p.text,keys:(n===0?(matchMedia('(pointer:coarse)').matches?'Tap Dash to dart the way you are moving. ':'Press Shift (or K) to dash the way you are moving. ')+'Nothing can hurt you mid-dash. ':'')+(lacks.length?'Still missing: '+lacks.join(', ')+'.':'Nothing is missing now. One thing is left to kill.'),btns:[['Climb on',()=>begin(S.level)]]})}
   const c=CLASSES[S.cls];
   if(n<11){const p=c.pows[n-8],s2=c.skills[2],touch=matchMedia('(pointer:coarse)').matches;
-    return show({soft:true,kick:(n===9?'The Flayed King is dead · ':'')+'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges. Every skill costs mana, the bar under your health: it seeps back on its own, and twice as fast while you stand still.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges, and what each costs in mana. Mana seeps back on its own, and twice as fast while you stand still.'):n===9?(touch?'Your fourth skill button is live. More skills come at floors '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at floors '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>begin(S.level)]]})}
+    return show({soft:true,kick:(n===9?'The Flayed King is dead · ':'')+'Power-up · '+c.name,title:p[0],body:p[1]+(n===8?' You also learn a third skill, '+s2.name+'. '+s2.text:''),keys:n===8?(touch?'Your skills each have their own button. It shows the seconds left while the skill recharges. Every skill costs mana, the bar under your health: it seeps back on its own, and twice as fast while you stand still.':'Skills are on keys 1 to 6 (E, Q, R, F, C and V also work). The bar under the arena shows the seconds left while each recharges, and what each costs in mana. Mana seeps back on its own, and twice as fast while you stand still.'):n===9?(touch?'Your fourth skill button is live. More skills come at floors '+SKLV.slice(4).join(', ')+'.':'Your fourth skill is on key 4 (or F). More skills come at floors '+SKLV.slice(4).join(', ')+'.'):'',btns:[['Go on',()=>rewardEnd(n)]]})}
   if(n>=49&&!S.adv)return show({wide:true,kick:'Fifty floors. Your class has more to give.',title:'Choose your path',body:'This lasts for the rest of the climb.',
     cards:c.adv.map(([id,name,sub,text])=>({title:name,sub,body:text,fn:()=>{S.adv=id;if(id==='beastmaster')petFit();rewardEnd(n)}}))});
   const L=S.L;boonPick(n,1+(L.floorKind==='ordeal'?1:0)+(L.door==='horde'?1:0),1,()=>rewardEnd(n));
@@ -2960,18 +3024,20 @@ function boonPick(n,of,i,next){
     cards:pool.slice(0,tri?4:3).map(b=>{const[name,text]=b.id==='spec'?c.boon:[b.name,b.text];return{title:name,sub:S.b[b.id]?'You have '+S.b[b.id]:'New',body:text,fn:()=>{S.b[b.id]++;if(i<of)boonPick(n,of,i+1,next);else next()}}})});
 }
 // the end of every reward flow past the crypt: the apex choice once floor 100 is behind you, the doors of a crossroads (the host's choice in co-op), then the next floor
-function rewardEnd(n){
-  if(n>=99&&S.cls&&!S.apex)return apexScreen(()=>rewardEnd(n));
+function rewardEnd(n,framed){
+  if(!framed)return frameAsk(()=>rewardEnd(n,true));
+  if(n>=99&&S.cls&&!S.apex)return apexScreen(()=>rewardEnd(n,true));
   if(S.L&&S.L.floorKind==='cross'&&!CL()&&!(S.door&&S.door.n===S.level))return doorScreen(()=>begin(S.level));
   begin(S.level);
 }
 function chooseClass(){
-  S.mode='reward';S.level=8;S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;TR=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the root';hud();
+  S.mode='reward';S.level=8;S.sp=frNew();S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;TR=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();eqSync();allies=[];if(P)P.inv=0;$('lvl').textContent='Out of the root';hud();
   show({wide:true,kick:'You are whole. You climb out of the root of the Spire as a person.',title:'Choose who you become',body:'You start with the basic equipment of your class and its first two skills. Eight more are learned as you climb, each with its own cooldown and its cost in mana, and you carry six at a time. Mana comes back on its own, faster while you stand still. Your pool grows with every floor, and skills cost a little more as you climb. After floor 50 the class can be upgraded, and after floor 100 it reaches its apex.',
     cards:[...(MP.on?mpPickCards():[]),...Object.entries(CLASSES).map(([id,c])=>({title:c.name,sub:c.gear,body:c.text+' '+c.mana+' mana. First skills: '+c.skills[0].name+', '+c.skills[1].name+'.',fn:()=>{S.cls=id;S.eq=basicSet(id);S.load=load0();emit('classpicked',{cls:id});begin(8)}}))]});
 }
 function pauseShow(){
   const btns=[['Resume',()=>pause(false)]];if(learned().length>NSK)btns.push(['Skills',()=>loadout(pauseShow)]);
+  if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(pauseShow)]);
   if(form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(pauseShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',pauseShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',pauseShow)]);
@@ -3015,10 +3081,10 @@ const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
   const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS){eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};if(S.eq[sl].m)eq[sl].m=1} // m: a trinket that carries mana
-  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),...(S.apex?{apex:S.apex}:{}),...(S.tr?{tr:S.tr}:{}),...(S.door?{door:[S.door.id,S.door.n]}:{}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
+  return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),...(S.apex?{apex:S.apex}:{}),...(S.tr?{tr:S.tr}:{}),...(S.door?{door:[S.door.id,S.door.n]}:{}),...(S.cls&&S.sp&&(!S.sp.auto||S.sp.asked)?{sp:frOut()}:{}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
 function save(n){if(MP.on)return mpSave(n); // a co-op run is kept apart and never touches the single-player save
-  SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,apex:SAVE.apex,tr:SAVE.tr,door:SAVE.door,st:SAVE.stats}))}
+  SAVE=snapshot(n);pref('level',n);pref('run',JSON.stringify({cls:SAVE.cls,adv:SAVE.adv,b:SAVE.b,eq:SAVE.eq,scrap:SAVE.scrap,load:SAVE.load,pets:SAVE.pets,pet:SAVE.pet,rev:SAVE.rev,apex:SAVE.apex,tr:SAVE.tr,door:SAVE.door,sp:SAVE.sp,st:SAVE.stats}))}
 const own=(o,k)=>Object.prototype.hasOwnProperty.call(o,k);
 // read a stored run into S, forgiving: a damaged or hand-edited save must not be able to break the run
 function applyRun(r,now=0){
@@ -3027,6 +3093,7 @@ function applyRun(r,now=0){
     const b=noBoons();if(S.cls&&r.b&&typeof r.b==='object')for(const k in b){const v=Math.floor(+r.b[k]);if(v>0)b[k]=Math.min(v,k==='spec'?CLASSES[S.cls].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999)}S.b=b;
     S.apex=S.cls&&apexOk(r.apex)?r.apex:null;S.tr=S.cls?Math.min(99999,Math.max(0,Math.floor(+r.tr)||0)):0; // older saves have no apex path and no trials behind them
     S.door=S.cls&&Array.isArray(r.door)&&own(DOOR,r.door[0])&&Number.isInteger(r.door[1])&&r.door[1]>=12?{id:r.door[0],n:r.door[1]}:null;
+    S.sp=frIn(r.sp);S.level=now;frFix(); // older saves have no frame: theirs is kept even
     S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
     S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
@@ -3035,7 +3102,7 @@ function applyRun(r,now=0){
       PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[]);petFix(now)}
     PETS.auto=!(r.rev===0||r.rev===false); // raising the fallen is on unless the save says otherwise
     stReset();const st=r.st&&typeof r.st==='object'?r.st:{};for(const k of['kills','deaths','dmgDealt','dmgTaken','time','bestLevel']){const v=+st[k];if(v>0&&isFinite(v))ST[k]=Math.min(v,1e12)} // older saves have no counters
-  }catch(e){S.cls=S.adv=S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
+  }catch(e){S.sp=frNew();S.cls=S.adv=S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
   eqSync();
 }
 // MB.api.loadSave is strict where applyRun is forgiving: anything that is not exactly a save is refused and nothing changes
@@ -3055,9 +3122,10 @@ function checkSave(o){
   let pets=[],pet=[];if(o.pets!==undefined&&o.pets!==null){if(!Array.isArray(o.pets)||o.pets.length>PETSANE||o.pets.length&&!canPet(c,o.adv))return null;for(const p of o.pets){const e=petIn(p);if(!e)return null;pets.push(e)}
     pet=actIn(o.pet,pets.length,pets.length);if(!pet)return null}
   if(o.rev!==undefined&&o.rev!==0&&o.rev!==1)return null;
+  if(o.sp!==undefined&&!(c&&Array.isArray(o.sp)&&o.sp.length===7&&o.sp.every(x=>int(x,0,30000))&&o.sp[2]+o.sp[3]+o.sp[4]+o.sp[5]+o.sp[6]<=FR.per*Math.max(0,o.level-8)))return null;
   const st={kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0};
   if(o.stats!==undefined){if(!o.stats||typeof o.stats!=='object')return null;for(const k in st){const v=o.stats[k];if(v===undefined)continue;if(typeof v!=='number'||!(v>=0&&v<=1e12))return null;st[k]=v}}
-  return{cls:c,adv:o.adv||null,apex,tr:o.tr||0,door:o.door||null,b,eq,scrap:o.scrap,load,pets,pet,rev:o.rev===0?0:1,st,level:o.level};
+  return{cls:c,adv:o.adv||null,apex,tr:o.tr||0,door:o.door||null,sp:o.sp,b,eq,scrap:o.scrap,load,pets,pet,rev:o.rev===0?0:1,st,level:o.level};
 }
 function loadSave(o){
   if(MP.on)return false;
@@ -3066,7 +3134,7 @@ function loadSave(o){
   applyRun(r,r.level);save(r.level);title(r.level);return true;
 }
 function storedLevel(){try{return Math.min(9998,Math.max(0,Math.floor(+localStorage.getItem('marrowborn.level'))||0))}catch(e){return SAVE.level}}
-function newRun(){S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
+function newRun(){S.sp=frNew();S.cls=null;S.adv=null;S.apex=null;S.tr=0;S.door=null;S.b=noBoons();S.eq=null;S.scrap=0;S.load=load0();petsClear();stReset()}
 // a hook set by extras.js; `back` puts the screen it was opened from back up
 function hook(name,back){try{MB[name](back)}catch(e){console.error('Ashes to Apex: '+name+' failed',e);back()}}
 let titleSaved=0;
@@ -3657,6 +3725,7 @@ function mpMenuShow(){
   if(VS)return vsMenuShow();
   const inLv=S.mode==='play'||S.mode==='clear',host=MP.role==='host',btns=[[inLv?'Back to the fight':'Back',mpMenuClose]];
   if(S.cls&&act2()&&learned().length>NSK)btns.push(['Skills',()=>loadout(mpMenuShow)]);
+  if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(mpMenuShow)]);
   if(S.cls&&form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(mpMenuShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',mpMenuShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',mpMenuShow)]);
@@ -4350,6 +4419,8 @@ function vsDraw2d(pass){
 /* ---------- boot ---------- */
 // Shared interface for the 3D renderer and model files. Arrays are reassigned by the game, so read them through these getters every frame.
 window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door(){return S.door&&DOOR[S.door.id]?{...doorInfo(S.door.id),floor:S.door.n+1}:null},get apex(){return apexInfo()},get apexPaths(){return apexPaths()},get arcs(){return arcs},get sightR(){return S.mode==='title'?0:sightR()},APEX,mp:MP,settings:SET,setSetting,on,api:API,stats:ST,get obstacles(){return obstacles},W,H,WALL,FOG,TAU,S,SPEC,CLASSES,PARTS,LEVELS,has,cls,pw,act2,melee,levelDef,col,cv,ctx,draw2d:draw,renderer:null,rank,pause,skills:SK,mana:MANA,RAR,pets:PETS,get equip(){return S.eq||{weapon:null,armor:null,trinket:null}},get fields(){return fields},
+  // round 14 (see the contract, section Round 14)
+  FRAME:FR,get frame(){return frInfo()},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
   // round 12 (see the contract in the round-12 notes)
   CHAINS:CHN,PD,BRK,FIN,LINK,DARES,GRD,get chain(){return{count:CB.n,best:CB.best,t:Math.max(0,CB.t),cls:cls(),style:CHN[cls()||'none'].style,steps:CHN[cls()||'none'].steps.length}},breakOf:m=>m&&m.brkMax?Math.max(0,m.brk/m.brkMax):-1,
   get finisher(){return FN},finish:()=>finish(),get objective(){return DRE},get grade(){return GR},skillLink:i=>{const c=cls(),si=c?slotSkill(i|0):-1,d=si>=0&&skD(c,si);return d?linkInfo(d[4]):{sets:[],pays:[]}},
@@ -4377,7 +4448,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)
