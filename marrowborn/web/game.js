@@ -452,28 +452,64 @@ function buildRoom(n,room){
 
 /* ---------- equipment: three slots, four rarities, dropped by every boss from level 9 on ---------- */
 const SLOTS=['weapon','armor','trinket'];
+// (round 15) a fourth thing to carry, the relic: nobody starts with one, it only drops. ESLOTS: everything worn, in order. A relic may be missing (S.eq.relic undefined).
+const ESLOTS=['weapon','armor','trinket','relic'];
 const RAR=[['common','#b9b2c6',1,.15],['rare','#6ea3e0',1.5,.2],['epic','#b88cff',2.1,.3],['legendary','#f0b848',2.8,.4]]; // name, colour, stat multiplier, upgrade step it gives when melted down
 const QUAL=['Plain','Fine','Runed','Ancient'];
-const GEAR={fighter:['Greatsword','Harness','Headband'],tank:['Sword','Plate','Iron Band'],assassin:['Daggers','Shadow Wrap','Mask'],mage:['Staff','Robe','Hat'],ranger:['Bow','Hood','Quiver'],healer:['Sun Staff','White Robe','Circlet'],necro:['Skull Staff','Grave Robe','Bone Charm']};
-const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall and pet damage',10,'%'],mana:['max mana',6,'%']};
-const slotStats=(c,slot)=>slot==='weapon'?['dmg','spd']:slot==='armor'?['hp','guard']:['cdr',c==='tank'?'sh':c==='healer'?'mend':c==='necro'?'thr':'mv'];
+const GEAR={fighter:['Greatsword','Harness','Headband','War Token'],tank:['Sword','Plate','Iron Band','Oath Seal'],assassin:['Daggers','Shadow Wrap','Mask','Knucklebone'],mage:['Staff','Robe','Hat','Glass Eye'],ranger:['Bow','Hood','Quiver','Fletcher\'s Knot'],healer:['Sun Staff','White Robe','Circlet','Candle Stub'],necro:['Skull Staff','Grave Robe','Bone Charm','Finger Bone']};
+const STAT={dmg:['damage',6,'%'],spd:['attack speed',4,'%'],hp:['max health',2,''],guard:['chance to shrug off a hit',3,'%'],cdr:['faster skill recharge',5,'%'],mv:['move speed',3,'%'],sh:['faster shield recharge',8,'%'],mend:['faster mending',8,'%'],thr:['thrall and pet damage',10,'%'],mana:['max mana',6,'%'],ward:['chance to step clear of a trap or of the floor itself',7,'%']};
+const slotStats=(c,slot)=>slot==='relic'?['ward','hp']:slot==='weapon'?['dmg','spd']:slot==='armor'?['hp','guard']:['cdr',c==='tank'?'sh':c==='healer'?'mend':c==='necro'?'thr':'mv'];
 // an item is fully described by class, slot, rarity r (0-3), upgrade count lvl and upgrade total up; common items carry one stat line, the rest two
 // m: a trinket of a casting class (CASTER) that carries max mana as its second line instead of the usual one; it is the only thing about an item that is rolled
 const CASTER={mage:1,healer:1,necro:1};
-function item(c,slot,r,lvl=0,up=0,m=0){const keys=slotStats(c,slot).slice(0,r?2:1);m=m&&slot==='trinket'&&r>0&&CASTER[c]?1:0;if(m)keys[1]='mana';return{slot,name:QUAL[r]+' '+GEAR[c][SLOTS.indexOf(slot)],rarity:RAR[r][0],r,lvl,up,m,keys}}
+/* ---------- round 15: sets and traits. A drop that is not common may carry the mark of a set; two pieces of a set worn give its first bonus, four its second. An epic or a legendary drop may also carry a trait: it changes how ONE skill of the class behaves ---------- */
+// SETS[1..4] (0: no mark). SETK: the numbers. Not in versus. Seasoned heroes start without marks and without a relic (their equipment is the one every table of rounds 7-14 was tuned with).
+const SETS=[null,
+ {id:'road',name:'The Long Road',col:'#d9a441',two:'Closers hit 15% harder.',four:'Every closer takes 0.4 s off each skill that is recharging.'},
+ {id:'margin',name:'The Thin Margin',col:'#6fe3ff',two:'A riposte hits 25% harder.',four:'A hairbreadth dodge throws a ring of force around you, and the next one may come a second sooner.'},
+ {id:'kindled',name:'Kindled Marks',col:'#ff8a4a',two:'Setups last 3 seconds longer and payoffs hit 10% harder.',four:'A payoff takes 1.2 s off each skill that is recharging.'},
+ {id:'well',name:'The Deep Well',col:'#b46cff',two:'10% more mana.',four:'Mana comes back a quarter faster.'}];
+const SETK={road2:1.15,road4:.4,margin2:1.25,marginR:130,marginD:2.5,marginCd:1,kind2:3,kindK:1.1,kind4:1.2,well2:1.1,well4:1.25,pSet:[0,.3,.45,.6],pTr:[0,0,.25,.5],pRelic:.2};
+// TRAITS[1..5]. An item's trait is tr:[kind, skill index 0-9]. echo: the skill is cast again `echoT` seconds later at `echoK` of its strength, for nothing; thirst: using it heals; fleet: readies the dash, quick feet for a moment;
+// braced: blows on you are halved for a moment; blood: it costs no mana, and `blood` of the health you have instead (never the last point).
+const TRAITS=[null,
+ {id:'echo',name:'Twice-Told',text:s=>s+' is cast a second time a moment later, at 40% of its strength, for nothing.'},
+ {id:'thirst',name:'Thirsting',text:s=>'Using '+s+' gives back 4% of your health.'},
+ {id:'fleet',name:'Fleet',text:s=>'Using '+s+' readies your dash at once and quickens your step for 2 seconds.'},
+ {id:'braced',name:'Braced',text:s=>'For 1.5 seconds after '+s+', every blow on you is halved.'},
+ {id:'blood',name:'Blood-Paid',text:s=>s+' costs no mana. It takes 6% of the health you have instead, never the last of it.'}];
+const TRK={echoT:.5,echoK:.4,thirst:.04,fleetT:2,braced:1.5,blood:.06};
+const ECHOOPS=['shock','rush','fan','ringp','blast','line','field','hit','chain','heal','burst','seq','collect','sever','verdict'];
+const setOk=v=>Number.isInteger(v)&&v>=1&&v<SETS.length,trOk=t=>Array.isArray(t)&&t.length===2&&Number.isInteger(t[0])&&t[0]>=1&&t[0]<TRAITS.length&&Number.isInteger(t[1])&&t[1]>=0&&t[1]<10;
+function item(c,slot,r,lvl=0,up=0,m=0,set=0,tr=null){const keys=slotStats(c,slot).slice(0,r?2:1);m=m&&slot==='trinket'&&r>0&&CASTER[c]?1:0;if(m)keys[1]='mana';return{slot,name:QUAL[r]+' '+GEAR[c][ESLOTS.indexOf(slot)],rarity:RAR[r][0],r,lvl,up,m,keys,set:setOk(set)?set:0,tr:trOk(tr)?[tr[0],tr[1]]:null,c}}
+const trName=(it,c)=>it.tr?TRAITS[it.tr[0]].name+' '+SKILLS[c||it.c||S.cls][it.tr[1]][1]:'';
+const trText=(it,c)=>it.tr?TRAITS[it.tr[0]].text(SKILLS[c||it.c||S.cls][it.tr[1]][1]):'';
+// the marks of an item in words: ' · The Long Road · Twice-Told Cleave'
+const itemMarks=it=>(it.set?' · '+SETS[it.set].name:'')+(it.tr?' · '+trName(it):'');
+let SETN=[0,0,0,0,0],TRON=new Map();
+const setN=i=>VS||!S.cls||S.level<8?0:SETN[i];
+// the traits worn that change skill si (kind ids), or null
+const trOf=si=>VS||!S.cls||S.level<8?null:TRON.get(si)||null;
+const trHas=(si,id)=>{const t=trOf(si);return!!t&&t.includes(id)};
+const cdCut=s=>{if(P)for(let i=0;i<P.cdS.length;i++)if(P.cdS[i]>0)P.cdS[i]=Math.max(0,P.cdS[i]-s)};
 const statV=(it,k)=>{const v=STAT[k][1]*RAR[it.r][2]*(1+it.up);return k==='hp'?Math.round(v):Math.round(v*10)/10};
 const itemLine=it=>it.keys.map(k=>'+'+statV(it,k)+STAT[k][2]+' '+STAT[k][0]).join(', ');
 const itemName=it=>it.name+(it.lvl?' +'+it.lvl:'');
 const basicSet=c=>({weapon:item(c,'weapon',0),armor:item(c,'armor',0),trinket:item(c,'trinket',0)});
 let EQ={};
-function eqSync(){EQ={};if(S.eq)for(const sl of SLOTS){const it=S.eq[sl];if(it)for(const k of it.keys)EQ[k]=(EQ[k]||0)+statV(it,k)}}
+function eqSync(){EQ={};SETN=[0,0,0,0,0];TRON=new Map();if(S.eq)for(const sl of ESLOTS){const it=S.eq[sl];if(!it)continue;for(const k of it.keys)EQ[k]=(EQ[k]||0)+statV(it,k);if(it.set)SETN[it.set]++;if(it.tr){const l=TRON.get(it.tr[1])||[];if(!l.includes(TRAITS[it.tr[0]].id))l.push(TRAITS[it.tr[0]].id);TRON.set(it.tr[1],l)}}}
 const eqv=k=>S.level>=8&&S.cls&&EQ[k]||0;
 // o: {luck: the better of two rolls (a trial's drop), min: the least rarity (the Red Door), rnd and cls: a fixed sequence for a class (a seasoned hero's equipment)}
 function dropItem(n,o){
   o=o||{};const rnd=o.rnd||rand,c=o.cls||S.cls;
   const N=n+1,big=N%10===0,pL=Math.min(.25,.01+(N-9)*.004)*(big?4:1),pE=Math.min(.35,.05+(N-9)*.008)*(big?2:1);let x=rnd();if(o.luck)x=Math.min(x,rnd());for(let i=0;i<(o.more|0);i++)x=Math.min(x,rnd()); // more: further rolls, the best counts (a good mark, a dare met)
   const slot=SLOTS[Math.floor(rnd()*3)],r=Math.max(o.min||0,x<pL?3:x<pL+pE?2:big||x<pL+pE+.3?1:0);
-  return item(c,slot,r,0,0,slot==='trinket'&&r>0&&CASTER[c]&&rnd()<.4?1:0);
+  const m=slot==='trinket'&&r>0&&CASTER[c]&&rnd()<.4?1:0;
+  if(!o.marks)return item(c,slot,r,0,0,m);
+  // (round 15) marks: only real drops roll them, after everything else, so the item itself is the one of before
+  const relic=rnd()<SETK.pRelic,set=rnd()<SETK.pSet[r]?1+Math.floor(rnd()*(SETS.length-1)):0;let tr=null;
+  if(rnd()<SETK.pTr[r]){const k=1+Math.floor(rnd()*(TRAITS.length-1)),ok=[];for(let si=0;si<10;si++)if(SKLV[si]<=N+8&&(TRAITS[k].id!=='echo'||SKILLS[c][si][4].some(op=>ECHOOPS.includes(op[0])))&&(TRAITS[k].id!=='blood'||SKILLS[c][si][6]>0))ok.push(si);if(ok.length)tr=[k,ok[Math.floor(rnd()*ok.length)]]}
+  return item(c,relic?'relic':slot,r,0,0,relic?0:m,set,tr);
 }
 const noBoons=()=>({might:0,haste:0,vigor:0,focus:0,fleet:0,well:0,spec:0});
 // apex: the apex path (one of the ten ids of APEX). tr: trials passed (each is worth TMANA maximum mana). door: {id, n} the door chosen at a crossroads for floor n.
@@ -581,12 +617,12 @@ const dmgMul=()=>frK(0,FR.e.dmg)*zealK()*axK()*(ORDS()?apxSt()[0]*(1+(P&&P.resB|
 const cdMul=()=>1/(frK(1,FR.e.as)*(P&&P.pdT>0&&MP.on?(VS?PD.hasteVs:PD.hasteK):1)*(P&&P.haste>0?1+AX.storm.as*P.haste:1)*(P&&P.rageT>0?1.25:1)*(1+eqv('spd')/100)*(1+.1*S.b.haste)*(adv('c')||1)*(S.cls==='fighter'?(1+.08*S.b.spec)*(pw(3)?1.15:1):1));
 const skMul=i=>{const k=frK(3,-FR.e.cd)*Math.pow(.88,S.b.focus)*(1-Math.min(.5,eqv('cdr')/100))*(S.adv==='phantom'?(i?1:.4):adv('k')||1);return i>9?Math.max(.5,k):k}; // Phantom only speeds up Shadowstep
 // mana: the pool, what a skill costs right now, and how fast the free part of the pool refills (per second, before the standing bonus)
-const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)*frK(3,FR.e.mana)):0};
+const manaMax=()=>{const c=cls();return c?Math.round((MANA0[c]+MWELL*S.b.well+MLEVEL*Math.max(0,S.level-8)+TMANA*(S.tr||0))*(1+eqv('mana')/100)*(setN(4)>=2?SETK.well2:1)*frK(3,FR.e.mana)):0};
 const skRise=()=>1+MRISE*Math.max(0,S.level-8);
-const skCost=si=>{const c=cls(),d=c&&skD(c,si);return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1)*(ORDS()?ORDCOST:1))):0};
+const skCost=si=>{const c=cls(),d=c&&skD(c,si);if(d&&trHas(si,'blood'))return 0;return d?Math.max(1,Math.round(d[6]*skRise()*(S.adv==='archmage'?.8:1)*(S.adv==='phantom'&&si===0?.5:1)*(ORDS()?ORDCOST:1))):0};
 const num=v=>Math.round(v).toLocaleString('en-US');
 const manaRoom=()=>P?Math.max(0,P.maxMana-P.resv):0;
-const manaRate=()=>hcap('nomana')?0:manaRoom()*MREGEN*(1+Math.min(MWELLRMAX,MWELLR*S.b.well))*(S.adv==='saint'?1.25:1)*(ORDS()?ORDMANA:1);
+const manaRate=()=>hcap('nomana')?0:manaRoom()*MREGEN*(1+Math.min(MWELLRMAX,MWELLR*S.b.well))*(S.adv==='saint'?1.25:1)*(ORDS()?ORDMANA:1)*(setN(4)>=4?SETK.well4:1);
 function manaGive(v){if(!P||!P.maxMana||hcap('nomana'))return;P.mana=Math.min(manaRoom(),P.mana+v)}
 function manaSync(){if(!P)return;MANA.cur=Math.floor(P.mana+1e-6);MANA.max=P.maxMana;MANA.reserved=P.resv;MANA.drawing=P.drawK>0&&P.mana<manaRoom()-.01;MANA.regen=P.maxMana&&P.mana<manaRoom()-.01?Math.round(manaRate()*(1+(MDRAW-1)*P.drawK)*10)/10:0}
 // a skill that was asked for and cannot be paid: a soft sound and a flag for the HUD (which button, when), and nothing else
@@ -1086,6 +1122,7 @@ function hurtP(d,src){
   if(window.__mb&&window.__mb.hits)window.__mb.hits[src]=(window.__mb.hits[src]||0)+1;
   if(TSRC.length&&TSRC[0].form==='ward'&&!(P.trCd>0)){P.trCd=2.5;P.trQ=1;P.trT=null} // hit, blocked or shrugged off: the ward answers
   if(P.guardT>0){zealAdd();P.inv=.4;puff(P,'#d6a544',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK/2);shock(115,2);return}
+  if((src==='pit'||src==='spikes'||src==='brazier'||src==='hazard'||src==='floor')&&rand()*100<Math.min(60,eqv('ward'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Sure-footed',life:.8,c:'#d5dce2'});SND.ward();return}
   if(rand()*100<Math.min(40,eqv('guard'))){P.inv=.5;floats.push({x:P.x,y:P.y-44,txt:'Shrugged off',life:.8,c:'#d5dce2'});SND.ward();return}
   if(cls()==='tank'&&P.shield){zealAdd();P.shield=false;P.shT=0;P.inv=.6;puff(P,'#d5dce2',10);SND.block();haptic(30);manaGive(P.maxMana*MBLOCK*(S.adv==='paladin'?2:1));if(S.adv==='paladin'&&P.hp<P.maxHp){healP(.1,2)}if(pw(1))shock(115,2);return}
   {const G=d<=blow(0)&&allies.find(a=>a.kind==='guardian'&&a.shield);if(G){G.shield=false;G.shT=8;G.flash=.2;P.inv=.5;puff(P,TCOL.healer,10);floats.push({x:P.x,y:P.y-44,txt:'Guarded',life:.8,c:TCOL.healer});SND.block();haptic(30);return}} // the guardian turns aside a blow that is not a heavy one
@@ -1121,8 +1158,8 @@ function strike(pt){
   const c=cls(),a=aim(pt,melee(c)?170:1200,{mage:430,ranger:720,necro:400,healer:560}[c]);let D=dmgMul(),H=cdMul();P.swing=a;
   // the string: which step this blow is; the closer is heavier and slower, a riposte hits much harder
   const CH=CHN[c||'none'],N=CH.steps.length,on=R12();if(!on||P.chS>=N||S.t-P.chAt>P.chGap)P.chS=0;
-  const stp=on?CH.steps[P.chS++]:[1,1],cl=on&&P.chS===N,rip=on&&P.rip>0,C=CH.closer,n0=pshots.length;D*=stp[0];H*=stp[1];if(rip)D*=VS?PD.ripVs:PD.ripK;
-  const done=()=>{P.chAt=S.t;P.chGap=P.cd+.7;P.chC=cl;P.chT=0;P.chN=N;if(cl)P.atk=.26;
+  const stp=on?CH.steps[P.chS++]:[1,1],cl=on&&P.chS===N,rip=on&&P.rip>0,C=CH.closer,n0=pshots.length;D*=stp[0];H*=stp[1];if(rip)D*=VS?PD.ripVs:PD.ripK*(setN(2)>=2?SETK.margin2:1);if(cl&&setN(1)>=2)D*=SETK.road2;
+  const done=()=>{P.chAt=S.t;P.chGap=P.cd+.7;P.chC=cl;P.chT=0;P.chN=N;if(cl)P.atk=.26;if(cl&&setN(1)>=4)cdCut(SETK.road4);
     const k=pshots.length-n0,one={fx:cl?1:0,rip:rip?1:0};for(let i=n0;i<pshots.length;i++){const p=pshots[i];p.one=one;if(cl){p.big=1.4;p.bk=BRK.closer*1.5/k;p.push=C.push;p.r+=C.r||0;if(C.pierce&&p.pierce<99)p.pierce+=C.pierce}if(rip)p.big=1.8} // (one: what the whole cast does once, whichever bolt lands first)
     if(rip&&k)P.rip=0;
     emit('chainstep',{step:P.chS,steps:N,closer:cl,cls:c,style:CH.style,ang:a,x:P.x,y:P.y})};
@@ -1201,14 +1238,34 @@ function skill(si){
   if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')||typeof need==='function'&&!need(t)){SND.fizzle();return false}
   const A=altOf(si),x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()*(A?A.k.d:1)};
   if(R12()){if(P.cd>0)P.cd*=.5;if(P.chS){P.chAt=S.t;P.chGap=Math.max(P.chGap,P.cd+.9)}} // a skill cuts the recovery of a blow short and keeps the place in the string
-  P.mana-=cost;P.atk=.16;P.swing=x.ta;SND.skill(c,si);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
+  P.mana-=cost;P.atk=.16;P.swing=x.ta;SND.skill(c,si);
+  const TRs=trOf(si);if(TRs)trUse(si,TRs);if(sk[2]>=40){S.shake=Math.max(S.shake,.3);haptic([40,40,40,40,160])}else haptic(35);
   AK=A?A.k:AK0;try{for(const op of sk[4]){if(S.mode!=='play')break;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam'||op[0]==='collect'||op[0]==='sever')&&!mons.includes(t))continue;cast(op,x)}}finally{AK=AK0}
   if(sk[0]==='shadowstep'&&TSRC.length&&TSRC[0].form==='venom'){P.trQ=1;P.trT=t}
   P.mxS[si]=sk[2]*skMul(si);P.cdS[si]=P.mxS[si];syncSkills();return true;
 }
+// (round 15) the traits worn that change this skill, at the moment it is used
+function trUse(si,l){
+  const nm=l.map(id=>TRAITS.find(t=>t&&t.id===id).name);emit('trait',{skill:si,ids:l.slice(),names:nm});
+  if(l.includes('blood')){const h=Math.min(P.hp-1,Math.max(1,Math.round(P.hp*TRK.blood)));if(h>0){P.hp-=h;puff(P,'#b8263d',8,120);floats.push({x:P.x,y:P.y-44,txt:'-'+h,life:.7,c:'#b8263d'});hud()}}
+  if(l.includes('thirst')&&P.hp<P.maxHp){healP(TRK.thirst);puff(P,'#7fd66b',8,120)}
+  if(l.includes('fleet')){P.dashCd=0;P.fleetT=Math.max(P.fleetT||0,TRK.fleetT)}
+  if(l.includes('braced')){P.stoneT=Math.max(P.stoneT||0,TRK.braced);rings.push({x:P.x,y:P.y,life:.35,max:.35,r:46,fx:true})}
+  if(l.includes('echo'))P.echo={si,t:TRK.echoT};
+}
+// the second telling of a Twice-Told skill: everything it does again at echoK, with no cost and no recharge
+function trEcho(si){
+  const c=cls(),sk=c&&si<10&&skD(c,si);if(!sk||S.mode!=='play'||P.down)return;
+  let t=null,bd=1e9;for(const m of mons){if(m.hidden)continue;const d=dist(m,P);if(d<bd){bd=d;t=m}}const need=sk[5];
+  if(need==='t'&&!t||need==='near'&&!(t&&bd<t.r+110)||need==='thrall'&&!allies.some(a=>a.kind==='thrall')||typeof need==='function'&&!need(t))return;
+  const A=altOf(si),k0=A?A.k:AK0,K=TRK.echoK,x={t,ta:t?angTo(P,t):P.face,at:t?{x:t.x,y:t.y}:{x:P.x+Math.cos(P.face)*160,y:P.y+Math.sin(P.face)*160},D:dmgMul()*k0.d*K};
+  floats.push({x:P.x,y:P.y-50,txt:'Twice-Told',life:.7,c:'#d9a441'});P.atk=.16;P.swing=x.ta;SND.skill(c,si);emit('traitEcho',{skill:si,x:P.x,y:P.y});
+  AK=Object.assign({},k0,{d:k0.d*K,h:k0.h*K,dur:k0.dur*K});try{for(const op of sk[4]){if(S.mode!=='play')break;if(op[0]==='back'||op[0]==='tele'||op[0]==='buff'||op[0]==='shield'||op[0]==='army'||op[0]==='pact'||op[0]==='summon')continue;if((op[0]==='hit'||op[0]==='ringT'||op[0]==='beam'||op[0]==='collect'||op[0]==='sever')&&!mons.includes(t))continue;cast(op,x)}}finally{AK=AK0}
+}
 function meteor(at,r,dur,dmg,ex){const z={x:at.x,y:at.y,r,t:0,dur,mine:true,dmg,stun:ex&&ex.stun,lk:LNK,sk:TAGOK>0,alt:AK.tag||undefined,altD:AK.tag?dmgMul():0};clamp(z,10);zones.push(z)}
 // skills that play out over time
 function channels(dt){
+  if(P.echo&&(P.echo.t-=dt)<=0){const e=P.echo;P.echo=null;trEcho(e.si)}
   MINE++;LNK='slam';
   if(P.stormT>0){P.stormT-=dt;if((P.stormK-=dt)<=0){P.stormK=.4;shock(120,2*(P.stormD||1));P.atk=.16;P.swing+=2}}
   if(P.quakeN>0&&(P.quakeT-=dt)<=0){P.quakeT=.4;shock(P.quakeN===2?190:250,4*(P.seqD||1));P.quakeN--}
@@ -2337,7 +2394,8 @@ function pdTry0(d,src){
   P.dgT=0;P.pdCd=VS?PD.cdVs:PD.cd;P.pdT=PD.haste;P.rip=PD.rip;if(!VS)P.inv=Math.max(P.inv,.45);const mana=P.maxMana*PD.mana;manaGive(mana);
   const slow=MP.on?0:PD.slow;if(slow){S.slowT=slow;S.slowK=PD.slowK}
   floats.push({x:P.x,y:P.y-56,txt:'Hairbreadth',life:1.1,c:'#6fe3ff',big:1.4});rings.push({x:P.x,y:P.y,life:.45,max:.45,r:70,fx:true});sfx(1320,.18,'triangle',.16,2200);haptic([15,30,15]);
-  emit('perfectDodge',{by:-1,x:P.x,y:P.y,src,slow,window:PD.haste,mana:Math.round(mana)});return true}
+  emit('perfectDodge',{by:-1,x:P.x,y:P.y,src,slow,window:PD.haste,mana:Math.round(mana)});
+  if(setN(2)>=4){P.pdCd=Math.max(0,P.pdCd-SETK.marginCd);const k=AK;AK=AK0;MINE++;try{shock(SETK.marginR,SETK.marginD)}finally{MINE--;AK=k}}return true}
 // at the moment a dash begins: is a blow about to land where I stand (within PD.win seconds)? Then the dash is a hairbreadth dodge even when it carries me clear of the blow.
 function pdScan(){
   const w=PD.win,near=(s,rr)=>{const rx=P.x-s.x,ry=P.y-s.y,vv=s.vx*s.vx+s.vy*s.vy;if(!vv)return false;const t=Math.max(0,Math.min(w,(rx*s.vx+ry*s.vy)/vv));return Math.hypot(rx-s.vx*t,ry-s.vy*t)<rr};
@@ -2383,16 +2441,16 @@ function linkInfo(ops){const sets=new Set(),pays=new Set(),dbg=o=>{if(!o)return;
   return{sets:[...sets],pays:[...pays]}}
 function tagSet(m,bit){
   if(!TAGOK||!m||m.vs||m.decoy||VS||m.hp<=0||!R12())return;
-  if(CL()){if(!(m.tags&bit)&&!(S.t-(m._tgQ||0)<.3)){m._tgQ=S.t;mpQ(['tg',m.id,bit])}return}
-  tagPut(m,bit)}
-function tagPut(m,bit){const i=bit>>1,t=m.tgT||(m.tgT=[0,0,0]),a=m.tgAt||(m.tgAt=[0,0,0]);if(!(t[i]>0))a[i]=S.t;t[i]=LINK.life;m.tags=(m.tags||0)|bit}
+  if(CL()){if(!(m.tags&bit)&&!(S.t-(m._tgQ||0)<.3)){m._tgQ=S.t;mpQ(['tg',m.id,bit,setN(3)>=2?1:0])}return}
+  tagPut(m,bit,setN(3)>=2?SETK.kind2:0)}
+function tagPut(m,bit,more){const i=bit>>1,t=m.tgT||(m.tgT=[0,0,0]),a=m.tgAt||(m.tgAt=[0,0,0]);if(!(t[i]>0))a[i]=S.t;t[i]=Math.max(t[i],LINK.life+(more||0));m.tags=(m.tags||0)|bit} // more: Kindled Marks (round 15)
 function tagStep(m,dt){const t=m.tgT;let b=0;if(t)for(let i=0;i<3;i++)if(t[i]>0){t[i]-=dt;if(t[i]>0)b|=1<<i}m.tags=b}
 // the blow d of kind LNK lands on m: when m carries the matching tag it is used up, and the blow comes back heavier
 function linkPay(m,d){
   const L=LINK.pay[LNK];if(!L||!(m.tags&L.bit)||m.vs||m.decoy||m.ward>0||!R12())return d;const kind=LNK,i=L.bit>>1;
   if(CL()){if(S.t-(m._lkAt||0)<1)return d;m._lkAt=S.t;m.tags&=~L.bit;mpQ(['lk',m.id,LINK.kinds.indexOf(kind)])}
   else{if(m.tgAt&&S.t-m.tgAt[i]<LINK.wait)return d;m.tgT[i]=0;m.tags&=~L.bit;if(MP.on)MP.lkq.push([m.id,LINK.kinds.indexOf(kind),MP.myIdx])}
-  const bonus=Math.max(d*L.k,LINK.min*dmgMul());
+  const bonus=Math.max(d*L.k,LINK.min*dmgMul())*(setN(3)>=2?SETK.kindK:1);if(setN(3)>=4)cdCut(SETK.kind4);
   floats.push({x:m.x,y:m.y-m.r-28,txt:L.name,life:1,c:L.col,big:1.4});rings.push({x:m.x,y:m.y,life:.4,max:.4,r:m.r+70,fx:true});puff(m,L.col,14,220);sfx(kind==='heavy'?1500:kind==='slam'?90:520,.22,kind==='slam'?'square':'triangle',.2,kind==='heavy'?500:kind==='slam'?40:1400);haptic(40);
   manaGive(P.maxMana*LINK.mana);emit('link',{id:m.id,x:m.x,y:m.y,kind,tag:L.tag,name:L.name,bonus,by:-1});if(TU)tutEv('link');hitFx('link',m,.07,.5);
   const lk=LNK,tk=TAGOK;LNK=null;TAGOK=0; // what follows is the payoff's own doing: it neither pays off nor sets up anything further
@@ -2936,7 +2994,7 @@ function hud(){
   S.rank=rank();tune();
   const chips=act2()&&S.cls?[['Rank '+S.rank,true],...(S.apex&&APEX[S.apex]?[[APEX[S.apex].title,true,'chipApex apexPath-'+S.apex+' apexSide-'+APEX[S.apex].side]]:[]),[cn(),true],...CLASSES[S.cls].pows.map((p,i)=>[p[0],pw(i+1)]),...(nb?[[nb+(nb>1?' boons':' boon'),true]]:[]),...(petOn().length?[[petOn().length>1?petOn().length+' '+tw().pl:cap1(tw().n)+' · '+petTag(petOn()[0]),true]]:[])]:PARTS.map(p=>[p.name,has(p.id)]);
   $('ledger').textContent='';chips.forEach(([name,on,k])=>{const li=document.createElement('li');li.textContent=name;if(on)li.className='on'+(k?' '+k:'');$('ledger').appendChild(li)});
-  if(act2()&&S.cls&&S.eq)for(const sl of SLOTS){const it=S.eq[sl],li=document.createElement('li');li.textContent=itemName(it);li.title=it.rarity+' '+sl+': '+itemLine(it);li.style.cssText='opacity:1;color:'+RAR[it.r][1]+';border-color:'+RAR[it.r][1];$('ledger').appendChild(li)}
+  if(act2()&&S.cls&&S.eq)for(const sl of ESLOTS){const it=S.eq[sl];if(!it)continue;const li=document.createElement('li');li.textContent=itemName(it);li.title=it.rarity+' '+sl+': '+itemLine(it)+itemMarks(it);if(it.set)li.dataset.set=SETS[it.set].id;if(it.tr)li.dataset.trait=TRAITS[it.tr[0]].id;li.style.cssText='opacity:1;color:'+RAR[it.r][1]+';border-color:'+RAR[it.r][1];$('ledger').appendChild(li)}
   const hp=$('hp');hp.textContent='';
   if(!P)return;
   hp.className=P.maxHp>50?'many lots':P.maxHp>20?'many':''; // a long row of pips gets thinner pips, so it still fits a phone
@@ -3149,11 +3207,31 @@ function dropScreen(n,rk,next,second){
   // the dice of a drop are seeded with the floor and the hero as it stands (class, upgrade, boons, equipment, scrap): leaving on the reward screen and clearing the floor again brings the same drop, not a new roll
   let sd=2166136261;for(const ch of[n,S.cls,S.adv,S.scrap,second?1:0,...SLOTS.map(sl=>S.eq[sl].r+':'+S.eq[sl].lvl),...Object.values(S.b)].join('|'))sd=Math.imul(sd^ch.charCodeAt(0),16777619)>>>0;sd=sd||1;
   const rnd=()=>{sd^=sd<<13;sd>>>=0;sd^=sd>>>17;sd^=sd<<5;sd>>>=0;return sd/4294967296};for(let i=0;i<4;i++)rnd();
-  const L=S.L,luck=isTrial(L.floorKind),d=dropItem(n,{luck,more:(GR&&GR.level===n?GR.luck:0)+(frF(4)>1?Math.floor((frF(4)-1)*FR.more+rnd()):0),min:L.door==='wrath'?1:0,rnd}),cur=S.eq[d.slot],after={...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]},go=f=>()=>{f();eqSync();hud();next()};
-  show({wide:true,cls:luck?'trialPanel':'',col:RAR[d.r][1],kick:second?second+': '+an(d.rarity)+' '+d.slot:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up '+an(d.rarity)+' '+d.slot:L.spec.name+' dropped '+an(d.rarity)+' '+d.slot,title:d.name,body:itemLine(d)+'. You carry '+itemName(cur)+' ('+cur.rarity+'): '+itemLine(cur)+'.',keys:rk,cards:[
-    {title:'Upgrade',sub:itemName(cur)+' to +'+after.lvl,col:RAR[cur.r][1],body:'Melt the drop into what you carry. A '+d.rarity+' drop adds '+Math.round(RAR[d.r][3]*100)+'% of its base stats. It becomes: '+itemLine(after)+'.',fn:go(()=>{S.eq[d.slot]=after})},
-    {title:'Replace',sub:d.name,col:RAR[d.r][1],body:'Wear the drop instead. '+itemName(cur)+' is gone for good. You get: '+itemLine(d)+'.',fn:go(()=>{S.eq[d.slot]=d})},
-    {title:'Destroy',sub:'Scrap',body:'Break it. Each item you scrap gives +1% damage for the rest of the run'+(S.scrap?' (so far +'+S.scrap+'%).':'.'),fn:go(()=>{S.scrap++})}]});
+  const L=S.L,luck=isTrial(L.floorKind),d=(window.__mb&&window.__mb.drop&&window.__mb.drop(n))||dropItem(n,{luck,more:(GR&&GR.level===n?GR.luck:0)+(frF(4)>1?Math.floor((frF(4)-1)*FR.more+rnd()):0),min:L.door==='wrath'?1:0,rnd,marks:!VS}),cur=S.eq[d.slot],after=cur?{...cur,lvl:cur.lvl+1,up:cur.up+RAR[d.r][3]}:null,go=f=>()=>{f();eqSync();hud();emit('gear',gearInfo());next()};
+  const marks=(d.set?' It bears the mark of '+SETS[d.set].name+' ('+(SETN[d.set]||0)+' of 4 worn).':'')+(d.tr?' Trait, '+trName(d)+': '+trText(d):''),takes=cur&&(d.set||d.tr)&&(d.set!==cur.set||String(d.tr)!==String(cur.tr));
+  if(!cur)return show({wide:true,cls:'gearDrop'+(luck?' trialPanel':''),col:RAR[d.r][1],kick:(second?second:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up':L.spec.name+' dropped')+' '+an(d.rarity)+' relic',title:d.name,body:itemLine(d)+'.'+marks+' A relic is a fourth thing to carry, and you carry none.',keys:rk,cards:[
+    {title:'Wear it',sub:d.name,col:RAR[d.r][1],data:{gear:'wear'},body:'You get: '+itemLine(d)+(itemMarks(d)?'. Marks: '+itemMarks(d).slice(3)+'.':'.'),fn:go(()=>{S.eq[d.slot]=d})},
+    {title:'Destroy',sub:'Scrap',data:{gear:'scrap'},body:'Break it. Each item you scrap gives +1% damage for the rest of the run'+(S.scrap?' (so far +'+S.scrap+'%).':'.'),fn:go(()=>{S.scrap++})}]});
+  show({wide:true,cls:luck?'trialPanel':'',col:RAR[d.r][1],kick:second?second+': '+an(d.rarity)+' '+d.slot:luck&&!boss&&(L.floorKind==='survive'||L.floorKind==='guard')?L.name+' is passed. The floor gives up '+an(d.rarity)+' '+d.slot:L.spec.name+' dropped '+an(d.rarity)+' '+d.slot,title:d.name,body:itemLine(d)+'.'+marks+' You carry '+itemName(cur)+' ('+cur.rarity+itemMarks(cur)+'): '+itemLine(cur)+'.',keys:rk,cards:[
+    {title:'Upgrade',sub:itemName(cur)+' to +'+after.lvl,col:RAR[cur.r][1],body:'Melt the drop into what you carry. A '+d.rarity+' drop adds '+Math.round(RAR[d.r][3]*100)+'% of its base stats. It becomes: '+itemLine(after)+'.'+(d.set||d.tr||cur.set||cur.tr?' What you carry keeps its own marks; the drop\'s are lost.':''),data:{gear:'upgrade'},fn:go(()=>{S.eq[d.slot]=after})},
+    {title:'Replace',sub:d.name,col:RAR[d.r][1],body:'Wear the drop instead. '+itemName(cur)+' is gone for good. You get: '+itemLine(d)+(itemMarks(d)?'. Marks: '+itemMarks(d).slice(3)+'.':'.'),data:{gear:'replace'},fn:go(()=>{S.eq[d.slot]=d})},
+    ...(takes?[{title:'Take its mark',sub:itemMarks(d).slice(3),col:d.set?SETS[d.set].col:RAR[d.r][1],data:{gear:'mark'},body:'Keep '+itemName(cur)+' and its numbers, and move the drop\'s marks onto it'+(cur.set||cur.tr?' in place of its own ('+itemMarks(cur).slice(3)+')':'')+'. The drop is used up; nothing is added to the numbers.',fn:go(()=>{S.eq[d.slot]={...cur,set:d.set,tr:d.tr}})}]:[]),
+    {title:'Destroy',sub:'Scrap',data:{gear:'scrap'},body:'Break it. Each item you scrap gives +1% damage for the rest of the run'+(S.scrap?' (so far +'+S.scrap+'%).':'.'),fn:go(()=>{S.scrap++})}]});
+}
+// (round 15) what MB.gear hands out: {slots:[{slot, empty, name, rarity, r, col, line, set (id or ''), setName, trait:{id, name, skill, skillName, text}|null}], sets:[{id, name, col, n, two, four, on2, on4}]}
+function gearInfo(){
+  if(!S.cls||!S.eq)return null;
+  return{slots:ESLOTS.map(sl=>{const it=S.eq[sl];if(!it)return{slot:sl,empty:true,name:'',rarity:'',r:-1,col:'',line:'',set:'',setName:'',trait:null};
+      return{slot:sl,empty:false,name:itemName(it),rarity:it.rarity,r:it.r,col:RAR[it.r][1],line:itemLine(it),set:it.set?SETS[it.set].id:'',setName:it.set?SETS[it.set].name:'',trait:it.tr?{id:TRAITS[it.tr[0]].id,name:TRAITS[it.tr[0]].name,skill:it.tr[1],skillName:SKILLS[S.cls][it.tr[1]][1],text:trText(it,S.cls)}:null}}),
+    sets:SETS.slice(1).map((s,i)=>({id:s.id,name:s.name,col:s.col,n:SETN[i+1],two:s.two,four:s.four,on2:setN(i+1)>=2,on4:setN(i+1)>=4}))};
+}
+function gearScreen(back){
+  const G=gearInfo();if(!G)return back&&back();const worn=G.sets.filter(s=>s.n>0);
+  show({wide:true,cls:'gearPanel',kick:'Equipment',title:'What you carry',body:'Four things: a weapon, armour, a trinket and a relic. A drop may bear the mark of a set: two pieces of one set give its first bonus, four its second. A rare few carry a trait that changes one of your skills. Marks stay on what you carry when you melt a drop into it.',
+    cards:[...G.slots.map(s=>s.empty?{title:'No '+s.slot,sub:cap1(s.slot),cls:'gearCard shut',data:{slot:s.slot},body:'Nothing yet. Relics only come as drops.',fn:()=>{}}
+        :{title:s.name,sub:cap1(s.rarity)+' '+s.slot+(s.setName?' · '+s.setName:''),col:s.col,cls:'gearCard'+(s.set?' set-'+s.set:''),data:{slot:s.slot,set:s.set,trait:s.trait?s.trait.id:''},body:s.line+'.'+(s.trait?' '+s.trait.name+' '+s.trait.skillName+': '+s.trait.text:''),fn:()=>{}}),
+      ...G.sets.filter(s=>s.n>0).map(s=>({title:s.name,sub:s.n+' of 4 worn',col:s.col,cls:'setCard'+(s.on2?' on2':'')+(s.on4?' on4':''),data:{setcard:s.id,n:s.n},body:'Two'+(s.on2?' (yours)':'')+': '+s.two+' Four'+(s.on4?' (yours)':'')+': '+s.four,fn:()=>{}}))],
+    keys:worn.length?'':'No set marks yet. They come on rare, epic and legendary drops.',btns:[['Back',back||API.hide]]});
 }
 /* ---------- round 14: the lesson. A quiet floor with one monster that waits: the fighting, taught a step at a time. Offered once after the class is chosen, and from the title ---------- */
 // TU: null, or {i, list (the step ids of this hero), t (seconds in the step), wait (> 0: the step is done, the next comes when it runs out), n (a count the step keeps), from 'class'|'title', back (the stored run to put back)}.
@@ -3256,10 +3334,11 @@ function pauseShow(){
   if(TU){const I=tutInfo();return show({kick:'Paused · the lesson · step '+(I.index+1)+' of '+I.of,title:I.title,body:I.text,btns:[['Resume',()=>pause(false)],['Skip this step',()=>{pause(false);if(TU.i>=TU.list.length-1)tutEnd(true);else{TU.wait=.01}}],['Leave the lesson',()=>tutEnd(false)]]})}
   const btns=[['Resume',()=>pause(false)]];if(learned().length>NSK||S.cls&&act2()&&altOpen(0,0))btns.push(['Skills',()=>loadout(pauseShow)]);
   if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(pauseShow)]);
+  if(S.cls&&act2()&&S.eq)btns.push(['Equipment',()=>gearScreen(pauseShow)]);
   if(form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(pauseShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',pauseShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',pauseShow)]);
-  show({kick:'Paused · floor '+(S.level+1)+' of '+TNAME+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:(TR?TR.title+'. '+TR.rule+' ':'')+(S.L.door?DOOR[S.L.door].title+'. '+DOOR[S.L.door].risk+' ':'')+(TR&&(TR.kind==='survive'||TR.kind==='guard')?'':S.L.spec.name+' is waiting.')+(P&&P.maxMana?' Mana '+num(MANA.cur)+' of '+num(P.maxMana-P.resv)+(P.resv?' ('+num(P.resv)+' more is held by your '+tw().pl+')':'')+'.':'')+(act2()&&S.eq?' You carry '+SLOTS.map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
+  show({kick:'Paused · floor '+(S.level+1)+' of '+TNAME+(S.rank?' · rank '+S.rank:''),title:'Catch your breath',body:(TR?TR.title+'. '+TR.rule+' ':'')+(S.L.door?DOOR[S.L.door].title+'. '+DOOR[S.L.door].risk+' ':'')+(TR&&(TR.kind==='survive'||TR.kind==='guard')?'':S.L.spec.name+' is waiting.')+(P&&P.maxMana?' Mana '+num(MANA.cur)+' of '+num(P.maxMana-P.resv)+(P.resv?' ('+num(P.resv)+' more is held by your '+tw().pl+')':'')+'.':'')+(act2()&&S.eq?' You carry '+ESLOTS.filter(sl=>S.eq[sl]).map(sl=>itemName(S.eq[sl])+' ('+itemLine(S.eq[sl])+')').join('; ')+'.':''),keys:matchMedia('(pointer:coarse)').matches?'':'Esc or P to go on.',btns});
 }
 function pause(on){
   if(MP.on)return mpMenu(); // no pause in a shared fight: a menu, and the game goes on
@@ -3298,7 +3377,7 @@ function petIn(p){
 const canPet=c=>!!c&&own(CLASSES,c);
 let SAVE={v:1,level:0,cls:null,adv:null,b:noBoons(),eq:null,scrap:0,load:load0(),pets:[],pet:[],stats:{kills:0,deaths:0,dmgDealt:0,dmgTaken:0,time:0,bestLevel:0}};
 function snapshot(n){
-  const eq=S.eq?{}:null;if(eq)for(const sl of SLOTS){eq[sl]={r:S.eq[sl].r,lvl:S.eq[sl].lvl,up:S.eq[sl].up};if(S.eq[sl].m)eq[sl].m=1} // m: a trinket that carries mana
+  const eq=S.eq?{}:null;if(eq)for(const sl of ESLOTS){const it=S.eq[sl];if(!it)continue;eq[sl]={r:it.r,lvl:it.lvl,up:it.up};if(it.m)eq[sl].m=1;if(it.set)eq[sl].s=it.set;if(it.tr)eq[sl].t=[it.tr[0],it.tr[1]]} // s: the mark of a set, t: a trait [kind, skill] (round 15); a relic only when one is worn // m: a trinket that carries mana
   return{v:1,level:n,cls:S.cls,adv:S.adv,b:{...S.b},eq,scrap:S.scrap,load:S.load.slice(),pets:PETS.roster.map(petOut),pet:PETS.active.slice(),...(PETS.auto?{}:{rev:0}),...(S.apex?{apex:S.apex}:{}),...(S.tr?{tr:S.tr}:{}),...(S.door?{door:[S.door.id,S.door.n]}:{}),...(S.cls&&S.sp&&(!S.sp.auto||S.sp.asked)?{sp:frOut()}:{}),...(S.cls&&S.md.some(v=>v)?{md:S.md.slice()}:{}),...(S.cls&&S.altSeen?{as:1}:{}),stats:{kills:ST.kills,deaths:ST.deaths,dmgDealt:Math.round(ST.dmgDealt),dmgTaken:ST.dmgTaken,time:Math.round(ST.time),bestLevel:ST.bestLevel}};
 }
 function save(n){if(TU)return;if(MP.on)return mpSave(n); // a co-op run is kept apart and never touches the single-player save
@@ -3314,7 +3393,7 @@ function applyRun(r,now=0){
     S.md=S.cls?altIn(r.md):noAlts();S.altSeen=!!r.as;S.sp=frIn(r.sp);S.level=now;frFix(); // older saves have no frame: theirs is kept even
     S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0(); // older saves carried four skills
     // older saves have no equipment: they get the basic set
-    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of SLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0)}}}
+    S.eq=null;S.scrap=0;if(S.cls){S.eq=basicSet(S.cls);S.scrap=Math.min(999,Math.max(0,Math.floor(+r.scrap)||0));if(r.eq&&typeof r.eq==='object')for(const sl of ESLOTS){const e=r.eq[sl];if(e&&typeof e==='object'){const q=Math.floor(+e.r),lv=Math.floor(+e.lvl),u=+e.up;if(q>=0&&q<=3)S.eq[sl]=item(S.cls,sl,q,lv>0?Math.min(lv,999):0,u>0?Math.min(u,400):0,e.m?1:0,e.s,e.t)}}}
     // older saves have no pets; a broken entry is dropped, the rest are kept
     petsClear();if(canPet(S.cls,S.adv)&&Array.isArray(r.pets)){for(const p of r.pets.slice(0,PETSANE)){const e=petIn(p);if(e)PETS.roster.push(e)}const n=PETS.roster.length;
       PETS.active=actIn(Array.isArray(r.pet)?r.pet.filter((x,i,l)=>Number.isInteger(x)&&x>=0&&x<n&&l.indexOf(x)===i):r.pet,n,n)||(n?[n-1]:[]);petFix(now)}
@@ -3332,7 +3411,7 @@ function checkSave(o){
   if(o.adv!==null&&o.adv!==undefined&&!(c&&CLASSES[c].adv.some(a=>a[0]===o.adv)))return null;
   const b=noBoons();if(!o.b||typeof o.b!=='object')return null;
   for(const k in b){const v=k==='well'&&o.b[k]===undefined?0:o.b[k],cap=!c?0:k==='spec'?CLASSES[c].boon[2]:k==='well'?9999:BOONS.find(x=>x.id===k).cap||999;if(!int(v,0,cap))return null;b[k]=v}
-  let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of SLOTS){const e=o.eq[sl];if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400)||e.m!==undefined&&e.m!==0&&e.m!==1)return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up,m:e.m?1:0}}}
+  let eq=null;if(o.eq!==null&&o.eq!==undefined){if(typeof o.eq!=='object')return null;eq={};for(const sl of ESLOTS){const e=o.eq[sl];if(sl==='relic'&&e===undefined)continue;if(!e||typeof e!=='object'||!int(e.r,0,3)||!int(e.lvl,0,999)||typeof e.up!=='number'||!(e.up>=0&&e.up<=400)||e.m!==undefined&&e.m!==0&&e.m!==1||e.s!==undefined&&!setOk(e.s)||e.t!==undefined&&!trOk(e.t))return null;eq[sl]={r:e.r,lvl:e.lvl,up:e.up,m:e.m?1:0};if(e.s)eq[sl].s=e.s;if(e.t)eq[sl].t=[e.t[0],e.t[1]]}}
   const load=fixLoad(o.load);if(!int(o.scrap,0,999)||!load)return null;
   const apex=o.apex===undefined||o.apex===null?null:o.apex;if(apex!==null&&!(c&&apexOk(apex)))return null;if(!apexLoad(load,apex))return null;
   if(o.tr!==undefined&&!(c&&int(o.tr,0,99999)))return null;
@@ -3638,7 +3717,7 @@ function mpOnHit(msg,from){
       else if(k==='vn'){const v=+op[2];if(v>0){m.venT=3;m.venD=Math.max(m.venD||0,v);m.venK=.5;m.venBy=null;m.venRem=REM;puff(m,TCOL.assassin,10,120)}}
       else if(k==='mv'){if(!m.hidden&&m.st!=='leap')mMove(m,+op[2]||m.x,+op[3]||m.y)}
       else if(k==='bk'){const v=+op[2];if(v>0)brkTake(m,Math.min(40,v))}
-      else if(k==='tg'){const b=op[2]|0;if((b===1||b===2||b===4)&&!m.decoy&&R12())tagPut(m,b)}
+      else if(k==='tg'){const b=op[2]|0;if((b===1||b===2||b===4)&&!m.decoy&&R12())tagPut(m,b,op[3]?SETK.kind2:0)}
       else if(k==='lk'){const i=op[2]|0,kd=LINK.kinds[i],L=LINK.pay[kd],r=MP.rById.get(''+from);if(L&&m.tgT&&m.tgT[i]>0){m.tgT[i]=0;m.tags&=~L.bit;MP.lkq.push([m.id,i,r?r.idx:-1]);emit('link',{id:m.id,x:m.x,y:m.y,kind:kd,tag:L.tag,name:L.name,bonus:0,by:r?r.idx:-1})}}
     }finally{REM=null}
     if(S.mode!=='play')break; // that was the boss
@@ -3952,6 +4031,7 @@ function mpMenuShow(){
   const inLv=S.mode==='play'||S.mode==='clear',host=MP.role==='host',btns=[[inLv?'Back to the fight':'Back',mpMenuClose]];
   if(S.cls&&act2()&&(learned().length>NSK||altOpen(0,0)))btns.push(['Skills',()=>loadout(mpMenuShow)]);
   if(S.cls&&act2()&&frBudget()>0)btns.push(['Frame'+(frLeft()?' ('+frLeft()+')':''),()=>frameScreen(mpMenuShow)]);
+  if(S.cls&&act2()&&S.eq)btns.push(['Equipment',()=>gearScreen(mpMenuShow)]);
   if(S.cls&&form()&&act2())btns.push([cap1(tw().pl),()=>petsScreen(mpMenuShow)]);
   if(typeof MB.openTower==='function')btns.push(['The climb',()=>hook('openTower',mpMenuShow)]);
   if(typeof MB.openSettings==='function')btns.push(['Settings',()=>hook('openSettings',mpMenuShow)]);
@@ -4650,7 +4730,7 @@ window.MB={tower:TOWER,get trial(){return TR},get doors(){return DOORS},get door
   PCMD,get petCmd(){return cmdInfo()},petCommand:c=>petCommand(c),
   PHASES:PH,get bossPhase(){return phInfo()},
   ALT,alterations:si=>altList(si|0),setAlteration:(si,j)=>altSet(si|0,j|0),get alterationsFree(){return!!P&&altFree()},openSkills:back=>{if(S.cls&&act2()&&!VS)loadout(typeof back==='function'?back:API.hide)},
-  FRAME:FR,get frame(){return frInfo()},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
+  FRAME:FR,get frame(){return frInfo()},get gear(){return gearInfo()},SETS,TRAITS,openGear:back=>{if(S.cls&&act2()&&!VS)gearScreen(typeof back==='function'?back:API.hide)},frameSet:o=>frSet(o),openFrame:back=>{if(S.cls&&act2()&&!VS)frameScreen(typeof back==='function'?back:API.hide)},
   // round 12 (see the contract in the round-12 notes)
   CHAINS:CHN,PD,BRK,FIN,LINK,DARES,GRD,get chain(){return{count:CB.n,best:CB.best,t:Math.max(0,CB.t),cls:cls(),style:CHN[cls()||'none'].style,steps:CHN[cls()||'none'].steps.length}},breakOf:m=>m&&m.brkMax?Math.max(0,m.brk/m.brkMax):-1,
   get finisher(){return FN},finish:()=>finish(),get objective(){return DRE},get grade(){return GR},skillLink:i=>{const c=cls(),si=c?slotSkill(i|0):-1,d=si>=0&&skD(c,si);if(!d)return{sets:[],pays:[]};const o=linkInfo(d[4]),A=altOf(si);if(A&&A.sets&&!o.sets.includes(A.sets))o.sets.push(A.sets);return o},
@@ -4678,7 +4758,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={SETS,SETK,TRAITS,TRK,gearScreen,dropItem,mkItem:item,gear:o=>{if(!S.cls)return null;if(!S.eq)S.eq=basicSet(S.cls);for(const sl of ESLOTS){const g=o&&o[sl];if(g===null){if(sl==='relic')delete S.eq.relic;continue}if(!g)continue;const cur=S.eq[sl]||item(S.cls,sl,1);S.eq[sl]=item(S.cls,sl,g.r!==undefined?g.r:cur.r,cur.lvl,cur.up,cur.m,g.set!==undefined?g.set:cur.set,g.tr!==undefined?g.tr:cur.tr)}eqSync();frApply();hud();return gearInfo()},TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)
