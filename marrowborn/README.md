@@ -16,7 +16,7 @@ still say "marrowborn", the game's working title, so existing installs and saves
 | 1 to 8 | The Root. One monster each. You win back organs, skin, touch, sight, hearing, smell and taste, and end up human. |
 | 9 to 12 | You choose a class and get its basic equipment and first two skills. Floor 10 is the first guardian, The Flayed King. |
 | 13 onward | Generated floors in named bands. Most are short, sharp fights against a monster with modest health that hits hard. About three in ten are trials: survive for a time, guard a lamp, beat a clock, fight under a handicap, or choose a door at a crossroads. Every tenth floor is a guardian with high health and power. Each clear gives an equipment drop and a boon. |
-| After 50 | You choose one of two upgrades for your class. |
+| After 50 | Your class has two upgrades. Alone, an upgrade is earned on the Proving Floor: a short solo floor that asks for what the upgrade does (it can be retried, or left for later). In co-op it is chosen from a menu. |
 | After 100 | You choose one of ten apex paths. Five command others: the Tithe (the dead), the Feral Vow (a pack), the Still Winter (frost), the Slow Rot (plague), the Last Pyre (fire). Five make you the weapon: the White Marrow (light), the Split Sky (lightning), the Standing Stone (earth), the Thousandth Cut (blades), the Returning Tide (water). The climb has no end. |
 
 Multiplayer on a local network has two modes: co-op for up to 8 against the tower, and
@@ -31,7 +31,43 @@ Clearing every tenth floor unlocks the next floor as a checkpoint, from which a 
 climb can start with a ready-made hero. The tower map ("The climb") shows bands,
 checkpoints and the floors ahead.
 
-The title screen also offers "Skip to class selection", which starts at level 9.
+The title screen also offers "Skip to class selection", which starts at level 9, the
+Tutorial (a short lesson, skippable step by step) and The bells.
+
+### The fighting (added in 3.7 to 4.2)
+
+- **Strings and closers (3.8).** The basic attack is a string of three to five blows per class; the last, the
+  closer, is the heavy one. Blows landed in a row count as a chain, shown on the HUD.
+- **Hairbreadth dodge and riposte (3.8).** A dash in the last instant before a blow lands slows the world for a
+  moment (alone) or quickens the dodger (multiplayer); the next blow is a riposte.
+- **Footing and the last rite (3.8).** The monster of every tenth floor has a footing gauge: emptied, it reels and
+  takes more damage. Below 8% health it can be ended with a short last rite, which co-op partners can join (4.1).
+- **Setups and payoffs (3.8).** Skills leave monsters aloft, brittle or branded; a matching skill pays the tag off
+  for more damage. In co-op a payoff on a partner's setup is worth more (4.1).
+- **Dares and marks (3.8).** About one plain floor in three carries an optional dare. Every floor from the ninth
+  is marked S to D for time, damage taken and chain; a better mark makes the drop luckier.
+- **Dynamic camera (3.8)** with a camera-distance setting, **versus refit (3.9)**, phone layout fixes (3.9).
+- **The frame (4.0).** Three stat points per floor in five stats (Sinew, Nerve, Marrow, Breath, Omen); they can be
+  placed by hand, taken back at any time, or left even automatically.
+- **Alterations (4.0).** Every class skill has three alterations that open as you climb; one is active per skill.
+- **Faces of a tyrant (4.0).** Tenth-floor monsters shift at two thirds and one third of their health: a short
+  warded beat, then a new attack and a hazard of the floor.
+- **Orders for pets (4.0):** attack my target, hold here, fall back, free.
+- **Equipment sets, traits and the relic (4.1).** A fourth slot, the relic; four set marks with two- and four-piece
+  bonuses; rare traits that change how one skill behaves.
+- **Elites, the arena and the land's hazards (4.1).** From floor 15 some lesser monsters carry a modifier of their
+  own; pillars break and braziers tip; each land has a hazard on some of its floors.
+- **Target lock (4.1)**, on by default on touch, with a Target button and tap-to-target.
+- **Co-op raising (4.1):** a downed hero can be raised by a partner standing beside them.
+- **The proof (4.2):** the class upgrade is earned on a solo floor, see the table above.
+- **Fissures (4.2).** One floor in every ten opens a fissure: an optional side floor with two packs and a keeper,
+  a clock and a twist rule. Closed in time it gives a drop that is rare or better and bears a set mark. Open
+  fissures are listed on the tower map. Single-player only; never needed to progress.
+- **The bells (4.2).** The Daybell rings one floor and the Weekbell three in a row, fixed by the local date with no
+  server. They are fought with a ready-made hero in a class of your choice; your climb is not touched. The best
+  mark of the day and of the week is kept on the device and shown in Records. Single-player only.
+- **The thread (4.2).** At every checkpoint floor a few lines continue the story of the body coming back. They
+  appear at the foot of the arena while the fight goes on, can be skipped, and are kept in Records.
 
 Classes follow the usual hunter archetypes. Each has ten active skills with their own
 cooldowns, of which six are carried at a time (keys 1 to 6, or six touch buttons).
@@ -46,7 +82,7 @@ cooldowns, of which six are carried at a time (keys 1 to 6, or six touch buttons
 | Healer | Ranged light orbs, steady self-healing | Saint, Inquisitor |
 | Necromancer | Bone spears and skeleton thralls that fight for you | Lich, Reaper |
 
-Bosses from level 9 drop a weapon, armor or trinket for your class in four rarities.
+Bosses from level 9 drop a weapon, armor, trinket or (rarely) a relic for your class in four rarities.
 You can melt the drop into your current item to upgrade it, replace the current item,
 or destroy the drop for a small permanent bonus.
 
@@ -100,7 +136,7 @@ Your firewall may ask whether Java may accept connections: allow it on private n
 
 ### Multiplayer on the local network
 
-Up to eight players, co-op (versus is planned). Everyone must be on the same Wi-Fi or wired network; a phone's own
+Up to eight players, co-op or versus. Everyone must be on the same Wi-Fi or wired network; a phone's own
 hotspot counts. Nothing leaves the local network and no account or internet connection is needed.
 
 - **Host on an Android phone:** Multiplayer, then "Host on this phone". The lobby shows a join code and an address.
@@ -144,16 +180,16 @@ several devices.
 
 - `web/` is the whole game, as plain script files with no build step:
   `game.js` (rules), `render3d.js` (3D scene), `models-player.js`, `models-monsters.js`,
-  `extras.js` (settings, records, hints, story), `net.js` (multiplayer transport and lobby), plus bundled fonts,
+  `extras.js` (settings, records, hints, story), `tower.js` (the tower map and the trial band), `net.js` (multiplayer transport and lobby), plus bundled fonts,
   icons, a web app manifest and three.js.
 - `server/` is the relay and desktop launcher in plain Java with no dependencies: `com.marrowborn.net.Relay` forwards
   messages between the players in a room and serves the game's files; the Android app uses the same class.
   `server/build.sh` builds `dist/marrowborn-server.jar` (needs only a JDK).
 - `android/` is a thin WebView wrapper that packages `web/` as an app and can run the relay for hosting.
 - `ios/` is an Xcode project for a WKWebView wrapper, source only and never built; see `ios/README.md`.
-- `dist/` holds the builds: `Marrowborn.apk` is the current single-player release (3.3) and `Marrowborn-3.4-mp1.apk`
-  the first multiplayer build, both for Android 6.0+; `Marrowborn-3.5.apk` is the previous release and
-  `Marrowborn-2.0.apk` the last 2D-only build; `marrowborn-server.jar` with its three launchers is the desktop server.
+- `dist/` holds the builds: `AshesToApex.apk` is the current Android release (Android 6.0+), the `Marrowborn-*.apk`
+  files are earlier releases kept for reference (`Marrowborn-2.0.apk` is the last 2D-only build);
+  `marrowborn-server.jar` with its three launchers is the desktop server.
 
 ## Play in a browser
 

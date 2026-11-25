@@ -1188,6 +1188,66 @@ button.mbn-mode:focus-visible{box-shadow:inset 0 0 0 calc(var(--u)*2) var(--powe
 .wrap:has(#ov:not([hidden])) #mbRev,.wrap:has(#mbx:not([hidden])) #mbRev,.wrap:has(#mbt:not([hidden])) #mbRev,.wrap:has(#mbn:not([hidden])) #mbRev{visibility:hidden}
 @media (max-width:420px){#mbRev b{font-size:.7rem;letter-spacing:.08em}#mbArea{font-size:.58rem;letter-spacing:.14em}}
 /*R15-HUD-END*/
+/*R16-HUD*/
+/* ================= round 16: asides (the proof, fissures, the bells) and the thread =================
+   .trialHud.aside = the trial band showing an aside (tower.js): a-proof / a-fissure / a-bell. --aside = its accent.
+   #mbThread = the thread: a few lines at a checkpoint, at the foot of the arena while the fight goes on (extras.js). Only its Skip button takes a touch.
+   .proofPanel / .fisPanel / .bellPanel = the game's own screens for them; .mbt-fis = the fissures on the map; .mbx-bells / .mbx-thread = the records. Everything is a multiple of --u. */
+:root{--aside:#9fd0ff;--thread:#e7dfcd}
+.trialHud.aside{--k:var(--aside);background:linear-gradient(90deg,rgba(12,34,58,.9),rgba(9,11,24,.84) 70%)}
+.trialHud.aside.a-proof{--k:var(--gold);background:linear-gradient(90deg,rgba(54,40,10,.9),rgba(9,11,24,.84) 70%)}
+.trialHud.aside.a-bell{--k:#c9a8ff;background:linear-gradient(90deg,rgba(36,20,62,.9),rgba(9,11,24,.84) 70%)}
+.trialHud.aside.s-clear{--k:#7fd66b;background:linear-gradient(90deg,rgba(16,52,26,.95),rgba(9,11,24,.93) 70%)}
+.trialHud.aside.s-clear .th-state{background:#7fd66b;color:var(--ink)}
+#mbThread{grid-area:1/1;position:relative;z-index:2;align-self:end;justify-self:center;margin:0 calc(var(--u)*12) calc(var(--foot) + calc(var(--u)*6));width:min(calc(var(--u)*560),calc(100% - calc(var(--u)*24)));box-sizing:border-box;pointer-events:none;
+  padding:calc(var(--u)*7) calc(var(--u)*16) calc(var(--u)*9);background:linear-gradient(180deg,rgba(9,11,24,.5),rgba(9,11,24,.86));border-top:1px solid rgba(231,223,205,.35);color:var(--thread);text-align:center;opacity:0;transition:opacity .5s}
+#mbThread[hidden]{display:none}
+#mbThread.on{opacity:1}
+#mbThread .tr-head{display:flex;align-items:center;gap:calc(var(--u)*8);min-height:calc(var(--u)*20)}
+#mbThread .tr-top{font-family:var(--display);font-weight:700;font-size:.64rem;line-height:1.2;letter-spacing:.2em;text-transform:uppercase;color:var(--ash);text-align:left;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#mbThread .tr-pips{display:flex;gap:calc(var(--u)*3);flex:none}
+#mbThread .tr-pips i{width:calc(var(--u)*9);height:calc(var(--u)*3);background:rgba(255,255,255,.2)}
+#mbThread .tr-pips i.on{background:var(--ash)}#mbThread .tr-pips i.cur{background:var(--thread)}
+#mbThread .tr-skip{pointer-events:auto;flex:none;--c:calc(var(--u)*4);min-height:calc(var(--u)*22);padding:calc(var(--u)*1) calc(var(--u)*10);border:1px solid var(--line);background:rgba(12,15,32,.75);color:var(--ash);font-family:var(--display);font-weight:700;font-size:.62rem;letter-spacing:.16em;text-transform:uppercase;cursor:pointer}
+#mbThread .tr-skip:hover{color:var(--bone)}
+#mbThread .tr-line{margin:calc(var(--u)*4) 0 0;font-size:1.02rem;line-height:1.4;text-wrap:balance;text-shadow:0 1px calc(var(--u)*2) #000,0 0 calc(var(--u)*8) #000;min-height:2.8em}
+#mbThread .tr-line.in{animation:trIn .7s ease-out both}
+@keyframes trIn{from{opacity:0;transform:translateY(calc(var(--u)*4))}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){#mbThread{transition:none}#mbThread .tr-line.in{animation:none}}
+/* a screen is up, or a hint has taken the foot of the arena: the thread waits out of sight */
+.stage:has(#ov:not([hidden])) #mbThread,.stage:has(#mbx:not([hidden])) #mbThread,.stage:has(#mbt:not([hidden])) #mbThread,.stage:has(#mbn:not([hidden])) #mbThread{visibility:hidden}
+.stage:has(.trialHud:not([hidden])):has(#mbHint.on) #mbThread,.stage:has(.mbt-peek.on) #mbThread{opacity:0}
+/* the land's words and the elite's stand under the boss bar; on a phone that is where the band begins, so an aside's band starts below them */
+@media (pointer:coarse){.wrap:has(#mbArea:not([hidden]):not(.beside)) .trialHud.aside{margin-top:calc(var(--hud-top,var(--hud0)) + calc(var(--u)*28))}}
+#mbArea.beside{transform:none;align-items:flex-start}#bossHz.beside{transform:none}
+/* a phone held sideways with the orders out: they keep their place under the vitals (they take touches), and any band (a trial, a dare, an aside) stands beside them */
+@media (pointer:coarse) and (max-height:500px){html:not(.mb-left) .wrap:has(#mbCmd:not([hidden])) .trialHud{margin-left:calc(var(--sl) + max(98px,calc(var(--u)*110)) + calc(var(--u)*16))}}
+/* a phone held upright with the Target button out: the lines keep to the other side of it */
+@media (pointer:coarse) and (max-width:600px){.wrap:has(#mbLock:not([hidden])) #mbThread{justify-self:start;width:calc(100% - calc(var(--u)*108))}.mb-left .wrap:has(#mbLock:not([hidden])) #mbThread,.wrap.mb-left:has(#mbLock:not([hidden])) #mbThread{justify-self:end}}
+@media (pointer:coarse){#mbThread .tr-skip{min-height:max(44px,calc(var(--u)*30));min-width:max(44px,calc(var(--u)*56))}}
+/* a phone held sideways: between the stick and the buttons */
+@media (pointer:coarse) and (max-height:500px){#mbThread{width:min(calc(var(--u)*360),calc(100% - calc(var(--u)*440)));margin-bottom:calc(var(--sb) + calc(var(--u)*4));padding:calc(var(--u)*3) calc(var(--u)*10) calc(var(--u)*5)}#mbThread .tr-line{font-size:.84rem;line-height:1.3;margin-top:calc(var(--u)*2);min-height:2.6em}}
+@media (max-width:420px){#mbThread .tr-line{font-size:.92rem}}
+/* the screens */
+.panel.proofPanel{box-shadow:inset 0 calc(var(--u)*3) 0 var(--gold)}.panel.fisPanel{box-shadow:inset 0 calc(var(--u)*3) 0 var(--aside)}.panel.bellPanel{box-shadow:inset 0 calc(var(--u)*3) 0 #c9a8ff}
+.panel.proofPanel .kick{color:var(--gold)}.panel.fisPanel .kick{color:var(--aside)}.panel.bellPanel .kick{color:#c9a8ff}
+/* the map */
+.mbt-fis{margin-top:calc(var(--u)*10);display:grid;gap:calc(var(--u)*6)}
+.mbt-fz{display:flex;align-items:center;gap:calc(var(--u)*8);padding:calc(var(--u)*6) calc(var(--u)*10);background:rgba(12,34,58,.55);box-shadow:inset calc(var(--u)*3) 0 0 var(--aside)}
+.mbt-fzt{display:grid;gap:1px;flex:1 1 auto;min-width:0;text-align:left}
+.mbt-fzt b{font-family:var(--display);font-weight:700;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;color:var(--bone)}
+.mbt-fzt small{font-family:var(--display);font-weight:600;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:var(--aside)}
+.mbt-fzt span{font-size:.8rem;line-height:1.3;color:var(--ash)}
+.mbt-panel .mbt-fz button.mbt-mini{flex:none;margin-left:0}
+/* the records */
+.mbx-bells,.mbx-thread{display:grid;gap:calc(var(--u)*6);text-align:left}
+.mbx-bells h3,.mbx-thread h3{margin:calc(var(--u)*6) 0 0;font-family:var(--display);font-weight:700;font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ash)}
+.mbx-bell{margin:0;display:grid;gap:1px;padding:calc(var(--u)*5) calc(var(--u)*10);background:rgba(36,20,62,.5);box-shadow:inset calc(var(--u)*3) 0 0 rgba(201,168,255,.4)}
+.mbx-bell.rung{box-shadow:inset calc(var(--u)*3) 0 0 #c9a8ff}
+.mbx-bell b{font-family:var(--display);font-weight:700;font-size:.82rem;letter-spacing:.1em;text-transform:uppercase;color:var(--bone)}
+.mbx-bell span{font-size:.86rem;line-height:1.3;color:var(--text)}
+.mbx-thread p{margin:0;font-size:.88rem;line-height:1.45;color:var(--text)}.mbx-thread p b{color:var(--thread)}
+/*R16-HUD-END*/
 </style>
 
 <main class="wrap">
@@ -1382,7 +1442,7 @@ P.roundRect=function(x,y,w,h,r){if(w<0){x+=w;w=-w}if(h<0){y+=h;h=-h}r=typeof r==
   if(keys&&window.MutationObserver)try{new MutationObserver(function(){try{markTick()}catch(e){}}).observe(keys,{childList:true,characterData:true,subtree:true,attributes:true,attributeFilter:['hidden']})}catch(e){}
   /* where the right-hand column may start: under the toggles and the ledger chips */
   var hudR=-1,hudRAt=0,hudRx=-1;
-  function rightTop(now){if(now<hudRAt)return;hudRAt=now+500;var top=0,els=[doc.querySelector('.togs'),doc.getElementById('ledger'),doc.getElementById('vsHud'),doc.getElementById('bossBar'),bk,doc.getElementById('bossName')],i,r;
+  function rightTop(now){if(now<hudRAt)return;hudRAt=now+500;var top=0,els=[doc.querySelector('.togs'),doc.getElementById('ledger'),doc.getElementById('vsHud'),doc.getElementById('bossBar'),bk,doc.getElementById('bossName'),doc.getElementById('trialHud'),doc.getElementById('mbArea'),doc.getElementById('bossHz')],i,r; // (round 16: a band or the land's words that reach this side count too)
     var side=wrap.classList.contains('mb-left')||doc.documentElement.classList.contains('mb-left')||doc.body.classList.contains('mb-left');
     for(i=0;i<els.length;i++){var e=els[i];if(!e||e.hidden)continue;r=e.getBoundingClientRect();if(!r.width||!r.height)continue;if(side?r.left<innerWidth*.3:r.right>innerWidth*.7)top=Math.max(top,r.bottom)}
     top=Math.round(Math.max(top,innerHeight*.12));if(top!==hudR){hudR=top;wrap.style.setProperty('--hud-r',top+'px')}
@@ -1440,8 +1500,10 @@ try{window.MBPhaseBand=true}catch(e){}
     var on=!!I;if(on!==PHS.on){PHS.on=on;wrap.classList.toggle('ph-on',on)}
     if(!on){if(!hz.hidden)hz.hidden=true;PHS.hz=null;PHS.ph=-1;return}
     if(I.phase!==PHS.ph){PHS.ph=I.phase;if(marks[0])marks[0].classList.toggle('gone',I.phase>=2);if(marks[1])marks[1].classList.toggle('gone',I.phase>=3)}
-    var name=I.hazard&&!I.shifting?I.hazard.name:'';if(name!==PHS.hz){PHS.hz=name;hz.textContent=name;hz.hidden=!name}
-    if(name&&bar){var r=bar.getBoundingClientRect(),u=U(),key=Math.round(r.right)+'|'+Math.round(r.bottom);if(key!==PHS.box&&r.width){PHS.box=key;hz.style.left=r.right+'px';hz.style.top=(r.bottom+9*u)+'px'}}
+    var name=I.hazard&&!I.shifting?I.hazard.name:'';if(name!==PHS.hz){PHS.hz=name;hz.textContent=name;hz.hidden=!name;PHS.box=''}
+    if(name&&bar){var r=bar.getBoundingClientRect(),u=U(),bs=false;try{bs=matchMedia('(pointer:coarse) and (max-height:500px)').matches}catch(e){}
+      if(bs){var tg=doc.querySelector('.togs'),tr=tg?tg.getBoundingClientRect():null;bs=!!tr&&tr.width>0&&r.right+8*u+hz.offsetWidth<=tr.left-4*u} // (round 16) a phone held sideways: beside the bar, not over the top of the arena
+      var key=Math.round(r.right)+'|'+Math.round(r.bottom)+'|'+bs;if(key!==PHS.box&&r.width){PHS.box=key;hz.classList.toggle('beside',bs);hz.style.left=(bs?r.right+8*u:r.right)+'px';hz.style.top=(bs?Math.max(2*u,r.top+r.height/2-hz.offsetHeight/2):r.bottom+9*u)+'px'}}
   }
   /* ---- orders ---- */
   var cmd=h('div');cmd.id='mbCmd';cmd.hidden=true;cmd.setAttribute('role','group');cmd.setAttribute('aria-label','Orders for your pets');cmd.appendChild(h('span','cmd-lab','Orders'));
@@ -1460,6 +1522,7 @@ try{window.MBPhaseBand=true}catch(e){}
     if(coarse&&bk&&!bk.hidden){var kr=bk.getBoundingClientRect();if(kr.left<innerWidth*.5)bot=Math.max(bot,kr.bottom+8*u)}
     if(!coarse)bot=you.bottom;
     var top=bot+(coarse?12:6)*u,left=Math.max(4,you.left),pad=coarse?doc.getElementById('pad'):null;
+    {var th=doc.getElementById('trialHud');if(th&&!th.hidden){var tr=th.getBoundingClientRect();if(tr.height&&tr.left<left+cmd.offsetWidth&&tr.right>left&&tr.bottom>top-2*u&&tr.top<top+cmd.offsetHeight)top=tr.bottom+(coarse?8:5)*u}} // (round 16) a band is up under the vitals (a trial, a dare, an aside): the orders go under it
     if(pad){var pr=pad.getBoundingClientRect(),ch=cmd.offsetHeight,cw=cmd.offsetWidth;if(pr.width&&left<pr.right&&left+cw>pr.left&&top+ch>pr.top-4*u)top=Math.max(bot+2*u,pr.top-4*u-ch)} // a large stick (the button-size setting): the orders move up to stay clear of it
     var key=Math.round(left)+'|'+Math.round(top);if(key!==C.box){C.box=key;cmd.style.left=left+'px';cmd.style.top=top+'px'}
   }
@@ -1512,7 +1575,10 @@ try{window.MBPhaseBand=true}catch(e){}
     var land=A&&A.theme&&!I?A.name:'',el='';if(E&&E.length&&!I){var names=[],N=MB.ELITE&&MB.ELITE.names,K=MB.ELITE&&MB.ELITE.kinds;for(var i=0;i<E.length&&i<3;i++){var j=K?K.indexOf(E[i].kind):-1;names.push(j>=0&&N?N[j]:E[i].kind)}el='Elite · '+names.join(', ')}
     var key=land+'|'+el;if(key!==AR.key){AR.key=key;while(ar.firstChild)ar.removeChild(ar.firstChild);if(land)ar.appendChild(h('span','ar-land',land));if(el)ar.appendChild(h('span','ar-el',el));ar.hidden=!(land||el);AR.box=''}
     if(ar.hidden)return;var bar=doc.getElementById('bossBar');if(!bar)return;var r=bar.getBoundingClientRect(),u=U(),bk=doc.getElementById('bossBrk'),bot=r.bottom;if(bk&&!bk.hidden){var kr=bk.getBoundingClientRect();if(kr.height)bot=Math.max(bot,kr.bottom)}
-    var k=Math.round(r.right)+'|'+Math.round(bot);if(k!==AR.box&&r.width){AR.box=k;ar.style.left=r.right+'px';ar.style.top=(bot+9*u)+'px'}
+    // (round 16) a phone held sideways: under the bar's right end is the top of the arena, where the floor's monster stands. The words go beside the bar instead, when there is room before the toggles
+    var bs=false;try{bs=matchMedia('(pointer:coarse) and (max-height:500px)').matches}catch(e){}
+    if(bs){var tg=doc.querySelector('.togs'),tr=tg?tg.getBoundingClientRect():null;bs=!!tr&&tr.width>0&&r.right+8*u+ar.offsetWidth<=tr.left-4*u}
+    var k=Math.round(r.right)+'|'+Math.round(bot)+'|'+bs;if(k!==AR.box&&r.width){AR.box=k;ar.classList.toggle('beside',bs);ar.style.left=(bs?r.right+8*u:r.right)+'px';ar.style.top=(bs?Math.max(2*u,r.top+r.height/2-ar.offsetHeight/2):bot+9*u)+'px'}
   }
   /* ---- the lock ---- */
   var lk=h('button',null,'Target');lk.id='mbLock';lk.type='button';lk.hidden=true;lk.setAttribute('aria-label','Next target');wrap.appendChild(lk);var LK={on:null,hard:null,at:0,box:''};

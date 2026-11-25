@@ -233,6 +233,18 @@ function showMap(){
     var left=h('section',{class:'mbt-tower'},h('h3',{class:'mbt-h',text:'The tower'}),col);
     p.appendChild(h('div',{class:'mbt-cols'},left,right));
 
+    /* (round 16) fissures: side floors that stand open off the stair */
+    var fz=null;try{fz=MB.fissures}catch(e){}
+    if(fz&&!co&&S().cls&&(fz.open&&fz.open.length||fz.done)){
+      var fs=h('section',{class:'mbt-fis'},h('h3',{class:'mbt-h',text:'Fissures'}));
+      if(fz.open.length)fz.open.forEach(function(f){
+        var row=h('div',{class:'mbt-fz'},h('div',{class:'mbt-fzt'},h('b',{text:f.name}),h('small',{text:'Off floor '+f.floor+' · '+f.time+' s · '+f.twist.name}),h('span',{text:f.twist.text})));
+        if(fz.can)row.appendChild(btn('Step in',function(){var N=f.floor;back=null;hideLayer();var ok=false;try{ok=MB.fissureEnter(N)}catch(e){}if(!ok){try{if(MB.api&&MB.api.hide)MB.api.hide()}catch(e){}}},false,{class:'mbt-mini','aria-label':'Step into '+f.name+', the fissure off floor '+f.floor}));
+        fs.appendChild(row)});
+      else fs.appendChild(h('p',{class:'mbt-note',text:'None stands open. One splits the wall off one floor in every ten.'}));
+      fs.appendChild(h('p',{class:'mbt-note',text:'A fissure is never on the way up: two packs and a keeper against a clock, with a twist. Closed in time it gives a drop that is rare or better and bears a mark. Closed so far on this climb: '+num(fz.done)+'.'}));
+      right.appendChild(fs);
+    }
     /* what can be done from here */
     if(!co){
       right.appendChild(h('p',{class:'mbt-note'+(canStart?' mbt-opt':'')},canStart?'A checkpoint opens every ten floors. A climb can start at any open one with a seasoned hero: a little weaker than one built floor by floor.'
@@ -531,8 +543,8 @@ function showPeek(d){
 function screenUp(){var ids=['ov','mbx','mbn','mbt'],i,e;for(i=0;i<ids.length;i++){e=$(ids[i]);if(e&&!e.hidden)return true}return false}
 function skipPeek(){if(peek&&peekT&&peek.classList.contains('on')&&Date.now()-peekAt>900)hidePeek()}
 if(typeof MB.on==='function'){
-  MB.on('floor',function(d){try{showPeek(d)}catch(e){}});
-  MB.on('levelstart',function(d){try{if(T())showPeek({floor:num(d&&d.level,-1)+1,kind:d&&d.L&&d.L.floorKind})}catch(e){}});
+  MB.on('floor',function(d){try{if(asideNow())return;showPeek(d)}catch(e){}});
+  MB.on('levelstart',function(d){try{if(d&&d.aside){hidePeek();return}if(T())showPeek({floor:num(d&&d.level,-1)+1,kind:d&&d.L&&d.L.floorKind})}catch(e){}});
   MB.on('title',hidePeek);MB.on('death',hidePeek);MB.on('reward',hidePeek);
 }
 win.addEventListener('keydown',function(e){if(!e.repeat)skipPeek()},true);
@@ -563,6 +575,8 @@ function hudOff(){if(hud&&!hud.hidden){hud.hidden=true;last={}}}
 function hudTick(){
   var s=S(),tr=trialNow(),mode=s.mode,live=!!tr&&typeof tr==='object'&&(mode==='play'||mode==='clear'),now=Date.now();
   // (round 12) a dare (MB.objective) borrows the band on a floor that is not a trial: never both on one floor
+  if(!live){var as=asideNow();if(as&&(mode==='play'||mode==='clear')){endState='';asideTick(as,now);return}}
+  if(asideOn){asideOn=false;asideKey='';last={}}
   if(!live&&!endState){var dr=dareNow();if(dr&&(mode==='play'||mode==='clear')){dareTick(dr,now);return}}
   if(dareOn){dareOn=false;dareKey='';dareEnd=0;last={}}
   if(endState&&now>stateT){endState='';endKind=''}
@@ -629,6 +643,31 @@ function dareTick(d,now){
   var cap=!st&&d.kind==='unscathed'?'No harm so far':!st&&d.kind==='holdout'?'Stay above half health':'';
   if(H.cap.hidden!==!cap)H.cap.hidden=!cap;if(cap)setTxt('cap',H.cap,cap);
   setCls('trialHud dare k-'+kind+(st?' s-'+st+' done':now<stateT?' s-start':'')+(urgent?' urgent':'')+(late?' late':''));
+  if(hud.hidden){hud.hidden=false;measure()}
+}
+/* (round 16) asides: MB.aside = null | {kind:'proof'|'fissure'|'bell', label, title, rule, twist:{id,name,text}|null, t, dur, left, hold, goal, progress, unit, state:'run'|'done'|'fail', step, of}.
+   A floor that is no floor of the climb borrows the band in a colour of its own (.trialHud.aside): its name and rule, the clock, the count it asks for, the twist. */
+var asideOn=false,asideKey='';
+try{window.MBAsideBand=true}catch(e){}
+function asideNow(){var d=null;try{d=MB.aside}catch(e){}return d&&typeof d==='object'&&typeof d.kind==='string'?d:null}
+function asideTick(d,now){
+  if(!ensureHud())return;
+  var key=d.kind+'|'+d.id+'|'+d.step,done=d.state==='done',fresh=key!==asideKey;
+  if(fresh){asideKey=key;stateT=now+2400;last={};say((d.label||'')+': '+(d.title||'')+'. '+(d.rule||''))}
+  asideOn=true;
+  var kind=d.hold?'survive':'race';
+  if(last.kind!==kind){last.kind=kind;H.ic.textContent='';H.ic.appendChild(icon(kind))}
+  setTxt('k',H.kind,d.title||d.label||'');setTxt('st',H.state,done?(d.kind==='proof'?'Passed':d.kind==='fissure'?'Closed':'Rung'):(d.label||'')+(num(d.of)>1?' · '+d.step+' of '+d.of:''));
+  setTxt('rule',H.rule,d.rule||'');
+  var dur=num(d.dur),left=Math.max(0,num(d.left)),timed=dur>0,urgent=false,late=false;
+  if(H.time.el.hidden!==!timed)H.time.el.hidden=!timed;
+  if(timed){setTxt('tv',H.time.val,clock(left));setW('tw',H.time.fill,d.hold?1-left/dur:left/dur);setTxt('tl',H.time.lab,d.hold?'Hold for':'Time left');late=urgent=!d.hold&&!done&&left<Math.max(5,dur*.25)}
+  var goal=num(d.goal);
+  if(H.goal.el.hidden!==!(goal>0))H.goal.el.hidden=!(goal>0);
+  if(goal>0){setTxt('gv',H.goal.val,Math.min(goal,Math.floor(num(d.progress)))+' / '+Math.round(goal));setW('gw',H.goal.fill,num(d.progress)/goal);setTxt('gl',H.goal.lab,d.unit||'Progress')}
+  if(!H.obj.el.hidden)H.obj.el.hidden=true;
+  var cap=d.twist&&d.twist.name||'';if(H.cap.hidden!==!cap)H.cap.hidden=!cap;if(cap)setTxt('cap',H.cap,cap);
+  setCls('trialHud aside a-'+d.kind+' k-'+kind+(done?' s-clear done':now<stateT?' s-start':'')+(urgent?' urgent':'')+(late?' late':''));
   if(hud.hidden){hud.hidden=false;measure()}
 }
 if(typeof MB.on==='function'){

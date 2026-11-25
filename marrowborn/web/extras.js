@@ -177,7 +177,7 @@ function levelSeconds(given){
 guard('records',function(){
   if(typeof MB.on!=='function')return;
   listen('levelstart',function(d){
-    if(inMp())return;
+    if(inMp()||d.aside)return;
     var lv=Math.floor(num(d.level,MB.S?MB.S.level:0)),retry=run.died===lv,c=classRec(MB.S&&MB.S.cls);
     run.died=-1;run.t0=Date.now();run.kills0=stat('kills');run.newBest=false;
     if(lv===0&&!retry){rec.runs++;run.crypt=true} // a new skeleton
@@ -264,6 +264,20 @@ function openRecords(){
         cols.appendChild(h('section',null,h('h3',{text:'By class'}),h('table',null,h('thead',null,h('tr',null,h('th',{scope:'col',text:'Class'}),h('th',{scope:'col',text:'Best'}),h('th',{scope:'col',text:'Climbs'}),h('th',{scope:'col',text:'Deaths'}),h('th',{scope:'col',text:'Time'}))),tb)));
       }
       if(cols.firstChild)p.appendChild(cols);
+    }
+    // (round 16) the bells, and what else is kept beside the climb
+    var bl=null,ad=null;try{bl=MB.bells;ad=MB.asides}catch(e){}
+    if(bl&&bl.day){
+      var bs=h('section',{class:'mbx-bells'},h('h3',{text:'The bells'}));
+      [bl.day,bl.week].forEach(function(b){bs.appendChild(h('p',{class:'mbx-bell'+(b.best?' rung':''),'data-bell':b.kind},h('b',{text:b.name+' · '+b.key}),h('span',{text:b.best?b.line+(b.best.n>1?' · rung '+b.best.n+' times':''):'Not rung yet. '+b.floors.map(function(f){return f.name}).join(', then ')+'. '+b.twist.name+'.'})))});
+      bs.appendChild(h('div',{class:'mbx-tiles'},tile(bl.days,'Days rung'),tile(bl.streak||'—','Days in a row'),tile(bl.weeks,'Weeks rung'),tile(bl.top?bl.top.mark+' '+bl.top.score:'—','Best day'),tile(ad?ad.fissures:0,'Fissures closed')));
+      p.appendChild(bs);
+    }
+    var heard=[];try{heard=MB.thread?MB.thread.heard():[]}catch(e){}
+    if(heard.length){
+      var ts=h('section',{class:'mbx-thread'},h('h3',{text:'The thread so far'}));
+      heard.forEach(function(t){ts.appendChild(h('p',null,h('b',{text:'Floor '+t.floor+' · '+t.title+'. '}),t.lines.join(' ')))});
+      p.appendChild(ts);
     }
     var done=button('Back',close,true);
     p.appendChild(h('div',{class:'btns'},done));
@@ -481,6 +495,60 @@ guard('story',function(){
   };
 });
 
+/*R16-THREAD*/
+/* ---------- (round 16) the thread: a few lines at every checkpoint, about the body that is still coming back. Never a screen: a band at the foot of the arena while the fight goes on ---------- */
+// keyed by the 1-based checkpoint floor (11, 21, ... 101); past that the four of LATER in turn. [title, line, line, line]
+var THREAD={
+  11:['What the hands remember','Your hands closed on the weapon before you thought to reach for it.','Somebody taught them that, long before the fire. You do not remember who.','The hands do. They are not saying.'],
+  21:['Sleep','On the stair above the road you slept, for the first time since you were burned.','No dream came. A body has to earn those back too.','You woke hungry, and that at least was yours.'],
+  31:['A scar','There is a scar on your new skin that you did not take in the Spire.','The skin grew back around it, the way a wall keeps the shape of a door that was bricked up.','Something happened to you once, before the dark. The body kept the mark and lost the story.'],
+  41:['A voice','You swore at something on the last floor, and the voice that came out had a place in it.','A way of leaning on the words. Somewhere there is a street where everyone speaks like that.','You could not name it. Your tongue could, almost.'],
+  51:['A face','Rain had pooled on the landing, and you looked.','It is not the face the dark took. It is the one you have made since, floor by floor.','It will do. It is the first thing here that is only yours.'],
+  61:['A shadow','By the last brazier you saw your shadow fall a half-step behind you.','It has been late ever since the root. It is catching up.','By the next landing it may be walking with you.'],
+  71:['An ache','The wound from two floors down still aches.','In the root nothing ached. There was nothing there to do the aching.','You find you would rather keep it.'],
+  81:['A laugh','Something on the stair struck you as funny, and you laughed out loud.','The sound went a long way up the Spire before it stopped.','Nothing answered. You think it was listening.'],
+  91:['A name, nearly','A name came to you on the landing: short, with the weight on its first half.','It may be yours. It may belong to someone you were meant to come back to.','You said it aloud once, and kept climbing.'],
+  101:['Whole','Count it over: heart, skin, eyes, tongue; hands, sleep, a scar, a voice, a face, a shadow, an ache, a laugh, a name.','The dark took a body. You have taken back a person.','Whatever you become above this floor was never in the grave to begin with.']
+};
+var LATER=[
+  ['The count','Another landing. You count yourself over, the way you once counted bones.','Everything is there. The Spire has stopped taking.','Now it only watches what you add.'],
+  ['Worn in','The body no longer feels returned to you.','It feels worn in, like a handle with your grip in it.','You would know it in the dark. You have.'],
+  ['Ash','You think of the ash only when you wash, and less each time.','It comes off. It always did.','You had to have skin to learn that.'],
+  ['The fire','Whatever you were burned for, you have outclimbed it.','Below you, somewhere, there is still a grave with no one in it.','Let them keep it.']
+];
+function threadFor(floor){floor=Math.floor(num(floor));if(floor<11||floor%10!==1)return null;var t=THREAD[floor]||LATER[Math.floor((floor-111)/10)%LATER.length];return t?{floor:floor,title:t[0],lines:t.slice(1)}:null}
+guard('thread',function(){
+  var stage=doc.querySelector('.stage');if(!stage||typeof MB.on!=='function')return;
+  var seen=store.get('thread',[]);if(!Array.isArray(seen))seen=[];seen=seen.filter(function(x){return typeof x==='number'&&x%10===1}).slice(-60);
+  var skip=h('button',{type:'button',class:'tr-skip','aria-label':'Skip these lines',text:'Skip'}),top=h('b',{class:'tr-top'}),line=h('p',{class:'tr-line'}),pips=h('span',{class:'tr-pips','aria-hidden':'true'});
+  var box=h('div',{id:'mbThread',hidden:true,role:'status','aria-live':'polite'},h('div',{class:'tr-head'},top,pips,skip),line);
+  stage.appendChild(box);
+  var cur=null,idx=0,left=0,lastT=0,HOLD=5.2,wait=0; // wait: the glimpse of the floors ahead has the foot of the arena for the first seconds of a floor
+  function put(){line.textContent=cur.lines[idx];line.classList.remove('in');void line.offsetWidth;line.classList.add('in');pips.textContent='';for(var i=0;i<cur.lines.length;i++)pips.appendChild(h('i',{class:i<idx?'on':i===idx?'cur':''}))}
+  function end(){cur=null;box.classList.remove('on');box.hidden=true}
+  function show(t,force){if(!t)return false;if(!force&&seen.indexOf(t.floor)>=0)return false;if(seen.indexOf(t.floor)<0){seen.push(t.floor);store.set('thread',seen)}
+    cur=t;idx=0;left=HOLD+1.2;wait=force?0:4;top.textContent='Floor '+t.floor+' · '+t.title;put();if(!wait)up();return true}
+  function up(){lastT=Date.now();box.hidden=false;void box.offsetWidth;box.classList.add('on')}
+  skip.addEventListener('pointerdown',function(e){e.stopPropagation();e.preventDefault();blip();end()});
+  skip.addEventListener('click',function(e){e.stopPropagation();end()});
+  // the lines move on only while the fight is in view; a screen over the arena holds them
+  setInterval(function(){try{
+    if(!cur)return;var s=MB.S,now=Date.now(),dt=clamp((now-lastT)/1000,0,.5);lastT=now;
+    if(s.mode==='title'||s.mode==='dead'||inMp()||MB.aside||MB.tutorial){end();return}
+    var playing=s.mode==='play'&&!s.paused&&(!layer||layer.hidden);if(!playing)return;
+    if(wait>0){wait-=dt;if(wait<=0)up();return}
+    left-=dt;if(left>0)return;
+    if(idx<cur.lines.length-1){idx++;left=HOLD;put()}else end();
+  }catch(e){}},200);
+  listen('floor',function(d){if(inMp())return;lastT=Date.now();show(threadFor(d.floor))});
+  // a new skeleton, or a new class, hears it from the start
+  listen('classpicked',function(d){if(inMp())return;seen=[];store.set('thread',seen)});
+  listen('title',end);listen('death',end);
+  MB.thread={get on(){return !!cur},get shown(){return !!cur&&!box.hidden},get index(){return cur?idx:-1},get seen(){return seen.slice()},at:threadFor,show:function(floor){return show(threadFor(floor),true)},skip:function(){var was=!!cur;end();return was},
+    heard:function(){return seen.slice().sort(function(a,b){return a-b}).map(threadFor).filter(Boolean)}};
+});
+
+/*R16-THREAD-END*/
 /* ---------- contextual hints ---------- */
 guard('hints',function(){
   var stage=doc.querySelector('.stage');

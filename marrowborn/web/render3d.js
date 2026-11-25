@@ -1558,7 +1558,7 @@ function drawOverlay(sight){
     const run=(age*.55)%1.4-.2;ctx.fillStyle=ac2;ctx.fillRect(W*run,y0-5,90,2);ctx.fillRect(W*(1-run)-90,y1+3,90,2);
     const tl=easeOut(clamp01((age-.1)/.36)),ox=(1-tl)*90+(1-out)*-60;
     ctx.globalAlpha=a*tl;ctx.textAlign='center';ctx.textBaseline='alphabetic';
-    ctx.font='700 15px '+FONT;spaced(4);ctx.fillStyle=tint(CSS.gold);ctx.fillText(((MB.tower?'FLOOR ':'LEVEL ')+(S.level+1)+'  //  '+L.spec.name).toUpperCase(),W/2-ox*.5,y0+30);spaced(0);
+    ctx.font='700 15px '+FONT;spaced(4);ctx.fillStyle=tint(CSS.gold);{let as=null;try{as=MB.aside}catch(e){}ctx.fillText(((as?as.label+(as.of>1?' '+as.step+' of '+as.of:''):(MB.tower?'FLOOR ':'LEVEL ')+(S.level+1))+'  //  '+(as?L.name:L.spec.name)).toUpperCase(),W/2-ox*.5,y0+30)}spaced(0);
     ctx.save();slant(W/2+ox,y0+86,0,.88,1);ctx.font='700 60px '+FONT;spaced(1.5);const tt=(''+L.title).toUpperCase(),tw=ctx.measureText(tt).width,fit=tw>W*.98?W*.98/tw:1;if(fit<1)ctx.scale(fit,1);
     ctx.fillStyle=ac;ctx.globalAlpha=a*tl*.7;ctx.fillText(tt,3.5,3.5);ctx.globalAlpha=a*tl;ctx.fillStyle=CSS.bone;ctx.fillText(tt,0,0);spaced(0);ctx.restore();
     ctx.fillStyle=ac2;ctx.fillRect(W/2-110*tl,y0+99,220*tl,1.5);

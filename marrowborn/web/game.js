@@ -422,7 +422,8 @@ function modsOf(n,kind,tyrant){
 // So that the floor stays short: an elite's fall shakes the floor's monster (`shake` of its health gone; if it has not entered yet, it enters `debt` short). Killing it also gives `mana` times a kill's mana and a morsel.
 const ELITE={from:14,kinds:['shielded','enraged','splitting','volatile','mending'],names:['Shielded','Enraged','Splitting','Volatile','Mending'],col:'#ffb347',
   text:['A shell closes round it again and again. Strike between.','Its clock runs fast from the first moment.','Two small ones step out of it when it falls.','It bursts where it falls. Step away.','It closes the wounds of the floor\'s monster. Kill it first.'],
-  hp:1.4,r:1.15,spd:.9,shake:.08,debt:.045,pay:.03,mana:3,mendT:3,mendK:.012,mendMax:.08,volR:96,volT:1,splitHp:.3,escHp:.085};
+  hp:1.25,r:1.15,spd:.9,shake:.07,debt:.12,pay:.03, // (round 16: hp 1.4 -> 1.25, shake .08 -> .07, debt .045 -> .12: an elite in a pack cost more than its fall gave back, one beside the floor's monster gave back more than it cost)
+  mana:3,mendT:3,mendK:.012,mendMax:.08,volR:96,volT:1,splitHp:.3,escHp:.085};
 const elOver=()=>{const o=CL()?MP.over:window.__mb&&window.__mb.over;return o&&o.elite!==undefined?o.elite:o&&o.kind?0:undefined};
 // how many elites floor n (0-based) brings, given its definition and whether a dare runs on it
 function elitesOf(n,L,dare){if(XF)return XF.elN|0;const o=elOver();if(o===0||o===false)return 0;if(VS||TU||L.floorKind!=='fight'||tenth(n)||n<12)return 0;if(o===undefined&&(n<ELITE.from||dare))return 0;return L.waves?L.waves:1}
@@ -486,7 +487,8 @@ function lesserSpec(kind,n,hp){const base=SPEC[kind];return{...base,ai:base.ai||
 // Braziers tip: any blow of a hero that reaches the bowl spills it along the blow. The fire burns monsters for `spillT` seconds and brands them, and the brazier is dark for the rest of the floor.
 // The lands (themeOf): ash: embers fall where a hero is going; fen: mires slow everything that wades through them (a dash crosses); peaks: rotten plates give way under weight and stay open;
 // court: the rake, a line of blasts drawn across the room through a hero, with a gap. Only on plain fight floors from floor 14 without a dare, every second one (areaOf). Not in versus, not in the lesson.
-const ARENA={from:12,pillarHp:3,fallR:90,fallD:7,fallStun:1.4,ramK:[.02,.3],spillR:88,spillT:4.5,spillTick:.5,spillD:.5,crackWarn:.9,crackR:50,crackK:[.05,.3],crackStun:1.5,mireR:66,mireK:.74,mireM:.7,pay:.03,
+const ARENA={from:12,pillarHp:3,fallR:90,fallD:7,fallStun:1.4,ramK:[.02,.3],spillR:88,spillT:4.5,spillTick:.5,spillD:.5,crackWarn:.9,crackR:50,crackK:[.05,.3],crackStun:1.5,mireR:66,mireK:.74,mireM:.7,pay:-.03, // (round 16) pay .03 -> -.03: the floor's monster no longer gives health up for the land, and on a floor with the land's hazard it keeps what an escort would have cost it
+  
   themes:['ash','fen','peaks','court'],names:{ash:'Falling Ash',fen:'The Mire',peaks:'Rotten Floor',court:'The Rake'},
   text:{ash:'Embers fall where you are going. Keep moving.',fen:'The mire slows whatever wades through it. A dash crosses.',peaks:'The cracked floor gives way under weight, and stays open.',court:'A line of blasts is drawn across the room. Find the gap.'},
   ash:{gap:5.5,r:68,warn:1.15},court:{gap:8.5,r:50,warn:1.25,step:.07}};
@@ -575,11 +577,11 @@ const CASTER={mage:1,healer:1,necro:1};
 /* ---------- round 15: sets and traits. A drop that is not common may carry the mark of a set; two pieces of a set worn give its first bonus, four its second. An epic or a legendary drop may also carry a trait: it changes how ONE skill of the class behaves ---------- */
 // SETS[1..4] (0: no mark). SETK: the numbers. Not in versus. Seasoned heroes start without marks and without a relic (their equipment is the one every table of rounds 7-14 was tuned with).
 const SETS=[null,
- {id:'road',name:'The Long Road',col:'#d9a441',two:'Closers hit 15% harder.',four:'Every closer takes 0.4 s off each skill that is recharging.'},
+ {id:'road',name:'The Long Road',col:'#d9a441',two:'Closers hit 15% harder.',four:'Every closer takes 0.3 s off each skill that is recharging.'},
  {id:'margin',name:'The Thin Margin',col:'#6fe3ff',two:'A riposte hits 25% harder.',four:'A hairbreadth dodge throws a ring of force around you, and the next one may come a second sooner.'},
  {id:'kindled',name:'Kindled Marks',col:'#ff8a4a',two:'Setups last 3 seconds longer and payoffs hit 10% harder.',four:'A payoff takes 1.2 s off each skill that is recharging.'},
  {id:'well',name:'The Deep Well',col:'#b46cff',two:'10% more mana.',four:'Mana comes back a quarter faster.'}];
-const SETK={road2:1.15,road4:.4,margin2:1.25,marginR:130,marginD:2.5,marginCd:1,kind2:3,kindK:1.1,kind4:1.2,well2:1.1,well4:1.25,pSet:[0,.3,.45,.6],pTr:[0,0,.25,.5],pRelic:.2};
+const SETK={road2:1.15,road4:.3,margin2:1.25,marginR:130,marginD:2.5,marginCd:1,kind2:3,kindK:1.1,kind4:1.2,well2:1.1,well4:1.25,pSet:[0,.3,.45,.6],pTr:[0,0,.25,.5],pRelic:.2};
 // TRAITS[1..5]. An item's trait is tr:[kind, skill index 0-9]. echo: the skill is cast again `echoT` seconds later at `echoK` of its strength, for nothing; thirst: using it heals; fleet: readies the dash, quick feet for a moment;
 // braced: blows on you are halved for a moment; blood: it costs no mana, and `blood` of the health you have instead (never the last point).
 const TRAITS=[null,
@@ -1221,7 +1223,7 @@ function hurtM(m,d,quiet){
   if(m.hp<=0){
     mons=mons.filter(x=>x!==m);puff(m,col(m.s.col),m.boss?50:10,m.boss?320:160);ST.kills++;if(!m.boss&&P)manaGive(P.maxMana*MKILL);if(m.quarry&&DRE)dareEnd('done');
     if(m.boss){if(TU)return tutEnd(true);if(XF)return xfWin();floorClear()}
-    else{if(XF)xfEv('kill');if(has('taste')&&rand()<.35*frK(4,FR.e.find)){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m);if(m.el)eliteFell(m)}
+    else{if(XF)xfEv('kill',m);if(has('taste')&&rand()<.35*frK(4,FR.e.find)){const f={id:nid(),x:m.x,y:m.y};collide(f,10,true);morsels.push(f)}if(S.level>=12)fallen(m);if(m.frozen>0||m.rot>0||m.burn>0)stDeath(m);if(m.el)eliteFell(m)}
   }
 }
 // a vampiric boss feeds when it wounds a hero
@@ -1240,7 +1242,7 @@ function hurtP(d,src){
   if(P.plates>0&&S.apex==='stone'){if(d>blow(0)){plateBreak();d=Math.round(d*AX.stone.leak);if(d<1)return}else d=Math.max(1,Math.round(d*(1-AX.stone.chip*P.plates)))} // a plate breaks a heavy blow: only `leak` of it reaches you; a light one gets through
   if(P.stoneT>0)d=Math.ceil(d/2);
   if(XF)d=xfBlow(d);
-  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();if(P.revT>0)P.revT=0; // (a wound breaks off the raising of an ally)if(TR&&TR.kind==='guard'&&TR.obj&&!CL())for(let i=0;i<TK.vigWound;i++)lampHit(TR.obj); // (round 13) a keeper's wound is the lamp's
+  ST.dmgTaken+=Math.max(0,Math.min(d,P.hp));P.hp-=d;P.inv=1;S.shake=.3;S.stop=.06;comboEnd();if(XF)xfEv('wound');if(P.revT>0)P.revT=0; // (a wound breaks off the raising of an ally)if(TR&&TR.kind==='guard'&&TR.obj&&!CL())for(let i=0;i<TK.vigWound;i++)lampHit(TR.obj); // (round 13) a keeper's wound is the lamp's
   const saved=P.hp<=0&&S.adv==='saint'&&!P.saved;haptic(P.hp>0||saved?70:[120,60,320]);if(has('touch'))floats.push({x:P.x,y:P.y-44,txt:'-'+d,life:.8,c:'#ff5b6e'});puff(P,has('skin')?'#b8263d':'#e7dfcd',8);SND.hurt();hud();
   if(CL())mpQ(['vp']);else vamp();
   if(saved){P.saved=true;P.hp=Math.ceil(P.maxHp/2);P.inv=2;hud();shock(140,3);floats.push({x:P.x,y:P.y-52,txt:'Saved',life:1.3,c:'#d6a544'});SND.skill('healer')}
@@ -3144,7 +3146,7 @@ function draw(){
   if(S.banner>0&&S.mode==='play'){
     const L=S.L;ctx.globalAlpha=Math.min(1,S.banner/.6);ctx.textAlign='center';
     ctx.fillStyle='rgba(13,12,17,.72)';ctx.fillRect(0,196,W,150);
-    ctx.fillStyle='#d6a544';ctx.font='600 15px Spectral,Georgia,serif';ctx.fillText(('FLOOR '+(S.level+1)+'  ·  '+L.name).toUpperCase(),W/2,228);
+    ctx.fillStyle='#d6a544';ctx.font='600 15px Spectral,Georgia,serif';ctx.fillText(((XF?XF.label+(XF.of>1?' '+(XF.i+1)+' of '+XF.of:''):'FLOOR '+(S.level+1))+'  ·  '+L.name).toUpperCase(),W/2,228);
     ctx.fillStyle='#e7dfcd';ctx.font='58px "Pirata One",Georgia,serif';ctx.fillText(L.title,W/2,286);
     ctx.fillStyle='#b9b2c6';ctx.font='italic 20px Spectral,Georgia,serif';ctx.fillText(L.hint,W/2,322);ctx.globalAlpha=1;
   }
@@ -3506,23 +3508,23 @@ function asdLoad(){try{const o=JSON.parse(localStorage.getItem('marrowborn.aside
 const asdSave=()=>pref('asides',JSON.stringify(ASD));
 
 /* ---- the proof: after floor 50 the upgrade of a class is not picked from a menu but earned on a short floor, alone, with the upgrade already in hand. It may be tried again, or the other one tried, or left for later ---- */
-// how: stone (bring the Assayer down), chain (a chain of n blows; a wound breaks it), casts (n skills, or skill `sk` n times), blocks (n blows turned by the shield), outlast (stand for t seconds; with lethal every blow is a killing one),
+// how: stone (bring the Assayer down), chain (one chain of blows kept alive for n seconds), casts (n skills, or skill `sk` n times), blocks (n blows turned by the shield), outlast (stand for t seconds; with lethal every blow is a killing one),
 // kills (n monsters in a formation: file, knot, horde). t: the clock. hp: the Assayer's health in ordinary monsters of the floor (stone). ai: what the Assayer fights as. mites: a few mites come this often (so that there are blows to block or to outlast).
 const PRF={keepHp:6,
-  champion:{title:'The Weight',how:'stone',rule:'Raw power. Bring the Assayer down before the clock runs out.',hp:1.5,t:45},
-  duelist:{title:'The Unbroken Line',how:'chain',n:40,rule:'Footwork. Land a chain of {n} blows on the Assayer. A wound breaks the chain.',t:50},
-  nightblade:{title:'The Deep Cut',how:'stone',rule:'Sharper. Cut the Assayer down before the clock runs out.',hp:1.5,t:45},
-  phantom:{title:'No Shadow',how:'casts',sk:0,n:7,rule:'Unseen. Shadowstep {n} times before the clock runs out.',t:40},
-  saint:{title:'The Second Breath',how:'outlast',lethal:1,ai:'witch',mites:5,rule:'Second life. Every blow on this floor is a killing one, and the first leaves you standing. Outlast it for {t} seconds.',t:30},
-  inquisitor:{title:'The Long Verdict',how:'kills',form:'file',n:8,rule:'Judgement. Your orbs pass through everything: fell the whole file, {n} of them.',t:40},
-  paladin:{title:'The Wall Answers',how:'blocks',n:6,ai:'hound',mites:3.5,rule:'Holy shield. Turn {n} blows aside with your shield before the clock runs out.',t:55},
-  berserker:{title:'Nothing Held',how:'stone',rule:'No shield. Bring the Assayer down before the clock runs out.',hp:1.9,t:45},
-  archmage:{title:'The Full Book',how:'casts',n:12,rule:'Mastery. Cast {n} skills before the clock runs out.',t:45},
-  pyromancer:{title:'The Kindling',how:'kills',form:'knot',n:12,rule:'Fire. They stand close together: burn all {n} before the clock runs out.',t:40},
-  sharpshooter:{title:'One Arrow',how:'kills',form:'file',n:8,rule:'Precision. Your arrows pass through everything: fell the whole file, {n} of them.',t:40},
-  beastmaster:{title:'The Pack of Two',how:'kills',form:'horde',n:10,rule:'A wolf. Hunt the pack down together, all {n} of them.',t:45},
-  lich:{title:'The Standing Dead',how:'kills',form:'horde',n:14,rule:'Undeath. Your dead no longer crumble: bring the horde down with them, all {n}.',t:50},
-  reaper:{title:'The Harvest Row',how:'kills',form:'file',n:8,rule:'Harvest. Your spears pass through everything: fell the whole file, {n} of them.',t:40}};
+  champion:{title:'The Weight',how:'stone',rule:'Raw power. Bring the Assayer down before the clock runs out.',hp:1.8,t:45},
+  duelist:{title:'The Unbroken Line',how:'chain',n:15,mites:5,rule:'Footwork. Keep one chain of blows alive for {n} seconds. A wound, or three seconds without a blow, breaks it.',t:55},
+  nightblade:{title:'The Deep Cut',how:'stone',rule:'Sharper. Cut the Assayer down before the clock runs out.',hp:2.2,t:45},
+  phantom:{title:'No Shadow',how:'casts',sk:0,n:14,rule:'Unseen. Shadowstep {n} times before the clock runs out.',t:32},
+  saint:{title:'The Second Breath',how:'outlast',lethal:1,ai:'witch',mites:7,rule:'Second life. Every blow on this floor is a killing one, and the first leaves you standing. Outlast it for {t} seconds.',t:25},
+  inquisitor:{title:'The Long Verdict',how:'kills',form:'file',n:8,hp:.8,mites:6,rule:'Judgement. Your orbs pass through everything: fell the whole file of the bound, {n} of them.',t:40},
+  paladin:{title:'The Wall Answers',how:'blocks',n:5,ai:'hound',mites:1.5,rule:'Holy shield. Turn {n} blows aside with your shield before the clock runs out.',t:60},
+  berserker:{title:'Nothing Held',how:'stone',rule:'No shield. Bring the Assayer down before the clock runs out.',hp:1.4,t:45},
+  archmage:{title:'The Full Book',how:'casts',n:24,rule:'Mastery. Cast {n} skills before the clock runs out.',t:40},
+  pyromancer:{title:'The Kindling',how:'kills',form:'knot',n:6,hp:.9,mites:6,rule:'Fire. The bound stand close together: burn all {n} before the clock runs out.',t:40},
+  sharpshooter:{title:'One Arrow',how:'kills',form:'file',n:8,hp:2,mites:6,rule:'Precision. Your arrows pass through everything: fell the whole file of the bound, {n} of them.',t:40},
+  beastmaster:{title:'The Pack of Two',how:'kills',form:'horde',n:10,hp:.25,rule:'A wolf. Hunt the pack down together, all {n} of them.',t:50},
+  lich:{title:'The Standing Dead',how:'kills',form:'horde',n:14,hp:.25,rule:'Undeath. Your dead no longer crumble: bring the horde down with them, all {n}.',t:50},
+  reaper:{title:'The Harvest Row',how:'kills',form:'file',n:8,hp:.35,mites:6,rule:'Harvest. Your spears pass through everything: fell the whole file of the bound, {n} of them.',t:40}};
 const prfRule=K=>K.rule.replace('{n}',K.n).replace('{t}',K.t);
 const advRow=id=>{for(const c in CLASSES){const a=CLASSES[c].adv.find(x=>x[0]===id);if(a)return a}return null};
 function proofDef(n){
@@ -3537,19 +3539,21 @@ function proofChoice(n){
 }
 function proofGo(id,n){
   if(MP.on||VS||TU||XF||!S.cls||!CLASSES[S.cls].adv.some(a=>a[0]===id)||S.adv)return false;
-  const K=PRF[id];XF={kind:'proof',label:'Proof',id,adv:id,n0:n,title:K.title,rule:prfRule(K),tw:null,t:0,dur:K.t,hold:K.how==='outlast',goal:K.how==='stone'||K.how==='outlast'?0:K.n,n:0,unit:K.how==='kills'?'Felled':K.how==='chain'?'Chain':K.how==='blocks'?'Turned':K.how==='casts'?'Cast':'',state:'run',i:0,of:1,keep:K.how!=='stone'&&K.how!=='kills',lethal:!!K.lethal,mT:2,cd0:null};
+  const K=PRF[id];XF={kind:'proof',label:'Proof',id,adv:id,n0:n,title:K.title,rule:prfRule(K),tw:null,t:0,dur:K.t,hold:K.how==='outlast',goal:K.how==='stone'||K.how==='outlast'?0:K.n,n:0,unit:K.how==='kills'?'Felled':K.how==='chain'?'Seconds':K.how==='blocks'?'Turned':K.how==='casts'?'Cast':'',state:'run',i:0,of:1,keep:K.how!=='stone'&&K.how!=='kills',lethal:!!K.lethal,mT:2,cd0:null,L0:S.L}; // L0: the floor that was cleared (the rest of its reward flow reads it)
   S.adv=id;startLevel(S.level);return true;
 }
 function proofBegin(){
-  const X=XF,K=PRF[X.adv],n=S.level,hpL=k=>GENHP[k]*genMul(n)*.085;X.cd0=P.cdS.slice();
+  const X=XF,K=PRF[X.adv],n=S.level,H0=GENHP.crawler*genMul(n);X.cd0=P.cdS.slice();
   if(K.how!=='kills')return;
-  if(K.form==='file')for(let i=0;i<K.n;i++){const m=lesser('crawler',W/2,96+i*30,hpL('crawler'));m.t=1.2+i*.05}
-  else if(K.form==='knot'){for(let i=0;i<4;i++){const m=lesser(['crawler','fist'][i%2],W/2+(i%2?34:-34),150+(i>1?46:0),hpL('crawler')*.8);m.t=1.4}for(let i=0;i<K.n-4;i++){const a=i/(K.n-4)*TAU,m=spawn('mite',W/2+Math.cos(a)*58,172+Math.sin(a)*46);m.t=1.4}}
-  else{const big=5;for(let i=0;i<big;i++){const m=lesser(LESSER[i%LESSER.length],W/2+(i-(big-1)/2)*150,130+(i%2)*40,hpL(LESSER[i%LESSER.length]));m.t=1.2}for(let i=0;i<K.n-big;i++){const m=spawn('mite',W/2+(i-(K.n-big-1)/2)*64,215);m.t=1.2}}
-  X.goal=mons.length;
+  // the bound: husks that stand where they are put and do nothing (a file to shoot through, a knot to burn); a horde walks and bites
+  const bound=(x,y)=>{const m=spawn('crawler',x,y,false,{...lesserSpec('crawler',n,H0*K.hp),ai:'dummy',name:'Bound Husk',col:'#b8a37a'});m.lesser=true;m.t=1;return m};
+  if(K.form==='file')for(let i=0;i<K.n;i++)bound(W/2,92+i*31);
+  else if(K.form==='knot')for(let i=0;i<K.n;i++){const a=i/K.n*TAU;bound(W/2+Math.cos(a)*46,200+Math.sin(a)*46)}
+  else{const big=5;for(let i=0;i<big;i++){const k=LESSER[i%LESSER.length],m=lesser(k,W/2+(i-(big-1)/2)*150,130+(i%2)*40,GENHP[k]*genMul(n)*K.hp);m.t=1.2}for(let i=0;i<K.n-big;i++){const m=spawn('mite',W/2+(i-(K.n-big-1)/2)*64,215);m.t=1.2}}
+  for(const m of mons)m.xb=1;X.goal=mons.length;
 }
 function proofOver(win,why){
-  const X=XF,id=X.adv,n=X.n0,row=advRow(id),K=PRF[id];xfDrop();S.mode='reward';allies=[];TSRC=[];
+  const X=XF,id=X.adv,n=X.n0,row=advRow(id),K=PRF[id];xfDrop();S.mode='reward';allies=[];TSRC=[];if(X.L0)S.L=X.L0;
   if(win){S.adv=id;if(id==='beastmaster')petFit();ASD.proofs++;asdSave();chime();haptic([40,60,40,60,140]);emit('aside',{kind:'proof',state:'done',id,time:Math.round(X.time*10)/10});
     return show({soft:true,cls:'proofPanel',kick:K.title+' · the proof is passed',title:row[1],body:row[3]+' It is yours for the rest of the climb.',btns:[['Go on',()=>rewardEnd(n)]]})}
   S.adv=null;emit('aside',{kind:'proof',state:'fail',id,why});
@@ -3559,7 +3563,7 @@ function proofOver(win,why){
 /* ---- fissures: a crack in the wall of the Spire opens off one floor in every ten. Behind it: two packs and a keeper, a clock and a twist. It is never on the way up; what it gives is a drop that is rare or better and bears a mark ---- */
 // at: the floor of each ten it opens off, in turn. t: the clock. keep: how many stay open at once (the oldest closes). stale: one that lies this many floors below closes. hp: the keeper's health against the monster of a two-pack floor.
 // min, more: the drop is at least this rare, with this many more rolls. S.fis = {done, open:[floors, 1-based]} is part of the run (save field fz).
-const FIS={from:13,at:[4,7,3,6,8],t:75,keep:3,stale:25,hp:.9,min:1,more:2,names:['The Split Stair','The Cold Seam','The Narrow Dark','The Weeping Crack','The Unlit Gap','The Low Door','The Sunk Landing','The Blind Turn']};
+const FIS={from:13,at:[4,7,3,6,8],t:50,keep:3,stale:25,hp:1.3,min:1,more:2,names:['The Split Stair','The Cold Seam','The Narrow Dark','The Weeping Crack','The Unlit Gap','The Low Door','The Sunk Landing','The Blind Turn']};
 const fisAt=N=>N>=FIS.from&&N%10===FIS.at[Math.floor((N-1)/10)%FIS.at.length];
 const fisNew=()=>({done:0,open:[]});
 const fisIn=a=>{const f=fisNew();if(Array.isArray(a)&&a.length<=1+FIS.keep&&a.every(v=>Number.isInteger(v)&&v>=0&&v<=99999)){f.done=a[0]|0;for(const N of a.slice(1))if(fisAt(N)&&!f.open.includes(N))f.open.push(N)}return f};
@@ -3570,7 +3574,7 @@ function fisDef(n){
   const name='Keeper of '+pl.name.replace(/^The /,'the ');
   return{title:pl.name,hint:XTW.names[pl.tw]+'. '+XTW.text[pl.tw],kind:pl.kind,spec:{...base,ai:pl.kind,crown:0,name,hp:Math.round(hp),col:'#6b86b8',r:base.r+2},name,hue:B.hue,waves:2,mods,room:pl.room,floorKind:'aside',band:bi,bandName:B.name,handicap:null,door:null};
 }
-const fisCan=()=>!MP.on&&!VS&&!TU&&!XF&&!!S.cls&&!!S.fis&&(S.mode==='title'?titleSaved>=12:S.mode==='reward'||S.mode==='play'||S.mode==='clear');
+const fisCan=()=>!MP.on&&!VS&&!TU&&!XF&&!!S.cls&&!!S.fis&&(S.mode==='title'?titleSaved>=12:S.mode==='play'); // (on the reward screens only the offer itself leads in: the rest of the flow must follow it)
 const fisRow=N=>{const pl=fisPlan(N);return{floor:N,name:pl.name,twist:{id:pl.tw,name:XTW.names[pl.tw],text:XTW.text[pl.tw]},time:pl.tw==='tide'?Math.round(FIS.t*XTW.tideT):FIS.t}};
 const fisInfo=()=>({done:S.fis?S.fis.done:0,total:ASD.fis,open:S.cls&&S.fis&&!MP.on?S.fis.open.map(fisRow):[],can:fisCan()});
 // floor N (1-based) is cleared: the one of its ten opens, old ones close
@@ -3583,20 +3587,20 @@ function fisOffer(N,next){
 function fisEnter(N,back){
   N=Math.floor(+N);if(!fisCan()||!S.fis.open.includes(N))return false;
   if(S.paused){S.paused=false;const pb=$('pauseB');if(pb)pb.setAttribute('aria-pressed','false');SND.pause(false)}
-  return fisGo(N,S.mode==='title'?'title':S.mode==='reward'?'reward':'floor',typeof back==='function'?back:null);
+  return fisGo(N,S.mode==='title'?'title':'floor',null);
 }
 function fisGo(N,from,back){
   const pl=fisPlan(N),lv=from==='title'?titleSaved:S.level,dur=pl.tw==='tide'?Math.round(FIS.t*XTW.tideT):FIS.t;
-  XF={kind:'fissure',label:'Fissure',id:N,N,from,lv,back,plan:pl,tw:pl.tw,title:pl.name,rule:'Two packs and their keeper, in '+dur+' seconds. '+XTW.names[pl.tw]+': '+XTW.text[pl.tw],t:0,dur,full:dur,hold:false,goal:0,n:0,unit:'',state:'run',i:0,of:1,elN:lv>=14?1:0,elK:pl.elK,area:pl.land&&lv>=13?themeOf(bandOf(lv+1)):null};
+  XF={kind:'fissure',label:'Fissure',id:N,N,from,lv,back,plan:pl,tw:pl.tw,title:pl.name,rule:'Two packs and their keeper, in '+dur+' seconds. '+XTW.names[pl.tw]+': '+XTW.text[pl.tw],t:0,dur,full:dur,hold:false,goal:0,n:0,unit:'',state:'run',i:0,of:1,elN:lv>=14?1:0,elK:pl.elK,area:pl.land&&lv>=13?themeOf(bandOf(lv+1)):null,L0:S.L};
   S.level=lv;startLevel(lv);return true;
 }
 function fisDrop(X){
   const n=X.lv,r=xrng(xhash(['fisdrop',X.N,S.cls,S.adv,S.scrap,...SLOTS.map(sl=>S.eq[sl].r+':'+S.eq[sl].lvl)].join('|')));let d=dropItem(n,{min:FIS.min,more:FIS.more,rnd:r,marks:true});
   if(!d.set)d=item(S.cls,d.slot,d.r,0,0,d.m?1:0,1+Math.floor(r()*(SETS.length-1)),d.tr||null);return d;
 }
-function fisBack(X){if(X.from==='title'){save(X.lv);return title(X.lv)}if(X.from==='reward'&&X.back)return X.back();begin(X.lv)}
+function fisBack(X){if(X.from==='title'){save(X.lv);return title(X.lv)}if(X.from==='reward'&&X.back){if(X.L0)S.L=X.L0;return X.back()}begin(X.lv)}
 function fisOver(win,why){
-  const X=XF;xfDrop();S.mode='reward';allies=[];TSRC=[];S.level=X.lv;
+  const X=XF;xfDrop();S.mode='reward';allies=[];TSRC=[];S.level=X.lv;if(X.L0&&X.from==='reward')S.L=X.L0; // (the floor that was cleared: the rest of its reward flow reads it)
   if(win){S.fis.open=S.fis.open.filter(v=>v!==X.N);S.fis.done++;ASD.fis++;asdSave();chime();haptic([40,60,40,60,140]);emit('aside',{kind:'fissure',state:'done',floor:X.N,time:Math.round(X.time*10)/10,twist:X.tw});
     if(!S.eq)S.eq=basicSet(S.cls);return dropScreen(X.lv,X.title+' is closed, in '+(Math.round(X.time*10)/10)+' s of '+X.full+'.',()=>fisBack(X),'The fissure gives up',fisDrop(X))}
   emit('aside',{kind:'fissure',state:'fail',floor:X.N,why});
@@ -3620,7 +3624,7 @@ function bellPlan(kind,key){
 }
 function bellDef(n){
   const X=XF,f=X.plan.floors[X.i],bi=bandOf(n+1),B=bandAt(bi),base=SPEC[f.kind],mods=n>=14?xmods(f.mod,f.kind):[];let hp=GENHP[f.kind]*genMul(n)*[1,.8,.68][f.waves];for(const k of mods)hp*=MODHP[k]||1;
-  return{title:BELL.names[X.which],hint:XTW.names[X.tw]+'. '+XTW.text[X.tw],kind:f.kind,spec:{...base,ai:f.kind,crown:0,name:f.name,hp:Math.round(hp),col:TINT[(n*3)%10],r:base.r+2},name:f.name,hue:B.hue,waves:f.waves,mods,room:f.room,floorKind:'aside',band:bi,bandName:B.name,handicap:null,door:null};
+  return{title:B.name,hint:XTW.names[X.tw]+'. '+XTW.text[X.tw],kind:f.kind,spec:{...base,ai:f.kind,crown:0,name:f.name,hp:Math.round(hp),col:TINT[(n*3)%10],r:base.r+2},name:f.name,hue:B.hue,waves:f.waves,mods,room:f.room,floorKind:'aside',band:bi,bandName:B.name,handicap:null,door:null};
 }
 const bellBest=kind=>{const b=kind==='day'?ASD.day:ASD.week;return b&&b.key===bellKey(kind)?b:null};
 const bellLine=b=>b?'Mark '+b.mark+' · '+b.score+' of 100 · '+(Math.round(b.time*10)/10)+' s'+(b.cls?' · '+((b.adv&&advRow(b.adv)||[0,CLASSES[b.cls].name])[1]):''):'';
@@ -3669,20 +3673,21 @@ function bellOver(win,why){
 /* ---- what all asides share ---- */
 const xfDef=n=>XF.kind==='proof'?proofDef(n):XF.kind==='fissure'?fisDef(n):bellDef(n);
 // MB.aside -> null, or {kind, label, id, title, rule, twist:{id,name,text}|null, t, dur, left, hold, goal, progress, unit, state, step, of}
-function xfInfo(){const X=XF;if(!X)return null;return{kind:X.kind,label:X.label,id:X.id,title:X.title,rule:X.rule,twist:X.tw?{id:X.tw,name:XTW.names[X.tw],text:XTW.text[X.tw]}:null,t:X.t,dur:X.dur,left:Math.max(0,X.dur-X.t),hold:!!X.hold,goal:X.goal,progress:Math.min(X.goal||1e9,X.n),unit:X.unit,state:X.state,step:X.i+1,of:X.of}}
+function xfInfo(){const X=XF;if(!X)return null;return{kind:X.kind,label:X.label,id:X.id,title:X.title,rule:X.rule,twist:X.tw?{id:X.tw,name:XTW.names[X.tw],text:XTW.text[X.tw]}:null,t:X.t,dur:X.dur,left:Math.max(0,X.dur-X.t),hold:!!X.hold,goal:X.goal,progress:Math.floor(Math.min(X.goal||1e9,X.n)),unit:X.unit,state:X.state,step:X.i+1,of:X.of}}
 // the floor has begun (the end of startLevel)
 function xfBegin(){const X=XF;if(X.kind==='proof')proofBegin();emit('aside',{kind:X.kind,state:'start',id:X.id,title:X.title,rule:X.rule,twist:X.tw,step:X.i+1,of:X.of});
   if(!window.MBAsideBand)floats.push({x:W/2,y:H/2-110,txt:X.title,life:3.2,c:'#9fd0ff',big:1.4})}
 // a blow lands on the hero: glass makes it heavier, a lethal floor makes it a killing one
 const xfBlow=d=>XF.lethal?Math.max(d,P.hp):XF.tw==='glass'?Math.ceil(d*XTW.glassK):d;
-function xfEv(name){const X=XF;if(!X||X.state!=='run')return;
-  if(name==='kill'){if(X.kind==='proof'&&PRF[X.adv].how==='kills')X.n++;if(X.tw==='tide')X.t=Math.max(0,X.t-XTW.tideK)}
-  else if(name==='block'){if(X.kind==='proof'&&PRF[X.adv].how==='blocks')X.n++}}
+function xfEv(name,m){const X=XF;if(!X||X.state!=='run')return;
+  if(name==='kill'){if(X.kind==='proof'&&PRF[X.adv].how==='kills'&&m&&m.xb)X.n++;if(X.tw==='tide')X.t=Math.max(0,X.t-XTW.tideK)}
+  else if(name==='block'){if(X.kind==='proof'&&PRF[X.adv].how==='blocks')X.n++}
+  else if(name==='wound'){if(X.kind==='proof'&&PRF[X.adv].how==='chain'&&X.n>1)floats.push({x:P.x,y:P.y-66,txt:'The chain is broken',life:1.4,c:'#ff5b6e'})}}
 function xfStep(dt){
   const X=XF;if(!X||X.state!=='run'||S.banner>0)return;X.t+=dt;
   if(X.kind==='proof'){const K=PRF[X.adv],b=boss;
     if(X.keep&&b&&b.hp<b.maxHp*.45)b.hp=Math.round(b.maxHp*.8);
-    if(K.how==='chain')X.n=CB.n;
+    if(K.how==='chain')X.n=CB.n>0?X.n+dt:0;
     if(K.how==='casts'){for(let i=0;i<10;i++){if(P.cdS[i]>X.cd0[i]+.5&&(K.sk===undefined||K.sk===i))X.n++;X.cd0[i]=P.cdS[i]}}
     if(K.mites&&(X.mT-=dt)<=0){X.mT=K.mites;if(mons.length<9)for(let i=0;i<3;i++){const a=rand()*TAU,m=spawn('mite',P.x+Math.cos(a)*230,P.y+Math.sin(a)*230);clamp(m,m.r);m.t=.9}}
     if(X.goal&&X.n>=X.goal)return xfWin()}
@@ -5212,7 +5217,7 @@ function start(data){
   if(data&&data.level>0)saved=Math.floor(data.level);
   title(saved);requestAnimationFrame(frame);
 }
-if(location.hash.startsWith('#dev'))window.__mb={get XF(){return XF},PRF,FIS,BELL,XTW,ASD,proofGo,proofChoice,fisPlan,fisGo,fisAt,fisTurn,fisOffer,fisDrop,bellPlan,bellKey,bellGo,bellScreen,xfWin,xfFail,xrng,xhash,REV,mpRaised,finJoin,LOCK,get LK(){return LK},lockTap,ARENA,areaOf,themeOf,objHit,objDo,ELITE,elitesOf,SETS,SETK,TRAITS,TRK,gearScreen,dropItem,mkItem:item,gear:o=>{if(!S.cls)return null;if(!S.eq)S.eq=basicSet(S.cls);for(const sl of ESLOTS){const g=o&&o[sl];if(g===null){if(sl==='relic')delete S.eq.relic;continue}if(!g)continue;const cur=S.eq[sl]||item(S.cls,sl,1);S.eq[sl]=item(S.cls,sl,g.r!==undefined?g.r:cur.r,cur.lvl,cur.up,cur.m,g.set!==undefined?g.set:cur.set,g.tr!==undefined?g.tr:cur.tr)}eqSync();frApply();hud();return gearInfo()},TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
+if(location.hash.startsWith('#dev'))window.__mb={get XF(){return XF},xfDrop,hurtM:(m,d)=>hurtM(m,d),hurtP:(d,src)=>hurtP(d,src||'dev'),PRF,FIS,BELL,XTW,ASD,proofGo,proofChoice,fisPlan,fisGo,fisAt,fisTurn,fisOffer,fisDrop,bellPlan,bellKey,bellGo,bellScreen,xfWin,xfFail,xrng,xhash,REV,mpRaised,finJoin,LOCK,get LK(){return LK},lockTap,ARENA,areaOf,themeOf,objHit,objDo,ELITE,elitesOf,SETS,SETK,TRAITS,TRK,gearScreen,dropItem,mkItem:item,gear:o=>{if(!S.cls)return null;if(!S.eq)S.eq=basicSet(S.cls);for(const sl of ESLOTS){const g=o&&o[sl];if(g===null){if(sl==='relic')delete S.eq.relic;continue}if(!g)continue;const cur=S.eq[sl]||item(S.cls,sl,1);S.eq[sl]=item(S.cls,sl,g.r!==undefined?g.r:cur.r,cur.lvl,cur.up,cur.m,g.set!==undefined?g.set:cur.set,g.tr!==undefined?g.tr:cur.tr)}eqSync();frApply();hud();return gearInfo()},TUT,get TU(){return TU},tutStart,tutOffer,PH,phase:ph=>{const b=boss;if(!b||!phOn(b)||CL())return null;ph=Math.max(2,Math.min(3,ph|0||(b.phase||1)+1));b.ward=0;b.hp=Math.min(b.hp,Math.floor(b.maxHp*(ph===2?2/3:1/3))-1);if(ph>(b.phase||1)){b.phase=ph;phaseShift(b)}return phInfo()},ALT,SKALT,altScreen,altNews,FR,frameScreen,frameAsk,S,keys,want,joy,VSK,NEC,LNG,AXK,PD,BRK,FIN,LINK,GRD,CHN,DARES,CB,pd:src=>{if(!P)return false;P.dgT=.1;P.pdCd=0;return pdTry(1e9,src||'shot')},tag:(m,t)=>{m=m||boss||mons[0];const i=LINK.tags.indexOf(t);if(m&&i>=0&&!CL())tagPut(m,1<<i);return m},brk:v=>{if(boss&&boss.brkMax)brkTake(boss,v===undefined?1e9:v);return boss},finish:()=>finish(),grade:()=>gradeMake(),dareOf,get DR(){return DRE},vsStep:dt=>{tick(dt);if(MP.on)mpFrame(dt)},get vp(){return VP},vsRaw:(d,by)=>vsHurt(d,by===undefined?-1:by,'dev'),step:tick,get fast(){return fast},set fast(v){fast=Math.max(1,v|0)},start:(n,r)=>{r=r||{};if(XF)xfDrop();S.fis=fisNew();stReset();petsClear();S.cls=r.cls||null;S.adv=r.adv||null;S.apex=apexOk(r.apex)?r.apex:null;S.tr=r.tr|0;S.door=null;S.b=Object.assign(noBoons(),r.b);S.md=altIn(r.md);S.altSeen=true;S.sp=frNew();S.level=n;if(Array.isArray(r.sp)&&S.cls){S.sp.auto=false;S.sp.asked=true;frSpread(frBudget(n),r.sp)}S.scrap=0;S.eq=S.cls?basicSet(S.cls):null;S.load=fixLoad(r.load)||load0();if(!apexLoad(S.load,S.apex))S.load=load0();
     // gear:true plays out the drops of every level cleared so far with a sensible policy: wear anything rarer, otherwise melt it in
     if(S.cls&&r.gear)for(let k=8;k<n;k++){const d=dropItem(k),cur=S.eq[d.slot];if(d.r>cur.r&&cur.up<(d.r-cur.r)*.9)S.eq[d.slot]=d;else{cur.lvl++;cur.up+=RAR[d.r][3]}}
     if(r.hold)return; // hold: only set the character (multiplayer tests)
