@@ -989,11 +989,12 @@ const AI={
 };
 /* ---------- round 14: the faces of a tyrant. The King and the tyrants (the monster of every tenth floor) shift at 2/3 and 1/3 of their health ---------- */
 // A shift is a beat of PH.beat seconds in which nothing can hurt the tyrant and it does not strike (m.st 'shift'), with a banner (the 'bossPhase' event). Then the new face begins with its new attack,
-// and a hazard of the floor starts: zones that fall by a pattern of their own, lighter than a blast of the tyrant's (a brush of a bolt's weight; z.hz).
+// and a hazard of the floor starts: zones that fall by a pattern of their own, far lighter than a blast of the tyrant's (they weigh what a brush against a monster does; z.hz).
+// first: on floor 10, the first tyrant a hero meets, the hazards come this much more slowly.
 // atk: the attack each face adds. reap: two (three in the last face) rays through the tyrant, a line that locks and then sweeps after its target; sky: it leaps on its target and the ground bursts around where it lands.
 // haz: cinder: embers fall where each hero is going and at random; ring: the rim of the floor gives way, then its heart, in turn; harrow: a row of ruin walks across the floor, with a gap that wanders.
 // order: which two hazards a tyrant brings (second face, last face), by its place among the tyrants. hp: what the health of a tenth-floor monster is multiplied by so the fight stays as long as it was (measured).
-const PH={beat:1.8,hp:1,titles:['','The Second Face','The Last Face'],
+const PH={beat:1.8,hp:1,first:1.5,titles:['','The Second Face','The Last Face'],
   atk:{reap:{name:'Reaping Light',text:'Its gaze becomes a line of light that sweeps after you. Step off the line, or dash through it.',aim:1,dur:2.4,turn:.5,dur3:2.6,turn3:.55},
        sky:{name:'Skyfall',text:'It leaps on you, and the floor bursts around where it lands.',dur:.9,r:95,ring:6,ringR:165,ringZ:62,after:.85}},
   haz:{cinder:{name:'Cinderfall',text:'Embers fall across the floor.',gap:2.8,gap3:2.2,r:58,warn:1.15,more:2},
@@ -1009,7 +1010,7 @@ function phInfo(){const m=boss;if(!m||!phOn(m)||!m.boss)return null;const ph=m.p
 // the hazard of the floor (host and alone): the pattern of its kind, every gap seconds
 function hazStep(m,dt){
   const h=m.hz;if(!h||m.st==='shift'||S.banner>0||FN&&FN.state==='play')return;if((h.t-=dt)>0)return;
-  const K=PH.haz[h.kind],last=(m.phase||1)>=3;h.t=last?K.gap3:K.gap;h.n=(h.n||0)+1;const hz=z=>{z.hz=1;return z},IN=WALL+50;
+  const K=PH.haz[h.kind],last=(m.phase||1)>=3;h.t=(last?K.gap3:K.gap)*(S.level<10?PH.first:1);h.n=(h.n||0)+1;const hz=z=>{z.hz=1;return z},IN=WALL+50;
   if(h.kind==='cinder'){const hs=MP.on?mpHeroes():[P];for(const q of hs)hz(zone(q.x+(q.vx||0)*.6,q.y+(q.vy||0)*.6,K.r,K.warn));
     for(let i=0;i<K.more+(last?1:0);i++)hz(zone(IN+rand()*(W-2*IN),IN+rand()*(H-2*IN),K.r,K.warn+.15*i))}
   else if(h.kind==='ring'){if(h.n%2){const nx=7,ny=3;for(let i=0;i<nx;i++){const x=WALL+62+i*(W-2*WALL-124)/(nx-1);hz(zone(x,WALL+58,62,K.warn));hz(zone(x,H-WALL-58,62,K.warn))}for(let j=1;j<=ny;j++){const y=WALL+58+j*(H-2*WALL-116)/(ny+1);hz(zone(WALL+62,y,62,K.warn));hz(zone(W-WALL-62,y,62,K.warn))}}
@@ -1033,7 +1034,8 @@ function phaseFx(m){
 function phaseShift(m){
   phaseFx(m);
   if(phOn(m)&&m.boss&&tenth(S.level)){ // a tyrant: the beat first (it stands, warded), the ring and the mites when the new face begins (phaseBegin)
-    m.ward=PH.beat;m.st='shift';m.t=PH.beat;m.again=0;m.lift=0;m.beam=null;m.vol=0;m.spiral=0;m.chase=0;m.hz=null;return}
+    m.ward=PH.beat;m.st='shift';m.t=PH.beat;m.again=0;m.lift=0;m.beam=null;m.vol=0;m.spiral=0;m.chase=0;m.hz=null;
+    if(has('taste')){const f={id:nid(),x:m.x+(rand()-.5)*120,y:m.y+m.r+40+rand()*40};clamp(f,10);collide(f,10,true);morsels.push(f)}return} // (the beat is a breath for the heroes too: it sheds a morsel)
   m.ward=1;m.st='idle';m.t=1;m.again=0;m.lift=0;ringShot(m,14,150,rand()*TAU);
   for(let i=0;i<2;i++)if(mons.length<8){const b=rand()*TAU;spawn('mite',m.x+Math.cos(b)*50,m.y+Math.sin(b)*50)}
 }
@@ -2576,7 +2578,7 @@ function step(dt){
     if(s.x<WALL||s.x>W-WALL||s.y<WALL||s.y>H-WALL||obstacles.length&&blocked(s))s.dead=true}
   shots=shots.filter(s=>!s.dead);
   for(const z of zones){z.t+=dt;if(z.t>=z.dur){z.dead=true;puff(z,col('#d6a544'),18,240);S.shake=Math.max(S.shake,.2);sfx(80,.25,'square',.35,40);noise(.2,.3);
-    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}if(z.alt&&mons.includes(m)){TAGOK++;debuff(m,z.alt,z.altD);TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(z.hz?0:1),z.hz?'hazard':'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(z.hz?0:1))}}}
+    if(z.mine){rings.push({x:z.x,y:z.y,life:.4,max:.4,r:z.r,fx:true,foe:z.foe});GEO++;if(!z.rem)for(const m of[...mons])if(!m.hidden&&mons.includes(m)&&dist(m,z)<z.r+m.r){byPet=z.pet||null;if(!z.pet){MINE++;LNK=z.lk||null}hurtM(m,z.dmg,!!z.pet);if(!z.pet){MINE--;LNK=null}byPet=null;if(z.stun&&mons.includes(m)){if(z.sk)TAGOK++;mStun(m,m.boss?z.stun:z.stun*2);if(z.sk)TAGOK--}if(z.alt&&mons.includes(m)){TAGOK++;debuff(m,z.alt,z.altD);TAGOK--}}GEO--;if(z.fis&&!z.rem)fisBurst(z);if(z.foe&&VS)vsZone(z)}else{if(dist(z,P)<z.r)hurtP(blow(z.hz?-1:1),z.hz?'hazard':'zone');for(const a of allies)if(a.pet&&dist(z,a)<z.r)hurtPet(a,blow(z.hz?-1:1))}}}
   zones=zones.filter(z=>!z.dead);
   for(const f of morsels)if(dist(f,P)<24&&!P.down){f.dead=true;healP(.25,3);SND.pickup();haptic(15);if(MP.on)mpMorsel(f)}
   morsels=morsels.filter(f=>!f.dead);
